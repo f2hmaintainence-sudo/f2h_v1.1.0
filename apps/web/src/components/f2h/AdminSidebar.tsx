@@ -30,6 +30,7 @@ const adminNav = [
       { name: "Customers", href: "/admin/customers/allcustomers", icon: Users },
       { name: "Special Prices", href: "/admin/customers/special-prices", icon: Tag },
       { name: "Subscriptions", href: "/admin/subscriptions/generate-orders", icon: RefreshCw },
+      { name: "Refund Candidates", href: "/admin/subscriptions/refund-candidates", icon: RotateCcw },
     ],
   },
 

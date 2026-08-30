@@ -1,6 +1,17 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : page.tsx
+// Description : Subscription Prepaid Refund Candidates & Wallet Credit Approvals
+//
+// ============================================================================
+
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   ArrowRightLeft,
   CheckCircle2,
@@ -19,6 +30,20 @@ import {
   CalendarDays,
   Receipt,
   Eye,
+  Search,
+  Download,
+  Home,
+  ChevronRight,
+  ShieldCheck,
+  Ban,
+  Sparkles,
+  SlidersHorizontal,
+  FileSpreadsheet,
+  Check,
+  X,
+  AlertTriangle,
+  Layers,
+  Calendar,
 } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/api-config';
 
@@ -38,7 +63,10 @@ interface SummaryData {
 interface Delivery {
   refund_candidate_id: string;
   subscription_id: string;
-  subscription_number: string;
+  subscription_number?: string;
+  customer_id: string;
+  customer_name?: string;
+  customer_phone?: string;
   scheduled_date: string;
   delivery_slot: string;
   quantity: number;
@@ -80,342 +108,38 @@ interface Payout {
   processed_at: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Formatters & Helpers ─────────────────────────────────────────────────────
 
-const REASON_LABELS: Record<string, string> = {
-  pause: 'Paused',
-  failed: 'Delivery Failed',
-  cancelled: 'Cancelled',
-  skipped: 'Skipped',
-  stock_out: 'Out of Stock',
-};
-
-const REASON_COLORS: Record<string, string> = {
-  pause: 'bg-amber-100 text-amber-800',
-  failed: 'bg-rose-100 text-rose-800',
-  cancelled: 'bg-red-100 text-red-800',
-  skipped: 'bg-slate-100 text-slate-700',
-  stock_out: 'bg-orange-100 text-orange-800',
-};
-
-function fmtDate(d: string) {
+function fmtDate(d?: string) {
+  if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function fmtAmount(n: number) {
-  return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtAmount(n: number | string | undefined | null) {
+  const num = Number(n || 0);
+  return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// ─── Summary Cards ────────────────────────────────────────────────────────────
-
-function SummaryCards({ data, loading }: { data: SummaryData | null; loading: boolean }) {
-  const cards = [
-    {
-      label: 'Pending Amount',
-      value: data ? fmtAmount(data.pending_amount) : '—',
-      icon: IndianRupee,
-      color: 'from-amber-500 to-orange-500',
-      bg: 'bg-amber-50',
-      text: 'text-amber-700',
-    },
-    {
-      label: 'Pending Customers',
-      value: data?.pending_customers ?? '—',
-      icon: Users,
-      color: 'from-blue-500 to-indigo-500',
-      bg: 'bg-blue-50',
-      text: 'text-blue-700',
-    },
-    {
-      label: 'Pending Deliveries',
-      value: data?.pending_count ?? '—',
-      icon: Package,
-      color: 'from-violet-500 to-purple-500',
-      bg: 'bg-violet-50',
-      text: 'text-violet-700',
-    },
-    {
-      label: 'Refunded Amount',
-      value: data ? fmtAmount(data.refunded_amount) : '—',
-      icon: Wallet,
-      color: 'from-emerald-500 to-teal-500',
-      bg: 'bg-emerald-50',
-      text: 'text-emerald-700',
-    },
-    {
-      label: 'Refunded Deliveries',
-      value: data?.refunded_count ?? '—',
-      icon: CheckCircle2,
-      color: 'from-green-500 to-emerald-500',
-      bg: 'bg-green-50',
-      text: 'text-green-700',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-      {cards.map((c) => {
-        const Icon = c.icon;
-        return (
-          <div key={c.label} className={`${c.bg} rounded-2xl p-4 flex flex-col gap-2 border border-white shadow-sm`}>
-            <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center`}>
-              <Icon size={16} className="text-white" />
-            </div>
-            <div className={`text-xl font-black ${c.text}`}>
-              {loading ? <Loader2 size={18} className="animate-spin" /> : c.value}
-            </div>
-            <div className="text-xs font-semibold text-slate-500">{c.label}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Delivery Row ─────────────────────────────────────────────────────────────
-
-function DeliveryRow({
-  delivery,
-  selected,
-  onToggle,
-  onInspect,
-}: {
-  delivery: Delivery;
-  selected: boolean;
-  onToggle: () => void;
-  onInspect?: (id: string) => void;
-}) {
-  // Pause day and failed order are different kinds of money owed — never blur them.
-  const isPause = (delivery.source ?? delivery.refund_reason) === 'pause';
-  return (
-    <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-        selected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:bg-slate-50'
-      }`}
-    >
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={onToggle}
-        className="accent-emerald-600 w-4 h-4 rounded"
-        id={`chk-${delivery.refund_candidate_id}`}
-      />
-      <label
-        htmlFor={`chk-${delivery.refund_candidate_id}`}
-        className="flex-1 flex flex-wrap items-center gap-2 cursor-pointer min-w-0"
-      >
-        <span className="font-semibold text-slate-800 text-sm">{fmtDate(delivery.scheduled_date)}</span>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
-          delivery.delivery_slot === 'morning' ? 'bg-yellow-100 text-yellow-800' : 'bg-indigo-100 text-indigo-800'
-        }`}>
-          {delivery.delivery_slot}
-        </span>
-        <span
-          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-            isPause
-              ? 'bg-amber-50 text-amber-800 border-amber-200'
-              : 'bg-rose-50 text-rose-700 border-rose-200'
-          }`}
-        >
-          {isPause ? 'PAUSE DAY' : 'FAILED ORDER'}
-        </span>
-        <span className="text-xs text-slate-500 truncate">
-          {delivery.product_name} · {delivery.variant_name}
-        </span>
-        <span className="text-[11px] text-slate-400 font-semibold">
-          {delivery.quantity} × {fmtAmount(delivery.final_price ?? 0)}
-        </span>
-        {delivery.order_number && (
-          <span className="text-xs font-mono text-slate-400">#{delivery.order_number}</span>
-        )}
-        {delivery.status === 'reviewed' && (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-            REVIEWED
-          </span>
-        )}
-      </label>
-      {onInspect && (
-        <button
-          type="button"
-          onClick={() => onInspect(delivery.refund_candidate_id)}
-          title="Review calculation"
-          className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-        >
-          <Eye size={15} />
-        </button>
-      )}
-      <span className="font-black text-emerald-700 text-sm shrink-0">
-        {fmtAmount(delivery.refund_amount)}
-      </span>
-    </div>
-  );
-}
-
-// ─── Customer Accordion ───────────────────────────────────────────────────────
-
-function CustomerAccordion({
-  group,
-  selectedIds,
-  onToggleDelivery,
-  onSelectAll,
-  onInspect,
-}: {
-  group: CustomerGroup;
-  selectedIds: Set<string>;
-  onToggleDelivery: (id: string) => void;
-  onSelectAll: (ids: string[]) => void;
-  onInspect?: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const deliveries = group.deliveries ?? [];
-  const allSelected = deliveries.length > 0 && deliveries.every((d) => selectedIds.has(d.refund_candidate_id));
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      {/* Header */}
-      <div
-        className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50 transition-colors"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <input
-          type="checkbox"
-          checked={allSelected}
-          onChange={(e) => {
-            e.stopPropagation();
-            onSelectAll(deliveries.map((d) => d.refund_candidate_id));
-          }}
-          className="accent-emerald-600 w-4 h-4"
-          onClick={(e) => e.stopPropagation()}
-          id={`sel-all-${group.customer_id}`}
-        />
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-deep-green to-emerald-600 flex items-center justify-center shrink-0">
-          <span className="text-white font-black text-base">{(group.customer_name || 'U')[0].toUpperCase()}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-bold text-slate-900 text-sm">{group.customer_name}</div>
-          <div className="text-xs text-slate-500">{group.customer_phone}</div>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="font-black text-emerald-700">{fmtAmount(group.pending_refund_amount)}</div>
-          <div className="text-xs text-slate-500">{group.pending_deliveries} deliveries</div>
-        </div>
-        <div className="ml-2 text-slate-400">
-          {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </div>
-      </div>
-
-      {/* Expanded deliveries */}
-      {open && (
-        <div className="border-t border-slate-100 p-4 space-y-2 bg-slate-50/50">
-          {deliveries.map((d) => (
-            <DeliveryRow
-              key={d.refund_candidate_id}
-              delivery={d}
-              selected={selectedIds.has(d.refund_candidate_id)}
-              onToggle={() => onToggleDelivery(d.refund_candidate_id)}
-              onInspect={onInspect}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Payouts Tab ──────────────────────────────────────────────────────────────
-
-function PayoutsTab() {
-  const [payouts, setPayouts] = useState<Payout[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchPayouts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/payouts?limit=50`, {
-        credentials: 'include',
-      });
-      const json = await res.json();
-      setPayouts(json.data ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchPayouts(); }, [fetchPayouts]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={36} className="animate-spin text-emerald-600" />
-      </div>
-    );
-  }
-
-  if (!payouts.length) {
-    return (
-      <div className="text-center py-20 text-slate-400">
-        <Receipt size={48} className="mx-auto mb-3 text-slate-300" />
-        <p className="font-semibold">No refund payouts yet.</p>
-        <p className="text-xs mt-1">Payouts are created when you approve refund candidates.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
-      <table className="w-full text-sm text-left">
-        <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-100">
-          <tr>
-            <th className="px-5 py-4">Refund #</th>
-            <th className="px-5 py-4">Customer</th>
-            <th className="px-5 py-4 text-right">Amount</th>
-            <th className="px-5 py-4 text-right">Deliveries</th>
-            <th className="px-5 py-4">Status</th>
-            <th className="px-5 py-4">Approved At</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {payouts.map((p) => (
-            <tr key={p.refund_payout_id} className="hover:bg-slate-50 transition-colors">
-              <td className="px-5 py-4 font-mono text-xs text-slate-500">{p.refund_number}</td>
-              <td className="px-5 py-4">
-                <div className="font-semibold text-slate-800">{p.customer_name}</div>
-                <div className="text-xs text-slate-400">{p.customer_phone}</div>
-              </td>
-              <td className="px-5 py-4 text-right font-black text-emerald-700">{fmtAmount(p.total_amount)}</td>
-              <td className="px-5 py-4 text-right text-slate-600 font-semibold">{p.total_deliveries}</td>
-              <td className="px-5 py-4">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  p.status === 'processed' ? 'bg-emerald-100 text-emerald-700' :
-                  p.status === 'failed' ? 'bg-rose-100 text-rose-700' :
-                  'bg-amber-100 text-amber-700'
-                }`}>
-                  {p.status}
-                </span>
-              </td>
-              <td className="px-5 py-4 text-xs text-slate-500">{fmtDate(p.approved_at)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function RefundCandidatesPage() {
-  const [activeTab, setActiveTab] = useState<'candidates' | 'payouts'>('candidates');
+  const [activeTab, setActiveTab] = useState<'grouped' | 'flat' | 'payouts'>('grouped');
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  // ── Filters ──────────────────────────────────────────────────────────────────
-  const [filterMonth, setFilterMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMonth, setFilterMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
@@ -423,60 +147,32 @@ export default function RefundCandidatesPage() {
   const [filterWarehouse, setFilterWarehouse] = useState('');
   const [filterSubscription, setFilterSubscription] = useState('');
   const [filterSource, setFilterSource] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   const [branches, setBranches] = useState<Array<{ branch_id: string; branch_name: string }>>([]);
   const [warehouses, setWarehouses] = useState<Array<{ warehouse_id: string; name: string }>>([]);
-  const [scanning, setScanning] = useState(false);
-  const [reviewing, setReviewing] = useState(false);
+
+  // Inspect Modal
   const [detail, setDetail] = useState<any | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Developer Testing: Scan Preview State
+  // Developer Testing Preview Modal
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState<{ range: { from: string; to: string }; rows: any[] } | null>(null);
 
-  const handlePreviewScan = async () => {
-    setPreviewOpen(true);
-    setPreviewLoading(true);
-    try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/scan/preview?${buildQuery()}`, { credentials: 'include' });
-      const json = await res.json();
-      if (json.status && json.data) {
-        setPreviewData(json.data);
-      } else {
-        setPreviewData(null);
-        showToast('error', json.message || 'Failed to fetch scan preview');
-      }
-    } catch {
-      showToast('error', 'Network error during preview calculation');
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
+  // Single Action Confirm / Reject Modals
+  const [singleRejectTarget, setSingleRejectTarget] = useState<string | null>(null);
+  const [singleRejectReason, setSingleRejectReason] = useState('');
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 4000);
   };
 
-  // ── Fetch Summary ─────────────────────────────────────────────────────────────
-  const fetchSummary = useCallback(async () => {
-    setSummaryLoading(true);
-    try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/summary`, { credentials: 'include' });
-      const json = await res.json();
-      setSummary(json.data ?? null);
-    } finally {
-      setSummaryLoading(false);
-    }
-  }, []);
-
-  // ── Fetch Customer Groups ─────────────────────────────────────────────────────
-  /** Filters shared by the listing and the calculation, so both agree on scope. */
+  // ── Query Builder ─────────────────────────────────────────────────────────────
   const buildQuery = useCallback(() => {
     const q = new URLSearchParams();
-    // An explicit date range wins over the month picker.
     if (filterDateFrom && filterDateTo) {
       q.set('date_from', filterDateFrom);
       q.set('date_to', filterDateTo);
@@ -492,9 +188,29 @@ export default function RefundCandidatesPage() {
     if (filterSource) q.set('source', filterSource);
     return q;
   }, [
-    filterMonth, filterDateFrom, filterDateTo, filterCustomer,
-    filterBranch, filterWarehouse, filterSubscription, filterSource,
+    filterMonth,
+    filterDateFrom,
+    filterDateTo,
+    filterCustomer,
+    filterBranch,
+    filterWarehouse,
+    filterSubscription,
+    filterSource,
   ]);
+
+  // ── Data Fetching ─────────────────────────────────────────────────────
+  const fetchSummary = useCallback(async () => {
+    setSummaryLoading(true);
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/summary`, { credentials: 'include' });
+      const json = await res.json();
+      setSummary(json.data ?? null);
+    } catch {
+      // ignore
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
 
   const fetchGroups = useCallback(async () => {
     setGroupsLoading(true);
@@ -505,15 +221,22 @@ export default function RefundCandidatesPage() {
       );
       const json = await res.json();
       setGroups(json.data ?? []);
+    } catch {
+      setGroups([]);
     } finally {
       setGroupsLoading(false);
     }
   }, [buildQuery]);
 
-  useEffect(() => { fetchSummary(); }, [fetchSummary]);
-  useEffect(() => { fetchGroups(); }, [fetchGroups]);
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
 
-  // Branch and warehouse pickers.
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
+
+  // Load branches & warehouses for dropdowns
   useEffect(() => {
     fetch(`${API}/admin/zone/branches-list`, { credentials: 'include' })
       .then((r) => r.json())
@@ -525,17 +248,81 @@ export default function RefundCandidatesPage() {
       .catch(() => {});
   }, []);
 
-  // ── Calculate refundable days/orders for the selected scope ──────────────────
+  // Flattened deliveries for Flat Table view
+  const allDeliveries = useMemo(() => {
+    const list: (Delivery & { customer_id: string; customer_name: string; customer_phone: string })[] = [];
+    groups.forEach((g) => {
+      (g.deliveries || []).forEach((d) => {
+        list.push({
+          ...d,
+          customer_id: g.customer_id,
+          customer_name: g.customer_name,
+          customer_phone: g.customer_phone,
+        });
+      });
+    });
+    return list;
+  }, [groups]);
+
+  // Filtered deliveries based on local search & status
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery.trim() && filterStatus === 'all') return groups;
+    const q = searchQuery.toLowerCase().trim();
+
+    return groups
+      .map((g) => {
+        const matchCustomer =
+          g.customer_name?.toLowerCase().includes(q) ||
+          g.customer_phone?.includes(q) ||
+          g.customer_id?.toLowerCase().includes(q);
+
+        const matchedDeliveries = (g.deliveries || []).filter((d) => {
+          const matchStatus = filterStatus === 'all' || d.status === filterStatus;
+          const matchDeliveryText =
+            matchCustomer ||
+            d.product_name?.toLowerCase().includes(q) ||
+            d.variant_name?.toLowerCase().includes(q) ||
+            d.subscription_id?.toLowerCase().includes(q) ||
+            d.subscription_number?.toLowerCase().includes(q) ||
+            d.order_number?.toLowerCase().includes(q) ||
+            d.scheduled_date?.includes(q);
+
+          return matchStatus && matchDeliveryText;
+        });
+
+        if (matchedDeliveries.length === 0) return null;
+        return {
+          ...g,
+          deliveries: matchedDeliveries,
+          pending_deliveries: matchedDeliveries.length,
+          pending_refund_amount: matchedDeliveries.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0),
+        };
+      })
+      .filter(Boolean) as CustomerGroup[];
+  }, [groups, searchQuery, filterStatus]);
+
+  // Total selected amount
+  const selectedTotalAmount = useMemo(() => {
+    let sum = 0;
+    allDeliveries.forEach((d) => {
+      if (selectedIds.has(d.refund_candidate_id)) {
+        sum += Number(d.refund_amount || 0);
+      }
+    });
+    return sum;
+  }, [allDeliveries, selectedIds]);
+
+  // ── Calculation Actions ───────────────────────────────────────────────────
   const handleScan = async () => {
     setScanning(true);
     try {
-      const res = await fetch(
-        `${API}/subscriptions/refund-candidates/scan?${buildQuery()}`,
-        { method: 'POST', credentials: 'include' },
-      );
+      const res = await fetch(`${API}/subscriptions/refund-candidates/scan?${buildQuery()}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
       const json = await res.json();
       if (json.status) {
-        showToast('success', json.message ?? 'Refund calculation complete');
+        showToast('success', json.message ?? 'Prepaid refund calculation complete');
         fetchSummary();
         fetchGroups();
       } else {
@@ -548,7 +335,28 @@ export default function RefundCandidatesPage() {
     }
   };
 
-  // ── Review (Eligible → Reviewed) ─────────────────────────────────────────────
+  const handlePreviewScan = async () => {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/scan/preview?${buildQuery()}`, {
+        credentials: 'include',
+      });
+      const json = await res.json();
+      if (json.status && json.data) {
+        setPreviewData(json.data);
+      } else {
+        setPreviewData(null);
+        showToast('error', json.message || 'Failed to calculate scan preview');
+      }
+    } catch {
+      showToast('error', 'Network error during calculation preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // ── Review & Approval Handlers ────────────────────────────────────────────
   const handleBulkReview = async () => {
     if (!selectedIds.size) return showToast('error', 'Please select at least one delivery');
     setReviewing(true);
@@ -573,54 +381,11 @@ export default function RefundCandidatesPage() {
     }
   };
 
-  /** Opens the review drawer with the full calculation basis for one day. */
-  const openDetail = async (candidateId: string) => {
-    setDetailLoading(true);
-    setDetail({ loading: true });
-    try {
-      const res = await fetch(
-        `${API}/subscriptions/refund-candidates/detail/${candidateId}`,
-        { credentials: 'include' },
-      );
-      const json = await res.json();
-      setDetail(json.data ?? null);
-    } catch {
-      setDetail(null);
-      showToast('error', 'Could not load refund details');
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
-  // ── Selection Helpers ─────────────────────────────────────────────────────────
-  const toggleDelivery = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = (ids: string[]) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      const allIn = ids.every((id) => next.has(id));
-      ids.forEach((id) => (allIn ? next.delete(id) : next.add(id)));
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    const allIds = groups.flatMap((g) => g.deliveries?.map((d) => d.refund_candidate_id) ?? []);
-    setSelectedIds(new Set(allIds));
-  };
-
-  const clearAll = () => setSelectedIds(new Set());
-
-  // ── Bulk Approve ──────────────────────────────────────────────────────────────
   const handleBulkApprove = async () => {
     if (!selectedIds.size) return showToast('error', 'Please select at least one delivery');
-    if (!confirm(`Approve and refund wallet for ${selectedIds.size} selected deliveries?`)) return;
+    if (!confirm(`Approve and credit wallet with ${fmtAmount(selectedTotalAmount)} for ${selectedIds.size} selected deliveries?`)) {
+      return;
+    }
     setProcessing(true);
     try {
       const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-approve`, {
@@ -631,7 +396,7 @@ export default function RefundCandidatesPage() {
       });
       const json = await res.json();
       if (json.status) {
-        showToast('success', json.message ?? 'Refunds approved and credited!');
+        showToast('success', json.message ?? 'Refunds approved and credited to customer wallets!');
         setSelectedIds(new Set());
         fetchSummary();
         fetchGroups();
@@ -645,11 +410,10 @@ export default function RefundCandidatesPage() {
     }
   };
 
-  // ── Bulk Reject ───────────────────────────────────────────────────────────────
   const handleBulkReject = async () => {
     if (!selectedIds.size) return showToast('error', 'Please select at least one delivery');
-    const notes = prompt(`Reason for rejecting ${selectedIds.size} deliveries (optional):`);
-    if (notes === null) return; // cancelled
+    const notes = prompt(`Reason for rejecting ${selectedIds.size} selected deliveries (optional):`);
+    if (notes === null) return;
     setProcessing(true);
     try {
       const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-reject`, {
@@ -660,12 +424,12 @@ export default function RefundCandidatesPage() {
       });
       const json = await res.json();
       if (json.status) {
-        showToast('success', json.message ?? 'Refunds rejected');
+        showToast('success', json.message ?? 'Refunds marked as rejected');
         setSelectedIds(new Set());
         fetchSummary();
         fetchGroups();
       } else {
-        showToast('error', json.message ?? 'Failed to reject');
+        showToast('error', json.message ?? 'Failed to reject refunds');
       }
     } catch {
       showToast('error', 'Network error — please try again');
@@ -674,365 +438,649 @@ export default function RefundCandidatesPage() {
     }
   };
 
-  return (
-    <div className="space-y-6 p-2 md:p-4 bg-[#f9f6ef] min-h-screen font-sans">
+  const handleSingleApprove = async (candidateId: string, amount: number) => {
+    if (!confirm(`Approve and refund ${fmtAmount(amount)} to customer wallet?`)) return;
+    setProcessing(true);
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-approve`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_ids: [candidateId] }),
+      });
+      const json = await res.json();
+      if (json.status) {
+        showToast('success', 'Refund approved and credited to wallet');
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(candidateId);
+          return next;
+        });
+        fetchSummary();
+        fetchGroups();
+      } else {
+        showToast('error', json.message ?? 'Failed to approve refund');
+      }
+    } catch {
+      showToast('error', 'Network error — please try again');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
-      {/* Toast */}
+  const handleSingleRejectConfirm = async () => {
+    if (!singleRejectTarget) return;
+    setProcessing(true);
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-reject`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_ids: [singleRejectTarget], notes: singleRejectReason }),
+      });
+      const json = await res.json();
+      if (json.status) {
+        showToast('success', 'Refund candidate rejected');
+        setSingleRejectTarget(null);
+        setSingleRejectReason('');
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(singleRejectTarget);
+          return next;
+        });
+        fetchSummary();
+        fetchGroups();
+      } else {
+        showToast('error', json.message ?? 'Failed to reject');
+      }
+    } catch {
+      showToast('error', 'Network error');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Inspect detail modal
+  const openDetail = async (candidateId: string) => {
+    setDetailLoading(true);
+    setDetail({ loading: true });
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/detail/${candidateId}`, {
+        credentials: 'include',
+      });
+      const json = await res.json();
+      setDetail(json.data ?? null);
+    } catch {
+      setDetail(null);
+      showToast('error', 'Could not load refund audit details');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // Selection helpers
+  const toggleDelivery = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectGroup = (ids: string[]) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allIn = ids.every((id) => next.has(id));
+      ids.forEach((id) => (allIn ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    const allIds = filteredGroups.flatMap((g) => g.deliveries?.map((d) => d.refund_candidate_id) ?? []);
+    setSelectedIds(new Set(allIds));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleExportCsv = () => {
+    if (!allDeliveries.length) {
+      showToast('error', 'No candidate data to export');
+      return;
+    }
+    const headers = ['Candidate ID', 'Customer ID', 'Customer Name', 'Phone', 'Subscription ID', 'Date', 'Slot', 'Product', 'Variant', 'Reason', 'Qty', 'Unit Price', 'Final Price', 'Refund Amount', 'Status'];
+    const rows = allDeliveries.map((d) => [
+      d.refund_candidate_id,
+      d.customer_id,
+      `"${d.customer_name || ''}"`,
+      d.customer_phone || '',
+      d.subscription_id,
+      d.scheduled_date,
+      d.delivery_slot,
+      `"${d.product_name || ''}"`,
+      `"${d.variant_name || ''}"`,
+      d.source === 'pause' ? 'Pause Day' : 'Failed Delivery',
+      d.quantity,
+      d.unit_price || 0,
+      d.final_price || 0,
+      d.refund_amount,
+      d.status,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `subscription_refund_candidates_${filterMonth || 'all'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('success', 'Exported refund candidates CSV');
+  };
+
+  return (
+    <div className="space-y-6 p-2 sm:p-4 md:p-6 bg-slate-50/60 min-h-screen font-sans">
+      {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl text-sm font-bold flex items-center gap-2 transition-all ${
-          toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+        <div
+          className={`fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl text-xs font-bold transition-all animate-in fade-in slide-in-from-top-2 ${
+            toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+          }`}
+        >
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           {toast.msg}
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black text-deep-green tracking-tight flex items-center gap-2">
-            <ArrowRightLeft size={26} className="text-emerald-600" />
-            Subscription Refund Candidates
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Review paused, failed, and skipped prepaid deliveries. Approve to credit customer wallets.
-          </p>
+      {/* Breadcrumb Navigation */}
+      <nav className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+        <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-emerald-600 transition-colors">
+          <Home size={13} /> Dashboard
+        </Link>
+        <ChevronRight size={12} className="text-slate-300" />
+        <span className="text-slate-500">Customers &amp; Subscriptions</span>
+        <ChevronRight size={12} className="text-slate-300" />
+        <span className="font-bold text-slate-800">Prepaid Refund Candidates</span>
+      </nav>
+
+      {/* Header Banner */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 md:p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100 shadow-xs shrink-0">
+            <ArrowRightLeft size={26} />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              Subscription Prepaid Refunds
+            </h1>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Review and credit wallet refunds for paused subscription days and failed prepaid deliveries.
+            </p>
+          </div>
         </div>
-        <button
-          onClick={() => { fetchSummary(); fetchGroups(); }}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-colors"
-        >
-          <RefreshCw size={16} />
-          Refresh
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={handlePreviewScan}
+            disabled={previewLoading || scanning}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-60"
+          >
+            {previewLoading ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+            Developer: Preview Scan
+          </button>
+
+          <button
+            type="button"
+            onClick={handleScan}
+            disabled={scanning}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-60"
+          >
+            {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {scanning ? 'Calculating...' : `Run Scan for ${filterMonth || 'Month'}`}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+          >
+            <Download size={14} /> Export CSV
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              fetchSummary();
+              fetchGroups();
+            }}
+            title="Refresh"
+            className="p-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl shadow-2xs transition-all cursor-pointer"
+          >
+            <RefreshCw size={15} className={groupsLoading || summaryLoading ? 'animate-spin text-emerald-600' : ''} />
+          </button>
+        </div>
       </div>
 
-      {/* Summary Cards */}
-      <SummaryCards data={summary} loading={summaryLoading} />
+      {/* KPI Overview Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="bg-white p-4 rounded-2xl border border-amber-100 bg-amber-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider mb-1">Pending Valuation</p>
+          <p className="text-xl font-black text-amber-800">
+            {summaryLoading ? <Loader2 size={18} className="animate-spin text-amber-600" /> : fmtAmount(summary?.pending_amount)}
+          </p>
+          <p className="text-[10px] text-amber-600 font-semibold mt-0.5">{summary?.pending_count ?? 0} deliveries pending</p>
+        </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-white rounded-2xl p-1 border border-slate-200 w-fit shadow-sm">
-        {([['candidates', 'Refund Candidates', Package], ['payouts', 'Refund Payouts', Receipt]] as const).map(([tab, label, Icon]) => (
+        <div className="bg-white p-4 rounded-2xl border border-blue-100 bg-blue-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider mb-1">Pending Customers</p>
+          <p className="text-xl font-black text-blue-900">
+            {summaryLoading ? <Loader2 size={18} className="animate-spin text-blue-600" /> : (summary?.pending_customers ?? 0)}
+          </p>
+          <p className="text-[10px] text-blue-600 font-semibold mt-0.5">Awaiting wallet credits</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-purple-100 bg-purple-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-purple-700 uppercase tracking-wider mb-1">Total Deliveries</p>
+          <p className="text-xl font-black text-purple-900">
+            {summaryLoading ? <Loader2 size={18} className="animate-spin text-purple-600" /> : (summary?.pending_count ?? 0)}
+          </p>
+          <p className="text-[10px] text-purple-600 font-semibold mt-0.5">Paused days &amp; failed orders</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-2xs">
+          <p className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider mb-1">Credited to Wallets</p>
+          <p className="text-xl font-black text-emerald-700">
+            {summaryLoading ? <Loader2 size={18} className="animate-spin text-emerald-600" /> : fmtAmount(summary?.refunded_amount)}
+          </p>
+          <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">{summary?.refunded_count ?? 0} settled deliveries</p>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs col-span-2 sm:col-span-1">
+          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Rejected Candidates</p>
+          <p className="text-xl font-black text-slate-700">
+            {summaryLoading ? <Loader2 size={18} className="animate-spin text-slate-400" /> : (summary?.rejected_count ?? 0)}
+          </p>
+          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Disallowed lines</p>
+        </div>
+      </div>
+
+      {/* Tabs & View Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+        <div className="flex gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all ${
-              activeTab === tab
-                ? 'bg-deep-green text-white shadow-md'
-                : 'text-slate-600 hover:bg-slate-50'
+            type="button"
+            onClick={() => setActiveTab('grouped')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'grouped'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <Icon size={15} />
-            {label}
+            <Users size={14} />
+            Customer Groups ({filteredGroups.length})
           </button>
-        ))}
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('flat')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'flat'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Layers size={14} />
+            All Candidates Table ({allDeliveries.length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('payouts')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'payouts'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Receipt size={14} />
+            Processed Payouts Ledger
+          </button>
+        </div>
+
+        {/* Quick selection summary if anything is selected */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 animate-in fade-in">
+            <span>{selectedIds.size} deliveries selected ({fmtAmount(selectedTotalAmount)})</span>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-emerald-600 hover:text-emerald-900 underline text-[11px] cursor-pointer ml-1"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ── Candidates Tab ── */}
-      {activeTab === 'candidates' && (
-        <div className="space-y-5">
-          {/* Filters */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-              <Filter size={16} className="text-slate-400" />
-              Filters
+      {/* Filter Toolbar (Visible in Candidates tabs) */}
+      {activeTab !== 'payouts' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            {/* Search Box */}
+            <div className="relative max-w-md w-full">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search Customer, Phone, Sub ID, Order #, Product..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-emerald-600 focus:outline-none transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <CalendarDays size={12} />
-                  Month
-                </label>
+
+            {/* Quick Filter Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Month Picker */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                <span className="text-[11px] font-bold text-slate-400">Month:</span>
                 <input
                   type="month"
                   value={filterMonth}
                   onChange={(e) => setFilterMonth(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors"
+                  className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <CalendarDays size={12} />
-                  From Date
-                </label>
-                <input
-                  type="date"
-                  value={filterDateFrom}
-                  onChange={(e) => setFilterDateFrom(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <CalendarDays size={12} />
-                  To Date
-                </label>
-                <input
-                  type="date"
-                  value={filterDateTo}
-                  onChange={(e) => setFilterDateTo(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400">Branch</label>
-                <select
-                  value={filterBranch}
-                  onChange={(e) => setFilterBranch(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors bg-white"
-                >
-                  <option value="">All branches</option>
-                  {branches.map((b) => (
-                    <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400">Warehouse</label>
-                <select
-                  value={filterWarehouse}
-                  onChange={(e) => setFilterWarehouse(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors bg-white"
-                >
-                  <option value="">All warehouses</option>
-                  {warehouses.map((w) => (
-                    <option key={w.warehouse_id} value={w.warehouse_id}>{w.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400">Reason</label>
+
+              {/* Source Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                <span className="text-[11px] font-bold text-slate-400">Reason:</span>
                 <select
                   value={filterSource}
                   onChange={(e) => setFilterSource(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors bg-white"
+                  className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
                 >
-                  <option value="">Pause days + failed orders</option>
-                  <option value="pause">Pause days only</option>
-                  <option value="order">Failed orders only</option>
+                  <option value="">All Sources</option>
+                  <option value="pause">Paused Days Only</option>
+                  <option value="order">Failed Deliveries Only</option>
                 </select>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400">Subscription</label>
-                <input
-                  type="text"
-                  placeholder="Subscription no. or ID…"
-                  value={filterSubscription}
-                  onChange={(e) => setFilterSubscription(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase text-slate-400">Customer ID</label>
-                <input
-                  type="text"
-                  placeholder="Search by customer ID…"
-                  value={filterCustomer}
-                  onChange={(e) => setFilterCustomer(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 transition-colors"
-                />
-              </div>
+
+              {/* Branch Filter */}
+              {branches.length > 0 && (
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                  <span className="text-[11px] font-bold text-slate-400">Branch:</span>
+                  <select
+                    value={filterBranch}
+                    onChange={(e) => setFilterBranch(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer max-w-[130px]"
+                  >
+                    <option value="">All Branches</option>
+                    {branches.map((b) => (
+                      <option key={b.branch_id} value={b.branch_id}>
+                        {b.branch_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Select All Visible Button */}
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Select All ({filteredGroups.reduce((acc, g) => acc + g.deliveries.length, 0)})
+              </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Nothing is refundable until it has been calculated — this is that trigger. */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  onClick={handleScan}
-                  disabled={scanning}
-                  className="flex items-center gap-2 px-4 py-2 bg-deep-green hover:bg-emerald-800 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-60 cursor-pointer"
-                >
-                  {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  {scanning
-                    ? 'Calculating…'
-                    : `Calculate refunds for ${filterMonth || 'this month'}`}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handlePreviewScan}
-                  disabled={previewLoading || scanning}
-                  className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-60"
-                >
-                  {previewLoading ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
-                  Developer: Preview Calculations
-                </button>
+      {/* ── TAB 1: GROUPED CUSTOMER ACCORDIONS ── */}
+      {activeTab === 'grouped' && (
+        <div className="space-y-3">
+          {groupsLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 space-y-3">
+              <Loader2 size={32} className="animate-spin text-emerald-600" />
+              <p className="text-xs font-bold">Loading refund candidate groups...</p>
+            </div>
+          ) : filteredGroups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-3xl border border-slate-200 text-center p-6 space-y-3">
+              <div className="p-4 bg-emerald-50 text-emerald-600 rounded-3xl">
+                <CheckCircle2 size={36} />
               </div>
-
-              <p className="text-xs text-slate-400 font-medium">
-                Scans paused days and failed subscription orders. Safe to re-run — existing
-                refunds are never duplicated.
+              <h3 className="text-base font-bold text-slate-800">No Pending Refund Candidates</h3>
+              <p className="text-xs text-slate-500 max-w-md">
+                All paused days and failed deliveries for this period have been approved, or none were detected. Click
+                &quot;Run Scan&quot; above to recalculate.
               </p>
             </div>
-          </div>
-
-          {/* Bulk Actions Bar */}
-          {selectedIds.size > 0 && (
-            <div className="sticky top-16 z-30 flex flex-wrap items-center gap-3 bg-deep-green text-white px-5 py-3 rounded-2xl shadow-xl">
-              <span className="font-bold text-sm">{selectedIds.size} selected</span>
-              <button
-                onClick={handleBulkReview}
-                disabled={reviewing || processing}
-                className="flex items-center gap-2 px-4 py-1.5 bg-white/15 hover:bg-white/25 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-60"
-              >
-                {reviewing ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
-                Mark Reviewed
-              </button>
-              <button
-                onClick={handleBulkApprove}
-                disabled={processing}
-                className="flex items-center gap-2 px-4 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-deep-green font-bold text-sm rounded-xl transition-colors disabled:opacity-60"
-              >
-                {processing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                Approve & Credit Wallet
-              </button>
-              <button
-                onClick={handleBulkReject}
-                disabled={processing}
-                className="flex items-center gap-2 px-4 py-1.5 bg-rose-500 hover:bg-rose-400 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-60"
-              >
-                <XCircle size={14} />
-                Reject Selected
-              </button>
-              <button onClick={clearAll} className="ml-auto text-white/70 hover:text-white text-xs underline">
-                Clear selection
-              </button>
-            </div>
-          )}
-
-          {/* Select All */}
-          <div className="flex items-center justify-between px-1">
-            <span className="text-sm font-semibold text-slate-600">
-              {groups.length} customer{groups.length !== 1 ? 's' : ''} with pending refunds
-            </span>
-            <div className="flex gap-2">
-              <button onClick={selectAll} className="text-xs font-bold text-emerald-700 hover:underline">Select All</button>
-              <span className="text-slate-300">|</span>
-              <button onClick={clearAll} className="text-xs font-bold text-slate-500 hover:underline">Clear</button>
-            </div>
-          </div>
-
-          {/* Groups */}
-          {groupsLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={36} className="animate-spin text-emerald-600" />
-            </div>
-          ) : groups.length === 0 ? (
-            <div className="text-center py-24 bg-white rounded-2xl border border-slate-100">
-              <CheckCircle2 size={52} className="mx-auto mb-3 text-emerald-400" />
-              <h3 className="font-black text-slate-700 text-lg">No pending refunds!</h3>
-              <p className="text-slate-400 text-sm mt-1">All subscription deliveries are fully settled.</p>
-            </div>
           ) : (
-            <div className="space-y-3">
-              {groups.map((g) => (
-                <CustomerAccordion
-                  key={g.customer_id}
-                  group={g}
-                  selectedIds={selectedIds}
-                  onToggleDelivery={toggleDelivery}
-                  onSelectAll={toggleSelectAll}
-                  onInspect={openDetail}
-                />
-              ))}
-            </div>
+            filteredGroups.map((group) => (
+              <CustomerGroupCard
+                key={group.customer_id}
+                group={group}
+                selectedIds={selectedIds}
+                onToggleDelivery={toggleDelivery}
+                onToggleGroup={toggleSelectGroup}
+                onInspect={openDetail}
+                onApproveSingle={handleSingleApprove}
+                onRejectSingle={(id) => {
+                  setSingleRejectTarget(id);
+                  setSingleRejectReason('');
+                }}
+              />
+            ))
           )}
         </div>
       )}
 
-      {/* ── Payouts Tab ── */}
+      {/* ── TAB 2: FLAT ALL DELIVERIES TABLE ── */}
+      {activeTab === 'flat' && (
+        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-xs">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-slate-50/80 text-[10px] font-extrabold uppercase text-slate-500 border-b border-slate-100">
+              <tr>
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allDeliveries.length > 0 && allDeliveries.every((d) => selectedIds.has(d.refund_candidate_id))}
+                    onChange={() => {
+                      if (allDeliveries.every((d) => selectedIds.has(d.refund_candidate_id))) {
+                        clearSelection();
+                      } else {
+                        selectAllVisible();
+                      }
+                    }}
+                    className="accent-emerald-600 rounded cursor-pointer"
+                  />
+                </th>
+                <th className="px-4 py-3">Scheduled Date</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Subscription</th>
+                <th className="px-4 py-3">Product / Variant</th>
+                <th className="px-4 py-3">Reason</th>
+                <th className="px-4 py-3 text-right">Calculation</th>
+                <th className="px-4 py-3 text-right">Refund Amount</th>
+                <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {allDeliveries.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="text-center py-12 text-slate-400 font-medium">
+                    No candidates found.
+                  </td>
+                </tr>
+              ) : (
+                allDeliveries.map((d) => {
+                  const isSelected = selectedIds.has(d.refund_candidate_id);
+                  const isPause = (d.source ?? d.refund_reason) === 'pause';
+                  return (
+                    <tr
+                      key={d.refund_candidate_id}
+                      className={`hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-emerald-50/40' : ''}`}
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleDelivery(d.refund_candidate_id)}
+                          className="accent-emerald-600 rounded cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="font-bold text-slate-900">{fmtDate(d.scheduled_date)}</div>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md uppercase ${
+                          d.delivery_slot === 'morning' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
+                        }`}>
+                          {d.delivery_slot}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-slate-900">{d.customer_name || 'Customer'}</div>
+                        <div className="text-[10px] text-slate-400">{d.customer_phone || d.customer_id}</div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
+                        {d.subscription_number || d.subscription_id}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-800">{d.product_name}</div>
+                        <div className="text-[10px] text-slate-400">{d.variant_name}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                            isPause
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}
+                        >
+                          {isPause ? 'PAUSE DAY' : 'FAILED ORDER'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-500 whitespace-nowrap font-mono text-[11px]">
+                        {d.quantity} &times; {fmtAmount(d.final_price || d.unit_price)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-black text-emerald-700 whitespace-nowrap">
+                        {fmtAmount(d.refund_amount)}
+                      </td>
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          d.status === 'reviewed' ? 'bg-sky-100 text-sky-800' :
+                          d.status === 'approved' ? 'bg-emerald-100 text-emerald-800' :
+                          d.status === 'rejected' ? 'bg-rose-100 text-rose-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {d.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openDetail(d.refund_candidate_id)}
+                            title="Inspect calculation audit"
+                            className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSingleApprove(d.refund_candidate_id, d.refund_amount)}
+                            title="Approve & Credit Wallet"
+                            className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <CheckCircle2 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSingleRejectTarget(d.refund_candidate_id);
+                              setSingleRejectReason('');
+                            }}
+                            title="Reject Candidate"
+                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <XCircle size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── TAB 3: PROCESSED PAYOUTS TAB ── */}
       {activeTab === 'payouts' && <PayoutsTab />}
 
-      {/* ── Review Drawer: how this amount was arrived at ── */}
-      {detail && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-slate-900/40"
-          onClick={() => setDetail(null)}
-        >
-          <div
-            className="w-full max-w-md h-full bg-white shadow-2xl overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white">
-              <div className="flex items-center gap-2">
-                <Receipt size={16} className="text-emerald-600" />
-                <h3 className="font-black text-slate-800 text-sm">Refund Review</h3>
-              </div>
-              <button
-                onClick={() => setDetail(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
-              >
-                <XCircle size={18} />
-              </button>
-            </div>
-
-            {detailLoading || detail.loading ? (
-              <div className="p-10 flex justify-center">
-                <Loader2 size={22} className="animate-spin text-emerald-600" />
-              </div>
-            ) : (
-              <div className="p-5 space-y-5">
-                <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
-                    Refundable amount
-                  </p>
-                  <p className="text-3xl font-black text-emerald-800 mt-1">
-                    {fmtAmount(detail.refund_amount)}
-                  </p>
-                  <p className="text-xs text-emerald-700/80 mt-1 font-semibold">
-                    {detail.quantity} × {fmtAmount(detail.final_price)} (prepaid price)
-                  </p>
-                  {Number(detail.recomputed_amount) !== Number(detail.refund_amount) && (
-                    <p className="text-xs font-bold text-rose-700 mt-2">
-                      Stored amount differs from quantity × price — verify before approving.
-                    </p>
-                  )}
-                </div>
-
-                <dl className="space-y-2 text-sm">
-                  {[
-                    ['Status', String(detail.status ?? '').toUpperCase()],
-                    ['Reason', detail.source === 'pause' ? 'Pause Day' : 'Failed Order'],
-                    ['Customer', `${detail.customer_name ?? ''} · ${detail.customer_phone ?? ''}`],
-                    ['Subscription', detail.subscription_number ?? detail.subscription_id],
-                    ['Payment type', detail.payment_type],
-                    ['Branch', detail.branch_name ?? detail.branch_id],
-                    ['Date', `${fmtDate(detail.scheduled_date)} · ${detail.delivery_slot}`],
-                    ['Product', `${detail.product_name ?? ''} ${detail.variant_name ?? ''}`],
-                    ['Order', detail.order_number ?? '—'],
-                    ['Order status', detail.order_status ?? '—'],
-                    ['Stop status', detail.stop_status ?? '—'],
-                    ['Failure reason', detail.failed_reason ?? '—'],
-                    ['Item unit price', fmtAmount(detail.item_unit_price ?? 0)],
-                    ['Discount applied', fmtAmount(detail.discount_amount ?? 0)],
-                    ['Coupon applied', fmtAmount(detail.coupon_amount ?? 0)],
-                    ['Reviewed by', detail.reviewed_by ?? '—'],
-                  ].map(([label, value]) => (
-                    <div key={label as string} className="flex justify-between gap-4">
-                      <dt className="text-slate-400 font-semibold shrink-0">{label}</dt>
-                      <dd className="text-slate-800 font-bold text-right break-words">
-                        {String(value ?? '—')}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-
-                {detail.notes && (
-                  <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
-                    <p className="text-[10px] font-black uppercase text-amber-700">Notes</p>
-                    <p className="text-xs text-amber-900 mt-1">{detail.notes}</p>
-                  </div>
-                )}
-
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Amounts use the price stored on the subscription item at purchase time, so
-                  later catalogue price changes never affect a refund.
-                </p>
-              </div>
-            )}
+      {/* Floating Sticky Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-wrap items-center gap-3 bg-slate-900 text-white px-5 py-3.5 rounded-3xl shadow-2xl border border-slate-800 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2 pr-3 border-r border-slate-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-extrabold text-xs">
+              {selectedIds.size} Selected &bull; {fmtAmount(selectedTotalAmount)}
+            </span>
           </div>
+
+          <button
+            type="button"
+            onClick={handleBulkReview}
+            disabled={reviewing || processing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {reviewing ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+            Mark Reviewed
+          </button>
+
+          <button
+            type="button"
+            onClick={handleBulkApprove}
+            disabled={processing}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+          >
+            {processing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            Approve &amp; Credit Wallet
+          </button>
+
+          <button
+            type="button"
+            onClick={handleBulkReject}
+            disabled={processing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-200 text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <Ban size={13} />
+            Reject
+          </button>
+
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
+            title="Deselect All"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
+
       {/* Developer Testing: Preview Calculations Modal */}
       {previewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
@@ -1040,14 +1088,14 @@ export default function RefundCandidatesPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
-                  <Receipt size={20} />
+                  <Sparkles size={20} />
                 </div>
                 <div>
                   <h2 className="text-base font-black text-slate-900 tracking-tight">
                     Developer Testing — Subscription Prepaid Refund Preview
                   </h2>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Simulates refund calculation on paused days and failed deliveries without writing
+                    Simulates refund calculations on paused subscription days and failed deliveries without writing data
                   </p>
                 </div>
               </div>
@@ -1056,35 +1104,37 @@ export default function RefundCandidatesPage() {
                 onClick={() => setPreviewOpen(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <XCircle size={18} />
+                <X size={18} />
               </button>
             </div>
 
             {previewLoading ? (
               <div className="flex flex-col items-center justify-center py-12 space-y-2 text-slate-400">
                 <Loader2 size={24} className="animate-spin text-emerald-600" />
-                <p className="text-xs font-bold">Calculating refundable days &amp; failed orders...</p>
+                <p className="text-xs font-bold">Calculating refundable paused days &amp; undelivered orders...</p>
               </div>
             ) : previewData ? (
               <div className="space-y-4 text-xs">
                 <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Analyzed Window</span>
-                    <p className="font-bold text-slate-800">{previewData.range?.from} to {previewData.range?.to}</p>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Analyzed Date Window</span>
+                    <p className="font-bold text-slate-800">
+                      {previewData.range?.from} &rarr; {previewData.range?.to}
+                    </p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Detected Refund Candidates</span>
-                    <p className="font-black text-slate-900 text-sm">{previewData.rows?.length ?? 0} items</p>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Detected Refund Items</span>
+                    <p className="font-black text-slate-900 text-sm">{previewData.rows?.length ?? 0} candidates</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">Total Estimated Valuation</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Calculated Total Valuation</span>
                     <p className="font-black text-emerald-700 text-sm">
                       {fmtAmount((previewData.rows || []).reduce((acc: number, r: any) => acc + Number(r.refund_amount || 0), 0))}
                     </p>
                   </div>
                 </div>
 
-                {(!previewData.rows || previewData.rows.length === 0) ? (
+                {!previewData.rows || previewData.rows.length === 0 ? (
                   <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 font-medium">
                     No paused days or failed deliveries found for the selected filter criteria.
                   </div>
@@ -1098,33 +1148,37 @@ export default function RefundCandidatesPage() {
                           <th className="p-2.5">Product &amp; Variant</th>
                           <th className="p-2.5">Reason</th>
                           <th className="p-2.5 text-right">Qty</th>
-                          <th className="p-2.5 text-right">Final Price</th>
+                          <th className="p-2.5 text-right">Subscribed Price</th>
                           <th className="p-2.5 text-right">Refund Amount</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                         {previewData.rows.map((row: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50 font-medium text-slate-700">
+                          <tr key={idx} className="hover:bg-slate-50">
                             <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
                               {row.scheduled_date} <span className="text-[10px] text-slate-400">({row.slot})</span>
                             </td>
                             <td className="p-2.5 whitespace-nowrap">
                               <span className="font-bold text-slate-800">{row.customer_id}</span>
-                              <div className="text-[10px] text-slate-400">{row.subscription_id}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">{row.subscription_id}</div>
                             </td>
                             <td className="p-2.5">
                               {row.product_name || 'Product'} {row.variant_name ? `(${row.variant_name})` : ''}
                             </td>
                             <td className="p-2.5">
-                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                row.source === 'pause' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                              }`}>
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  row.source === 'pause' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
                                 {row.source === 'pause' ? 'Paused Day' : 'Delivery Failed'}
                               </span>
                             </td>
                             <td className="p-2.5 text-right font-bold">{row.quantity}</td>
                             <td className="p-2.5 text-right">{fmtAmount(row.final_price || row.unit_price)}</td>
-                            <td className="p-2.5 text-right font-bold text-emerald-700">{fmtAmount(row.refund_amount)}</td>
+                            <td className="p-2.5 text-right font-black text-emerald-700">
+                              {fmtAmount(row.refund_amount)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1152,12 +1206,387 @@ export default function RefundCandidatesPage() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
               >
                 {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                Run Live Calculation &amp; Save Candidates
+                Run Live Scan &amp; Materialize Candidates
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Inspect Audit Detail Modal */}
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                  <Receipt size={18} />
+                </div>
+                <h3 className="text-base font-black text-slate-900">Refund Candidate Audit</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetail(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 size={24} className="animate-spin text-emerald-600" />
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-emerald-800">Refund Valuation</span>
+                    <p className="text-2xl font-black text-emerald-700">{fmtAmount(detail.refund_amount)}</p>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-extrabold rounded-full text-[11px]">
+                    {String(detail.status || 'PENDING').toUpperCase()}
+                  </span>
+                </div>
+
+                <dl className="space-y-2.5 divide-y divide-slate-100">
+                  {[
+                    ['Customer', `${detail.customer_name ?? ''} (${detail.customer_phone ?? detail.customer_id})`],
+                    ['Subscription', detail.subscription_number ?? detail.subscription_id],
+                    ['Reason', detail.source === 'pause' ? 'Paused Day' : 'Failed Delivery'],
+                    ['Scheduled Delivery', `${fmtDate(detail.scheduled_date)} (${detail.delivery_slot || 'morning'})`],
+                    ['Product Item', `${detail.product_name ?? ''} ${detail.variant_name ? `(${detail.variant_name})` : ''}`],
+                    ['Quantity', detail.quantity ?? 1],
+                    ['Subscribed Final Price', fmtAmount(detail.final_price || detail.unit_price)],
+                    ['Order Ref', detail.order_number || detail.order_id || '—'],
+                    ['Failure Reason', detail.failed_reason || '—'],
+                    ['Audit Reviewer', detail.reviewed_by || 'Unreviewed'],
+                  ].map(([label, value]) => (
+                    <div key={label as string} className="pt-2 flex justify-between gap-4">
+                      <dt className="text-slate-400 font-semibold shrink-0">{label}</dt>
+                      <dd className="text-slate-800 font-bold text-right break-words">{String(value ?? '—')}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {detail.notes && (
+                  <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
+                    <p className="text-[10px] font-bold uppercase text-amber-700">Audit Notes</p>
+                    <p className="text-xs text-amber-900 mt-0.5">{detail.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDetail(null)}
+                className="px-4 py-2 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Reject Modal with Reason */}
+      {singleRejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-2 text-rose-600 font-black text-sm">
+              <AlertTriangle size={18} />
+              Reject Refund Candidate
+            </div>
+            <p className="text-xs text-slate-500 font-medium">
+              Please enter the reason for rejecting this refund candidate:
+            </p>
+            <textarea
+              rows={3}
+              value={singleRejectReason}
+              onChange={(e) => setSingleRejectReason(e.target.value)}
+              placeholder="e.g. Delivery was confirmed offline by customer"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-rose-500"
+            />
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSingleRejectTarget(null)}
+                className="px-3 py-1.5 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSingleRejectConfirm}
+                disabled={processing}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {processing ? 'Rejecting...' : 'Confirm Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Customer Group Card Component ────────────────────────────────────────────
+
+function CustomerGroupCard({
+  group,
+  selectedIds,
+  onToggleDelivery,
+  onToggleGroup,
+  onInspect,
+  onApproveSingle,
+  onRejectSingle,
+}: {
+  group: CustomerGroup;
+  selectedIds: Set<string>;
+  onToggleDelivery: (id: string) => void;
+  onToggleGroup: (ids: string[]) => void;
+  onInspect: (id: string) => void;
+  onApproveSingle: (id: string, amt: number) => void;
+  onRejectSingle: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const deliveries = group.deliveries ?? [];
+  const groupIds = deliveries.map((d) => d.refund_candidate_id);
+  const allInGroupSelected = groupIds.length > 0 && groupIds.every((id) => selectedIds.has(id));
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all">
+      {/* Group Header Card */}
+      <div
+        onClick={() => setOpen((v) => !v)}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50/80 transition-colors"
+      >
+        <div className="flex items-center gap-3.5">
+          <input
+            type="checkbox"
+            checked={allInGroupSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleGroup(groupIds);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="accent-emerald-600 w-4 h-4 rounded cursor-pointer shrink-0"
+          />
+
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-black text-sm shadow-xs shrink-0">
+            {(group.customer_name || 'C')[0].toUpperCase()}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-slate-900 text-sm">{group.customer_name || 'Customer'}</span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                {group.customer_id}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-0.5">{group.customer_phone || '—'}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-4 pl-7 sm:pl-0">
+          <div className="text-right">
+            <div className="font-black text-emerald-700 text-base">{fmtAmount(group.pending_refund_amount)}</div>
+            <div className="text-[11px] text-slate-400 font-semibold">{deliveries.length} refundable deliveries</div>
+          </div>
+
+          <div className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Deliveries List */}
+      {open && (
+        <div className="border-t border-slate-100 p-3 sm:p-4 space-y-2 bg-slate-50/40">
+          {deliveries.map((d) => {
+            const isSelected = selectedIds.has(d.refund_candidate_id);
+            const isPause = (d.source ?? d.refund_reason) === 'pause';
+            return (
+              <div
+                key={d.refund_candidate_id}
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all ${
+                  isSelected ? 'bg-emerald-50/70 border-emerald-200 shadow-2xs' : 'bg-white border-slate-200/70 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleDelivery(d.refund_candidate_id)}
+                    className="accent-emerald-600 w-4 h-4 rounded cursor-pointer shrink-0"
+                  />
+
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-extrabold text-slate-900 text-xs">{fmtDate(d.scheduled_date)}</span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md uppercase ${
+                          d.delivery_slot === 'morning' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
+                        }`}
+                      >
+                        {d.delivery_slot}
+                      </span>
+                      <span
+                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          isPause
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}
+                      >
+                        {isPause ? 'PAUSE DAY' : 'FAILED ORDER'}
+                      </span>
+                      {d.status === 'reviewed' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                          REVIEWED
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 font-medium">
+                      <span className="font-bold text-slate-800">{d.product_name}</span>
+                      <span className="text-slate-400">&bull;</span>
+                      <span className="text-slate-500">{d.variant_name}</span>
+                      <span className="text-slate-400">&bull;</span>
+                      <span className="font-mono text-[11px] text-slate-500">
+                        {d.quantity} &times; {fmtAmount(d.final_price || d.unit_price)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-3 pl-7 sm:pl-0 shrink-0">
+                  <span className="font-black text-emerald-700 text-sm">{fmtAmount(d.refund_amount)}</span>
+
+                  <div className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onInspect(d.refund_candidate_id)}
+                      title="Inspect calculation audit"
+                      className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onApproveSingle(d.refund_candidate_id, d.refund_amount)}
+                      title="Approve & Credit Wallet"
+                      className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <CheckCircle2 size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRejectSingle(d.refund_candidate_id)}
+                      title="Reject Candidate"
+                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <XCircle size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Payouts Tab Component ────────────────────────────────────────────────────
+
+function PayoutsTab() {
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPayouts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/payouts?limit=50`, {
+        credentials: 'include',
+      });
+      const json = await res.json();
+      setPayouts(json.data ?? []);
+    } catch {
+      setPayouts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPayouts();
+  }, [fetchPayouts]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 bg-white rounded-3xl border border-slate-200">
+        <Loader2 size={32} className="animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  if (!payouts.length) {
+    return (
+      <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 p-6">
+        <Receipt size={48} className="mx-auto mb-3 text-slate-300" />
+        <p className="font-bold text-slate-700">No Processed Payouts Yet</p>
+        <p className="text-xs mt-1 text-slate-500">Payout records are created when candidates are approved and credited to customer wallets.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-xs">
+      <table className="w-full text-xs text-left">
+        <thead className="bg-slate-50/80 text-[10px] font-extrabold uppercase text-slate-500 border-b border-slate-100">
+          <tr>
+            <th className="px-5 py-4">Refund #</th>
+            <th className="px-5 py-4">Customer</th>
+            <th className="px-5 py-4 text-right">Total Amount</th>
+            <th className="px-5 py-4 text-right">Deliveries</th>
+            <th className="px-5 py-4 text-center">Status</th>
+            <th className="px-5 py-4">Approved At</th>
+            <th className="px-5 py-4">Approved By</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 font-medium">
+          {payouts.map((p) => (
+            <tr key={p.refund_payout_id} className="hover:bg-slate-50/80 transition-colors">
+              <td className="px-5 py-4 font-mono text-xs text-slate-700 font-bold">{p.refund_number}</td>
+              <td className="px-5 py-4">
+                <div className="font-bold text-slate-900">{p.customer_name}</div>
+                <div className="text-[10px] text-slate-400">{p.customer_phone}</div>
+              </td>
+              <td className="px-5 py-4 text-right font-black text-emerald-700 text-sm">{fmtAmount(p.total_amount)}</td>
+              <td className="px-5 py-4 text-right text-slate-600 font-bold">{p.total_deliveries}</td>
+              <td className="px-5 py-4 text-center">
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    p.status === 'processed'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : p.status === 'failed'
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {p.status.toUpperCase()}
+                </span>
+              </td>
+              <td className="px-5 py-4 text-xs text-slate-500">{fmtDate(p.approved_at)}</td>
+              <td className="px-5 py-4 text-xs text-slate-500">{p.approved_by || 'system'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
