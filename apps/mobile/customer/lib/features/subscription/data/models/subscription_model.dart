@@ -379,10 +379,20 @@ class SubscriptionItemModel {
     this.customDates = const [],
   });
 
-  factory SubscriptionItemModel.fromJson(Map<String, dynamic> json) {
     final unitP = _asDouble(json['unit_price'] ?? json['unitPrice'] ?? json['price']);
+    final finalP = _asDouble(json['final_price'] ?? json['finalPrice']);
     final origP = _asDouble(json['original_price'] ?? json['originalPrice']);
     final disc = _asInt(json['discount'] ?? json['discount_percentage']);
+
+    final effectiveOrig = origP > 0
+        ? origP
+        : (finalP > 0 && unitP > finalP ? unitP : (unitP > 0 ? unitP : 0.0));
+    final effectivePrice = finalP > 0 ? finalP : unitP;
+    final effectiveDisc = disc > 0
+        ? disc
+        : (effectiveOrig > effectivePrice && effectiveOrig > 0
+            ? (((effectiveOrig - effectivePrice) / effectiveOrig) * 100).round()
+            : 0);
 
     return SubscriptionItemModel(
       id:
@@ -407,13 +417,9 @@ class SubscriptionItemModel {
       defaultMQty: _asInt(json['default_m_quantity'] ?? json['defaultMQty']),
       defaultEQty: _asInt(json['default_e_quantity'] ?? json['defaultEQty']),
       unitPrice: unitP,
-      finalPrice: _asDouble(json['final_price'] ?? json['finalPrice']),
-      originalPrice: origP > 0 ? origP : unitP,
-      discount: disc > 0
-          ? disc
-          : (origP > unitP && origP > 0
-              ? (((origP - unitP) / origP) * 100).round()
-              : 0),
+      finalPrice: finalP,
+      originalPrice: effectiveOrig,
+      discount: effectiveDisc,
       status: (_asString(json['item_status'] ?? json['status']) ?? 'active').toLowerCase() == 'paused'
           ? 'active'
           : (_asString(json['item_status'] ?? json['status']) ?? 'active'),
@@ -697,33 +703,7 @@ class Subscription {
         ? items
         : <SubscriptionItemModel>[
             if (_asString(json['product_variant_id']) != null)
-              SubscriptionItemModel(
-                id: _asString(json['subscription_item_id'] ?? json['id']) ?? '',
-                subscriptionId:
-                    _asString(json['subscription_id'] ?? json['id']) ?? '',
-                productVariantId: _asString(json['product_variant_id']) ?? '',
-                productName:
-                    (_asString(json['product_name'] ?? json['name']) ??
-                            'Product')
-                        .toTitleCase(),
-                variantName:
-                    _asString(json['variant_name'] ?? json['name']) ?? '',
-                sku: _asString(json['sku']) ?? '',
-                defaultMQty: _asInt(json['default_m_quantity']),
-                defaultEQty: _asInt(json['default_e_quantity']),
-                unitPrice: _asDouble(json['unit_price']),
-                finalPrice: _asDouble(json['final_price']),
-                status: (_asString(json['item_status'] ?? json['status']) ?? 'active').toLowerCase() == 'paused'
-                    ? 'active'
-                    : (_asString(json['item_status'] ?? json['status']) ?? 'active'),
-                startDate: _asString(
-                  json['item_start_date'] ?? json['start_date'],
-                ),
-                endDate: _asString(json['item_end_date'] ?? json['end_date']),
-                imageUrl: _asString(
-                  json['url'] ?? json['image_url'] ?? json['imagePath'],
-                ),
-              ),
+              SubscriptionItemModel.fromJson(json),
           ];
 
     final productLabel = normalizedItems.isNotEmpty

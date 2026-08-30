@@ -1536,7 +1536,40 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '${firstItem != null && firstItem.unitValue > 0 ? '${firstItem.unitValue % 1 == 0 ? firstItem.unitValue.toInt() : firstItem.unitValue} ${firstItem.unitType.isNotEmpty ? firstItem.unitType : 'Unit'}' : (firstItem?.variantName.isNotEmpty == true ? firstItem!.variantName : '1 Unit')}${s.qty > 1 ? ' x${s.qty}' : ''} • ${s.frequency}',
+                                    () {
+                                      final count = s.qty > 0 ? s.qty : 1;
+                                      String volume = '';
+                                      if (firstItem != null && firstItem.unitValue > 0) {
+                                        final type = firstItem.unitType.toLowerCase().trim();
+                                        if (type == 'ml') {
+                                          final totalMl = firstItem.unitValue * count;
+                                          if (totalMl == 500) {
+                                            volume = '0.5 Litre';
+                                          } else if (totalMl % 1000 == 0) {
+                                            final l = (totalMl / 1000).toInt();
+                                            volume = '$l Litre${l > 1 ? 's' : ''}';
+                                          } else if (totalMl >= 1000) {
+                                            final l = (totalMl / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+                                            volume = '$l Litres';
+                                          } else {
+                                            volume = '${totalMl.toInt()} ml';
+                                          }
+                                        } else if (type == 'l' || type == 'litre' || type == 'litres') {
+                                          final totalL = firstItem.unitValue * count;
+                                          final formatted = totalL % 1 == 0 ? totalL.toInt().toString() : totalL.toString();
+                                          volume = '$formatted Litre${totalL > 1 ? 's' : ''}';
+                                        } else {
+                                          final totalVal = firstItem.unitValue * count;
+                                          final formatted = totalVal % 1 == 0 ? totalVal.toInt().toString() : totalVal.toString();
+                                          volume = '$formatted ${firstItem.unitType}';
+                                        }
+                                      } else if (firstItem != null && firstItem.variantName.isNotEmpty && firstItem.variantName.toLowerCase() != 'standard') {
+                                        volume = count > 1 ? '${firstItem.variantName} x$count' : firstItem.variantName;
+                                      } else {
+                                        volume = count > 1 ? '$count Units' : '1 Unit';
+                                      }
+                                      return s.frequency.isNotEmpty ? '$volume • ${s.frequency}' : volume;
+                                    }(),
                                     style: const TextStyle(
                                       fontSize: 12.5,
                                       color: kTextSub,
