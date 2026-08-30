@@ -453,13 +453,15 @@ export class CartService {
         );
       }
 
-      if (plan.createPrepaidBills) {
-        await this.insertPrepaidBillingRecords(
+      if (plan.createOrderBills) {
+        await this.insertOrderBillingRecords(
           plan.customerId,
           plan.groups,
           walletTransactionsToInsert,
           referenceId,
           plan.paymentMethod,
+          plan.paymentType,
+          plan.isCod,
           tx,
         );
       }
@@ -757,7 +759,7 @@ export class CartService {
       couponCode: body.coupon_code || null,
       discountResolution,
       debitWallet: paymentMethod === 'wallet' && !isCod && paymentType === 'prepaid',
-      createPrepaidBills: !isPostpaidOrder && !isCod && paymentType === 'prepaid',
+      createOrderBills: !isPostpaidOrder && (paymentType === 'prepaid' || isCod || paymentMethod === 'cod'),
     };
   }
 
@@ -987,18 +989,21 @@ export class CartService {
     }
   }
 
-  private async insertPrepaidBillingRecords(
+  private async insertOrderBillingRecords(
     customerId: string,
     groups: { deliveryDate: string; deliverySlot: string; items: { item: OnetimeCheckoutItemDto; price: number; qty: number; productName: string }[]; subtotal: number }[],
     walletTransactions: { amount: number; reference_type: string; reference_id: string; remarks: string }[],
     fallbackReferenceId: string | null,
     paymentMethod: string,
+    paymentType: string,
+    isCod: boolean,
     transaction: any,
   ): Promise<void> {
     const pm = (paymentMethod || '').toLowerCase();
-    if (pm === 'cod' || pm === 'postpaid') return;
+    if (pm === 'postpaid' || paymentType === 'postpaid') return;
 
     const today = new Date().toISOString().split('T')[0];
+    const isCodOrder = isCod || pm === 'cod' || paymentType === 'cod';
 
     for (const group of groups) {
       const billId = generateId('BILL', 15);
@@ -1006,8 +1011,6 @@ export class CartService {
         walletTransactions.find((tx) => tx.reference_type === 'order')?.reference_id ||
         fallbackReferenceId;
 
-      // No try/catch here on purpose: a bill that fails to write must roll the whole
-      // checkout back rather than leave the customer charged with no invoice.
       this.Data.assertWritten(
         await this.Data.insert(
           'customer_bills',
@@ -1016,19 +1019,19 @@ export class CartService {
             customer_id: customerId,
             bill_type: 'order',
             reference_id: orderRefId,
-            payment_type: 'prepaid',
-            payment_method: paymentMethod,
+            payment_type: isCodOrder ? 'cod' : 'prepaid',
+            payment_method: isCodOrder ? 'cod' : paymentMethod,
             billing_from: group.deliveryDate,
             billing_to: group.deliveryDate,
-            due_date: today,
+            due_date: group.deliveryDate || today,
             subtotal: group.subtotal,
             discount_amount: 0,
             tax_amount: 0,
             total_amount: group.subtotal,
-            paid_amount: group.subtotal,
-            due_amount: 0,
-            status: 'paid',
-            remarks: 'Prepaid order checkout',
+            paid_amount: isCodOrder ? 0 : group.subtotal,
+            due_amount: isCodOrder ? group.subtotal : 0,
+            status: isCodOrder ? 'pending' : 'paid',
+            remarks: isCodOrder ? 'Cash on delivery order' : 'Prepaid order checkout',
             created_at: new Date(),
             updated_at: new Date(),
           },

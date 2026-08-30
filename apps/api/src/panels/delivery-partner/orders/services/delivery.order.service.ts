@@ -1100,6 +1100,10 @@ export class DeliveryOrderService {
 
         const cashCollected = this.computeCashCollected(norm, [order], status, norm.paymentMode);
 
+        const effectivePaymentMode = (norm.paymentMode || order.payment_mode || '').toLowerCase();
+        const isCOD = (effectivePaymentMode === 'cod' || effectivePaymentMode === 'cash');
+        const effectivePaymentStatus = norm.paymentStatus || (status === 'delivered' && isCOD ? 'paid' : null);
+
         // Update order record
         await client.query(
           `UPDATE orders 
@@ -1113,11 +1117,16 @@ export class DeliveryOrderService {
           [
             status,
             norm.paymentMode,
-            norm.paymentStatus,
+            effectivePaymentStatus,
             norm.deliveryImage,
             order.order_id,
           ],
         );
+
+        // When a COD order is delivered, record cash payment transaction and settle/create customer bill
+        if (status === 'delivered' && isCOD) {
+          await this.handleCodDeliveryPaymentAndBill(client, order, boy.full_name);
+        }
 
         // Update stop status in delivery_run_addresses
         await client.query(
@@ -1302,12 +1311,23 @@ export class DeliveryOrderService {
       [runIds],
     );
 
+    const cashRes = await this.db.query(
+      `SELECT COALESCE(SUM(o.total_amount), 0) AS total_cash_collected
+       FROM orders o
+       WHERE (o.delivery_run_id = ANY($1))
+         AND o.status = 'delivered'
+         AND (o.payment_mode = 'cod' OR o.payment_mode = 'cash')`,
+      [runIds],
+    );
+    const totalCashCollected = Number(cashRes?.[0]?.total_cash_collected || 0);
+
     return {
       success: true,
       message: 'Run handed over successfully',
       status: 'handed_over',
       empty_bottles_returned: totalBottles,
       returned_items: returnedItems,
+      total_cash_collected: totalCashCollected,
     };
   }
 
@@ -1505,6 +1525,10 @@ export class DeliveryOrderService {
 
       const cashCollected = this.computeCashCollected(norm, [order], status, norm.paymentMode);
 
+      const effectivePaymentMode = (norm.paymentMode || order.payment_mode || '').toLowerCase();
+      const isCOD = (effectivePaymentMode === 'cod' || effectivePaymentMode === 'cash');
+      const effectivePaymentStatus = norm.paymentStatus || (status === 'delivered' && isCOD ? 'paid' : null);
+
       await client.query(
         `UPDATE orders 
          SET status = $1,
@@ -1514,8 +1538,12 @@ export class DeliveryOrderService {
              delivery_image = COALESCE($4, delivery_image),
              updated_at = NOW()
          WHERE order_id = $5`,
-        [status, norm.paymentMode, norm.paymentStatus, norm.deliveryImage, order.order_id],
+        [status, norm.paymentMode, effectivePaymentStatus, norm.deliveryImage, order.order_id],
       );
+
+      if (status === 'delivered' && isCOD) {
+        await this.handleCodDeliveryPaymentAndBill(client, order, boy.full_name);
+      }
 
       // Update delivery_dispatch_items delivered quantities
       if (status === 'delivered') {
@@ -2025,5 +2053,74 @@ export class DeliveryOrderService {
     };
   }
 
+  private async handleCodDeliveryPaymentAndBill(
+    client: { query: (sql: string, params?: any[]) => Promise<any> },
+    order: { order_id: string; customer_id: string; total_amount: number | string; payment_mode?: string; scheduled_date?: string },
+    boyFullName: string,
+  ) {
+    const cashAmount = Number(order.total_amount || 0);
 
+    // 1. Record cash collection in payment_transactions if not already existing
+    const existingTxn = await client.query(
+      `SELECT 1 FROM payment_transactions WHERE reference_id = $1 AND purpose = 'order_payment' AND status = 'success' LIMIT 1`,
+      [order.order_id],
+    );
+    if (!existingTxn?.rows?.length && !existingTxn?.length) {
+      const txnId = `TXN_COD_${order.order_id}_${Date.now()}`;
+      await client.query(
+        `INSERT INTO payment_transactions (
+          transaction_id, customer_id, purpose, reference_id,
+          provider, method, amount, currency, status, paid_at, created_at, updated_at
+        ) VALUES ($1, $2, 'order_payment', $3, 'cash', 'cash', $4, 'INR', 'success', NOW(), NOW(), NOW())`,
+        [txnId, order.customer_id, order.order_id, cashAmount],
+      );
+    }
+
+    // 2. Settle or create customer_bills and customer_bill_items
+    const existingBill = await client.query(
+      `SELECT bill_id FROM customer_bills WHERE reference_id = $1 LIMIT 1`,
+      [order.order_id],
+    );
+    if (existingBill?.rows?.length || existingBill?.length) {
+      await client.query(
+        `UPDATE customer_bills
+         SET status = 'paid',
+             paid_amount = total_amount,
+             due_amount = 0,
+             updated_at = NOW()
+         WHERE reference_id = $1`,
+        [order.order_id],
+      );
+    } else {
+      const newBillId = `BILL-${order.order_id}`;
+      await client.query(
+        `INSERT INTO customer_bills (
+          bill_id, customer_id, bill_type, reference_id, payment_type, payment_method,
+          billing_from, billing_to, due_date, subtotal, discount_amount, tax_amount,
+          total_amount, paid_amount, due_amount, status, remarks, created_at, updated_at
+        ) VALUES (
+          $1, $2, 'order', $3, 'cod', 'cod',
+          CURRENT_DATE, CURRENT_DATE, CURRENT_DATE, $4, 0, 0,
+          $4, $4, 0, 'paid', 'Cash on Delivery - Collected on delivery', NOW(), NOW()
+        )`,
+        [newBillId, order.customer_id, order.order_id, cashAmount],
+      );
+
+      const orderItemsRes = await client.query(
+        `SELECT variant_id, quantity, unit_price, total_price FROM order_items WHERE order_id = $1 AND deleted_at IS NULL`,
+        [order.order_id],
+      );
+      const items = orderItemsRes.rows || orderItemsRes || [];
+      for (const item of items) {
+        const itemTotal = Number(item.total_price || (Number(item.unit_price || 0) * Number(item.quantity || 1)));
+        await client.query(
+          `INSERT INTO customer_bill_items (
+            bill_id, reference_type, reference_id, product_variant_id,
+            quantity, unit_price, discount_amount, tax_amount, total_amount, created_at
+          ) VALUES ($1, 'order', $2, $3, $4, $5, 0, 0, $6, NOW())`,
+          [newBillId, order.order_id, item.variant_id, item.quantity, item.unit_price, itemTotal],
+        );
+      }
+    }
+  }
 }
