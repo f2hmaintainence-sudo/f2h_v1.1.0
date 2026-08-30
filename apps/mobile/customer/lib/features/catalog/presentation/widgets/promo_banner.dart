@@ -301,11 +301,57 @@ class _PromoBannerState extends State<PromoBanner> {
   }
 
   Widget _buildOfferCard(Map<String, dynamic> banner, String imageUrl) {
-    return Image.asset(
-      'assets/splash/splash.png',
-      fit: BoxFit.contain,
+    final title = banner['title']?.toString() ?? 'F2H Fresh';
+    final desc = banner['description']?.toString() ?? 'Fresh Daily Essentials Delivered To Your Doorstep';
+    return Container(
       width: double.infinity,
       height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  desc,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Image.asset(
+            'assets/icon/app_icon.png',
+            width: 50,
+            height: 50,
+            fit: BoxFit.contain,
+          ),
+        ],
+      ),
     );
   }
 }

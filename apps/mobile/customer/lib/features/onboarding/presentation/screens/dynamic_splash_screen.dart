@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:f2h_customer/core/widgets/animations.dart';
-import 'package:f2h_customer/core/services/app_asset_service.dart';
+import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
 class DynamicSplashScreen extends StatefulWidget {
   final Widget child;
@@ -15,18 +13,16 @@ class DynamicSplashScreen extends StatefulWidget {
 class _DynamicSplashScreenState extends State<DynamicSplashScreen>
     with SingleTickerProviderStateMixin {
   bool _showSplash = true;
-  bool _showBanner = false;
-  String? _splashImage;
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
+  Timer? _autoDismissTimer;
 
   @override
   void initState() {
     super.initState();
-    AppAssetService().init();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 500),
     );
     _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
@@ -36,50 +32,23 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
 
   @override
   void dispose() {
+    _autoDismissTimer?.cancel();
     _animationController.dispose();
     super.dispose();
   }
 
-  Future<void> _startSplashSequence() async {
-    // Prepare image key
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      int count = prefs.getInt('app_open_count') ?? 0;
-      final images = [
-        'assets/splash/splash.png',
-      ];
-
-      if (images.isNotEmpty) {
-        _splashImage = images[count % images.length];
+  void _startSplashSequence() {
+    // Auto-dismiss smoothly after 3.5 seconds if user doesn't tap Skip
+    _autoDismissTimer = Timer(const Duration(milliseconds: 3500), () {
+      if (mounted && _showSplash) {
+        _fadeOutAndDismiss();
       }
-
-      await prefs.setInt('app_open_count', count + 1);
-    } catch (e) {
-      debugPrint('Error preparing splash image: $e');
-    }
-
-    // Step 1: First show loading animation for 4 seconds on app launch
-    await Future.delayed(const Duration(seconds: 4));
-    if (!mounted || !_showSplash) return;
-
-    // Step 2: Then switch to showing the splash banner image
-    if (_splashImage != null) {
-      if (mounted) {
-        setState(() {
-          _showBanner = true;
-        });
-      }
-    }
-
-    // Step 3: Auto-dismiss after 2.5 seconds max if user doesn't tap Skip
-    await Future.delayed(const Duration(milliseconds: 2500));
-    if (mounted && _showSplash) {
-      _fadeOutAndDismiss();
-    }
+    });
   }
 
   void _fadeOutAndDismiss() {
-    if (!mounted) return;
+    if (!mounted || !_showSplash) return;
+    _autoDismissTimer?.cancel();
     _animationController.forward().then((_) {
       if (mounted) {
         setState(() {
@@ -95,85 +64,324 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
       return widget.child;
     }
 
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: Stack(
-          children: [
-            // Smooth CrossFade: First show Loading Animation, then switch to Splash Banner
-            Positioned.fill(
-              child: AnimatedCrossFade(
-                duration: const Duration(milliseconds: 500),
-                crossFadeState: _showBanner && _splashImage != null
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                firstChild: Container(
-                  color: Colors.white,
-                  child: const Center(
-                    child: InitialLoadingScreen(),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFE8FAF0),
+                Color(0xFFF3FCF7),
+                Color(0xFFFFFFFF),
+              ],
+              stops: [0.0, 0.45, 1.0],
+            ),
+          ),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                // ── Top Right Skip Button ──────────────────────────────
+                Positioned(
+                  top: 12,
+                  right: 16,
+                  child: GestureDetector(
+                    onTap: _fadeOutAndDismiss,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            'Skip',
+                            style: TextStyle(
+                              color: Color(0xFF16A34A),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          SizedBox(width: 5),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Color(0xFF16A34A),
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                secondChild: _splashImage != null
-                    ? SizedBox.expand(
-                        child: AppAssetImage(
-                          assetKey: _splashImage!,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                    : Container(color: Colors.white),
-              ),
-            ),
 
-            // Glassmorphic Skip Button during Banner Phase (Stays until user taps Skip)
-            if (_showBanner)
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 16,
-                right: 16,
-                child: SafeArea(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _fadeOutAndDismiss,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 1,
-                          ),
+                // ── Main Content ───────────────────────────────────────
+                Column(
+                  children: [
+                    SizedBox(height: topPadding > 0 ? 32 : 48),
+
+                    // 1. Logo Circle
+                    Container(
+                      width: 88,
+                      height: 88,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFDCFCE7),
+                          width: 2,
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/icon/app_icon.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 2. Headline
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: const TextSpan(
                           children: [
-                            Text(
-                              'Skip',
+                            TextSpan(
+                              text: 'Fresh ',
                               style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.5,
                               ),
                             ),
-                            SizedBox(width: 4),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: Colors.white,
-                              size: 18,
+                            TextSpan(
+                              text: 'Milk & Curd\n',
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF16A34A),
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'Delivered, Every Day!',
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.5,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ),
+
+                    const SizedBox(height: 12),
+
+                    // 3. Heart Line Divider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 1.8,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.favorite_rounded,
+                          size: 14,
+                          color: Color(0xFF22C55E),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 28,
+                          height: 1.8,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+
+                    // 4. Center Cow Drinking Milk Animation with Soft Mint Glow
+                    Container(
+                      width: 170,
+                      height: 170,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFDDF5E8).withValues(alpha: 0.7),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF16A34A).withValues(alpha: 0.08),
+                            blurRadius: 36,
+                            spreadRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: CowLoadingWidget(size: 170),
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // 5. Bottom Feature Card
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildFeatureItem(
+                            icon: Icons.calendar_month_rounded,
+                            iconBg: const Color(0xFFD4F8E8),
+                            iconColor: const Color(0xFF16A34A),
+                            title: 'Flexible Plans',
+                            subtitle: 'Daily & Weekly',
+                          ),
+                          _buildFeatureItem(
+                            icon: Icons.pause_rounded,
+                            iconBg: const Color(0xFFE0EEFD),
+                            iconColor: const Color(0xFF2563EB),
+                            title: 'Pause Anytime',
+                            subtitle: 'Skip or pause',
+                          ),
+                          _buildFeatureItem(
+                            icon: Icons.percent_rounded,
+                            iconBg: const Color(0xFFFEF0E0),
+                            iconColor: const Color(0xFFEA580C),
+                            title: 'Save More',
+                            subtitle: 'Member offers',
+                          ),
+                          _buildFeatureItem(
+                            icon: Icons.verified_user_rounded,
+                            iconBg: const Color(0xFFEFE5FC),
+                            iconColor: const Color(0xFF7C3AED),
+                            title: '100% Pure',
+                            subtitle: 'Farm fresh',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureItem({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: iconBg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ],
       ),
     );
   }
