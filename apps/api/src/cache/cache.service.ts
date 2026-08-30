@@ -26,41 +26,10 @@ export class CacheService {
       return null;
     }
     const userRecord = dbUser.data[0];
-    const roleAssignments = await this.Data.query('role_assignments', {
-      select: ['role_id'],
-      where: [
-        { column: 'user_id', operator: '=', value: user_id },
-        { column: 'is_active', operator: '=', value: 1 },
-      ],
-    });
-    let roles = [];
-    let isAdmin = false;
-    if (roleAssignments?.status && roleAssignments?.data?.length > 0) {
-      const roleIds = roleAssignments.data.map((r) => r.role_id);
-      const rolesData = await this.Data.query('roles', {
-        select: ['role_id', 'name'],
-        where: [
-          { column: 'role_id', operator: 'IN', value: roleIds },
-          { column: 'is_active', operator: '=', value: 1 },
-        ],
-      });
-      if (rolesData?.status && rolesData?.data?.length > 0) {
-        const seenRoleIds = new Set<string>();
-        roles = rolesData.data.reduce((acc, role) => {
-          if (!seenRoleIds.has(role.role_id)) {
-            seenRoleIds.add(role.role_id);
-            if (
-              role.role_id === 'ADMIN' ||
-              role.name?.toUpperCase() === 'ADMIN'
-            ) {
-              isAdmin = true;
-            }
-            acc.push({ role_id: role.role_id, name: role.name });
-          }
-          return acc;
-        }, []);
-      }
-    }
+    const roleId = (userRecord.role_id || 'CUSTOMER').toString().toUpperCase().trim();
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(roleId);
+    const roles = [{ role_id: roleId, name: roleId }];
+
     const cacheObject = {
       user_id: userRecord.user_id,
       username: userRecord.user_name,
