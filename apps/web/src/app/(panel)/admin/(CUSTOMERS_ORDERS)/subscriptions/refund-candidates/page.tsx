@@ -5,6 +5,7 @@
 // Project     : F2H Fresh
 // File        : page.tsx
 // Description : Subscription Prepaid Refund Candidates & Wallet Credit Approvals
+//               (Customer-wise, Date-wise, Pause vs Failed Order Grouping)
 //
 // ============================================================================
 
@@ -44,6 +45,9 @@ import {
   AlertTriangle,
   Layers,
   Calendar,
+  PauseCircle,
+  Truck,
+  RotateCcw,
 } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/api-config';
 
@@ -108,6 +112,8 @@ interface Payout {
   processed_at: string;
 }
 
+type GroupViewMode = 'customer' | 'date' | 'source' | 'flat' | 'payouts';
+
 // ─── Formatters & Helpers ─────────────────────────────────────────────────────
 
 function fmtDate(d?: string) {
@@ -123,7 +129,7 @@ function fmtAmount(n: number | string | undefined | null) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function RefundCandidatesPage() {
-  const [activeTab, setActiveTab] = useState<'grouped' | 'flat' | 'payouts'>('grouped');
+  const [activeTab, setActiveTab] = useState<GroupViewMode>('customer');
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
@@ -147,6 +153,7 @@ export default function RefundCandidatesPage() {
   const [filterWarehouse, setFilterWarehouse] = useState('');
   const [filterSubscription, setFilterSubscription] = useState('');
   const [filterSource, setFilterSource] = useState('');
+  const [filterSlot, setFilterSlot] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
   const [branches, setBranches] = useState<Array<{ branch_id: string; branch_name: string }>>([]);
@@ -248,7 +255,7 @@ export default function RefundCandidatesPage() {
       .catch(() => {});
   }, []);
 
-  // Flattened deliveries for Flat Table view
+  // ── Flattened & Filtered Deliveries ──────────────────────────────────────────
   const allDeliveries = useMemo(() => {
     const list: (Delivery & { customer_id: string; customer_name: string; customer_phone: string })[] = [];
     groups.forEach((g) => {
@@ -264,42 +271,112 @@ export default function RefundCandidatesPage() {
     return list;
   }, [groups]);
 
-  // Filtered deliveries based on local search & status
-  const filteredGroups = useMemo(() => {
-    if (!searchQuery.trim() && filterStatus === 'all') return groups;
+  // Filtered deliveries list based on search, slot, status, source
+  const filteredDeliveries = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
+    return allDeliveries.filter((d) => {
+      if (filterStatus !== 'all' && d.status !== filterStatus) return false;
+      if (filterSlot && d.delivery_slot !== filterSlot) return false;
+      if (filterSource && (d.source ?? d.refund_reason) !== filterSource) return false;
 
-    return groups
-      .map((g) => {
-        const matchCustomer =
-          g.customer_name?.toLowerCase().includes(q) ||
-          g.customer_phone?.includes(q) ||
-          g.customer_id?.toLowerCase().includes(q);
+      if (!q) return true;
+      return (
+        d.customer_name?.toLowerCase().includes(q) ||
+        d.customer_phone?.includes(q) ||
+        d.customer_id?.toLowerCase().includes(q) ||
+        d.product_name?.toLowerCase().includes(q) ||
+        d.variant_name?.toLowerCase().includes(q) ||
+        d.subscription_id?.toLowerCase().includes(q) ||
+        d.subscription_number?.toLowerCase().includes(q) ||
+        d.order_number?.toLowerCase().includes(q) ||
+        d.scheduled_date?.includes(q)
+      );
+    });
+  }, [allDeliveries, searchQuery, filterStatus, filterSlot, filterSource]);
 
-        const matchedDeliveries = (g.deliveries || []).filter((d) => {
-          const matchStatus = filterStatus === 'all' || d.status === filterStatus;
-          const matchDeliveryText =
-            matchCustomer ||
-            d.product_name?.toLowerCase().includes(q) ||
-            d.variant_name?.toLowerCase().includes(q) ||
-            d.subscription_id?.toLowerCase().includes(q) ||
-            d.subscription_number?.toLowerCase().includes(q) ||
-            d.order_number?.toLowerCase().includes(q) ||
-            d.scheduled_date?.includes(q);
-
-          return matchStatus && matchDeliveryText;
+  // 1. Grouped by Customer
+  const customerWiseGroups = useMemo(() => {
+    const map = new Map<string, { customer_id: string; customer_name: string; customer_phone: string; deliveries: typeof filteredDeliveries }>();
+    filteredDeliveries.forEach((d) => {
+      const cid = d.customer_id || 'UNKNOWN';
+      if (!map.has(cid)) {
+        map.set(cid, {
+          customer_id: cid,
+          customer_name: d.customer_name || 'Customer',
+          customer_phone: d.customer_phone || '',
+          deliveries: [],
         });
+      }
+      map.get(cid)!.deliveries.push(d);
+    });
 
-        if (matchedDeliveries.length === 0) return null;
-        return {
-          ...g,
-          deliveries: matchedDeliveries,
-          pending_deliveries: matchedDeliveries.length,
-          pending_refund_amount: matchedDeliveries.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0),
-        };
-      })
-      .filter(Boolean) as CustomerGroup[];
-  }, [groups, searchQuery, filterStatus]);
+    return Array.from(map.values()).map((g) => ({
+      ...g,
+      pending_deliveries: g.deliveries.length,
+      pending_refund_amount: g.deliveries.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0),
+    }));
+  }, [filteredDeliveries]);
+
+  // 2. Grouped by Scheduled Date
+  const dateWiseGroups = useMemo(() => {
+    const map = new Map<string, { date: string; deliveries: typeof filteredDeliveries; uniqueCustomers: Set<string> }>();
+    filteredDeliveries.forEach((d) => {
+      const dateKey = d.scheduled_date || 'No Date';
+      if (!map.has(dateKey)) {
+        map.set(dateKey, {
+          date: dateKey,
+          deliveries: [],
+          uniqueCustomers: new Set(),
+        });
+      }
+      const item = map.get(dateKey)!;
+      item.deliveries.push(d);
+      if (d.customer_id) item.uniqueCustomers.add(d.customer_id);
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((g) => ({
+        date: g.date,
+        deliveries: g.deliveries,
+        deliveries_count: g.deliveries.length,
+        customers_count: g.uniqueCustomers.size,
+        total_amount: g.deliveries.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0),
+      }));
+  }, [filteredDeliveries]);
+
+  // 3. Grouped by Source / Reason (Paused Days vs Failed Delivery Orders)
+  const sourceWiseGroups = useMemo(() => {
+    const pauseItems = filteredDeliveries.filter((d) => (d.source ?? d.refund_reason) === 'pause');
+    const orderItems = filteredDeliveries.filter((d) => (d.source ?? d.refund_reason) !== 'pause');
+
+    return [
+      {
+        id: 'pause',
+        title: 'Paused Subscription Days',
+        badge: 'PAUSED DAYS',
+        description: 'Scheduled deliveries skipped during customer pause windows',
+        icon: PauseCircle,
+        color: 'from-amber-500 to-orange-500',
+        bg: 'bg-amber-50/40 border-amber-200',
+        deliveries: pauseItems,
+        total_amount: pauseItems.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0),
+        customers_count: new Set(pauseItems.map((d) => d.customer_id)).size,
+      },
+      {
+        id: 'order',
+        title: 'Failed Delivery Orders',
+        badge: 'FAILED DELIVERIES',
+        description: 'Orders undelivered by delivery partners or marked failed on run',
+        icon: Truck,
+        color: 'from-rose-500 to-red-600',
+        bg: 'bg-rose-50/40 border-rose-200',
+        deliveries: orderItems,
+        total_amount: orderItems.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0),
+        customers_count: new Set(orderItems.map((d) => d.customer_id)).size,
+      },
+    ];
+  }, [filteredDeliveries]);
 
   // Total selected amount
   const selectedTotalAmount = useMemo(() => {
@@ -311,6 +388,42 @@ export default function RefundCandidatesPage() {
     });
     return sum;
   }, [allDeliveries, selectedIds]);
+
+  // ── Preset Date Selectors ──────────────────────────────────────────────────
+  const setPresetToday = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setFilterDateFrom(today);
+    setFilterDateTo(today);
+  };
+
+  const setPresetThisMonth = () => {
+    const now = new Date();
+    const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    setFilterMonth(m);
+    setFilterDateFrom('');
+    setFilterDateTo('');
+  };
+
+  const setPresetLastMonth = () => {
+    const now = new Date();
+    now.setMonth(now.getMonth() - 1);
+    const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    setFilterMonth(m);
+    setFilterDateFrom('');
+    setFilterDateTo('');
+  };
+
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setPresetThisMonth();
+    setFilterCustomer('');
+    setFilterBranch('');
+    setFilterWarehouse('');
+    setFilterSubscription('');
+    setFilterSource('');
+    setFilterSlot('');
+    setFilterStatus('all');
+  };
 
   // ── Calculation Actions ───────────────────────────────────────────────────
   const handleScan = async () => {
@@ -536,20 +649,20 @@ export default function RefundCandidatesPage() {
     });
   };
 
-  const selectAllVisible = () => {
-    const allIds = filteredGroups.flatMap((g) => g.deliveries?.map((d) => d.refund_candidate_id) ?? []);
+  const selectAllFiltered = () => {
+    const allIds = filteredDeliveries.map((d) => d.refund_candidate_id);
     setSelectedIds(new Set(allIds));
   };
 
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleExportCsv = () => {
-    if (!allDeliveries.length) {
+    if (!filteredDeliveries.length) {
       showToast('error', 'No candidate data to export');
       return;
     }
     const headers = ['Candidate ID', 'Customer ID', 'Customer Name', 'Phone', 'Subscription ID', 'Date', 'Slot', 'Product', 'Variant', 'Reason', 'Qty', 'Unit Price', 'Final Price', 'Refund Amount', 'Status'];
-    const rows = allDeliveries.map((d) => [
+    const rows = filteredDeliveries.map((d) => [
       d.refund_candidate_id,
       d.customer_id,
       `"${d.customer_name || ''}"`,
@@ -559,7 +672,7 @@ export default function RefundCandidatesPage() {
       d.delivery_slot,
       `"${d.product_name || ''}"`,
       `"${d.variant_name || ''}"`,
-      d.source === 'pause' ? 'Pause Day' : 'Failed Delivery',
+      (d.source ?? d.refund_reason) === 'pause' ? 'Pause Day' : 'Failed Delivery',
       d.quantity,
       d.unit_price || 0,
       d.final_price || 0,
@@ -705,46 +818,77 @@ export default function RefundCandidatesPage() {
         </div>
       </div>
 
-      {/* Tabs & View Switcher */}
+      {/* ── Grouping & View Selector Tabs ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
-        <div className="flex gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="flex flex-wrap gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs">
+          {/* Customer Wise Tab */}
           <button
             type="button"
-            onClick={() => setActiveTab('grouped')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'grouped'
+            onClick={() => setActiveTab('customer')}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'customer'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <Users size={14} />
-            Customer Groups ({filteredGroups.length})
+            Customer-wise ({customerWiseGroups.length})
           </button>
 
+          {/* Date Wise Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('date')}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'date'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Calendar size={14} />
+            Date-wise ({dateWiseGroups.length} days)
+          </button>
+
+          {/* Pause & Failed Orders Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('source')}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'source'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+            Pause &amp; Failed Orders
+          </button>
+
+          {/* Flat All Candidates Table */}
           <button
             type="button"
             onClick={() => setActiveTab('flat')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'flat'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <Layers size={14} />
-            All Candidates Table ({allDeliveries.length})
+            All Items ({filteredDeliveries.length})
           </button>
 
+          {/* Processed Payouts Ledger */}
           <button
             type="button"
             onClick={() => setActiveTab('payouts')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'payouts'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <Receipt size={14} />
-            Processed Payouts Ledger
+            Payouts Ledger
           </button>
         </div>
 
@@ -763,9 +907,10 @@ export default function RefundCandidatesPage() {
         )}
       </div>
 
-      {/* Filter Toolbar (Visible in Candidates tabs) */}
+      {/* ── Comprehensive Filter Toolbar ── */}
       {activeTab !== 'payouts' && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-xs">
+        <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-5 space-y-3.5 shadow-xs">
+          {/* Row 1: Search & Date Presets */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Search Box */}
             <div className="relative max-w-md w-full">
@@ -788,86 +933,139 @@ export default function RefundCandidatesPage() {
               )}
             </div>
 
-            {/* Quick Filter Controls */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Month Picker */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                <span className="text-[11px] font-bold text-slate-400">Month:</span>
-                <input
-                  type="month"
-                  value={filterMonth}
-                  onChange={(e) => setFilterMonth(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
-                />
-              </div>
-
-              {/* Source Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                <span className="text-[11px] font-bold text-slate-400">Reason:</span>
-                <select
-                  value={filterSource}
-                  onChange={(e) => setFilterSource(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
-                >
-                  <option value="">All Sources</option>
-                  <option value="pause">Paused Days Only</option>
-                  <option value="order">Failed Deliveries Only</option>
-                </select>
-              </div>
-
-              {/* Branch Filter */}
-              {branches.length > 0 && (
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                  <span className="text-[11px] font-bold text-slate-400">Branch:</span>
-                  <select
-                    value={filterBranch}
-                    onChange={(e) => setFilterBranch(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer max-w-[130px]"
-                  >
-                    <option value="">All Branches</option>
-                    {branches.map((b) => (
-                      <option key={b.branch_id} value={b.branch_id}>
-                        {b.branch_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Select All Visible Button */}
+            {/* Quick Date Presets */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-400 mr-1">Date Presets:</span>
               <button
                 type="button"
-                onClick={selectAllVisible}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                onClick={setPresetToday}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
               >
-                Select All ({filteredGroups.reduce((acc, g) => acc + g.deliveries.length, 0)})
+                Today
               </button>
+              <button
+                type="button"
+                onClick={setPresetThisMonth}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                This Month
+              </button>
+              <button
+                type="button"
+                onClick={setPresetLastMonth}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Last Month
+              </button>
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ml-1"
+                title="Reset All Filters"
+              >
+                Reset All
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Granular Filters */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-2 border-t border-slate-100">
+            {/* Month Picker */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase text-slate-400">Month</label>
+              <input
+                type="month"
+                value={filterMonth}
+                onChange={(e) => {
+                  setFilterMonth(e.target.value);
+                  setFilterDateFrom('');
+                  setFilterDateTo('');
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Custom Date Range: From */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase text-slate-400">From Date</label>
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Custom Date Range: To */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase text-slate-400">To Date</label>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Reason / Source */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase text-slate-400">Reason / Source</label>
+              <select
+                value={filterSource}
+                onChange={(e) => setFilterSource(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+              >
+                <option value="">All (Pause + Failed)</option>
+                <option value="pause">Paused Days Only</option>
+                <option value="order">Failed Orders Only</option>
+              </select>
+            </div>
+
+            {/* Delivery Slot */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase text-slate-400">Delivery Slot</label>
+              <select
+                value={filterSlot}
+                onChange={(e) => setFilterSlot(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+              >
+                <option value="">All Slots</option>
+                <option value="morning">Morning Shift</option>
+                <option value="evening">Evening Shift</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-extrabold uppercase text-slate-400">Candidate Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending Review</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="approved">Approved / Credited</option>
+                <option value="rejected">Rejected</option>
+              </select>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── TAB 1: GROUPED CUSTOMER ACCORDIONS ── */}
-      {activeTab === 'grouped' && (
+      {/* ── TAB 1: CUSTOMER-WISE VIEW ── */}
+      {activeTab === 'customer' && (
         <div className="space-y-3">
           {groupsLoading ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 space-y-3">
               <Loader2 size={32} className="animate-spin text-emerald-600" />
-              <p className="text-xs font-bold">Loading refund candidate groups...</p>
+              <p className="text-xs font-bold">Loading customer-wise refund candidates...</p>
             </div>
-          ) : filteredGroups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-3xl border border-slate-200 text-center p-6 space-y-3">
-              <div className="p-4 bg-emerald-50 text-emerald-600 rounded-3xl">
-                <CheckCircle2 size={36} />
-              </div>
-              <h3 className="text-base font-bold text-slate-800">No Pending Refund Candidates</h3>
-              <p className="text-xs text-slate-500 max-w-md">
-                All paused days and failed deliveries for this period have been approved, or none were detected. Click
-                &quot;Run Scan&quot; above to recalculate.
-              </p>
-            </div>
+          ) : customerWiseGroups.length === 0 ? (
+            <EmptyState message="No refund candidates match your customer and filter criteria." onScan={handleScan} />
           ) : (
-            filteredGroups.map((group) => (
+            customerWiseGroups.map((group) => (
               <CustomerGroupCard
                 key={group.customer_id}
                 group={group}
@@ -886,7 +1084,67 @@ export default function RefundCandidatesPage() {
         </div>
       )}
 
-      {/* ── TAB 2: FLAT ALL DELIVERIES TABLE ── */}
+      {/* ── TAB 2: DATE-WISE VIEW ── */}
+      {activeTab === 'date' && (
+        <div className="space-y-3">
+          {groupsLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 space-y-3">
+              <Loader2 size={32} className="animate-spin text-emerald-600" />
+              <p className="text-xs font-bold">Loading date-wise refund breakdown...</p>
+            </div>
+          ) : dateWiseGroups.length === 0 ? (
+            <EmptyState message="No refund candidates match your date and filter criteria." onScan={handleScan} />
+          ) : (
+            dateWiseGroups.map((group) => (
+              <DateGroupCard
+                key={group.date}
+                group={group}
+                selectedIds={selectedIds}
+                onToggleDelivery={toggleDelivery}
+                onToggleGroup={toggleSelectGroup}
+                onInspect={openDetail}
+                onApproveSingle={handleSingleApprove}
+                onRejectSingle={(id) => {
+                  setSingleRejectTarget(id);
+                  setSingleRejectReason('');
+                }}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 3: SOURCE-WISE VIEW (PAUSED DAYS VS FAILED ORDERS) ── */}
+      {activeTab === 'source' && (
+        <div className="space-y-5">
+          {groupsLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 space-y-3">
+              <Loader2 size={32} className="animate-spin text-emerald-600" />
+              <p className="text-xs font-bold">Loading paused days and failed orders breakdown...</p>
+            </div>
+          ) : filteredDeliveries.length === 0 ? (
+            <EmptyState message="No paused subscription days or failed deliveries found for this period." onScan={handleScan} />
+          ) : (
+            sourceWiseGroups.map((group) => (
+              <SourceGroupCard
+                key={group.id}
+                group={group}
+                selectedIds={selectedIds}
+                onToggleDelivery={toggleDelivery}
+                onToggleGroup={toggleSelectGroup}
+                onInspect={openDetail}
+                onApproveSingle={handleSingleApprove}
+                onRejectSingle={(id) => {
+                  setSingleRejectTarget(id);
+                  setSingleRejectReason('');
+                }}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── TAB 4: FLAT ALL DELIVERIES TABLE ── */}
       {activeTab === 'flat' && (
         <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-xs">
           <table className="w-full text-xs text-left">
@@ -895,12 +1153,12 @@ export default function RefundCandidatesPage() {
                 <th className="px-4 py-3 w-10">
                   <input
                     type="checkbox"
-                    checked={allDeliveries.length > 0 && allDeliveries.every((d) => selectedIds.has(d.refund_candidate_id))}
+                    checked={filteredDeliveries.length > 0 && filteredDeliveries.every((d) => selectedIds.has(d.refund_candidate_id))}
                     onChange={() => {
-                      if (allDeliveries.every((d) => selectedIds.has(d.refund_candidate_id))) {
+                      if (filteredDeliveries.every((d) => selectedIds.has(d.refund_candidate_id))) {
                         clearSelection();
                       } else {
-                        selectAllVisible();
+                        selectAllFiltered();
                       }
                     }}
                     className="accent-emerald-600 rounded cursor-pointer"
@@ -918,14 +1176,14 @@ export default function RefundCandidatesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {allDeliveries.length === 0 ? (
+              {filteredDeliveries.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-12 text-slate-400 font-medium">
-                    No candidates found.
+                    No candidates match the filter criteria.
                   </td>
                 </tr>
               ) : (
-                allDeliveries.map((d) => {
+                filteredDeliveries.map((d) => {
                   const isSelected = selectedIds.has(d.refund_candidate_id);
                   const isPause = (d.source ?? d.refund_reason) === 'pause';
                   return (
@@ -1027,7 +1285,7 @@ export default function RefundCandidatesPage() {
         </div>
       )}
 
-      {/* ── TAB 3: PROCESSED PAYOUTS TAB ── */}
+      {/* ── TAB 5: PROCESSED PAYOUTS TAB ── */}
       {activeTab === 'payouts' && <PayoutsTab />}
 
       {/* Floating Sticky Bulk Action Bar */}
@@ -1406,97 +1664,350 @@ function CustomerGroupCard({
       {/* Expanded Deliveries List */}
       {open && (
         <div className="border-t border-slate-100 p-3 sm:p-4 space-y-2 bg-slate-50/40">
-          {deliveries.map((d) => {
-            const isSelected = selectedIds.has(d.refund_candidate_id);
-            const isPause = (d.source ?? d.refund_reason) === 'pause';
-            return (
-              <div
-                key={d.refund_candidate_id}
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all ${
-                  isSelected ? 'bg-emerald-50/70 border-emerald-200 shadow-2xs' : 'bg-white border-slate-200/70 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => onToggleDelivery(d.refund_candidate_id)}
-                    className="accent-emerald-600 w-4 h-4 rounded cursor-pointer shrink-0"
-                  />
-
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-extrabold text-slate-900 text-xs">{fmtDate(d.scheduled_date)}</span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md uppercase ${
-                          d.delivery_slot === 'morning' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
-                        }`}
-                      >
-                        {d.delivery_slot}
-                      </span>
-                      <span
-                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                          isPause
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}
-                      >
-                        {isPause ? 'PAUSE DAY' : 'FAILED ORDER'}
-                      </span>
-                      {d.status === 'reviewed' && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-                          REVIEWED
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 font-medium">
-                      <span className="font-bold text-slate-800">{d.product_name}</span>
-                      <span className="text-slate-400">&bull;</span>
-                      <span className="text-slate-500">{d.variant_name}</span>
-                      <span className="text-slate-400">&bull;</span>
-                      <span className="font-mono text-[11px] text-slate-500">
-                        {d.quantity} &times; {fmtAmount(d.final_price || d.unit_price)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-3 pl-7 sm:pl-0 shrink-0">
-                  <span className="font-black text-emerald-700 text-sm">{fmtAmount(d.refund_amount)}</span>
-
-                  <div className="inline-flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => onInspect(d.refund_candidate_id)}
-                      title="Inspect calculation audit"
-                      className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <Eye size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onApproveSingle(d.refund_candidate_id, d.refund_amount)}
-                      title="Approve & Credit Wallet"
-                      className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <CheckCircle2 size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRejectSingle(d.refund_candidate_id)}
-                      title="Reject Candidate"
-                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <XCircle size={15} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {deliveries.map((d) => (
+            <DeliveryItemRow
+              key={d.refund_candidate_id}
+              delivery={d}
+              selected={selectedIds.has(d.refund_candidate_id)}
+              onToggle={() => onToggleDelivery(d.refund_candidate_id)}
+              onInspect={onInspect}
+              onApproveSingle={onApproveSingle}
+              onRejectSingle={onRejectSingle}
+            />
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Date Group Card Component ────────────────────────────────────────────────
+
+function DateGroupCard({
+  group,
+  selectedIds,
+  onToggleDelivery,
+  onToggleGroup,
+  onInspect,
+  onApproveSingle,
+  onRejectSingle,
+}: {
+  group: { date: string; deliveries: Delivery[]; deliveries_count: number; customers_count: number; total_amount: number };
+  selectedIds: Set<string>;
+  onToggleDelivery: (id: string) => void;
+  onToggleGroup: (ids: string[]) => void;
+  onInspect: (id: string) => void;
+  onApproveSingle: (id: string, amt: number) => void;
+  onRejectSingle: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const deliveries = group.deliveries ?? [];
+  const groupIds = deliveries.map((d) => d.refund_candidate_id);
+  const allInGroupSelected = groupIds.length > 0 && groupIds.every((id) => selectedIds.has(id));
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all">
+      {/* Date Header */}
+      <div
+        onClick={() => setOpen((v) => !v)}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50/80 transition-colors"
+      >
+        <div className="flex items-center gap-3.5">
+          <input
+            type="checkbox"
+            checked={allInGroupSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleGroup(groupIds);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="accent-emerald-600 w-4 h-4 rounded cursor-pointer shrink-0"
+          />
+
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shrink-0">
+            <Calendar size={18} />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-slate-900 text-sm">{fmtDate(group.date)}</span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                {group.date}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-0.5">
+              {group.customers_count} customer{group.customers_count === 1 ? '' : 's'} affected
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-4 pl-7 sm:pl-0">
+          <div className="text-right">
+            <div className="font-black text-emerald-700 text-base">{fmtAmount(group.total_amount)}</div>
+            <div className="text-[11px] text-slate-400 font-semibold">{group.deliveries_count} refund deliveries</div>
+          </div>
+
+          <div className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Deliveries List */}
+      {open && (
+        <div className="border-t border-slate-100 p-3 sm:p-4 space-y-2 bg-slate-50/40">
+          {deliveries.map((d) => (
+            <DeliveryItemRow
+              key={d.refund_candidate_id}
+              delivery={d}
+              selected={selectedIds.has(d.refund_candidate_id)}
+              onToggle={() => onToggleDelivery(d.refund_candidate_id)}
+              onInspect={onInspect}
+              onApproveSingle={onApproveSingle}
+              onRejectSingle={onRejectSingle}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Source Group Card Component (Paused vs Failed) ───────────────────────────
+
+function SourceGroupCard({
+  group,
+  selectedIds,
+  onToggleDelivery,
+  onToggleGroup,
+  onInspect,
+  onApproveSingle,
+  onRejectSingle,
+}: {
+  group: {
+    id: string;
+    title: string;
+    badge: string;
+    description: string;
+    icon: any;
+    color: string;
+    bg: string;
+    deliveries: Delivery[];
+    total_amount: number;
+    customers_count: number;
+  };
+  selectedIds: Set<string>;
+  onToggleDelivery: (id: string) => void;
+  onToggleGroup: (ids: string[]) => void;
+  onInspect: (id: string) => void;
+  onApproveSingle: (id: string, amt: number) => void;
+  onRejectSingle: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const Icon = group.icon;
+  const deliveries = group.deliveries ?? [];
+  const groupIds = deliveries.map((d) => d.refund_candidate_id);
+  const allInGroupSelected = groupIds.length > 0 && groupIds.every((id) => selectedIds.has(id));
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all">
+      {/* Header Banner */}
+      <div
+        onClick={() => setOpen((v) => !v)}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50/80 transition-colors"
+      >
+        <div className="flex items-center gap-3.5">
+          <input
+            type="checkbox"
+            checked={allInGroupSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleGroup(groupIds);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="accent-emerald-600 w-4 h-4 rounded cursor-pointer shrink-0"
+          />
+
+          <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${group.color} flex items-center justify-center text-white shadow-xs shrink-0`}>
+            <Icon size={20} />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-slate-900 text-sm">{group.title}</span>
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                {group.badge}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-0.5">
+              {group.description} &bull; {group.customers_count} customer{group.customers_count === 1 ? '' : 's'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-4 pl-7 sm:pl-0">
+          <div className="text-right">
+            <div className="font-black text-emerald-700 text-base">{fmtAmount(group.total_amount)}</div>
+            <div className="text-[11px] text-slate-400 font-semibold">{deliveries.length} items</div>
+          </div>
+
+          <div className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+            {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded Deliveries List */}
+      {open && (
+        <div className="border-t border-slate-100 p-3 sm:p-4 space-y-2 bg-slate-50/40">
+          {deliveries.length === 0 ? (
+            <p className="text-xs text-slate-400 font-medium py-3 text-center">No items in this category.</p>
+          ) : (
+            deliveries.map((d) => (
+              <DeliveryItemRow
+                key={d.refund_candidate_id}
+                delivery={d}
+                selected={selectedIds.has(d.refund_candidate_id)}
+                onToggle={() => onToggleDelivery(d.refund_candidate_id)}
+                onInspect={onInspect}
+                onApproveSingle={onApproveSingle}
+                onRejectSingle={onRejectSingle}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Reusable Delivery Row Component ──────────────────────────────────────────
+
+function DeliveryItemRow({
+  delivery,
+  selected,
+  onToggle,
+  onInspect,
+  onApproveSingle,
+  onRejectSingle,
+}: {
+  delivery: Delivery;
+  selected: boolean;
+  onToggle: () => void;
+  onInspect: (id: string) => void;
+  onApproveSingle: (id: string, amt: number) => void;
+  onRejectSingle: (id: string) => void;
+}) {
+  const isPause = (delivery.source ?? delivery.refund_reason) === 'pause';
+
+  return (
+    <div
+      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all ${
+        selected ? 'bg-emerald-50/70 border-emerald-200 shadow-2xs' : 'bg-white border-slate-200/70 hover:border-slate-300'
+      }`}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          className="accent-emerald-600 w-4 h-4 rounded cursor-pointer shrink-0"
+        />
+
+        <div className="space-y-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-extrabold text-slate-900 text-xs">{fmtDate(delivery.scheduled_date)}</span>
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md uppercase ${
+                delivery.delivery_slot === 'morning' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
+              }`}
+            >
+              {delivery.delivery_slot}
+            </span>
+            <span
+              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                isPause
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              }`}
+            >
+              {isPause ? 'PAUSE DAY' : 'FAILED ORDER'}
+            </span>
+            {delivery.customer_name && (
+              <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                {delivery.customer_name}
+              </span>
+            )}
+            {delivery.status === 'reviewed' && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                REVIEWED
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 font-medium">
+            <span className="font-bold text-slate-800">{delivery.product_name}</span>
+            <span className="text-slate-400">&bull;</span>
+            <span className="text-slate-500">{delivery.variant_name}</span>
+            <span className="text-slate-400">&bull;</span>
+            <span className="font-mono text-[11px] text-slate-500">
+              {delivery.quantity} &times; {fmtAmount(delivery.final_price || delivery.unit_price)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between sm:justify-end gap-3 pl-7 sm:pl-0 shrink-0">
+        <span className="font-black text-emerald-700 text-sm">{fmtAmount(delivery.refund_amount)}</span>
+
+        <div className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onInspect(delivery.refund_candidate_id)}
+            title="Inspect calculation audit"
+            className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+          >
+            <Eye size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onApproveSingle(delivery.refund_candidate_id, delivery.refund_amount)}
+            title="Approve & Credit Wallet"
+            className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+          >
+            <CheckCircle2 size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onRejectSingle(delivery.refund_candidate_id)}
+            title="Reject Candidate"
+            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+          >
+            <XCircle size={15} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Empty State Component ────────────────────────────────────────────────────
+
+function EmptyState({ message, onScan }: { message: string; onScan: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 bg-white rounded-3xl border border-slate-200 text-center p-6 space-y-3">
+      <div className="p-4 bg-emerald-50 text-emerald-600 rounded-3xl">
+        <CheckCircle2 size={36} />
+      </div>
+      <h3 className="text-base font-bold text-slate-800">No Pending Refund Candidates</h3>
+      <p className="text-xs text-slate-500 max-w-md">{message}</p>
+      <button
+        type="button"
+        onClick={onScan}
+        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+      >
+        <RefreshCw size={14} /> Recalculate Period
+      </button>
     </div>
   );
 }
