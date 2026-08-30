@@ -11,7 +11,7 @@ export class CustomerBillingRepository {
 
   async findEligiblePostpaidCustomers(): Promise<any[]> {
     const sql = `
-      SELECT c.customer_id, u.first_name, u.phone, c.is_postpaid_enabled
+      SELECT c.customer_id, u.first_name, u.last_name, u.phone, u.email, c.is_postpaid_enabled, c.postpaid_credit_limit
       FROM public.customers c
       JOIN public.users u ON u.user_id = c.customer_id
       WHERE c.is_postpaid_enabled = true AND c.deleted_at IS NULL
@@ -31,7 +31,7 @@ export class CustomerBillingRepository {
 
   async checkCustomerPostpaidEnabled(customerId: string): Promise<any> {
     const sql = `
-      SELECT c.customer_id, u.first_name, u.phone, c.is_postpaid_enabled
+      SELECT c.customer_id, u.first_name, u.last_name, u.phone, u.email, c.is_postpaid_enabled, c.postpaid_credit_limit
       FROM public.customers c
       JOIN public.users u ON u.user_id = c.customer_id
       WHERE c.customer_id = $1
@@ -68,7 +68,7 @@ export class CustomerBillingRepository {
   ): Promise<any[]> {
     const statusFilter = isPostpaid ? `AND status = 'delivered'` : '';
     const sql = `
-      SELECT id, order_id, scheduled_date, total_amount, status, order_source, payment_status,
+      SELECT id, order_id, subscription_id, scheduled_date, total_amount, status, order_source, payment_status,
         COALESCE(
           (SELECT STRING_AGG(COALESCE(pv.name, pr.name), ', ') 
            FROM public.order_items oi 

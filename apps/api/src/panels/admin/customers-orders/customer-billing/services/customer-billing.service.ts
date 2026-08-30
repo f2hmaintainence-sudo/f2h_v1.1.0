@@ -243,6 +243,162 @@ export class CustomerBillingService {
     };
   }
 
+  /**
+   * Simulation / Developer Testing: Preview Postpaid Bill Calculations without database writes
+   */
+  async previewMonthlyBatchBilling(dto: GenerateCustomerBillDto): Promise<any> {
+    let periodStart = dto?.periodStart;
+    let periodEnd = dto?.periodEnd;
+    let dueDate = dto?.dueDate;
+
+    if (!periodStart || !periodEnd || !dueDate) {
+      const now = new Date();
+      const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevYear = prevMonthDate.getFullYear();
+      const prevMonth = prevMonthDate.getMonth();
+
+      const startDay = new Date(prevYear, prevMonth, 1);
+      const endDay = new Date(prevYear, prevMonth + 1, 0);
+      const dueDay = new Date(now.getFullYear(), now.getMonth(), 5);
+
+      const formatYYMMDD = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      periodStart = periodStart || formatYYMMDD(startDay);
+      periodEnd = periodEnd || formatYYMMDD(endDay);
+      dueDate = dueDate || formatYYMMDD(dueDay);
+    }
+
+    let targetCustomers: any[] = [];
+    const isSingleCustomer = Boolean(dto?.customerId && dto.customerId.trim() !== '' && dto.customerId !== 'ALL');
+
+    if (isSingleCustomer) {
+      targetCustomers = [{ customer_id: dto.customerId!.trim() }];
+    } else {
+      const eligible = await this.repository.findEligiblePostpaidCustomers();
+      targetCustomers = eligible || [];
+    }
+
+    const candidates: any[] = [];
+    const skipped: any[] = [];
+    let totalSimulatedAmount = 0;
+
+    for (const c of targetCustomers) {
+      const cid = c.customer_id;
+      try {
+        const custInfo = await this.repository.checkCustomerPostpaidEnabled(cid);
+        const nameParts = [custInfo?.first_name || c.first_name, custInfo?.last_name || c.last_name].filter(Boolean);
+        const customerName = nameParts.length > 0 ? nameParts.join(' ') : 'Customer';
+        const customerPhone = custInfo?.phone || c.phone || '';
+
+        const existingBill = await this.repository.checkBillExists(cid, periodStart, periodEnd);
+        if (existingBill) {
+          skipped.push({
+            customer_id: cid,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            reason: `Bill #${existingBill.bill_number} already exists (${existingBill.status}, ₹${existingBill.total_amount})`,
+          });
+          continue;
+        }
+
+        const deliveredOrders = await this.repository.findDeliveredOrdersForPeriod(cid, periodStart, periodEnd, true);
+        if (!deliveredOrders || deliveredOrders.length === 0) {
+          skipped.push({
+            customer_id: cid,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            reason: 'No delivered orders found in this billing period',
+          });
+          continue;
+        }
+
+        let totalAmt = 0;
+        let paidAmt = 0;
+        for (const ord of deliveredOrders) {
+          const amt = Number(ord.total_amount || 0);
+          totalAmt += amt;
+          if (ord.order_source === 'one-time' && ord.payment_status === 'paid') {
+            paidAmt += amt;
+          }
+        }
+
+        totalSimulatedAmount += totalAmt;
+
+        // Group delivered orders by subscription or one-time
+        const subsMap = new Map<string, any>();
+        for (const ord of deliveredOrders) {
+          const subKey = ord.subscription_id || 'ONETIME';
+          if (!subsMap.has(subKey)) {
+            subsMap.set(subKey, {
+              subscription_id: ord.subscription_id || null,
+              is_subscription: Boolean(ord.subscription_id),
+              title: ord.subscription_id ? `Subscription ${ord.subscription_id}` : 'One-Time Orders',
+              total_amount: 0,
+              items_count: 0,
+              orders: [],
+            });
+          }
+          const subGroup = subsMap.get(subKey);
+          subGroup.total_amount = Math.round((subGroup.total_amount + Number(ord.total_amount || 0)) * 100) / 100;
+          subGroup.items_count++;
+          subGroup.orders.push({
+            order_id: ord.order_id,
+            scheduled_date: ord.scheduled_date,
+            total_amount: Number(ord.total_amount || 0),
+            order_name: ord.order_name,
+            order_source: ord.order_source,
+            status: ord.status,
+          });
+        }
+
+        candidates.push({
+          customer_id: cid,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          orders_count: deliveredOrders.length,
+          total_amount: Math.round(totalAmt * 100) / 100,
+          paid_amount: Math.round(paidAmt * 100) / 100,
+          due_amount: Math.round((totalAmt - paidAmt) * 100) / 100,
+          simulated_bill_id: `SIM_BILL_${cid}_${periodStart.replace(/-/g, '')}`,
+          subscriptions: Array.from(subsMap.values()),
+          orders: deliveredOrders.map((o) => ({
+            order_id: o.order_id,
+            subscription_id: o.subscription_id,
+            scheduled_date: o.scheduled_date,
+            total_amount: Number(o.total_amount || 0),
+            order_name: o.order_name,
+            order_source: o.order_source,
+            status: o.status,
+          })),
+        });
+      } catch (err: any) {
+        skipped.push({
+          customer_id: cid,
+          reason: err.message || 'Error checking customer',
+        });
+      }
+    }
+
+    return {
+      status: true,
+      data: {
+        billingPeriod: { start: periodStart, end: periodEnd },
+        dueDate,
+        totalEligibleCustomers: targetCustomers.length,
+        totalCalculatedBills: candidates.length,
+        totalSkipped: skipped.length,
+        totalSimulatedAmount: Math.round(totalSimulatedAmount * 100) / 100,
+        candidates,
+        skipped,
+      },
+    };
+  }
+
   private async processSingleCustomerBill(
     customerId: string,
     periodStart: string,

@@ -17,7 +17,8 @@ import {
   Receipt, RefreshCw, ChevronRight, Home, Search,
   CheckCircle2, Clock, AlertCircle, AlertTriangle, X, Eye, Loader2,
   Calendar, CreditCard, ShoppingBag, Download, Send, Phone,
-  Mail, Building, DollarSign, Wallet, ArrowUpRight, Layers, TrendingUp
+  Mail, Building, DollarSign, Wallet, ArrowUpRight, Layers, TrendingUp,
+  ChevronDown, ChevronUp, Package, Users, Sparkles, Check, User, Filter, RotateCcw
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -100,7 +101,7 @@ export default function CustomerBillingPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Developer Testing: Postpaid Bill Generation Modal
+  // Developer Testing: Postpaid Bill Generation & Simulation Modal
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [eligibleCustomers, setEligibleCustomers] = useState<any[]>([]);
   const [loadingEligible, setLoadingEligible] = useState(false);
@@ -119,8 +120,51 @@ export default function CustomerBillingPage() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-05`;
   });
+  const [simulatingPreview, setSimulatingPreview] = useState(false);
+  const [simulatedData, setSimulatedData] = useState<any | null>(null);
   const [generatingBills, setGeneratingBills] = useState(false);
   const [generationResult, setGenerationResult] = useState<any | null>(null);
+  const [previewTab, setPreviewTab] = useState<'candidates' | 'skipped'>('candidates');
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [previewViewMode, setPreviewViewMode] = useState<'grouped' | 'flat'>('grouped');
+  const [expandedPreviewCustomers, setExpandedPreviewCustomers] = useState<Set<string>>(new Set());
+  const [expandedPreviewSubs, setExpandedPreviewSubs] = useState<Set<string>>(new Set());
+
+  const handleRunPreviewSimulation = async (targetCid = genCustomerId, pStart = genPeriodStart, pEnd = genPeriodEnd, dDate = genDueDate) => {
+    setSimulatingPreview(true);
+    setSimulatedData(null);
+    setGenerationResult(null);
+    setPreviewSearch('');
+    try {
+      const q = new URLSearchParams({
+        customerId: targetCid === "ALL" ? "" : targetCid,
+        periodStart: pStart,
+        periodEnd: pEnd,
+        dueDate: dDate,
+      });
+      const res = await api.get<any>(`/admin/postpaid-bills/preview?${q.toString()}`);
+      if (res.data?.status && res.data.data) {
+        setSimulatedData(res.data.data);
+        const custIds = new Set<string>();
+        const subIds = new Set<string>();
+        (res.data.data.candidates || []).forEach((c: any) => {
+          if (c.customer_id) custIds.add(c.customer_id);
+          (c.subscriptions || []).forEach((s: any) => {
+            if (s.subscription_id) subIds.add(s.subscription_id);
+          });
+        });
+        setExpandedPreviewCustomers(custIds);
+        setExpandedPreviewSubs(subIds);
+      } else {
+        showToast(res.data?.message || 'Failed to simulate bill calculations', false);
+      }
+    } catch (err: any) {
+      console.error('Simulation preview error:', err);
+      showToast(err.response?.data?.message || 'Failed to simulate postpaid bills', false);
+    } finally {
+      setSimulatingPreview(false);
+    }
+  };
 
   const openGenerateBillsModal = async () => {
     setShowGenerateModal(true);
@@ -135,6 +179,8 @@ export default function CustomerBillingPage() {
       } else {
         setEligibleCustomers([]);
       }
+      // Trigger initial preview calculation
+      handleRunPreviewSimulation("ALL", genPeriodStart, genPeriodEnd, genDueDate);
     } catch (err: any) {
       console.error('Failed to load eligible customers:', err);
       showToast('Failed to load eligible postpaid customers', false);
@@ -159,6 +205,8 @@ export default function CustomerBillingPage() {
         showToast(`Postpaid bill calculation finished. Generated: ${res.data?.summary?.generated ?? 1}`, true);
         fetchBills();
         fetchStats();
+        // Refresh simulation preview after live generation
+        handleRunPreviewSimulation();
       } else {
         showToast(res.data?.message || 'Bill calculation completed with notes', false);
       }
@@ -781,6 +829,46 @@ export default function CustomerBillingPage() {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-xs">
+        {/* Quick Type Selection Pills */}
+        <div className="flex flex-wrap items-center gap-1.5 pb-1 border-b border-slate-100">
+          <button
+            type="button"
+            onClick={() => { setTypeFilter("all"); setPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              typeFilter === "all" ? "bg-slate-900 text-white shadow-2xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            All Bills
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTypeFilter("subscription_postpaid"); setPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              typeFilter === "subscription_postpaid" ? "bg-blue-600 text-white shadow-2xs" : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60"
+            }`}
+          >
+            🔄 Postpaid Subscriptions
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTypeFilter("subscription_prepaid"); setPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              typeFilter === "subscription_prepaid" ? "bg-purple-600 text-white shadow-2xs" : "bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/60"
+            }`}
+          >
+            ⚡ Prepaid Subscriptions
+          </button>
+          <button
+            type="button"
+            onClick={() => { setTypeFilter("order"); setPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              typeFilter === "order" ? "bg-emerald-600 text-white shadow-2xs" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60"
+            }`}
+          >
+            🛍️ One-Time / COD Orders
+          </button>
+        </div>
+
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Box */}
           <div className="relative max-w-md w-full">
@@ -830,7 +918,9 @@ export default function CustomerBillingPage() {
                 className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
               >
                 <option value="all">All Types</option>
-                <option value="subscription">Subscriptions / Postpaid</option>
+                <option value="subscription_postpaid">Subscriptions / Postpaid</option>
+                <option value="subscription_prepaid">Subscriptions / Prepaid</option>
+                <option value="subscription">All Subscriptions</option>
                 <option value="order">Prepaid / One-Time</option>
               </select>
             </div>
@@ -947,8 +1037,21 @@ export default function CustomerBillingPage() {
                         </span>
                       </td>
 
-                      <td className="px-4 py-3.5 text-slate-600 capitalize align-middle">
-                        {bill.bill_type || bill.payment_type || "Order"}
+                      <td className="px-4 py-3.5 align-middle">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-slate-800 capitalize">
+                            {bill.bill_type === 'subscription' ? 'Subscription' : 'One-Time Order'}
+                          </span>
+                          {bill.payment_type === 'postpaid' ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60 w-fit">
+                              Postpaid
+                            </span>
+                          ) : bill.payment_type === 'prepaid' ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200/60 w-fit">
+                              Prepaid
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
 
                       <td className="px-4 py-3.5 text-right font-bold text-slate-700 align-middle">
@@ -1389,21 +1492,27 @@ export default function CustomerBillingPage() {
         </div>
       )}
 
-      {/* Developer Testing: Postpaid Bill Generation Modal */}
+      {/* Developer Testing: Postpaid Bill Generation & Simulation Modal */}
       {showGenerateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
-                  <Receipt size={20} />
+                <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl shadow-xs">
+                  <Receipt size={22} />
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-slate-900 tracking-tight">
-                    Developer Testing — Postpaid Billing Engine
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-black text-slate-900 tracking-tight">
+                      Developer Testing — Postpaid Billing Engine &amp; Simulation
+                    </h2>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full">
+                      Testing Tool
+                    </span>
+                  </div>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Test &amp; trigger monthly postpaid bill calculation for eligible customers
+                    Simulate calculations or materialize monthly postpaid bills for eligible customers
                   </p>
                 </div>
               </div>
@@ -1416,33 +1525,34 @@ export default function CustomerBillingPage() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Target Customer
-                </label>
-                {loadingEligible ? (
-                  <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
-                    <Loader2 size={14} className="animate-spin text-emerald-600" />
-                    Loading eligible postpaid customers...
-                  </div>
-                ) : (
-                  <select
-                    value={genCustomerId}
-                    onChange={(e) => setGenCustomerId(e.target.value)}
-                    className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
-                  >
-                    <option value="ALL">🌟 ALL Eligible Postpaid Customers ({eligibleCustomers.length})</option>
-                    {eligibleCustomers.map((cust) => (
-                      <option key={cust.customerId || cust.customer_id} value={cust.customerId || cust.customer_id}>
-                        {cust.customerName || cust.first_name || "Customer"} ({cust.customerId || cust.customer_id}) {cust.phone ? `— ${cust.phone}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+            {/* Config & Parameter Controls */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Target Customer
+                  </label>
+                  {loadingEligible ? (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 py-2">
+                      <Loader2 size={13} className="animate-spin text-emerald-600" />
+                      Loading...
+                    </div>
+                  ) : (
+                    <select
+                      value={genCustomerId}
+                      onChange={(e) => setGenCustomerId(e.target.value)}
+                      className="w-full py-2 px-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
+                    >
+                      <option value="ALL">🌟 ALL Postpaid ({eligibleCustomers.length})</option>
+                      {eligibleCustomers.map((cust) => (
+                        <option key={cust.customerId || cust.customer_id} value={cust.customerId || cust.customer_id}>
+                          {cust.customerName || cust.first_name || "Customer"} ({cust.customerId || cust.customer_id})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
                     Period Start
@@ -1451,9 +1561,10 @@ export default function CustomerBillingPage() {
                     type="date"
                     value={genPeriodStart}
                     onChange={(e) => setGenPeriodStart(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                    className="w-full py-2 px-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
                   />
                 </div>
+
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
                     Period End
@@ -1462,9 +1573,10 @@ export default function CustomerBillingPage() {
                     type="date"
                     value={genPeriodEnd}
                     onChange={(e) => setGenPeriodEnd(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                    className="w-full py-2 px-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
                   />
                 </div>
+
                 <div>
                   <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
                     Due Date
@@ -1473,49 +1585,509 @@ export default function CustomerBillingPage() {
                     type="date"
                     value={genDueDate}
                     onChange={(e) => setGenDueDate(e.target.value)}
-                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                    className="w-full py-2 px-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
                   />
                 </div>
               </div>
 
-              {generationResult && (
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
-                  <div className="flex items-center justify-between font-bold text-slate-800">
-                    <span>Calculation Result:</span>
-                    <span className={generationResult.status ? "text-emerald-600" : "text-amber-600"}>
-                      {generationResult.message || (generationResult.status ? "Completed" : "Note")}
-                    </span>
-                  </div>
-                  {generationResult.summary && (
-                    <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-center">
-                      <div className="bg-white p-2 rounded-xl border border-slate-100">
-                        <p className="text-[10px] text-slate-400 font-bold">Eligible</p>
-                        <p className="text-sm font-black text-slate-800">{generationResult.summary.eligibleCustomers ?? 0}</p>
-                      </div>
-                      <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100">
-                        <p className="text-[10px] text-emerald-600 font-bold">Generated</p>
-                        <p className="text-sm font-black text-emerald-700">{generationResult.summary.generated ?? 0}</p>
-                      </div>
-                      <div className="bg-amber-50/50 p-2 rounded-xl border border-amber-100">
-                        <p className="text-[10px] text-amber-600 font-bold">Skipped</p>
-                        <p className="text-sm font-black text-amber-700">{generationResult.summary.skipped ?? 0}</p>
-                      </div>
-                      <div className="bg-rose-50/50 p-2 rounded-xl border border-rose-100">
-                        <p className="text-[10px] text-rose-600 font-bold">Failed</p>
-                        <p className="text-sm font-black text-rose-700">{generationResult.summary.failed ?? 0}</p>
-                      </div>
-                    </div>
-                  )}
-                  {generationResult.billNumber && (
-                    <div className="mt-2 p-2 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 font-medium">
-                      Generated Bill ID: <span className="font-bold">{generationResult.billNumber}</span> &bull; Amount: <span className="font-bold">₹{generationResult.totalAmount}</span>
-                    </div>
-                  )}
+              {/* Action Buttons in Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60">
+                <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-emerald-600" />
+                  <span>Simulation calculates ledger items from delivered orders without writing to database.</span>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRunPreviewSimulation(genCustomerId, genPeriodStart, genPeriodEnd, genDueDate)}
+                    disabled={simulatingPreview}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {simulatingPreview ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin text-emerald-600" />
+                        Simulating...
+                      </>
+                    ) : (
+                      <>
+                        <Eye size={13} className="text-emerald-700" />
+                        Simulate &amp; Preview
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRunBillGeneration}
+                    disabled={generatingBills}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {generatingBills ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        Generating Live Bills...
+                      </>
+                    ) : (
+                      <>
+                        <Receipt size={13} />
+                        Generate Live Bills
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            {/* Generation Live Result Notice */}
+            {generationResult && (
+              <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs space-y-1.5 animate-in fade-in">
+                <div className="flex items-center justify-between font-bold text-emerald-900">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    Live Generation Result:
+                  </span>
+                  <span>{generationResult.message || "Completed"}</span>
+                </div>
+                {generationResult.summary && (
+                  <div className="grid grid-cols-4 gap-2 pt-1.5 border-t border-emerald-200/60 text-center font-medium">
+                    <div className="bg-white/80 p-1.5 rounded-xl">
+                      <p className="text-[10px] text-slate-400 font-bold">Eligible</p>
+                      <p className="text-xs font-black text-slate-800">{generationResult.summary.eligibleCustomers ?? 0}</p>
+                    </div>
+                    <div className="bg-white/80 p-1.5 rounded-xl">
+                      <p className="text-[10px] text-emerald-600 font-bold">Generated</p>
+                      <p className="text-xs font-black text-emerald-700">{generationResult.summary.generated ?? 0}</p>
+                    </div>
+                    <div className="bg-white/80 p-1.5 rounded-xl">
+                      <p className="text-[10px] text-amber-600 font-bold">Skipped</p>
+                      <p className="text-xs font-black text-amber-700">{generationResult.summary.skipped ?? 0}</p>
+                    </div>
+                    <div className="bg-white/80 p-1.5 rounded-xl">
+                      <p className="text-[10px] text-rose-600 font-bold">Failed</p>
+                      <p className="text-xs font-black text-rose-700">{generationResult.summary.failed ?? 0}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Simulation Preview Section */}
+            {simulatingPreview ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-2 text-slate-400">
+                <Loader2 size={24} className="animate-spin text-emerald-600" />
+                <p className="text-xs font-bold">Calculating delivered subscription orders and monthly estimations...</p>
+              </div>
+            ) : simulatedData ? (() => {
+                const candidates = simulatedData.candidates || [];
+                const skipped = simulatedData.skipped || [];
+
+                // Filter candidates by search
+                const filteredCandidates = candidates.filter((c: any) => {
+                  if (!previewSearch.trim()) return true;
+                  const q = previewSearch.toLowerCase().trim();
+                  const matchCid = (c.customer_id || '').toLowerCase().includes(q);
+                  const matchName = (c.customer_name || '').toLowerCase().includes(q);
+                  const matchPhone = (c.customer_phone || '').toLowerCase().includes(q);
+                  const matchSub = (c.subscriptions || []).some((s: any) => 
+                    (s.subscription_id || '').toLowerCase().includes(q) || (s.title || '').toLowerCase().includes(q)
+                  );
+                  const matchOrd = (c.orders || []).some((o: any) =>
+                    (o.order_id || '').toLowerCase().includes(q) || (o.order_name || '').toLowerCase().includes(q)
+                  );
+                  return matchCid || matchName || matchPhone || matchSub || matchOrd;
+                });
+
+                const filteredSkipped = skipped.filter((s: any) => {
+                  if (!previewSearch.trim()) return true;
+                  const q = previewSearch.toLowerCase().trim();
+                  return (s.customer_id || '').toLowerCase().includes(q) || (s.customer_name || '').toLowerCase().includes(q) || (s.reason || '').toLowerCase().includes(q);
+                });
+
+                const toggleCustomer = (cId: string) => {
+                  setExpandedPreviewCustomers((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(cId)) next.delete(cId);
+                    else next.add(cId);
+                    return next;
+                  });
+                };
+
+                const toggleSub = (subId: string) => {
+                  setExpandedPreviewSubs((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(subId)) next.delete(subId);
+                    else next.add(subId);
+                    return next;
+                  });
+                };
+
+                const expandAll = () => {
+                  const cIds = new Set<string>();
+                  const sIds = new Set<string>();
+                  candidates.forEach((c: any) => {
+                    if (c.customer_id) cIds.add(c.customer_id);
+                    (c.subscriptions || []).forEach((s: any) => {
+                      if (s.subscription_id) sIds.add(s.subscription_id);
+                    });
+                  });
+                  setExpandedPreviewCustomers(cIds);
+                  setExpandedPreviewSubs(sIds);
+                };
+
+                const collapseAll = () => {
+                  setExpandedPreviewCustomers(new Set());
+                  setExpandedPreviewSubs(new Set());
+                };
+
+                return (
+                  <div className="space-y-3.5 text-xs">
+                    {/* Top Simulation KPI Banner */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-r from-slate-50 to-blue-50/40 rounded-2xl border border-slate-200 shadow-2xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Analyzed Period</span>
+                        <p className="font-extrabold text-slate-800">
+                          {simulatedData.billingPeriod?.start} &rarr; {simulatedData.billingPeriod?.end}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Eligible Customers</span>
+                        <p className="font-extrabold text-slate-900">
+                          {simulatedData.totalEligibleCustomers} postpaid users
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Calculable Invoices</span>
+                        <p className="font-black text-slate-900 text-sm">
+                          {candidates.length} bills <span className="text-[10px] text-slate-400 font-normal">({skipped.length} skipped)</span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Total Simulated Valuation</span>
+                        <p className="font-black text-emerald-700 text-base">
+                          {formatMoney(simulatedData.totalSimulatedAmount)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Toolbar: Sub-tabs, View Switcher, Search, Expand/Collapse */}
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 p-2 bg-slate-50 rounded-2xl border border-slate-200">
+                      {/* Left: Sub-Tabs */}
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewTab('candidates')}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            previewTab === 'candidates'
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Receipt size={13} />
+                          Calculable Bills ({candidates.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewTab('skipped')}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            previewTab === 'skipped'
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Clock size={13} />
+                          Skipped / Existing ({skipped.length})
+                        </button>
+                      </div>
+
+                      {/* Right: View mode toggle & Search */}
+                      <div className="flex items-center gap-2">
+                        {previewTab === 'candidates' && (
+                          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewViewMode('grouped')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                previewViewMode === 'grouped' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              Grouped
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewViewMode('flat')}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                previewViewMode === 'flat' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              Flat Orders
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Filter simulation results..."
+                            value={previewSearch}
+                            onChange={(e) => setPreviewSearch(e.target.value)}
+                            className="pl-7 pr-2.5 py-1 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 w-44 placeholder:text-slate-400"
+                          />
+                        </div>
+
+                        {previewTab === 'candidates' && previewViewMode === 'grouped' && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={expandAll}
+                              className="px-2 py-1 text-[10px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg cursor-pointer"
+                            >
+                              Expand
+                            </button>
+                            <button
+                              type="button"
+                              onClick={collapseAll}
+                              className="px-2 py-1 text-[10px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg cursor-pointer"
+                            >
+                              Collapse
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Content Display: Candidates Tab */}
+                    {previewTab === 'candidates' ? (
+                      filteredCandidates.length === 0 ? (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 font-medium">
+                          No calculable postpaid bills found for this period or search criteria.
+                        </div>
+                      ) : previewViewMode === 'grouped' ? (
+                        /* ── GROUPED CUSTOMER & SUBSCRIPTION VIEW ── */
+                        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                          {filteredCandidates.map((cust: any) => {
+                            const isCustExpanded = expandedPreviewCustomers.has(cust.customer_id);
+                            return (
+                              <div
+                                key={cust.customer_id}
+                                className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden"
+                              >
+                                {/* Customer Header */}
+                                <div
+                                  onClick={() => toggleCustomer(cust.customer_id)}
+                                  className="flex items-center justify-between p-3.5 bg-slate-50/80 hover:bg-slate-100/80 cursor-pointer select-none transition-colors border-b border-slate-100"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center font-black text-xs shadow-2xs">
+                                      {cust.customer_name ? cust.customer_name.charAt(0).toUpperCase() : 'C'}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-extrabold text-sm text-slate-900">
+                                          {cust.customer_name || 'Customer'}
+                                        </span>
+                                        <span className="font-mono text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                                          {cust.customer_id}
+                                        </span>
+                                        {cust.customer_phone && (
+                                          <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                                            <Phone size={11} className="text-slate-400" />
+                                            {cust.customer_phone}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-2">
+                                        <span>{cust.orders_count} delivered order(s)</span>
+                                        <span>&bull;</span>
+                                        <span>{cust.subscriptions.length} subscription / group(s)</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3">
+                                    <div className="text-right">
+                                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Simulated Invoiced Total</span>
+                                      <span className="font-black text-sm text-emerald-700">
+                                        {formatMoney(cust.total_amount)}
+                                      </span>
+                                    </div>
+
+                                    <div className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-transform">
+                                      {isCustExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Customer Subscriptions & Orders */}
+                                {isCustExpanded && (
+                                  <div className="p-3.5 space-y-3 bg-white">
+                                    {cust.subscriptions.map((sub: any, sIdx: number) => {
+                                      const subKey = sub.subscription_id || `ONETIME_${sIdx}`;
+                                      const isSubExpanded = expandedPreviewSubs.has(subKey);
+                                      return (
+                                        <div
+                                          key={subKey}
+                                          className="rounded-xl border border-slate-200/90 overflow-hidden bg-slate-50/40"
+                                        >
+                                          <div
+                                            onClick={() => toggleSub(subKey)}
+                                            className="flex items-center justify-between p-2.5 bg-slate-100/60 hover:bg-slate-100 cursor-pointer select-none transition-colors border-b border-slate-200/60"
+                                          >
+                                            <div className="flex items-center gap-2.5">
+                                              <div className="p-1.5 bg-white text-blue-700 rounded-lg border border-slate-200 shadow-2xs">
+                                                <Package size={14} />
+                                              </div>
+                                              <div>
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-mono text-xs font-black text-slate-800">
+                                                    {sub.title}
+                                                  </span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-medium">
+                                                  {sub.items_count} delivered order line(s)
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3">
+                                              <div className="text-right">
+                                                <span className="font-extrabold text-xs text-emerald-700">
+                                                  {formatMoney(sub.total_amount)}
+                                                </span>
+                                              </div>
+                                              <div className="p-1 text-slate-400">
+                                                {isSubExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {isSubExpanded && (
+                                            <div className="overflow-x-auto bg-white">
+                                              <table className="w-full text-left text-xs">
+                                                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100 text-[11px]">
+                                                  <tr>
+                                                    <th className="py-2 px-3">Date</th>
+                                                    <th className="py-2 px-3">Order ID</th>
+                                                    <th className="py-2 px-3">Delivered Products &amp; Items</th>
+                                                    <th className="py-2 px-3 text-center">Status</th>
+                                                    <th className="py-2 px-3 text-right">Order Amount</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                                  {sub.orders.map((ord: any, oIdx: number) => (
+                                                    <tr key={oIdx} className="hover:bg-slate-50/60">
+                                                      <td className="py-2 px-3 font-bold text-slate-900 whitespace-nowrap">
+                                                        {fmtDate(ord.scheduled_date)}
+                                                      </td>
+                                                      <td className="py-2 px-3 font-mono text-[11px] text-slate-700 font-bold">
+                                                        #{ord.order_id}
+                                                      </td>
+                                                      <td className="py-2 px-3 font-medium text-slate-800">
+                                                        {ord.order_name}
+                                                      </td>
+                                                      <td className="py-2 px-3 text-center">
+                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                          {ord.status}
+                                                        </span>
+                                                      </td>
+                                                      <td className="py-2 px-3 text-right font-black text-emerald-700 whitespace-nowrap">
+                                                        {formatMoney(ord.total_amount)}
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        /* ── FLAT ORDERS VIEW ── */
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[50vh]">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 sticky top-0">
+                              <tr>
+                                <th className="p-2.5">Date</th>
+                                <th className="p-2.5">Customer</th>
+                                <th className="p-2.5">Order ID</th>
+                                <th className="p-2.5">Delivered Products</th>
+                                <th className="p-2.5 text-center">Status</th>
+                                <th className="p-2.5 text-right">Order Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                              {filteredCandidates.flatMap((c: any) =>
+                                (c.orders || []).map((ord: any, idx: number) => (
+                                  <tr key={`${c.customer_id}_${ord.order_id}_${idx}`} className="hover:bg-slate-50">
+                                    <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
+                                      {fmtDate(ord.scheduled_date)}
+                                    </td>
+                                    <td className="p-2.5 whitespace-nowrap">
+                                      <span className="font-bold text-slate-800">{c.customer_name}</span>
+                                      <div className="text-[10px] text-slate-400 font-mono">{c.customer_id}</div>
+                                    </td>
+                                    <td className="p-2.5 font-mono font-bold text-slate-700">#{ord.order_id}</td>
+                                    <td className="p-2.5 font-medium">{ord.order_name}</td>
+                                    <td className="p-2.5 text-center">
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                        {ord.status}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-right font-black text-emerald-700">
+                                      {formatMoney(ord.total_amount)}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    ) : (
+                      /* ── SKIPPED CUSTOMERS TAB ── */
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[50vh]">
+                        {filteredSkipped.length === 0 ? (
+                          <div className="p-8 text-center bg-slate-50 text-slate-500 font-medium">
+                            No customers skipped.
+                          </div>
+                        ) : (
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 sticky top-0">
+                              <tr>
+                                <th className="p-2.5">Customer</th>
+                                <th className="p-2.5">Phone</th>
+                                <th className="p-2.5">Reason Skipped</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                              {filteredSkipped.map((sk: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-slate-50">
+                                  <td className="p-2.5 whitespace-nowrap">
+                                    <span className="font-bold text-slate-800">{sk.customer_name || sk.customer_id}</span>
+                                    <div className="text-[10px] text-slate-400 font-mono">{sk.customer_id}</div>
+                                  </td>
+                                  <td className="p-2.5 text-slate-500">{sk.customer_phone || "—"}</td>
+                                  <td className="p-2.5 text-amber-700 font-semibold">{sk.reason}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })() : null}
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setShowGenerateModal(false)}
@@ -1523,24 +2095,26 @@ export default function CustomerBillingPage() {
               >
                 Close
               </button>
-              <button
-                type="button"
-                onClick={handleRunBillGeneration}
-                disabled={generatingBills}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
-              >
-                {generatingBills ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Calculating &amp; Generating...
-                  </>
-                ) : (
-                  <>
-                    <Receipt size={14} />
-                    Run Calculation &amp; Generate Bills
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRunBillGeneration}
+                  disabled={generatingBills}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {generatingBills ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Calculating &amp; Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Receipt size={14} />
+                      Run Live Bill Generation
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

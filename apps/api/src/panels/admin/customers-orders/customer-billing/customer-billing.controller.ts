@@ -29,6 +29,11 @@ export class CustomerBillingApiController {
     return await this.service.getEligibleCustomers();
   }
 
+  @Get('preview')
+  async previewBill(@Query() query: GenerateCustomerBillDto) {
+    return await this.service.previewMonthlyBatchBilling(query || {});
+  }
+
   @Post('generate')
   @HttpCode(HttpStatus.CREATED)
   async generateBill(@Body(new ValidationPipe({ transform: true, skipMissingProperties: true })) dto: GenerateCustomerBillDto) {
@@ -47,6 +52,11 @@ export class CustomerBillingAdminController {
   @Get('eligible-customers')
   async getEligibleCustomersAdmin() {
     return await this.service.getEligibleCustomers();
+  }
+
+  @Get('preview')
+  async previewBillAdmin(@Query() query: GenerateCustomerBillDto) {
+    return await this.service.previewMonthlyBatchBilling(query || {});
   }
 
   @Post('generate')

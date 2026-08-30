@@ -245,7 +245,11 @@ export class FinanceRepository {
 
     if (query.type && query.type !== 'all') {
       const t = String(query.type).toLowerCase();
-      if (t === 'subscription' || t === 'postpaid') {
+      if (t === 'subscription_postpaid' || t === 'postpaid') {
+        conditions.push(`(pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid') AND pb.payment_type = 'postpaid'`);
+      } else if (t === 'subscription_prepaid') {
+        conditions.push(`pb.bill_type = 'subscription' AND pb.payment_type = 'prepaid'`);
+      } else if (t === 'subscription') {
         conditions.push(`(pb.bill_type IN ('subscription', 'postpaid') OR pb.payment_type = 'postpaid')`);
       } else if (t === 'order' || t === 'prepaid' || t === 'one-time' || t === 'one_time') {
         conditions.push(`((pb.bill_type IN ('order', 'prepaid') OR pb.payment_type = 'prepaid') AND pb.bill_type NOT IN ('subscription', 'postpaid'))`);
