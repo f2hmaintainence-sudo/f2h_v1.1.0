@@ -69,12 +69,7 @@ export class CustomerBillingRepository {
     const statusFilter = isPostpaid ? `AND orders.status = 'delivered'` : '';
     const sql = `
       SELECT orders.id, orders.order_id, orders.subscription_id, orders.scheduled_date,
-        COALESCE(
-          (SELECT SUM(COALESCE(NULLIF(oi.final_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1))
-           FROM public.order_items oi
-           WHERE oi.order_id = orders.order_id),
-          orders.total_amount
-        ) AS total_amount,
+        orders.total_amount,
         orders.status, orders.order_source, orders.payment_status,
         COALESCE(
           (SELECT STRING_AGG(COALESCE(pv.name, pr.name), ', ') 
