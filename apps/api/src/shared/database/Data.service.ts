@@ -1625,8 +1625,14 @@ export async function qualifySelect(
         alias = match[2].trim();
       }
     }
-    // Handle raw SQL expressions / subqueries e.g. (SELECT ...) or COALESCE(...)
-    if (typeof rawCol === 'string' && (rawCol.trim().startsWith('(') || rawCol.trim().toUpperCase().startsWith('COALESCE('))) {
+    // Handle raw SQL expressions / subqueries e.g. (SELECT ...) or COALESCE(...), CONCAT_WS(...), etc.
+    const isRawExpr =
+      typeof rawCol === 'string' &&
+      (rawCol.trim().startsWith('(') ||
+        /^(COALESCE|CONCAT_WS|CONCAT|TRIM|NULLIF|UPPER|LOWER|CASE|CAST|TO_CHAR|COUNT|SUM|AVG|MIN|MAX)\b/i.test(
+          rawCol.trim(),
+        ));
+    if (isRawExpr) {
       const resultKey = alias ?? 'expr';
       qualified.push(`${rawCol} AS "${resultKey}"`);
       sourceMap[resultKey] = {

@@ -134,7 +134,6 @@ export class RefundEligibilityService {
         SELECT
           sp.id AS pause_id,
           sp.subscription_id,
-          sp.subscription_item_id AS pause_item_ref,
           GREATEST(sp.start_date, $1::date) AS win_from,
           LEAST(
             CASE WHEN sp.status = 'resumed'
@@ -146,28 +145,26 @@ export class RefundEligibilityService {
         FROM subscription_pauses sp
         JOIN subscriptions s ON s.subscription_id = sp.subscription_id
         WHERE sp.deleted_at IS NULL
-          AND sp.is_refunded = false
           AND s.deleted_at IS NULL
           AND s.payment_type = 'prepaid'
           ${scope.join('\n          ')}
       ),
       paused_days AS (
-        SELECT pw.pause_id, pw.subscription_id, pw.pause_item_ref, d::date AS scheduled_date
+        SELECT pw.pause_id, pw.subscription_id, d::date AS scheduled_date
         FROM pause_windows pw
         CROSS JOIN LATERAL generate_series(pw.win_from, pw.win_to, '1 day') AS d
         WHERE pw.win_from <= pw.win_to
       ),
       items AS (
-        SELECT pd.*, si.subscription_item_id, si.final_price, si.unit_price,
+        SELECT pd.*, si.subscription_item_id,
+               COALESCE(si.final_price, si.unit_price - COALESCE(si.discount_amount, 0) - COALESCE(si.coupon_amount, 0), si.unit_price) AS final_price,
+               si.unit_price,
                s.customer_id, pv.name AS variant_name, p.name AS product_name
         FROM paused_days pd
         JOIN subscriptions s ON s.subscription_id = pd.subscription_id
         JOIN subscription_items si
           ON si.subscription_id = pd.subscription_id
          AND si.deleted_at IS NULL
-         AND (pd.pause_item_ref IS NULL
-              OR pd.pause_item_ref = si.subscription_item_id
-              OR pd.pause_item_ref = si.id::text)
         LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
       ),
@@ -192,7 +189,7 @@ export class RefundEligibilityService {
              quantity::numeric AS quantity,
              unit_price::numeric AS unit_price,
              final_price::numeric AS final_price,
-             ROUND(quantity * final_price, 2) AS refund_amount,
+             ROUND(quantity * COALESCE(final_price, unit_price, 0), 2) AS refund_amount,
              product_name, variant_name, pause_id
       FROM (
         SELECT q.*, 'morning' AS slot, q.m_qty AS quantity FROM qty q WHERE q.m_qty > 0
@@ -232,11 +229,9 @@ export class RefundEligibilityService {
   }
 
   /**
-   * Subscription orders whose delivery explicitly failed.
-   *
-   * Only an explicit failure marker counts — a stop marked `failed`, or a proof
-   * log of `not_home` / `issue`. An order merely still sitting at `pending` is
-   * not treated as refundable, or every undelivered order of the day would be.
+   * Finds orders on prepaid subscriptions that were scheduled within the window
+   * but never delivered (marked failed on a run, logged with a delivery issue,
+   * or still pending past their delivery date without a delivered status).
    */
   private async findFailedOrders(
     range: { from: string; to: string },
@@ -269,8 +264,8 @@ export class RefundEligibilityService {
         o.delivery_slot AS slot,
         oi.quantity::numeric AS quantity,
         si.unit_price::numeric AS unit_price,
-        si.final_price::numeric AS final_price,
-        ROUND(oi.quantity * si.final_price, 2) AS refund_amount,
+        COALESCE(si.final_price, si.unit_price - COALESCE(si.discount_amount, 0) - COALESCE(si.coupon_amount, 0), si.unit_price)::numeric AS final_price,
+        ROUND(oi.quantity * COALESCE(si.final_price, si.unit_price - COALESCE(si.discount_amount, 0) - COALESCE(si.coupon_amount, 0), si.unit_price), 2) AS refund_amount,
         p.name AS product_name,
         pv.name AS variant_name,
         oi.item_status::text AS item_status,
@@ -290,7 +285,7 @@ export class RefundEligibilityService {
       LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
       LEFT JOIN products p ON p.product_id = pv.product_id
       LEFT JOIN delivery_run_addresses dra
-        ON dra.order_id = o.order_id AND dra.deleted_at IS NULL
+        ON (dra.order_ids::text LIKE '%' || o.order_id || '%') AND dra.deleted_at IS NULL
       WHERE o.deleted_at IS NULL
         AND o.scheduled_date BETWEEN $1::date AND $2::date
         AND o.status <> 'cancelled'
@@ -299,8 +294,7 @@ export class RefundEligibilityService {
         AND LOWER(COALESCE(oi.item_status::text, '')) <> 'delivered'
         ${scope.join('\n        ')}
         AND (
-          dra.status = 'failed'
-          OR dra.delivery_status = 'failed'
+          dra.delivery_status = 'failed'
           OR EXISTS (
             SELECT 1 FROM delivery_proof_logs dpl
             WHERE dpl.subscription_id = o.subscription_id

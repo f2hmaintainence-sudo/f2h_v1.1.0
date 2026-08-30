@@ -14,6 +14,7 @@ export class CustomerBillingRepository {
       SELECT c.customer_id, u.first_name, u.phone, c.is_postpaid_enabled
       FROM public.customers c
       JOIN public.users u ON u.user_id = c.customer_id
+      WHERE c.is_postpaid_enabled = true AND c.deleted_at IS NULL
       ORDER BY u.first_name ASC, c.customer_id ASC
     `;
     return await this.databaseService.query(sql);

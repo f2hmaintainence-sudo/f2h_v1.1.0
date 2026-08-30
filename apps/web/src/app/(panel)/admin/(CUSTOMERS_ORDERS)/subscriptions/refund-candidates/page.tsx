@@ -431,6 +431,30 @@ export default function RefundCandidatesPage() {
   const [detail, setDetail] = useState<any | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Developer Testing: Scan Preview State
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<{ range: { from: string; to: string }; rows: any[] } | null>(null);
+
+  const handlePreviewScan = async () => {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(`${API}/subscriptions/refund-candidates/scan/preview?${buildQuery()}`, { credentials: 'include' });
+      const json = await res.json();
+      if (json.status && json.data) {
+        setPreviewData(json.data);
+      } else {
+        setPreviewData(null);
+        showToast('error', json.message || 'Failed to fetch scan preview');
+      }
+    } catch {
+      showToast('error', 'Network error during preview calculation');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 4000);
@@ -811,17 +835,30 @@ export default function RefundCandidatesPage() {
             </div>
 
             {/* Nothing is refundable until it has been calculated — this is that trigger. */}
-            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-100">
-              <button
-                onClick={handleScan}
-                disabled={scanning}
-                className="flex items-center gap-2 px-4 py-2 bg-deep-green hover:bg-emerald-800 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-60"
-              >
-                {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                {scanning
-                  ? 'Calculating…'
-                  : `Calculate refunds for ${filterMonth || 'this month'}`}
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  onClick={handleScan}
+                  disabled={scanning}
+                  className="flex items-center gap-2 px-4 py-2 bg-deep-green hover:bg-emerald-800 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {scanning
+                    ? 'Calculating…'
+                    : `Calculate refunds for ${filterMonth || 'this month'}`}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePreviewScan}
+                  disabled={previewLoading || scanning}
+                  className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {previewLoading ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                  Developer: Preview Calculations
+                </button>
+              </div>
+
               <p className="text-xs text-slate-400 font-medium">
                 Scans paused days and failed subscription orders. Safe to re-run — existing
                 refunds are never duplicated.
@@ -993,6 +1030,131 @@ export default function RefundCandidatesPage() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Developer Testing: Preview Calculations Modal */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                  <Receipt size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 tracking-tight">
+                    Developer Testing — Subscription Prepaid Refund Preview
+                  </h2>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Simulates refund calculation on paused days and failed deliveries without writing
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            {previewLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-2 text-slate-400">
+                <Loader2 size={24} className="animate-spin text-emerald-600" />
+                <p className="text-xs font-bold">Calculating refundable days &amp; failed orders...</p>
+              </div>
+            ) : previewData ? (
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Analyzed Window</span>
+                    <p className="font-bold text-slate-800">{previewData.range?.from} to {previewData.range?.to}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Detected Refund Candidates</span>
+                    <p className="font-black text-slate-900 text-sm">{previewData.rows?.length ?? 0} items</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Total Estimated Valuation</span>
+                    <p className="font-black text-emerald-700 text-sm">
+                      {fmtAmount((previewData.rows || []).reduce((acc: number, r: any) => acc + Number(r.refund_amount || 0), 0))}
+                    </p>
+                  </div>
+                </div>
+
+                {(!previewData.rows || previewData.rows.length === 0) ? (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 font-medium">
+                    No paused days or failed deliveries found for the selected filter criteria.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-72">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 sticky top-0">
+                        <tr>
+                          <th className="p-2.5">Date &amp; Slot</th>
+                          <th className="p-2.5">Customer / Sub</th>
+                          <th className="p-2.5">Product &amp; Variant</th>
+                          <th className="p-2.5">Reason</th>
+                          <th className="p-2.5 text-right">Qty</th>
+                          <th className="p-2.5 text-right">Final Price</th>
+                          <th className="p-2.5 text-right">Refund Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {previewData.rows.map((row: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50 font-medium text-slate-700">
+                            <td className="p-2.5 font-bold text-slate-900 whitespace-nowrap">
+                              {row.scheduled_date} <span className="text-[10px] text-slate-400">({row.slot})</span>
+                            </td>
+                            <td className="p-2.5 whitespace-nowrap">
+                              <span className="font-bold text-slate-800">{row.customer_id}</span>
+                              <div className="text-[10px] text-slate-400">{row.subscription_id}</div>
+                            </td>
+                            <td className="p-2.5">
+                              {row.product_name || 'Product'} {row.variant_name ? `(${row.variant_name})` : ''}
+                            </td>
+                            <td className="p-2.5">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                row.source === 'pause' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {row.source === 'pause' ? 'Paused Day' : 'Delivery Failed'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-right font-bold">{row.quantity}</td>
+                            <td className="p-2.5 text-right">{fmtAmount(row.final_price || row.unit_price)}</td>
+                            <td className="p-2.5 text-right font-bold text-emerald-700">{fmtAmount(row.refund_amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="px-4 py-2 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewOpen(false);
+                  handleScan();
+                }}
+                disabled={scanning}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Run Live Calculation &amp; Save Candidates
+              </button>
+            </div>
           </div>
         </div>
       )}

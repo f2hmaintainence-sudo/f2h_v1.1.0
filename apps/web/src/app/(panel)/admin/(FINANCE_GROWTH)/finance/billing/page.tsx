@@ -100,6 +100,76 @@ export default function CustomerBillingPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  // Developer Testing: Postpaid Bill Generation Modal
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [eligibleCustomers, setEligibleCustomers] = useState<any[]>([]);
+  const [loadingEligible, setLoadingEligible] = useState(false);
+  const [genCustomerId, setGenCustomerId] = useState<string>("ALL");
+  const [genPeriodStart, setGenPeriodStart] = useState<string>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [genPeriodEnd, setGenPeriodEnd] = useState<string>(() => {
+    const d = new Date();
+    const lastDay = new Date(d.getFullYear(), d.getMonth(), 0);
+    return `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+  });
+  const [genDueDate, setGenDueDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-05`;
+  });
+  const [generatingBills, setGeneratingBills] = useState(false);
+  const [generationResult, setGenerationResult] = useState<any | null>(null);
+
+  const openGenerateBillsModal = async () => {
+    setShowGenerateModal(true);
+    setGenerationResult(null);
+    setLoadingEligible(true);
+    try {
+      const res = await api.get<any>('/admin/postpaid-bills/eligible-customers');
+      if (res.data?.status && Array.isArray(res.data.data)) {
+        setEligibleCustomers(res.data.data);
+      } else if (Array.isArray(res.data)) {
+        setEligibleCustomers(res.data);
+      } else {
+        setEligibleCustomers([]);
+      }
+    } catch (err: any) {
+      console.error('Failed to load eligible customers:', err);
+      showToast('Failed to load eligible postpaid customers', false);
+    } finally {
+      setLoadingEligible(false);
+    }
+  };
+
+  const handleRunBillGeneration = async () => {
+    setGeneratingBills(true);
+    setGenerationResult(null);
+    try {
+      const payload: any = {
+        customerId: genCustomerId === "ALL" ? "" : genCustomerId,
+        periodStart: genPeriodStart,
+        periodEnd: genPeriodEnd,
+        dueDate: genDueDate,
+      };
+      const res = await api.post<any>('/admin/postpaid-bills/generate', payload);
+      setGenerationResult(res.data);
+      if (res.data?.status || (res.data?.summary && res.data.summary.generated > 0)) {
+        showToast(`Postpaid bill calculation finished. Generated: ${res.data?.summary?.generated ?? 1}`, true);
+        fetchBills();
+        fetchStats();
+      } else {
+        showToast(res.data?.message || 'Bill calculation completed with notes', false);
+      }
+    } catch (err: any) {
+      console.error('Bill generation error:', err);
+      showToast(err.response?.data?.message || 'Failed to calculate postpaid bills', false);
+    } finally {
+      setGeneratingBills(false);
+    }
+  };
+
   const fetchStats = useCallback(async (d = days) => {
     setLoadingStats(true);
     try {
@@ -395,6 +465,14 @@ export default function CustomerBillingPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={openGenerateBillsModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+          >
+            <Receipt size={14} /> Developer: Calculate Postpaid Bills
+          </button>
+
           <button
             type="button"
             onClick={handleExportCsv}
@@ -1308,6 +1386,163 @@ export default function CustomerBillingPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Developer Testing: Postpaid Bill Generation Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                  <Receipt size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 tracking-tight">
+                    Developer Testing — Postpaid Billing Engine
+                  </h2>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Test &amp; trigger monthly postpaid bill calculation for eligible customers
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGenerateModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Target Customer
+                </label>
+                {loadingEligible ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                    <Loader2 size={14} className="animate-spin text-emerald-600" />
+                    Loading eligible postpaid customers...
+                  </div>
+                ) : (
+                  <select
+                    value={genCustomerId}
+                    onChange={(e) => setGenCustomerId(e.target.value)}
+                    className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 cursor-pointer"
+                  >
+                    <option value="ALL">🌟 ALL Eligible Postpaid Customers ({eligibleCustomers.length})</option>
+                    {eligibleCustomers.map((cust) => (
+                      <option key={cust.customerId || cust.customer_id} value={cust.customerId || cust.customer_id}>
+                        {cust.customerName || cust.first_name || "Customer"} ({cust.customerId || cust.customer_id}) {cust.phone ? `— ${cust.phone}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Period Start
+                  </label>
+                  <input
+                    type="date"
+                    value={genPeriodStart}
+                    onChange={(e) => setGenPeriodStart(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Period End
+                  </label>
+                  <input
+                    type="date"
+                    value={genPeriodEnd}
+                    onChange={(e) => setGenPeriodEnd(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={genDueDate}
+                    onChange={(e) => setGenDueDate(e.target.value)}
+                    className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {generationResult && (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+                  <div className="flex items-center justify-between font-bold text-slate-800">
+                    <span>Calculation Result:</span>
+                    <span className={generationResult.status ? "text-emerald-600" : "text-amber-600"}>
+                      {generationResult.message || (generationResult.status ? "Completed" : "Note")}
+                    </span>
+                  </div>
+                  {generationResult.summary && (
+                    <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-center">
+                      <div className="bg-white p-2 rounded-xl border border-slate-100">
+                        <p className="text-[10px] text-slate-400 font-bold">Eligible</p>
+                        <p className="text-sm font-black text-slate-800">{generationResult.summary.eligibleCustomers ?? 0}</p>
+                      </div>
+                      <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100">
+                        <p className="text-[10px] text-emerald-600 font-bold">Generated</p>
+                        <p className="text-sm font-black text-emerald-700">{generationResult.summary.generated ?? 0}</p>
+                      </div>
+                      <div className="bg-amber-50/50 p-2 rounded-xl border border-amber-100">
+                        <p className="text-[10px] text-amber-600 font-bold">Skipped</p>
+                        <p className="text-sm font-black text-amber-700">{generationResult.summary.skipped ?? 0}</p>
+                      </div>
+                      <div className="bg-rose-50/50 p-2 rounded-xl border border-rose-100">
+                        <p className="text-[10px] text-rose-600 font-bold">Failed</p>
+                        <p className="text-sm font-black text-rose-700">{generationResult.summary.failed ?? 0}</p>
+                      </div>
+                    </div>
+                  )}
+                  {generationResult.billNumber && (
+                    <div className="mt-2 p-2 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 font-medium">
+                      Generated Bill ID: <span className="font-bold">{generationResult.billNumber}</span> &bull; Amount: <span className="font-bold">₹{generationResult.totalAmount}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowGenerateModal(false)}
+                className="px-4 py-2 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleRunBillGeneration}
+                disabled={generatingBills}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                {generatingBills ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Calculating &amp; Generating...
+                  </>
+                ) : (
+                  <>
+                    <Receipt size={14} />
+                    Run Calculation &amp; Generate Bills
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

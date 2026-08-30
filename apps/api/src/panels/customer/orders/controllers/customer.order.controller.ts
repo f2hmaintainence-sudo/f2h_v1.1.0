@@ -591,17 +591,22 @@ export class CustomerOrderController {
       // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
       // Record the refund in the refunds table
       const refundNumber = 'RFND-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+      const walletTxId = 'WTR_' + Date.now().toString(36).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
       let walletTransactionId: string | null = null;
 
-      if (order.payment_mode === 'wallet' || order.payment_mode === 'upi' && refundAmount > 0) {
-        await this.data.update(
+      if ((order.payment_mode === 'wallet' || order.payment_mode === 'upi') && refundAmount > 0) {
+        const custUpdate = await this.data.update(
           'customers',
           { wallet_balance: newBalance },
           [{ column: 'customer_id', operator: '=', value: customer.customer_id }],
           { transaction: conn },
         );
+        if (custUpdate && !custUpdate.status) {
+          throw new Error(custUpdate.message || 'Failed to update customer wallet balance');
+        }
 
         const txInsert = await this.data.insert('customer_wallet_transactions', {
+          transaction_id: walletTxId,
           customer_id: customer.customer_id,
           transaction_type: 'credit',
           reference_type: 'refund',
@@ -613,12 +618,14 @@ export class CustomerOrderController {
           created_at: new Date(),
         }, { transaction: conn });
         this.logger.log('Wallet transaction insert result', txInsert);
-        if (txInsert && txInsert.status && txInsert.id) {
-          walletTransactionId = txInsert.id;
+        if (txInsert && txInsert.status) {
+          walletTransactionId = txInsert.id || walletTxId;
+        } else {
+          throw new Error(txInsert?.message || 'Failed to record customer wallet transaction');
         }
 
         // Insert processed wallet refund record
-        await this.data.insert('refunds', {
+        const refInsert = await this.data.insert('refunds', {
           refund_number: refundNumber,
           customer_id: customer.customer_id,
           order_id: order.order_id,
@@ -629,10 +636,13 @@ export class CustomerOrderController {
           approved_by: 'system',
           approved_at: new Date(),
           processed_at: new Date(),
-          transaction_id: String(walletTransactionId),
+          transaction_id: String(walletTransactionId || walletTxId),
           created_at: new Date(),
           updated_at: new Date(),
         }, { transaction: conn });
+        if (refInsert && !refInsert.status) {
+          throw new Error(refInsert?.message || 'Failed to record refund entry');
+        }
       }
 
       // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
@@ -640,7 +650,7 @@ export class CustomerOrderController {
       const notificationId = 'NTF-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
       const notifTitle = 'Order Cancelled';
       let notifMessage = `Your order #${order.order_id.substring(0, Math.min(order.order_id.length, 12))} has been successfully cancelled.`;
-      if (order.payment_mode === 'wallet' || order.payment_mode === 'upi' && refundAmount > 0) {
+      if ((order.payment_mode === 'wallet' || order.payment_mode === 'upi') && refundAmount > 0) {
         notifMessage += ` A refund of ₹${refundAmount.toFixed(0)} has been credited to your wallet.`;
       } else if (refundAmount > 0) {
         notifMessage += ` A refund of ₹${refundAmount.toFixed(0)} is being processed via ${order.payment_mode === 'cod' ? 'Cash' : 'UPI'}.`;

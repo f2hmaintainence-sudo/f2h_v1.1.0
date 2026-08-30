@@ -571,6 +571,11 @@ export class SubscriptionsService {
         });
 
         const subscriptionItemId = this.makeId('SBI');
+        const unitPrice = Number(item.unit_price || 0);
+        const discountAmount = Number(item.discount_amount || 0);
+        const couponAmount = Number(item.coupon_amount || 0);
+        const finalPrice = Math.max(0, unitPrice - discountAmount - couponAmount);
+
         const itemInsertRes = await client.query(
           `
           INSERT INTO subscription_items (
@@ -578,24 +583,26 @@ export class SubscriptionsService {
             subscription_id,
             product_variant_id,
             unit_price,
+            final_price,
             discount_id,
             coupon_id,
             discount_amount,
             coupon_amount,
             status
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
           RETURNING id, subscription_item_id
           `,
           [
             subscriptionItemId,
             subscriptionId,
             item.product_variant_id,
-            item.unit_price || 0,
+            unitPrice,
+            finalPrice,
             item.discount_id || null,
             item.coupon_id || null,
-            item.discount_amount || 0,
-            item.coupon_amount || 0,
+            discountAmount,
+            couponAmount,
           ],
         );
 
