@@ -14,6 +14,7 @@ import '../../../../core/guards/auth_guard.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../widgets/cart_widgets.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
+import '../helpers/cart_helpers.dart';
 
 // ══════════════════════════════════════════════════════════
 //  PRODUCT DETAIL VIEW SCREEN — Blinkit / Zepto Style

@@ -379,6 +379,7 @@ class SubscriptionItemModel {
     this.customDates = const [],
   });
 
+  factory SubscriptionItemModel.fromJson(Map<String, dynamic> json) {
     final unitP = _asDouble(json['unit_price'] ?? json['unitPrice'] ?? json['price']);
     final finalP = _asDouble(json['final_price'] ?? json['finalPrice']);
     final origP = _asDouble(json['original_price'] ?? json['originalPrice']);

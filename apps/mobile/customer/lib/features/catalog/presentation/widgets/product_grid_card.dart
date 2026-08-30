@@ -21,6 +21,7 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/widgets/product_tile.dart';
+import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/subscription_setup_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
