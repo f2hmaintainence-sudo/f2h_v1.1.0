@@ -125,14 +125,14 @@ export class DeliveryDispatchService {
             if (stock.available_quantity < delta) {
               const [varRes, whRes] = await Promise.all([
                 client.query(
-                  `SELECT p.product_name, pv.variant_name, pv.unit_value, pv.unit_type
+                  `SELECT p.name AS product_name, pv.name AS variant_name, pv.unit_value, pv.unit_type
                    FROM product_variants pv
                    JOIN products p ON p.product_id = pv.product_id
-                   WHERE pv.product_variant_id = $1`,
+                   WHERE pv.variant_id = $1 OR pv.id::text = $1`,
                   [item.product_variant_id],
                 ),
                 client.query(
-                  `SELECT warehouse_name FROM warehouses WHERE warehouse_id = $1`,
+                  `SELECT name AS warehouse_name FROM warehouses WHERE warehouse_id = $1`,
                   [targetWarehouseId],
                 ),
               ]);
