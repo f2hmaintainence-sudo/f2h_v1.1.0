@@ -1627,7 +1627,7 @@ export class AuthService {
         email: email.toLowerCase().trim(),
         first_name: identity.name || email.split('@')[0],
         role_id: roleId,
-        is_active: true,
+        account_status: 'active',
         created_at: new Date(),
         updated_at: new Date(),
       });

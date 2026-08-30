@@ -41,7 +41,7 @@ export class UsersController {
 
     const users = await this.db.query(
       `SELECT user_id, email, user_name, first_name, last_name
-       FROM users WHERE user_id = ?`,
+       FROM users WHERE user_id = $1`,
       [userId],
     );
     const rawUser = users?.[0];
@@ -52,7 +52,7 @@ export class UsersController {
       `SELECT ra.role_id, r.name as role_name
        FROM role_assignments ra
        JOIN roles r ON UPPER(ra.role_id) = UPPER(r.role_id) 
-       WHERE ra.user_id = ? AND ra.is_active = 1 AND ra.deleted_at IS NULL
+       WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
        ORDER BY CASE UPPER(ra.role_id) WHEN 'ADMIN' THEN 1 WHEN 'DELIVERY_PARTNER' THEN 2 WHEN 'CUSTOMER' THEN 3 ELSE 4 END`,
       [userId],
     );

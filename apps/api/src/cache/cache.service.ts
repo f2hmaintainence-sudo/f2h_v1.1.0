@@ -18,7 +18,7 @@ export class CacheService {
   ================================================================================================*/
   async buildUserCache(user_id: string): Promise<any> {
     const dbUser = await this.Data.query('users', {
-      select: ['user_id', 'user_name', 'first_name', 'last_name', 'email'],
+      select: ['user_id', 'user_name', 'first_name', 'last_name', 'email', 'role_id'],
       where: [{ column: 'user_id', operator: '=', value: user_id }],
     });
 
@@ -26,7 +26,7 @@ export class CacheService {
       return null;
     }
     const userRecord = dbUser.data[0];
-    const roleAssignments = await this.Data.query('users', {
+    const roleAssignments = await this.Data.query('role_assignments', {
       select: ['role_id'],
       where: [
         { column: 'user_id', operator: '=', value: user_id },
