@@ -684,12 +684,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     }
 
                     // ===== Bill Calculations =====
-                    final deliveryRules = sessionState.deliveryRules;
-                    final double baseDeliveryFee = _toDouble(deliveryRules['base_delivery_fee'] ?? 60.0);
-                    final double freeDeliveryThreshold = _toDouble(deliveryRules['free_delivery_threshold'] ?? 199.0);
-                    final bool freeDeliveryForSubscriptions = deliveryRules['free_delivery_for_subscriptions'] != false;
-                    final bool freeDeliveryFirstOrder = deliveryRules['free_delivery_first_order'] != false;
-                    final double taxesAndHandling = _toDouble(deliveryRules['taxes_and_handling_fee'] ?? 0.0);
                     final double donation = _donating ? 2.0 : 0.0;
 
                     final double onetimeTotal = calculateOneTimeTotal(
@@ -707,19 +701,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     final double payableItems = _payableFor(subtotal);
                     final double couponSavings = subtotal - payableItems;
 
-                    final bool isFirstOrder = sessionState.profile?.firstOrderCompleted != true;
-
-                    // Check if free delivery applies for this one-time order
-                    final bool isFreeDelivery = (subtotal >= freeDeliveryThreshold && freeDeliveryThreshold > 0) ||
-                        (freeDeliveryFirstOrder && isFirstOrder);
-
-                    final double deliveryFee = subtotal > 0 ? baseDeliveryFee : 0.0;
-                    final double deliveryDiscount = (subtotal > 0 && isFreeDelivery) ? deliveryFee : 0.0;
-                    final double effectiveDeliveryFee = deliveryFee - deliveryDiscount;
-                    final double effectiveTaxes = subtotal > 0 ? taxesAndHandling : 0.0;
-
-                    final double grandTotal =
-                        payableItems + effectiveDeliveryFee + effectiveTaxes + donation;
+                    final double grandTotal = payableItems + donation;
                     final double payableNow = grandTotal;
 
                     return Column(
@@ -1237,26 +1219,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           valueColor: kPrimaryLt,
                                         ),
                                       ],
-                                      if (deliveryFee > 0) ...[
-                                        const SizedBox(height: 8),
-                                        SummaryRow(
-                                          label: 'Delivery Fee',
-                                          value: '₹${deliveryFee.toStringAsFixed(0)}',
-                                        ),
-                                      ],
-                                       if (deliveryDiscount > 0) ...[
-                                         const SizedBox(height: 8),
-                                         SummaryRow(
-                                           label: 'Delivery Discount',
-                                           value: '-₹${deliveryDiscount.toStringAsFixed(0)}',
-                                           valueColor: kPrimaryLt,
-                                         ),
-                                       ],
-                                       const SizedBox(height: 8),
-                                       SummaryRow(
-                                         label: 'Taxes & Handling Charges',
-                                         value: '₹' + effectiveTaxes.toStringAsFixed(0),
-                                       ),
                                       if (_donating) ...[
                                         const SizedBox(height: 8),
                                         const SummaryRow(

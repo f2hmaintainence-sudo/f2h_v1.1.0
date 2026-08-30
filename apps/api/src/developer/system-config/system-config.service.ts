@@ -182,8 +182,8 @@ export class SystemConfigService implements OnModuleInit {
           'Delivery Fee & Discount Rules',
           'Standard delivery charges, free delivery thresholds, subscription waivers, and promotional rules.',
           JSON.stringify({
-            base_delivery_fee: 39.0,
-            free_delivery_threshold: 199.0,
+            base_delivery_fee: 0.0,
+            free_delivery_threshold: 0.0,
             free_delivery_for_subscriptions: true,
             free_delivery_first_order: true,
             surge_fee_enabled: false,
@@ -192,8 +192,7 @@ export class SystemConfigService implements OnModuleInit {
             container_deposit_fee: 0.0,
             currency: 'INR',
             currency_symbol: '₹',
-            display_notes:
-              'Zero delivery fee on all active daily subscriptions. Standard delivery fee applies on single orders below ₹199.',
+            display_notes: 'Free delivery on all orders.',
           }),
         ],
       );
@@ -361,8 +360,8 @@ export class SystemConfigService implements OnModuleInit {
       const data: Record<string, any> = (all.data as Record<string, any>) || {};
 
       const deliveryRules: DeliveryFeeRules = data.delivery_rules?.config_data || {
-        base_delivery_fee: 39.0,
-        free_delivery_threshold: 199.0,
+        base_delivery_fee: 0.0,
+        free_delivery_threshold: 0.0,
         free_delivery_for_subscriptions: true,
         free_delivery_first_order: true,
         surge_fee_enabled: false,
@@ -371,6 +370,7 @@ export class SystemConfigService implements OnModuleInit {
         container_deposit_fee: 0.0,
         currency: 'INR',
         currency_symbol: '₹',
+        display_notes: 'Free delivery on all orders.',
       };
 
       const slotTimings = data.slot_timings?.config_data || {};
@@ -390,13 +390,14 @@ export class SystemConfigService implements OnModuleInit {
         status: true,
         data: {
           delivery_rules: {
-            base_delivery_fee: 39.0,
-            free_delivery_threshold: 199.0,
+            base_delivery_fee: 0.0,
+            free_delivery_threshold: 0.0,
             free_delivery_for_subscriptions: true,
             free_delivery_first_order: true,
             taxes_and_handling_fee: 0.0,
             currency: 'INR',
             currency_symbol: '₹',
+            display_notes: 'Free delivery on all orders.',
           },
           slot_timings: {},
           order_rules: {

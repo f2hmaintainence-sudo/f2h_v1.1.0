@@ -36,7 +36,7 @@ import {
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
 export default function SystemConfigPage() {
-  const [activeTab, setActiveTab] = useState<"slots" | "crons" | "delivery" | "ordering">("slots");
+  const [activeTab, setActiveTab] = useState<"slots" | "crons" | "ordering">("slots");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -284,14 +284,14 @@ export default function SystemConfigPage() {
         <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
           <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">BASE DELIVERY FEE</span>
+            <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">MIN ORDER SUBTOTAL</span>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Truck size={16} />
+              <Calendar size={16} />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-800">₹{deliveryRules.base_delivery_fee.toFixed(0)}</div>
-            <p className="text-[11px] font-medium text-slate-400 mt-0.5">Free over ₹{deliveryRules.free_delivery_threshold.toFixed(0)}</p>
+            <div className="text-2xl font-black text-slate-800">₹{orderRules.min_order_subtotal.toFixed(0)}</div>
+            <p className="text-[11px] font-medium text-slate-400 mt-0.5">Minimum checkout amount</p>
           </div>
         </div>
 
@@ -299,16 +299,14 @@ export default function SystemConfigPage() {
         <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
           <div className="absolute top-0 left-0 right-0 h-1 bg-purple-500" />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">SUBSCRIPTION WAIVER</span>
+            <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">DELIVERY CHARGES</span>
             <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
               <ShieldCheck size={16} />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-800">
-              {deliveryRules.free_delivery_for_subscriptions ? "100% Free" : "Standard Fee"}
-            </div>
-            <p className="text-[11px] font-medium text-slate-400 mt-0.5">Daily milk delivery fee</p>
+            <div className="text-2xl font-black text-emerald-700">Always ₹0</div>
+            <p className="text-[11px] font-medium text-slate-400 mt-0.5">100% Free delivery on all orders</p>
           </div>
         </div>
       </div>
@@ -337,18 +335,6 @@ export default function SystemConfigPage() {
         >
           <Zap size={15} />
           Background Automated Crons
-        </button>
-
-        <button
-          onClick={() => setActiveTab("delivery")}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeTab === "delivery"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
-        >
-          <Truck size={15} />
-          Delivery Charges & Discount Rules
         </button>
 
         <button
@@ -782,180 +768,7 @@ export default function SystemConfigPage() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* TAB 3: DELIVERY CHARGES & DISCOUNT RULES */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "delivery" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Truck className="text-emerald-600 w-4 h-4" />
-                Delivery Fee & Threshold Configuration
-              </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Base Delivery Fee (₹)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">₹</span>
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      value={deliveryRules.base_delivery_fee}
-                      onChange={(e) =>
-                        setDeliveryRules({
-                          ...deliveryRules,
-                          base_delivery_fee: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full text-xs font-semibold pl-8 pr-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Charged on one-time orders below the free threshold.</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Free Delivery Threshold (₹)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">₹</span>
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      value={deliveryRules.free_delivery_threshold}
-                      onChange={(e) =>
-                        setDeliveryRules({
-                          ...deliveryRules,
-                          free_delivery_threshold: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full text-xs font-semibold pl-8 pr-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Orders at or above this value get automatic 100% free delivery.</p>
-                </div>
-              </div>
-
-              {/* Toggles */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200/60">
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">Free Delivery for Active Subscriptions</div>
-                    <div className="text-[11px] text-slate-500">Waives delivery charges for all scheduled daily milk & subscription items.</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={deliveryRules.free_delivery_for_subscriptions}
-                    onChange={(e) =>
-                      setDeliveryRules({
-                        ...deliveryRules,
-                        free_delivery_for_subscriptions: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200/60">
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">First Order Free Delivery</div>
-                    <div className="text-[11px] text-slate-500">Automatically offers ₹0 delivery fee on any new customer's first order.</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={deliveryRules.free_delivery_first_order}
-                    onChange={(e) =>
-                      setDeliveryRules({
-                        ...deliveryRules,
-                        free_delivery_first_order: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200/60">
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">Taxes & Handling Charges (₹)</div>
-                    <div className="text-[11px] text-slate-500">Platform packaging or handling surcharge (set 0 for zero charges).</div>
-                  </div>
-                  <div className="w-24">
-                    <input
-                      type="number"
-                      value={deliveryRules.taxes_and_handling_fee}
-                      onChange={(e) =>
-                        setDeliveryRules({
-                          ...deliveryRules,
-                          taxes_and_handling_fee: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full text-xs font-bold px-2 py-1 border border-slate-200 rounded-lg text-right"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Customer Display Policy Notes</label>
-                <textarea
-                  rows={2}
-                  value={deliveryRules.display_notes}
-                  onChange={(e) => setDeliveryRules({ ...deliveryRules, display_notes: e.target.value })}
-                  className="w-full text-xs font-medium px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white"
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  onClick={() => handleSaveSection("delivery_rules", deliveryRules, "Delivery Charges & Rules")}
-                  disabled={saving}
-                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-all flex items-center gap-2"
-                >
-                  <Save size={14} />
-                  Save Delivery Rules
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Live Preview Card */}
-          <div>
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Customer App Checkout Preview</h4>
-
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200/70 space-y-2.5">
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Item Total</span>
-                  <span className="font-semibold">₹40</span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Delivery Fee</span>
-                  <span className="font-semibold">₹{deliveryRules.base_delivery_fee.toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-emerald-700">
-                  <span>Delivery Discount</span>
-                  <span className="font-bold">-₹{deliveryRules.base_delivery_fee.toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Taxes & Handling</span>
-                  <span className="font-semibold">₹{deliveryRules.taxes_and_handling_fee.toFixed(0)}</span>
-                </div>
-                <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-extrabold text-slate-900">
-                  <span>To Pay</span>
-                  <span className="text-emerald-700">₹{(40 + deliveryRules.taxes_and_handling_fee).toFixed(0)}</span>
-                </div>
-              </div>
-
-              <div className="text-[11px] text-slate-500 bg-emerald-50/60 p-3 rounded-xl border border-emerald-200/60 leading-relaxed">
-                <span className="font-bold text-emerald-800">Policy active: </span>
-                {deliveryRules.display_notes}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* TAB 4: CUSTOMER ORDERING LIMITS */}

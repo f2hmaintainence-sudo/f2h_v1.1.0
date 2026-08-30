@@ -153,20 +153,24 @@ export class CustomerBootstrapController {
     const firebaseConfig = await this.loadFirebaseClientConfig('firebase:customer');
 
     let deliveryRules: any = {
-      base_delivery_fee: 60.0,
-      free_delivery_threshold: 199.0,
+      base_delivery_fee: 0.0,
+      free_delivery_threshold: 0.0,
       free_delivery_for_subscriptions: true,
       free_delivery_first_order: true,
-      taxes_and_handling_fee: 10.0,
-      display_notes:
-        'Zero delivery fee on all active daily subscriptions. Standard delivery fee applies on single orders below ₹199.',
+      taxes_and_handling_fee: 0.0,
+      display_notes: 'Free delivery on all orders.',
     };
     try {
       const deliveryRulesRes = await this.db.query(
         `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' LIMIT 1`,
       );
       if (deliveryRulesRes?.[0]?.config_data) {
-        deliveryRules = deliveryRulesRes[0].config_data;
+        deliveryRules = {
+          ...deliveryRulesRes[0].config_data,
+          base_delivery_fee: 0.0,
+          taxes_and_handling_fee: 0.0,
+          free_delivery_threshold: 0.0,
+        };
       }
     } catch (err) {
       this.Developer.error('[CustomerBootstrapController] Failed to load delivery_rules', err);
