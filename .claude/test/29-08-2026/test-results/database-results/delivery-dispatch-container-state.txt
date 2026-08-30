@@ -1,0 +1,24 @@
+status | count
+assigned | 29
+completed | 11
+in_progress | 17
+(3 rows)
+id | customer_id | container_id | issued_quantity | returned_quantity | damaged_quantity | lost_quantity | balance_quantity | updated_at | deleted_at
+115 | QA_CUST_PRE | CONT-001 | 3 | 5 | 0 | 0 | -2 | 2026-08-29 13:53:28.236775+02 | 
+(1 row)
+run_id | container_id | collected_quantity | submitted_quantity | discrepancy_quantity | status
+RUN-20260830-MOR-002 | CONT-001 | 5 | 0 | 5 | pending
+RUN-20260829-MOR-004 | CONT-001 | 7 | 7 | 0 | closed
+RUN-20260829-MOR-004 | CONT-5721 | 2 | 2 | 0 | closed
+RUN-20260828-EVE-002 | CONT-001 | 1 | 1 | 0 | closed
+RUN-20260818-MOR-004 | CONT-001 | 1 | 1 | 0 | closed
+(5 rows)
+warehouse_id | container_id | quantity
+WH-MRXCBJM6YV4IUP | CONT-5721 | 100
+WH-MRXCBJM6YV4IUP | CONT-001 | 100
+WH-MRXD13W8PWMMON | CONT-5721 | 100
+WH-MRXD13W8PWMMON | CONT-001 | 119
+WH-MSUIIEYIKSTL7M | CONT-001 | 98
+WH-MSUIIEYIKSTL7M | CONT-5721 | 100
+WH-MTEBESZ953A8S7 | CONT-001 | 0
+(7 rows)

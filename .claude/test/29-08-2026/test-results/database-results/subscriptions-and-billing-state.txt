@@ -1,0 +1,34 @@
+subscription_id | customer_id | payment_type | status | monthly_estimate | branch_id
+SUB_MSH5LBCZYOTH | F2HQFK7NH | prepaid | active | $1,170.00 | BRANCHTSfmHjqAa0f7
+SUB_MSHOHK23NM9L | F2HVYNCUO | prepaid | active | $1,800.00 | BRANCHuGzz5gljgKYo
+SUB_MSIYKVBR1E89 | F2HQFK7NH | prepaid | active | $600.00 | BRANCHaDDaQYijF9nZ
+SUB_MSJ1CE4GA1JM | F2HVYNCUO | prepaid | active | $2,160.00 | BRANCHuGzz5gljgKYo
+SUB_MSOHIKRCCLNA | F2HQFK7NH | postpaid | active | $600.00 | BRANCHuGzz5gljgKYo
+SUB_MSQ1G384N1EH | F2HQFK7NH | postpaid | active | $600.00 | BRANCHuGzz5gljgKYo
+SUB_MT5K2OFEZD6U | F2HQFK7NH | prepaid | active | $1,860.00 | BRANCHTSfmHjqAa0f7
+SUB_MT9ZDU3BF2NY | F2HFUGZ6H | prepaid | active | $1,085.00 | BRANCHTSfmHjqAa0f7
+SUB_MTB7N7V5ZNPY | F2HVYNCUO | prepaid | active | $4,464.00 | BRANCHuGzz5gljgKYo
+SUB_MTEAXM4QC04R | QA_CUST_PRE | prepaid | active | $0.00 | ALL
+SUB_MTEB2QBM1FY0 | QA_CUST_PRE | prepaid | active | $2,160.00 | BRANCHTSfmHjqAa0f7
+(11 rows)
+subscription_item_id | subscription_id | unit_price | final_price
+SBI_MSH5LBML5DHX | SUB_MSH5LBCZYOTH | 39.00 | 39.00
+SBI_MSHOHK29H0A3 | SUB_MSHOHK23NM9L | 72 | 
+SBI_MSIYKVBZD896 | SUB_MSIYKVBR1E89 | 50 | 20
+SBI_MSJ1CE4LWVPB | SUB_MSJ1CE4GA1JM | 80 | 72
+SBI_MSOHIKRVUIB2 | SUB_MSOHIKRCCLNA | 50 | 20
+SBI_MSQ1G38M94LK | SUB_MSQ1G384N1EH | 50 | 20
+SBI_MT5K2OFIKFKM | SUB_MT5K2OFEZD6U | 60 | 
+SBI_MT9ZDU3DWU4Y | SUB_MT9ZDU3BF2NY | 35 | 
+SBI_MTB7N7V9PQX2 | SUB_MTB7N7V5ZNPY | 72 | 
+SBI_MTEAXM4S3128 | SUB_MTEAXM4QC04R | 72 | 
+SBI_MTEB2QBNN2PZ | SUB_MTEB2QBM1FY0 | 72 | 
+(11 rows)
+refund_candidates
+0
+(1 row)
+bill_type | payment_type | status | count
+subscription | postpaid | paid | 1
+order | prepaid | paid | 44
+subscription | prepaid | paid | 9
+(3 rows)

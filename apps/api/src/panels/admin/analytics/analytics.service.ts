@@ -362,9 +362,9 @@ export class AnalyticsService {
     const sql = `
       SELECT
         c.customer_id,
-        c.first_name,
-        c.last_name,
-        c.phone,
+        u.first_name,
+        u.last_name,
+        u.phone,
         COALESCE(c.wallet_balance, 0)::numeric AS wallet_balance,
         (
           SELECT COALESCE(SUM(o.total_amount), 0)::numeric
@@ -374,6 +374,7 @@ export class AnalyticsService {
             AND o.status != 'cancelled'
         ) AS pending_amount
       FROM customers c
+      JOIN users u ON u.user_id = c.customer_id
       WHERE
         COALESCE(c.wallet_balance, 0) < 0
         OR (

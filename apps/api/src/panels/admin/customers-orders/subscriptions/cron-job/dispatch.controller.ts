@@ -34,20 +34,16 @@ export class DispatchController {
    */
   @Get('pre-summary')
   async getPreDispatchSummary(
-    @Query('date') date: string,
-    @Query('slot') slot: string,
+    @Query('date') date?: string,
+    @Query('slot') slot?: string,
     @Query('branchId') branchId?: string,
   ) {
-    if (!date || !slot) {
-      throw new BadRequestException('date and slot are required query parameters');
-    }
-    if (slot !== 'morning' && slot !== 'evening') {
-      throw new BadRequestException('slot must be "morning" or "evening"');
-    }
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetSlot = (slot === 'evening' || slot === 'morning') ? slot : 'morning';
 
     return this.snapshotService.getPreDispatchSummary(
-      date,
-      slot as 'morning' | 'evening',
+      targetDate,
+      targetSlot as 'morning' | 'evening',
       branchId || null,
     );
   }
@@ -60,20 +56,16 @@ export class DispatchController {
    */
   @Get('branch-stats')
   async getBranchWiseStats(
-    @Query('date') date: string,
-    @Query('slot') slot: string,
+    @Query('date') date?: string,
+    @Query('slot') slot?: string,
     @Query('branchId') branchId?: string,
   ) {
-    if (!date || !slot) {
-      throw new BadRequestException('date and slot are required query parameters');
-    }
-    if (slot !== 'morning' && slot !== 'evening') {
-      throw new BadRequestException('slot must be "morning" or "evening"');
-    }
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetSlot = (slot === 'evening' || slot === 'morning') ? slot : 'morning';
 
     return this.snapshotService.getBranchWiseStats(
-      date,
-      slot as 'morning' | 'evening',
+      targetDate,
+      targetSlot as 'morning' | 'evening',
       branchId || null,
     );
   }

@@ -25,13 +25,13 @@ import { DeliveryOrderService } from '../services/delivery.order.service';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @Roles(ROLE.DELIVERY_PARTNER, ROLE.ADMIN, ROLE.SUPER_ADMIN)
-@Controller({ path: 'delivery/orders', version: '1' })
+@Controller({ path: ['delivery-partner/orders', 'delivery/orders'], version: '1' })
 @UseGuards(JwtAuthGuard)
 export class DeliveryOrderController {
   constructor(
     private readonly service: DeliveryOrderService,
     private readonly db: DatabaseService,
-  ) {}
+  ) { }
 
   @Post(':orderId/upload-proof')
   @UseInterceptors(

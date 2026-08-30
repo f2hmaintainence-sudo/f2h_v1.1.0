@@ -117,16 +117,16 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   // Pickup & Delivery Operations
   // ---------------------------------------------------------------------------
-  static const String pickupItems            = '/delivery/orders/pickup-items';
-  static const String confirmPickup          = '/delivery/orders/pickup-items/confirm';
-  static const String todayDeliveries        = '/delivery/orders/today';
-  static const String todayRun               = '/delivery/orders/run/today';
-  static const String markOutForDelivery     = '/delivery/orders/mark-out-for-delivery';
-  static String startRun(String runId) => '/delivery/orders/run/$runId/start';
+  static const String pickupItems            = '/delivery-partner/orders/pickup-items';
+  static const String confirmPickup          = '/delivery-partner/orders/pickup-items/confirm';
+  static const String todayDeliveries        = '/delivery-partner/orders/today';
+  static const String todayRun               = '/delivery-partner/orders/run/today';
+  static const String markOutForDelivery     = '/delivery-partner/orders/mark-out-for-delivery';
+  static String startRun(String runId) => '/delivery-partner/orders/run/$runId/start';
   static String markStopDelivered(String runId, String addressId) =>
-      '/delivery/orders/run/$runId/address/$addressId/deliver';
-  static String handoverRun(String runId) => '/delivery/orders/run/$runId/handover';
-  static const String updateOrderStatus = '/delivery/orders';
+      '/delivery-partner/orders/run/$runId/address/$addressId/deliver';
+  static String handoverRun(String runId) => '/delivery-partner/orders/run/$runId/handover';
+  static const String updateOrderStatus = '/delivery-partner/orders';
   static const String supportTickets = '/support-tickets';
 
   // ---------------------------------------------------------------------------

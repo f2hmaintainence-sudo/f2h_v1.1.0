@@ -1,0 +1,23 @@
+reference_type | count
+subscription | 10
+topup | 33
+order | 24
+(3 rows)
+refer_id | referrer_customer_id | referred_customer_id | status | rewarded_at
+REFXO9EQ | F2HQ9PV99 | F2HQFK7NH | pending | 
+REF1_MTBBRY82 | T_CR_MTBBRY82 | T_CE_MTBBRY82 | pending | 2026-08-27 11:33:25.657056+02
+REF1_MTBBSAUT | T_CR_MTBBSAUT | T_CE_MTBBSAUT | pending | 2026-08-27 11:33:42.019696+02
+REF1_MTBBSX6A | T_CR_MTBBSX6A | T_CE_MTBBSX6A | pending | 2026-08-27 11:34:10.943947+02
+REF1_MTBBTACM | T_CR_MTBBTACM | T_CE_MTBBTACM | pending | 2026-08-27 11:34:28.017197+02
+REF1_MTBBTLZF | T_CR_MTBBTLZF | T_CE_MTBBTLZF | pending | 2026-08-27 11:34:43.108417+02
+REF1_MTBBTX9B | T_CR_MTBBTX9B | T_CE_MTBBTX9B | pending | 2026-08-27 11:34:57.710039+02
+(7 rows)
+dp_referral_bonuses
+0
+(1 row)
+webhook_events
+0
+(1 row)
+auth_log_rows
+0
+(1 row)

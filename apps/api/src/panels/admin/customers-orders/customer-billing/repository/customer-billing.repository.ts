@@ -11,9 +11,10 @@ export class CustomerBillingRepository {
 
   async findEligiblePostpaidCustomers(): Promise<any[]> {
     const sql = `
-      SELECT customer_id, first_name, phone, is_postpaid_enabled
-      FROM public.customers
-      ORDER BY first_name ASC, customer_id ASC
+      SELECT c.customer_id, u.first_name, u.phone, c.is_postpaid_enabled
+      FROM public.customers c
+      JOIN public.users u ON u.user_id = c.customer_id
+      ORDER BY u.first_name ASC, c.customer_id ASC
     `;
     return await this.databaseService.query(sql);
   }
@@ -29,9 +30,10 @@ export class CustomerBillingRepository {
 
   async checkCustomerPostpaidEnabled(customerId: string): Promise<any> {
     const sql = `
-      SELECT customer_id, first_name, phone, is_postpaid_enabled
-      FROM public.customers
-      WHERE customer_id = $1
+      SELECT c.customer_id, u.first_name, u.phone, c.is_postpaid_enabled
+      FROM public.customers c
+      JOIN public.users u ON u.user_id = c.customer_id
+      WHERE c.customer_id = $1
       LIMIT 1
     `;
     const rows = await this.databaseService.query(sql, [customerId]);
@@ -314,7 +316,7 @@ export class CustomerBillingRepository {
         pb.due_amount,
         pb.status,
         pb.created_at,
-        c.first_name AS customer_name,
+        COALESCE(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), u.user_name, 'Customer') AS customer_name,
         pb.payment_type = 'postpaid' AS is_postpaid_enabled,
         (
           SELECT COUNT(*)
@@ -323,6 +325,7 @@ export class CustomerBillingRepository {
         ) AS order_count
       FROM public.customer_bills pb
       LEFT JOIN public.customers c ON c.customer_id = pb.customer_id
+      LEFT JOIN public.users u ON u.user_id = pb.customer_id
       ${whereClause}
       ORDER BY pb.created_at DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -349,11 +352,12 @@ export class CustomerBillingRepository {
         pb.created_at,
         pb.bill_type,
         pb.reference_id,
-        c.first_name AS customer_name,
-        c.phone AS customer_phone,
+        COALESCE(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), u.user_name, 'Customer') AS customer_name,
+        u.phone AS customer_phone,
         pb.payment_type = 'postpaid' AS is_postpaid_enabled
       FROM public.customer_bills pb
       LEFT JOIN public.customers c ON c.customer_id = pb.customer_id
+      LEFT JOIN public.users u ON u.user_id = pb.customer_id
       WHERE pb.bill_id = $1::varchar
       LIMIT 1
     `;

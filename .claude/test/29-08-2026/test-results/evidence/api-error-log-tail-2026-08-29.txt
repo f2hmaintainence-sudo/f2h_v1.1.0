@@ -1,0 +1,397 @@
+16:54:21:   hint: [32m'No operator matches the given name and argument types. You might need to add explicit type casts.'[39m,
+16:54:21:   position: [32m'297'[39m,
+16:54:21:   internalPosition: [90mundefined[39m,
+16:54:21:   internalQuery: [90mundefined[39m,
+16:54:21:   where: [90mundefined[39m,
+16:54:21:   schema: [90mundefined[39m,
+16:54:21:   table: [90mundefined[39m,
+16:54:21:   column: [90mundefined[39m,
+16:54:21:   dataType: [90mundefined[39m,
+16:54:21:   constraint: [90mundefined[39m,
+16:54:21:   file: [32m'parse_oper.c'[39m,
+16:54:21:   line: [32m'647'[39m,
+16:54:21:   routine: [32m'op_error'[39m
+16:54:21: }
+16:54:21: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:21 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mGET /api/v1/admin/subscriptions/calendar/day-details?date=2026-08-29 500 52 - curl/8.5.0 127.0.0.1 +5ms[39m
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+16:54:50:   sql: [32m"SELECT\n         src.customer_id,\n         u.first_name || ' ' || u.last_name AS customer_name,\n         u.phone AS customer_phone,\n         COUNT(src.refund_candidate_id)::int AS pending_deliveries,\n "[39m,
+16:54:50:   errorCode: [32m'42703'[39m
+16:54:50: }
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[RefundCandidatesService] [39m[31mgetCustomerGroups error[39m
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[RefundCandidatesService] [39merror: column src.reviewed_by does not exist
+16:54:50:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg-pool[24m/index.js:45:11
+16:54:50: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+16:54:50:     at async DatabaseService.query [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/shared/database/Database.service.ts:212:35[90m)[39m
+16:54:50:     at async RefundCandidatesRepository.getCustomerGroups [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-candidates.repository.ts:240:18[90m)[39m
+16:54:50:     at async RefundCandidatesService.getCustomerGroups [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-candidates.service.ts:91:20[90m)[39m
+16:54:50:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+16:54:50:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+16:54:50:   length: [33m115[39m,
+16:54:50:   severity: [32m'ERROR'[39m,
+16:54:50:   code: [32m'42703'[39m,
+16:54:50:   detail: [90mundefined[39m,
+16:54:50:   hint: [90mundefined[39m,
+16:54:50:   position: [32m'1067'[39m,
+16:54:50:   internalPosition: [90mundefined[39m,
+16:54:50:   internalQuery: [90mundefined[39m,
+16:54:50:   where: [90mundefined[39m,
+16:54:50:   schema: [90mundefined[39m,
+16:54:50:   table: [90mundefined[39m,
+16:54:50:   column: [90mundefined[39m,
+16:54:50:   dataType: [90mundefined[39m,
+16:54:50:   constraint: [90mundefined[39m,
+16:54:50:   file: [32m'parse_relation.c'[39m,
+16:54:50:   line: [32m'3722'[39m,
+16:54:50:   routine: [32m'errorMissingColumn'[39m
+16:54:50: }
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mGET /api/v1/subscriptions/refund-candidates/customer-groups 500 94 - curl/8.5.0 127.0.0.1 +18ms[39m
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+16:54:50:   sql: [32m'\n      SELECT customer_id, first_name, phone, is_postpaid_enabled\n      FROM public.customers\n      ORDER BY first_name ASC, customer_id ASC\n    '[39m,
+16:54:50:   errorCode: [32m'42703'[39m
+16:54:50: }
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39merror: column "first_name" does not exist
+16:54:50:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg-pool[24m/index.js:45:11
+16:54:50: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+16:54:50:     at async DatabaseService.query [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/shared/database/Database.service.ts:212:35[90m)[39m
+16:54:50:     at async CustomerBillingRepository.findEligiblePostpaidCustomers [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/customer-billing/repository/customer-billing.repository.ts:18:12[90m)[39m
+16:54:50:     at async CustomerBillingService.getEligibleCustomers [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/customer-billing/services/customer-billing.service.ts:368:23[90m)[39m
+16:54:50:     at async CustomerBillingAdminController.getEligibleCustomersAdmin [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/customer-billing/customer-billing.controller.ts:49:12[90m)[39m
+16:54:50:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+16:54:50:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+16:54:50:   length: [33m110[39m,
+16:54:50:   severity: [32m'ERROR'[39m,
+16:54:50:   code: [32m'42703'[39m,
+16:54:50:   detail: [90mundefined[39m,
+16:54:50:   hint: [90mundefined[39m,
+16:54:50:   position: [32m'28'[39m,
+16:54:50:   internalPosition: [90mundefined[39m,
+16:54:50:   internalQuery: [90mundefined[39m,
+16:54:50:   where: [90mundefined[39m,
+16:54:50:   schema: [90mundefined[39m,
+16:54:50:   table: [90mundefined[39m,
+16:54:50:   column: [90mundefined[39m,
+16:54:50:   dataType: [90mundefined[39m,
+16:54:50:   constraint: [90mundefined[39m,
+16:54:50:   file: [32m'parse_relation.c'[39m,
+16:54:50:   line: [32m'3722'[39m,
+16:54:50:   routine: [32m'errorMissingColumn'[39m
+16:54:50: }
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mGET /api/v1/admin/postpaid-bills/eligible-customers 500 52 - curl/8.5.0 127.0.0.1 +5ms[39m
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+16:54:50:   sql: [32m'\n      SELECT\n        sp.id,\n        sp.subscription_item_id,\n        sp.subscription_id,\n        sub.customer_id,\n        si.product_variant_id,\n        sp.start_date::text,\n        sp.end_date::text'[39m,
+16:54:50:   errorCode: [32m'42883'[39m
+16:54:50: }
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39merror: operator does not exist: integer = character varying
+16:54:50:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg-pool[24m/index.js:45:11
+16:54:50: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+16:54:50:     at async DatabaseService.query [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/shared/database/Database.service.ts:212:35[90m)[39m
+16:54:50:     at async CalendarRepository.findDayDetails [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/calendar/repository/calendar.repository.ts:36:20[90m)[39m
+16:54:50:     at async CalendarService.getDayDetails [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/calendar/calendar.service.ts:28:22[90m)[39m
+16:54:50:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+16:54:50:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+16:54:50:   length: [33m213[39m,
+16:54:50:   severity: [32m'ERROR'[39m,
+16:54:50:   code: [32m'42883'[39m,
+16:54:50:   detail: [90mundefined[39m,
+16:54:50:   hint: [32m'No operator matches the given name and argument types. You might need to add explicit type casts.'[39m,
+16:54:50:   position: [32m'297'[39m,
+16:54:50:   internalPosition: [90mundefined[39m,
+16:54:50:   internalQuery: [90mundefined[39m,
+16:54:50:   where: [90mundefined[39m,
+16:54:50:   schema: [90mundefined[39m,
+16:54:50:   table: [90mundefined[39m,
+16:54:50:   column: [90mundefined[39m,
+16:54:50:   dataType: [90mundefined[39m,
+16:54:50:   constraint: [90mundefined[39m,
+16:54:50:   file: [32m'parse_oper.c'[39m,
+16:54:50:   line: [32m'647'[39m,
+16:54:50:   routine: [32m'op_error'[39m
+16:54:50: }
+16:54:50: [31m[Nest] 3089309  - [39m08/29/2026, 4:54:50 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mGET /api/v1/admin/subscriptions/calendar/day-details?date=2026-08-29&slot=morning 500 52 - curl/8.5.0 127.0.0.1 +13ms[39m
+16:56:20: [31m[Nest] 3089309  - [39m08/29/2026, 4:56:20 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+16:56:20: [31m[Nest] 3089309  - [39m08/29/2026, 4:56:20 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+16:56:20:   sql: [32m'\n      SELECT customer_id, first_name, phone, is_postpaid_enabled\n      FROM public.customers\n      WHERE customer_id = $1\n      LIMIT 1\n    '[39m,
+16:56:20:   errorCode: [32m'42703'[39m
+16:56:20: }
+16:56:20: [31m[Nest] 3089309  - [39m08/29/2026, 4:56:20 PM [31m  ERROR[39m [38;5;3m[CustomerBillingService] [39m[31mError generating bill for customer QA_CUST_POST: column "first_name" does not exist[39m
+16:56:20: error: column "first_name" does not exist
+16:56:20:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/pg-pool/index.js:45:11
+16:56:20:     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+16:56:20:     at async DatabaseService.query (/home/f2hfresh/htdocs/f2hfresh.com/apps/api/src/shared/database/Database.service.ts:212:35)
+16:56:20:     at async CustomerBillingRepository.checkCustomerPostpaidEnabled (/home/f2hfresh/htdocs/f2hfresh.com/apps/api/src/panels/admin/customers-orders/customer-billing/repository/customer-billing.repository.ts:37:18)
+16:56:20:     at async CustomerBillingService.runMonthlyBatchBilling (/home/f2hfresh/htdocs/f2hfresh.com/apps/api/src/panels/admin/customers-orders/customer-billing/services/customer-billing.service.ts:161:30)
+16:56:20:     at async CustomerBillingAdminController.generateBillAdmin (/home/f2hfresh/htdocs/f2hfresh.com/apps/api/src/panels/admin/customers-orders/customer-billing/customer-billing.controller.ts:55:12)
+16:56:20:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/@nestjs/core/router/router-execution-context.js:47:62
+16:56:20:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/@nestjs/core/router/router-proxy.js:9:17
+16:57:20: [31m[Nest] 3089309  - [39m08/29/2026, 4:57:20 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+16:57:20: [31m[Nest] 3089309  - [39m08/29/2026, 4:57:20 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+16:57:20:   sql: [32m'SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1'[39m,
+16:57:20:   errorCode: [32m'42703'[39m
+16:57:20: }
+16:58:22: [31m[Nest] 3089309  - [39m08/29/2026, 4:58:22 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+16:58:22: [31m[Nest] 3089309  - [39m08/29/2026, 4:58:22 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+16:58:22:   sql: [32m'SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1'[39m,
+16:58:22:   errorCode: [32m'42703'[39m
+16:58:22: }
+17:01:21: [31m[Nest] 3089309  - [39m08/29/2026, 5:01:21 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:01:21: [31m[Nest] 3089309  - [39m08/29/2026, 5:01:21 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:01:21:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:01:21:   errorCode: [32m'23502'[39m
+17:01:21: }
+17:03:08: [31m[Nest] 3089309  - [39m08/29/2026, 5:03:08 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:03:08: [31m[Nest] 3089309  - [39m08/29/2026, 5:03:08 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:03:08:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:03:08:   errorCode: [32m'23502'[39m
+17:03:08: }
+17:07:07: [31m[Nest] 3089309  - [39m08/29/2026, 5:07:07 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:07:07: [31m[Nest] 3089309  - [39m08/29/2026, 5:07:07 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:07:07:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:07:07:   errorCode: [32m'23502'[39m
+17:07:07: }
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:10:10:   sql: [32m'\n      SELECT\n        o.subscription_id,\n        oi.subscription_item_id,\n        o.customer_id,\n        o.order_id,\n        o.scheduled_date::text AS scheduled_date,\n        o.delivery_slot AS slot,\n'[39m,
+17:10:10:   errorCode: [32m'42703'[39m
+17:10:10: }
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39merror: column dra.order_id does not exist
+17:10:10:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg-pool[24m/index.js:45:11
+17:10:10: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+17:10:10:     at async DatabaseService.query [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/shared/database/Database.service.ts:212:35[90m)[39m
+17:10:10:     at async RefundEligibilityService.findFailedOrders [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service.ts:261:18[90m)[39m
+17:10:10:     at async Promise.all (index 1)
+17:10:10:     at async RefundEligibilityService.preview [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service.ts:350:30[90m)[39m
+17:10:10:     at async RefundCandidatesService.previewScan [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-candidates.service.ts:163:29[90m)[39m
+17:10:10:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+17:10:10:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+17:10:10:   length: [33m172[39m,
+17:10:10:   severity: [32m'ERROR'[39m,
+17:10:10:   code: [32m'42703'[39m,
+17:10:10:   detail: [90mundefined[39m,
+17:10:10:   hint: [32m'Perhaps you meant to reference the column "dra.order_ids".'[39m,
+17:10:10:   position: [32m'1163'[39m,
+17:10:10:   internalPosition: [90mundefined[39m,
+17:10:10:   internalQuery: [90mundefined[39m,
+17:10:10:   where: [90mundefined[39m,
+17:10:10:   schema: [90mundefined[39m,
+17:10:10:   table: [90mundefined[39m,
+17:10:10:   column: [90mundefined[39m,
+17:10:10:   dataType: [90mundefined[39m,
+17:10:10:   constraint: [90mundefined[39m,
+17:10:10:   file: [32m'parse_relation.c'[39m,
+17:10:10:   line: [32m'3729'[39m,
+17:10:10:   routine: [32m'errorMissingColumn'[39m
+17:10:10: }
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mGET /api/v1/subscriptions/refund-candidates/scan/preview?month=2026-09&customer_id=QA_CUST_PRE 500 52 - curl/8.5.0 127.0.0.1 +27ms[39m
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:10:10:   sql: [32m'\n      SELECT\n        o.subscription_id,\n        oi.subscription_item_id,\n        o.customer_id,\n        o.order_id,\n        o.scheduled_date::text AS scheduled_date,\n        o.delivery_slot AS slot,\n'[39m,
+17:10:10:   errorCode: [32m'42703'[39m
+17:10:10: }
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39merror: column dra.order_id does not exist
+17:10:10:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg-pool[24m/index.js:45:11
+17:10:10: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+17:10:10:     at async DatabaseService.query [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/shared/database/Database.service.ts:212:35[90m)[39m
+17:10:10:     at async RefundEligibilityService.findFailedOrders [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service.ts:261:18[90m)[39m
+17:10:10:     at async Promise.all (index 1)
+17:10:10:     at async RefundEligibilityService.preview [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service.ts:350:30[90m)[39m
+17:10:10:     at async RefundCandidatesService.previewScan [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-candidates.service.ts:163:29[90m)[39m
+17:10:10:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+17:10:10:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+17:10:10:   length: [33m172[39m,
+17:10:10:   severity: [32m'ERROR'[39m,
+17:10:10:   code: [32m'42703'[39m,
+17:10:10:   detail: [90mundefined[39m,
+17:10:10:   hint: [32m'Perhaps you meant to reference the column "dra.order_ids".'[39m,
+17:10:10:   position: [32m'1163'[39m,
+17:10:10:   internalPosition: [90mundefined[39m,
+17:10:10:   internalQuery: [90mundefined[39m,
+17:10:10:   where: [90mundefined[39m,
+17:10:10:   schema: [90mundefined[39m,
+17:10:10:   table: [90mundefined[39m,
+17:10:10:   column: [90mundefined[39m,
+17:10:10:   dataType: [90mundefined[39m,
+17:10:10:   constraint: [90mundefined[39m,
+17:10:10:   file: [32m'parse_relation.c'[39m,
+17:10:10:   line: [32m'3729'[39m,
+17:10:10:   routine: [32m'errorMissingColumn'[39m
+17:10:10: }
+17:10:10: [31m[Nest] 3089309  - [39m08/29/2026, 5:10:10 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mGET /api/v1/subscriptions/refund-candidates/scan/preview?month=2026-08 500 52 - curl/8.5.0 127.0.0.1 +20ms[39m
+17:11:11: [31m[Nest] 3089309  - [39m08/29/2026, 5:11:11 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:11:11: [31m[Nest] 3089309  - [39m08/29/2026, 5:11:11 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:11:11:   sql: [32m'\n      SELECT\n        o.subscription_id,\n        oi.subscription_item_id,\n        o.customer_id,\n        o.order_id,\n        o.scheduled_date::text AS scheduled_date,\n        o.delivery_slot AS slot,\n'[39m,
+17:11:11:   errorCode: [32m'42703'[39m
+17:11:11: }
+17:11:11: [31m[Nest] 3089309  - [39m08/29/2026, 5:11:11 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39merror: column dra.order_id does not exist
+17:11:11:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg-pool[24m/index.js:45:11
+17:11:11: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+17:11:11:     at async DatabaseService.query [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/shared/database/Database.service.ts:212:35[90m)[39m
+17:11:11:     at async RefundEligibilityService.findFailedOrders [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service.ts:261:18[90m)[39m
+17:11:11:     at async Promise.all (index 1)
+17:11:11:     at async RefundEligibilityService.preview [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service.ts:350:30[90m)[39m
+17:11:11:     at async RefundEligibilityService.scan [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service.ts:373:29[90m)[39m
+17:11:11:     at async RefundCandidatesService.scan [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/admin/customers-orders/subscriptions/refund-candidates/refund-candidates.service.ts:153:20[90m)[39m
+17:11:11:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+17:11:11:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+17:11:11:   length: [33m172[39m,
+17:11:11:   severity: [32m'ERROR'[39m,
+17:11:11:   code: [32m'42703'[39m,
+17:11:11:   detail: [90mundefined[39m,
+17:11:11:   hint: [32m'Perhaps you meant to reference the column "dra.order_ids".'[39m,
+17:11:11:   position: [32m'1163'[39m,
+17:11:11:   internalPosition: [90mundefined[39m,
+17:11:11:   internalQuery: [90mundefined[39m,
+17:11:11:   where: [90mundefined[39m,
+17:11:11:   schema: [90mundefined[39m,
+17:11:11:   table: [90mundefined[39m,
+17:11:11:   column: [90mundefined[39m,
+17:11:11:   dataType: [90mundefined[39m,
+17:11:11:   constraint: [90mundefined[39m,
+17:11:11:   file: [32m'parse_relation.c'[39m,
+17:11:11:   line: [32m'3729'[39m,
+17:11:11:   routine: [32m'errorMissingColumn'[39m
+17:11:11: }
+17:11:11: [31m[Nest] 3089309  - [39m08/29/2026, 5:11:11 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mPOST /api/v1/subscriptions/refund-candidates/scan 500 52 - curl/8.5.0 127.0.0.1 +21ms[39m
+17:12:58: [31m[Nest] 3089309  - [39m08/29/2026, 5:12:58 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:12:58: [31m[Nest] 3089309  - [39m08/29/2026, 5:12:58 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:12:58:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:12:58:   errorCode: [32m'23502'[39m
+17:12:58: }
+17:12:58: [31m[Nest] 3089309  - [39m08/29/2026, 5:12:58 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:12:58: [31m[Nest] 3089309  - [39m08/29/2026, 5:12:58 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:12:58:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:12:58:   errorCode: [32m'23502'[39m
+17:12:58: }
+17:12:58: [31m[Nest] 3089309  - [39m08/29/2026, 5:12:58 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:12:58: [31m[Nest] 3089309  - [39m08/29/2026, 5:12:58 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:12:58:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:12:58:   errorCode: [32m'23502'[39m
+17:12:58: }
+17:14:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:14:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:14:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:14:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:14:02:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:14:02:   errorCode: [32m'23502'[39m
+17:14:02: }
+17:14:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:14:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:14:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:14:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:14:02:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:14:02:   errorCode: [32m'23502'[39m
+17:14:02: }
+17:16:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:16:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:16:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:16:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:16:02:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:16:02:   errorCode: [32m'23502'[39m
+17:16:02: }
+17:16:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:16:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:16:02: [31m[Nest] 3089309  - [39m08/29/2026, 5:16:02 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:16:02:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:16:02:   errorCode: [32m'23502'[39m
+17:16:02: }
+17:18:31: [31m[Nest] 3089309  - [39m08/29/2026, 5:18:31 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:18:31: [31m[Nest] 3089309  - [39m08/29/2026, 5:18:31 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:18:31:   sql: [32m'SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1'[39m,
+17:18:31:   errorCode: [32m'42703'[39m
+17:18:31: }
+17:18:31: [31m[Nest] 3089309  - [39m08/29/2026, 5:18:31 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:18:31: [31m[Nest] 3089309  - [39m08/29/2026, 5:18:31 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:18:31:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:18:31:   errorCode: [32m'23502'[39m
+17:18:31: }
+17:19:04: [31m[Nest] 3089309  - [39m08/29/2026, 5:19:04 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:19:04: [31m[Nest] 3089309  - [39m08/29/2026, 5:19:04 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:19:04:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:19:04:   errorCode: [32m'23502'[39m
+17:19:04: }
+17:19:04: [31m[Nest] 3089309  - [39m08/29/2026, 5:19:04 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:19:04: [31m[Nest] 3089309  - [39m08/29/2026, 5:19:04 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:19:04:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:19:04:   errorCode: [32m'23502'[39m
+17:19:04: }
+17:19:35: [31m[Nest] 3089309  - [39m08/29/2026, 5:19:35 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:19:35: [31m[Nest] 3089309  - [39m08/29/2026, 5:19:35 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:19:35:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:19:35:   errorCode: [32m'23502'[39m
+17:19:35: }
+17:20:48: [31m[Nest] 3089309  - [39m08/29/2026, 5:20:48 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39merror: column "started_at" of relation "delivery_runs" does not exist
+17:20:48:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg[24m/lib/client.js:652:17
+17:20:48: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+17:20:48:     at async <anonymous> [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/delivery-partner/orders/services/delivery.order.service.ts:954:7[90m)[39m
+17:20:48:     at async DatabaseService.transaction [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/shared/database/Database.service.ts:277:22[90m)[39m
+17:20:48:     at async DeliveryOrderService.startTodayRun [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/delivery-partner/orders/services/delivery.order.service.ts:953:5[90m)[39m
+17:20:48:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+17:20:48:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+17:20:48:   length: [33m138[39m,
+17:20:48:   severity: [32m'ERROR'[39m,
+17:20:48:   code: [32m'42703'[39m,
+17:20:48:   detail: [90mundefined[39m,
+17:20:48:   hint: [90mundefined[39m,
+17:20:48:   position: [32m'50'[39m,
+17:20:48:   internalPosition: [90mundefined[39m,
+17:20:48:   internalQuery: [90mundefined[39m,
+17:20:48:   where: [90mundefined[39m,
+17:20:48:   schema: [90mundefined[39m,
+17:20:48:   table: [90mundefined[39m,
+17:20:48:   column: [90mundefined[39m,
+17:20:48:   dataType: [90mundefined[39m,
+17:20:48:   constraint: [90mundefined[39m,
+17:20:48:   file: [32m'analyze.c'[39m,
+17:20:48:   line: [32m'2527'[39m,
+17:20:48:   routine: [32m'transformUpdateTargetList'[39m
+17:20:48: }
+17:20:48: [31m[Nest] 3089309  - [39m08/29/2026, 5:20:48 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mPOST /api/v1/delivery/orders/run/RUN-20260830-MOR-002/start 500 52 - curl/8.5.0 127.0.0.1 +15ms[39m
+17:23:28: [31m[Nest] 3089309  - [39m08/29/2026, 5:23:28 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:23:28: [31m[Nest] 3089309  - [39m08/29/2026, 5:23:28 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:23:28:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:23:28:   errorCode: [32m'23502'[39m
+17:23:28: }
+17:23:28: [31m[Nest] 3089309  - [39m08/29/2026, 5:23:28 PM [31m  ERROR[39m [38;5;3m[ReferralRewardEngineService] [39m[31mREFERRAL_REWARD_FAILED - Error processing referral reward for customerId: QA_CUST_PRE, orderId: OrdMOCB3B10KA70[39m
+17:23:28: [31m[Nest] 3089309  - [39m08/29/2026, 5:23:28 PM [31m  ERROR[39m [38;5;3m[ReferralRewardEngineService] [39merror: column "referred_user_id" does not exist
+17:23:28:     at /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4mpg[24m/lib/client.js:652:17
+17:23:28: [90m    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+17:23:28:     at async ReferralRewardEngineService.processReferralReward [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/customer/referral/services/referral-reward-engine.service.ts:57:22[90m)[39m
+17:23:28:     at async DeliveryOrderService.markStopDelivered [90m(/home/f2hfresh/htdocs/f2hfresh.com/apps/api/[39msrc/panels/delivery-partner/orders/services/delivery.order.service.ts:1239:13[90m)[39m
+17:23:28:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-execution-context.js:47:62
+17:23:28:     at async /home/f2hfresh/htdocs/f2hfresh.com/node_modules/[4m@nestjs/core[24m/router/router-proxy.js:9:17 {
+17:23:28:   length: [33m116[39m,
+17:23:28:   severity: [32m'ERROR'[39m,
+17:23:28:   code: [32m'42703'[39m,
+17:23:28:   detail: [90mundefined[39m,
+17:23:28:   hint: [90mundefined[39m,
+17:23:28:   position: [32m'53'[39m,
+17:23:28:   internalPosition: [90mundefined[39m,
+17:23:28:   internalQuery: [90mundefined[39m,
+17:23:28:   where: [90mundefined[39m,
+17:23:28:   schema: [90mundefined[39m,
+17:23:28:   table: [90mundefined[39m,
+17:23:28:   column: [90mundefined[39m,
+17:23:28:   dataType: [90mundefined[39m,
+17:23:28:   constraint: [90mundefined[39m,
+17:23:28:   file: [32m'parse_relation.c'[39m,
+17:23:28:   line: [32m'3722'[39m,
+17:23:28:   routine: [32m'errorMissingColumn'[39m
+17:23:28: }
+17:26:07: [31m[Nest] 3089309  - [39m08/29/2026, 5:26:07 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:26:07: [31m[Nest] 3089309  - [39m08/29/2026, 5:26:07 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:26:07:   sql: [32m'SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1'[39m,
+17:26:07:   errorCode: [32m'42703'[39m
+17:26:07: }
+17:27:56: [31m[Nest] 3089309  - [39m08/29/2026, 5:27:56 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:27:56: [31m[Nest] 3089309  - [39m08/29/2026, 5:27:56 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:27:56:   sql: [32m"INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)\n                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)"[39m,
+17:27:56:   errorCode: [32m'23502'[39m
+17:27:56: }
+17:31:01: [31m[Nest] 3089309  - [39m08/29/2026, 5:31:01 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:31:01: [31m[Nest] 3089309  - [39m08/29/2026, 5:31:01 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:31:01:   sql: [32m'SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1'[39m,
+17:31:01:   errorCode: [32m'42703'[39m
+17:31:01: }
+17:37:28: [31m[Nest] 3089309  - [39m08/29/2026, 5:37:28 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39m[31mQuery failed[39m
+17:37:28: [31m[Nest] 3089309  - [39m08/29/2026, 5:37:28 PM [31m  ERROR[39m [38;5;3m[DatabaseService] [39mObject(2) {
+17:37:28:   sql: [32m'SELECT is_active FROM customers WHERE customer_id = $1 LIMIT 1'[39m,
+17:37:28:   errorCode: [32m'42703'[39m
+17:37:28: }
+17:38:36: [31m[Nest] 3089309  - [39m08/29/2026, 5:38:36 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mPOST /api/v1/admin/inventory/purchases 500 94 - curl/8.5.0 127.0.0.1 +20ms[39m
+17:39:25: [31m[Nest] 3089309  - [39m08/29/2026, 5:39:25 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mPOST /api/v1/admin/inventory/purchases 500 94 - curl/8.5.0 127.0.0.1 +7ms[39m
+17:40:07: [31m[Nest] 3089309  - [39m08/29/2026, 5:40:07 PM [31m  ERROR[39m [38;5;3m[HTTP] [39m[31mPOST /api/v1/admin/delivery/dispatch/RUN-20260830-MOR-002 500 97 - curl/8.5.0 127.0.0.1 +17ms[39m

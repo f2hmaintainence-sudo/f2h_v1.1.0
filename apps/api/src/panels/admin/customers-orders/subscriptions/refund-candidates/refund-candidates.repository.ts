@@ -261,8 +261,8 @@ export class RefundCandidatesRepository {
              'refund_reason', src.refund_reason,
              'source', src.source,
              'status', src.status,
-             'reviewed_by', src.reviewed_by,
-             'reviewed_at', src.reviewed_at,
+             'reviewed_by', src.approved_by,
+             'reviewed_at', src.approved_at,
              'notes', src.notes,
              'product_name', p.name,
              'variant_name', pv.name
@@ -297,9 +297,9 @@ export class RefundCandidatesRepository {
   ): Promise<number> {
     const rows = await this.db.query(
       `UPDATE subscription_refund_candidates
-          SET status = 'reviewed',
-              reviewed_by = $2,
-              reviewed_at = NOW(),
+          SET status = 'approved',
+              approved_by = $2,
+              approved_at = NOW(),
               notes = CASE WHEN $3::text IS NULL OR $3::text = ''
                            THEN notes
                            ELSE COALESCE(notes || ' | ', '') || $3::text END,

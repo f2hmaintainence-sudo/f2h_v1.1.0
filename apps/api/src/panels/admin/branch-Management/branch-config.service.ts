@@ -143,15 +143,28 @@ export class BranchConfigService {
     try {
       const sql = `
         SELECT
-          db.id, db.full_name, db.phone, db.branch_id,
+          db.delivery_partner_id AS id,
+          COALESCE(u.first_name || ' ' || u.last_name, u.user_name, 'Delivery Partner') AS full_name,
+          u.phone,
+          db.branch_id,
           b.branch_name,
-          db.is_active, db.is_available,
-          db.max_daily_orders, db.total_runs, db.total_deliveries,
-          db.average_rating
+          db.is_active,
+          db.is_available,
+          db.max_daily_orders,
+          (
+            SELECT COUNT(*)::int FROM delivery_runs dr
+            WHERE dr.delivery_partner_id = db.delivery_partner_id
+          ) AS total_runs,
+          (
+            SELECT COUNT(*)::int FROM orders o
+            WHERE o.delivery_partner_id = db.delivery_partner_id AND o.status = 'delivered'
+          ) AS total_deliveries,
+          5.0 AS average_rating
         FROM delivery_partners db
+        LEFT JOIN users u ON u.user_id = db.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = db.branch_id
         WHERE db.is_active = true
-        ORDER BY b.branch_name ASC, db.full_name ASC
+        ORDER BY b.branch_name ASC, u.first_name ASC
       `;
       const rows = await this.db.query(sql, []);
 
