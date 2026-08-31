@@ -1,7 +1,8 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'dart:ui_web' as ui_web;
+import 'package:web/web.dart' as web;
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
@@ -900,6 +901,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildMapRoutePreviewCard() {
+    final lat = _currentStop.addressLat;
+    final lng = _currentStop.addressLng;
+    final apiKey = AppConfig.googleMapsApiKey;
+    final viewId = 'gmaps-stop-${_currentStop.stop}-${lat.toStringAsFixed(5)}';
+
+    if (kIsWeb) {
+      // Register the Google Maps Embed iframe once per unique stop
+      try {
+        ui_web.platformViewRegistry.registerViewFactory(
+          viewId,
+          (int id) {
+            final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
+            iframe.src = 'https://www.google.com/maps/embed/v1/place?key=$apiKey&q=$lat,$lng&zoom=16&maptype=roadmap';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = '0';
+            iframe.loading = 'lazy';
+            iframe.referrerPolicy = 'no-referrer-when-downgrade';
+            iframe.allowFullscreen = true;
+            return iframe;
+          },
+        );
+      } catch (_) {
+        // Already registered — safe to ignore
+      }
+    }
+
     return Container(
       height: 200,
       decoration: BoxDecoration(
@@ -912,44 +940,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            FlutterMap(
-              options: MapOptions(
-                initialCenter: LatLng(_currentStop.addressLat, _currentStop.addressLng),
-                initialZoom: 16.0,
-                maxZoom: 18.0,
-                minZoom: 12.0,
+            if (kIsWeb)
+              HtmlElementView(viewType: viewId)
+            else
+              // Fallback for native: open Google Maps in browser
+              InkWell(
+                onTap: () => _openNav(lat, lng),
+                child: Container(
+                  color: const Color(0xFFE8F5E9),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.map_rounded, color: kPrimary, size: 48),
+                      const SizedBox(height: 8),
+                      Text('Tap to open in Google Maps',
+                          style: TextStyle(color: kPrimary, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: AppConfig.mapTileUrlTemplate,
-                  userAgentPackageName: 'com.f2h.delivery',
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(_currentStop.addressLat, _currentStop.addressLng),
-                      width: 44,
-                      height: 44,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: kSuccess,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            )
-                          ],
-                        ),
-                        child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
             
             // ETA Overlay Card
             Positioned(

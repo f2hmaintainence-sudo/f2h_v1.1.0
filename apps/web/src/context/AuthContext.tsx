@@ -13,6 +13,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { api } from "@/services/api.client";
 import { useRouter, usePathname } from "next/navigation";
+import { clearCsrfToken } from "@/lib/csrf";
 
 export interface UserRole {
   role_id: string;
@@ -36,7 +37,7 @@ interface AuthContextType {
   activeRole: string | null;
   switchRole: (roleId: string) => Promise<void>;
   refresh: () => Promise<AuthUser | null | void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -45,7 +46,7 @@ const AuthContext = createContext<AuthContextType>({
   activeRole: null,
   switchRole: async () => { },
   refresh: async () => { },
-  logout: () => { },
+  logout: async () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -110,13 +111,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchUser, router]);
 
-  const logout = useCallback(() => {
-    // Clear cookies
-    document.cookie = "access_token=; Max-Age=0; path=/";
-    document.cookie = "refresh_token=; Max-Age=0; path=/";
-    document.cookie = "csrf_token=; Max-Age=0; path=/";
-    setUser(null);
-    router.push("/login");
+  const logout = useCallback(async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (err) {
+      console.warn("[AuthContext] Backend logout request failed:", err);
+    } finally {
+      // Clear cookies from document
+      document.cookie = "access_token=; Max-Age=0; path=/";
+      document.cookie = "refresh_token=; Max-Age=0; path=/";
+      document.cookie = "csrf_token=; Max-Age=0; path=/";
+
+      // Clear local storage tokens and keys
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("token");
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("f2h_access_token");
+      }
+
+      clearCsrfToken();
+      setUser(null);
+
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      } else {
+        router.push("/login");
+      }
+    }
   }, [router]);
 
   return (
