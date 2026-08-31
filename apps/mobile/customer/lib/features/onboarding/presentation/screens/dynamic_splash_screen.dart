@@ -264,7 +264,10 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                         ],
                       ),
                       child: const Center(
-                        child: CowLoadingWidget(size: 170),
+                        child: CowLoadingWidget(
+                          size: 135,
+                          loadingBarWidth: 85,
+                        ),
                       ),
                     ),
 

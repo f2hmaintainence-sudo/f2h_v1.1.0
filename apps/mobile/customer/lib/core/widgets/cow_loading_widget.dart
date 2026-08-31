@@ -41,8 +41,8 @@ class CowLoadingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final barWidth = loadingBarWidth ?? (size * 0.75).clamp(64.0, 220.0);
-    final barHeight = (size * 0.05).clamp(4.0, 8.0);
+    final barWidth = loadingBarWidth ?? (size * 0.65).clamp(48.0, 160.0);
+    final barHeight = (size * 0.045).clamp(4.0, 7.0);
 
     final content = Column(
       mainAxisSize: MainAxisSize.min,
@@ -59,11 +59,12 @@ class CowLoadingWidget extends StatelessWidget {
             fit: BoxFit.contain,
             repeat: true,
             animate: true,
+            filterQuality: FilterQuality.medium,
             errorBuilder: (context, error, stackTrace) {
               return Center(
                 child: SizedBox(
-                  width: size * 0.4,
-                  height: size * 0.4,
+                  width: size * 0.35,
+                  height: size * 0.35,
                   child: const CircularProgressIndicator(
                     color: kPrimary,
                     strokeWidth: 2.5,
@@ -74,7 +75,7 @@ class CowLoadingWidget extends StatelessWidget {
           ),
         ),
         if (showLoadingBar) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           GreenLoadingBar(
             width: barWidth,
             height: barHeight,
@@ -120,8 +121,8 @@ class CowLoadingWidget extends StatelessWidget {
   }
 }
 
-/// Standalone Green Loading Bar Lottie Animation Widget
-class GreenLoadingBar extends StatelessWidget {
+/// Hardware-accelerated, ultra-smooth Green Loading Bar
+class GreenLoadingBar extends StatefulWidget {
   final double width;
   final double height;
 
@@ -132,26 +133,85 @@ class GreenLoadingBar extends StatelessWidget {
   });
 
   @override
+  State<GreenLoadingBar> createState() => _GreenLoadingBarState();
+}
+
+class _GreenLoadingBarState extends State<GreenLoadingBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final barWidth = widget.width;
+    final barHeight = widget.height;
+    final pillWidth = (barWidth * 0.42).clamp(24.0, 80.0);
+
     return SizedBox(
-      width: width,
-      height: height,
+      width: barWidth,
+      height: barHeight,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(height / 2),
-        child: Lottie.asset(
-          'assets/loading/green_loading_bar.json',
-          width: width,
-          height: height,
-          fit: BoxFit.fill,
-          repeat: true,
-          animate: true,
-          errorBuilder: (context, error, stackTrace) {
-            return LinearProgressIndicator(
-              backgroundColor: const Color(0xFFDCFCE7),
-              valueColor: const AlwaysStoppedAnimation<Color>(kPrimary),
-              minHeight: height,
-            );
-          },
+        borderRadius: BorderRadius.circular(barHeight / 2),
+        child: Stack(
+          children: [
+            // Background track
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(barHeight / 2),
+                ),
+              ),
+            ),
+            // Smooth moving glowing gradient pill
+            AnimatedBuilder(
+              animation: _ctrl,
+              builder: (context, _) {
+                final curved = Curves.easeInOutCubic.transform(_ctrl.value);
+                final maxOffset = barWidth - pillWidth;
+                final left = maxOffset * curved;
+
+                return Positioned(
+                  left: left,
+                  top: 0,
+                  bottom: 0,
+                  width: pillWidth,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(barHeight / 2),
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF16A34A),
+                          Color(0xFF22C55E),
+                          Color(0xFF4ADE80),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+                          blurRadius: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
