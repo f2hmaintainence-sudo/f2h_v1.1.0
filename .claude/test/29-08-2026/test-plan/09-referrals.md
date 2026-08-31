@@ -7,7 +7,23 @@
 
 ---
 
-## 1. Referral Reward Engine Lifecycle
+## 1. Business Logic & Referral Rules
+
+1. **Referred Customer (Referee) Reward**:
+   - Only the **referred customer (new account user)** receives the **₹100 wallet reward** when registering with a valid referral code and completing their qualifying first order.
+2. **Referrer (Inviter) Rule**:
+   - Customer referrers **never** receive a reward (`₹0.00`).
+3. **No Automatic First-Order Refunds/Cashbacks**:
+   - No hardcoded ₹50 or automatic wallet cashback/refund on first orders.
+   - Customers receive discounts on their first order **strictly via Coupons and Promotions** applied at checkout.
+4. **Delivery Partner Referral Acquisition**:
+   - When a Delivery Partner refers a customer (using DP referral code), a **₹75 acquisition bonus** is logged in `delivery_partner_referral_bonuses` for the partner's payout/salary ledger.
+5. **Idempotency & Concurrency Protection**:
+   - Atomic PostgreSQL transactions with `SELECT ... FOR UPDATE` row-level locks prevent double-crediting or duplicate reward events.
+
+---
+
+## 2. Referral Reward Engine Lifecycle
 
 ```mermaid
 sequenceDiagram
@@ -20,7 +36,7 @@ sequenceDiagram
 
     REF->>NEW: Shares Referral Code (e.g., REF_ALICE)
     NEW->>DB: Registers with referral code (customers.referred_by = 'REF_ALICE')
-    DB->>DB: INSERT INTO referrals (status='pending', referrer_reward_amount=100.00)
+    DB->>DB: INSERT INTO referrals (status='pending', referred_reward_amount=100.00, referrer_reward_amount=0.00)
 
     Note over NEW,ORD: Referee places 1st order & order is delivered
     ORD->>ENG: processReferralReward(refereeCustomerId, orderId)
@@ -30,52 +46,77 @@ sequenceDiagram
     
     alt Status != 'rewarded' AND first_order_completed = false
         ENG->>DB: UPDATE referrals (status='rewarded', rewarded_at=NOW())
-        ENG->>DB: UPDATE customers SET first_order_completed=true
+        ENG->>DB: UPDATE customers SET first_order_completed=true WHERE customer_id = refereeCustomerId
+        
         alt Referrer is Customer
-            ENG->>DB: UPDATE customers SET wallet_balance += 100.00 (Referrer)
-            ENG->>DB: INSERT INTO customer_wallet_transactions (amount=100.00, type='credit')
-            ENG->>REF: Send FCM Push: "🎉 ₹100 Referral Bonus Credited!"
+            Note over ENG,DB: Referrer gets ₹0, Referee gets ₹100
+            ENG->>DB: UPDATE customers SET wallet_balance += 100.00 (Referee)
+            ENG->>DB: INSERT INTO customer_wallet_transactions (customer_id=referee, amount=100.00, type='credit', ref='referral_reward')
+            ENG->>NEW: Send FCM Push: "🎉 ₹100 Welcome Referral Reward Credited to your wallet!"
         else Referrer is Delivery Partner
-            ENG->>DB: INSERT INTO delivery_partner_referral_bonuses (amount=75.00, status='pending')
+            Note over ENG,DB: DP gets ₹75 Bonus, Referee gets ₹100
+            ENG->>DB: UPDATE customers SET wallet_balance += 100.00 (Referee)
+            ENG->>DB: INSERT INTO delivery_partner_referral_bonuses (partner_id=dp, amount=75.00, status='pending')
+            ENG->>NEW: Send FCM Push: "🎉 ₹100 Welcome Referral Reward Credited!"
         end
         ENG->>DB: COMMIT TRANSACTION
     else Already Rewarded / Duplicate Event
         ENG->>DB: ROLLBACK / COMMIT without mutation
-        ENG-->>ORD: Returns { status: false, message: "Referral reward already processed" }
+        ENG-->>ORD: Returns { status: false, message: "Referral reward already processed previously." }
     end
 ```
 
 ---
 
-## 2. Test Cases
+## 3. Test Cases
 
-### 2.1 Customer-to-Customer Referrals
+### 3.1 Customer Referral Flows
 
-#### REF-CUST-001: End-to-End Customer Referral Flow & ₹100 Wallet Reward
+#### REF-CUST-001: End-to-End Referred Customer ₹100 Reward (Referrer Gets ₹0)
 - **Module:** `Referrals / Customer`
-- **Scenario:** Customer A refers Customer B; upon B's first delivery, A receives ₹100 in wallet
+- **Scenario:** Customer A refers Customer B; upon B's first delivered order, Customer B (referee) receives ₹100 in wallet, Customer A (referrer) receives ₹0
 - **Priority:** `Critical`
 - **Preconditions:**
   - Customer A (`CUST_A`) has wallet balance = `₹50.00`.
-  - Customer B (`CUST_B`) registers using A's referral code.
+  - Customer B (`CUST_B`) has wallet balance = `₹0.00`.
+  - Customer B registers using A's referral code.
 - **Dependencies:** None
 - **Steps:**
-  1. Customer B completes one-time order `#F2H-ORD-B1`.
-  2. Delivery partner delivers `#F2H-ORD-B1` and uploads proof.
+  1. Customer B completes first order `#F2H-ORD-B1`.
+  2. Delivery partner delivers `#F2H-ORD-B1`.
   3. `ReferralRewardEngineService.processReferralReward('CUST_B', 'F2H-ORD-B1')` is triggered.
 - **Expected Result:**
   - Referral status transitions to `rewarded`.
-  - Customer A's wallet balance increases to `₹150.00` (`+₹100.00`).
+  - Customer B's wallet balance increases to `₹100.00` (`+₹100.00`).
+  - Customer A's wallet balance remains `₹50.00` (`+₹0.00` — referrer never gets reward).
   - Customer B's profile updates `first_order_completed = true`.
-  - Customer A receives FCM Push Notification: *"🎉 Referral Bonus Received! ₹100 credited to your wallet!"*.
+  - Customer B receives FCM Push Notification: *"🎉 Welcome Bonus! ₹100 referral reward credited to your wallet!"*.
 - **Database / API Verification Points:**
-  - Table `referrals`: `status = 'rewarded'`, `rewarded_at` is set.
-  - Table `customers` (Customer A): `wallet_balance = 150.00`.
-  - Table `customer_wallet_transactions`: row with `transaction_type = 'credit'`, `amount = 100.00`, `balance_after = 150.00`, `reference_type = 'referral_bonus'`.
+  - Table `referrals`: `status = 'rewarded'`, `referred_reward_amount = 100.00`, `referrer_reward_amount = 0.00`, `rewarded_at` is set.
+  - Table `customers` (Customer B): `wallet_balance = 100.00`, `first_order_completed = true`.
+  - Table `customers` (Customer A): `wallet_balance = 50.00` (unchanged).
+  - Table `customer_wallet_transactions`: row with `customer_id = 'CUST_B'`, `transaction_type = 'credit'`, `amount = 100.00`, `balance_after = 100.00`, `reference_type = 'referral_reward'`.
 
-#### REF-CUST-002: Double Reward Fraud Prevention
+#### REF-CUST-002: First Order Discount via Coupon Only (No Auto-Refund/Cashback)
+- **Module:** `Orders / Promotions & Discounts`
+- **Scenario:** Customer places first order without coupon; verify NO hardcoded ₹50 or automatic wallet refund is applied
+- **Priority:** `High`
+- **Preconditions:** New customer `CUST_NEW` registered.
+- **Dependencies:** None
+- **Steps:**
+  1. `CUST_NEW` places first order of ₹450 without applying any coupon.
+  2. Order is delivered and confirmed.
+- **Expected Result:**
+  - Order total charged is exactly ₹450 (no hardcoded ₹50 discount).
+  - Wallet receives NO automatic first-order refund/cashback.
+  - Discounts on first order apply only when an active promotional coupon (e.g. `WELCOME50`) is entered.
+- **Database / API Verification Points:**
+  - Table `orders`: `discount_amount = 0.00`, `total_amount = 450.00`.
+  - Table `customer_wallet_transactions`: NO automatic cashback transaction created.
+
+#### REF-CUST-003: Double Reward Fraud & Idempotency Prevention
 - **Module:** `Referrals / Idempotency`
-- **Scenario:** Delivery partner marks order delivered multiple times; verify reward credited ONLY once
+- **Scenario:** Delivery partner marks order delivered multiple times or referee places 2nd order; verify reward credited ONLY once
 - **Priority:** `Critical`
 - **Preconditions:** Reward for `CUST_B` already processed in `REF-CUST-001`.
 - **Dependencies:** `REF-CUST-001`
@@ -85,11 +126,11 @@ sequenceDiagram
 - **Expected Result:**
   - Engine detects `referrals.status = 'rewarded'` and `first_order_completed = true`.
   - Rejection response returned: `{ status: false, message: "Referral reward already processed previously." }`.
-  - Customer A's wallet balance remains `₹150.00` (NO second ₹100 credit).
+  - Customer B's wallet balance remains `₹100.00` (NO second ₹100 credit).
 - **Database / API Verification Points:**
-  - `SELECT COUNT(*) FROM customer_wallet_transactions WHERE customer_id = 'CUST_A' AND reference_type = 'referral_bonus'` returns exactly `1`.
+  - `SELECT COUNT(*) FROM customer_wallet_transactions WHERE customer_id = 'CUST_B' AND reference_type = 'referral_reward'` returns exactly `1`.
 
-#### REF-CUST-003: Self-Referral Prevention
+#### REF-CUST-004: Self-Referral Prevention
 - **Module:** `Referrals / Security`
 - **Scenario:** Customer attempts to refer their own phone number or email
 - **Priority:** `High`
@@ -104,11 +145,11 @@ sequenceDiagram
 
 ---
 
-### 2.2 Delivery Partner Acquisition Bonuses
+### 3.2 Delivery Partner Acquisition Bonuses
 
-#### REF-PART-001: Delivery Partner Referral ₹75 Bonus Accrual
+#### REF-PART-001: Delivery Partner Referral ₹75 Bonus Accrual & Referee ₹100 Reward
 - **Module:** `Referrals / Partner Bonus`
-- **Scenario:** Delivery partner `DP_01` refers customer `CUST_C`; on first delivery, ₹75 bonus logged
+- **Scenario:** Delivery partner `DP_01` refers customer `CUST_C`; on first delivery, ₹75 bonus logged for partner and ₹100 credited to referee wallet
 - **Priority:** `Critical`
 - **Preconditions:** Delivery partner `DP_01` exists in `delivery_partners`. `CUST_C` signs up with code `DP_01`.
 - **Dependencies:** None
@@ -117,8 +158,9 @@ sequenceDiagram
   2. `ReferralRewardEngineService.processReferralReward('CUST_C', 'F2H-ORD-C1')` triggers.
 - **Expected Result:**
   - Engine detects referrer is in `delivery_partners` table.
-  - Inserts ₹75 pending bonus into `delivery_partner_referral_bonuses`.
-  - Customer `CUST_C` wallet is NOT credited with referrer bonus.
+  - Inserts ₹75 pending acquisition bonus into `delivery_partner_referral_bonuses`.
+  - Customer `CUST_C` wallet is credited with ₹100 referee welcome reward.
 - **Database / API Verification Points:**
   - Table `delivery_partner_referral_bonuses`: row with `partner_id = 'DP_01'`, `amount = 75.00`, `status = 'pending'`, `order_id = 'F2H-ORD-C1'`.
-  - Table `referrals`: `status = 'rewarded'`, `referrer_reward_amount = 75.00`.
+  - Table `referrals`: `status = 'rewarded'`, `referrer_reward_amount = 75.00`, `referred_reward_amount = 100.00`.
+  - Table `customers` (`CUST_C`): `wallet_balance = 100.00`.
