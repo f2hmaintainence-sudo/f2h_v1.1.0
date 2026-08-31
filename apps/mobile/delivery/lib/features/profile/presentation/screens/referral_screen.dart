@@ -149,7 +149,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   const SizedBox(width: 10),
                   Text(
                     'Share Customer Referral',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
                       color: const Color(0xFF0F172A),
@@ -161,7 +161,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               Text(
                 'Invite customers to order fresh milk & produce. You earn ₹75 per customer upon their first delivery!',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 12,
                   color: const Color(0xFF64748B),
                   height: 1.4,
@@ -254,7 +254,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             const SizedBox(height: 8),
             Text(
               label,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFF334155),
@@ -295,7 +295,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                       const SizedBox(width: 10),
                       Text(
                         'Customer QR Code',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: const Color(0xFF0F172A),
@@ -360,7 +360,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                       ),
                       child: Text(
                         'CODE: $code',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontWeight: FontWeight.w900,
                           fontSize: 13,
                           letterSpacing: 1.5,
@@ -372,7 +372,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     Text(
                       'Scan using any Camera, Google Lens, or Scanner to download app with your referral tag applied!',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 11,
                         color: const Color(0xFF64748B),
                         fontWeight: FontWeight.w500,
@@ -397,7 +397,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 13.5),
+                    textStyle: GoogleFonts.roboto(fontWeight: FontWeight.w800, fontSize: 13.5),
                   ),
                 ),
               ),
@@ -491,7 +491,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             const SizedBox(height: 16),
             Text(
               'Unable to load referrals',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
                 color: const Color(0xFF0F172A),
@@ -501,7 +501,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontSize: 13),
+              style: GoogleFonts.roboto(color: const Color(0xFF64748B), fontSize: 13),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -590,7 +590,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                           const SizedBox(width: 4),
                           Text(
                             'UNLIMITED EARNINGS',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               color: const Color(0xFF4ADE80),
                               fontWeight: FontWeight.w900,
                               fontSize: 10,
@@ -609,7 +609,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                 const SizedBox(height: 14),
                 Text(
                   'Earn ₹75 Per Customer',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
@@ -619,7 +619,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                 const SizedBox(height: 4),
                 Text(
                   'Share your referral link with customers on your route. When they place their first order, ₹75 is credited to your settlement.',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 12,
                     color: const Color(0xFF94A3B8),
                     height: 1.4,
@@ -645,7 +645,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                         children: [
                           Text(
                             'YOUR REFERRAL CODE',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               color: const Color(0xFF94A3B8),
                               fontSize: 9.5,
                               fontWeight: FontWeight.w700,
@@ -655,7 +655,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                           const SizedBox(height: 2),
                           Text(
                             code,
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               color: const Color(0xFF4ADE80),
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
@@ -675,7 +675,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 12),
+                          textStyle: GoogleFonts.roboto(fontWeight: FontWeight.w800, fontSize: 12),
                         ),
                       ),
                     ],
@@ -783,7 +783,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                 const Spacer(),
                 Text(
                   title,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF64748B),
@@ -794,7 +794,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             const SizedBox(height: 12),
             Text(
               value,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFF0F172A),
@@ -804,7 +804,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 10.5,
                 color: const Color(0xFF94A3B8),
                 fontWeight: FontWeight.w500,
@@ -861,7 +861,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   children: [
                     Text(
                       'Rider Milestone Reward',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF0F172A),
@@ -871,7 +871,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                       remaining > 0
                           ? '$remaining more customer referrals to unlock Milestone bonus'
                           : 'Milestone reached! Claim bonus with admin.',
-                      style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                      style: GoogleFonts.roboto(fontSize: 11, color: const Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -884,7 +884,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                 ),
                 child: Text(
                   '$count / $nextMilestone',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: const Color(0xFF0F172A),
@@ -925,7 +925,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               const SizedBox(width: 6),
               Text(
                 'Instant One-Tap Share',
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF14532D),
@@ -948,7 +948,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 13),
+                    textStyle: GoogleFonts.roboto(fontWeight: FontWeight.w800, fontSize: 13),
                   ),
                 ),
               ),
@@ -964,7 +964,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     side: const BorderSide(color: Color(0xFF16A34A), width: 1.4),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13),
+                    textStyle: GoogleFonts.roboto(fontWeight: FontWeight.w700, fontSize: 13),
                   ),
                 ),
               ),
@@ -1006,7 +1006,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               const SizedBox(width: 10),
               Text(
                 'How Referral Works',
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF0F172A),
@@ -1038,7 +1038,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
           alignment: Alignment.center,
           child: Text(
             number,
-            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w900, color: fg),
+            style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.w900, color: fg),
           ),
         ),
         const SizedBox(width: 12),
@@ -1048,7 +1048,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             children: [
               Text(
                 title,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFF0F172A),
@@ -1056,7 +1056,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               ),
               Text(
                 subtitle,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 11.5,
                   color: const Color(0xFF64748B),
                   height: 1.3,
@@ -1101,7 +1101,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
           children: [
             Text(
               'Activity Ledger',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: const Color(0xFF0F172A),
@@ -1110,7 +1110,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             const Spacer(),
             Text(
               '${rawReferrals.length} Total',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFF64748B),
@@ -1138,8 +1138,8 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             ),
             labelColor: const Color(0xFF0F172A),
             unselectedLabelColor: const Color(0xFF64748B),
-            labelStyle: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w800),
-            unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w600),
+            labelStyle: GoogleFonts.roboto(fontSize: 12.5, fontWeight: FontWeight.w800),
+            unselectedLabelStyle: GoogleFonts.roboto(fontSize: 12.5, fontWeight: FontWeight.w600),
             tabs: [
               Tab(text: 'Referred Customers (${rawReferrals.length})'),
               Tab(text: 'Payouts (${payments.length})'),
@@ -1164,7 +1164,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             },
             decoration: InputDecoration(
               hintText: 'Search customer name or phone...',
-              hintStyle: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 12.5),
+              hintStyle: GoogleFonts.roboto(color: const Color(0xFF94A3B8), fontSize: 12.5),
               prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
@@ -1178,7 +1178,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
-            style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF0F172A)),
+            style: GoogleFonts.roboto(fontSize: 13, color: const Color(0xFF0F172A)),
           ),
         ),
         const SizedBox(height: 10),
@@ -1231,7 +1231,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
         ),
         child: Text(
           label,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
             color: isSelected ? Colors.white : const Color(0xFF475569),
@@ -1264,7 +1264,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             const SizedBox(height: 14),
             Text(
               _searchQuery.isNotEmpty ? 'No matches found' : 'No referrals yet',
-              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+              style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
             ),
             const SizedBox(height: 4),
             Text(
@@ -1272,7 +1272,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   ? 'Try a different search term or filter'
                   : 'Share your referral code to start earning ₹75 on each new customer!',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
+              style: GoogleFonts.roboto(fontSize: 12, color: const Color(0xFF64748B)),
             ),
           ],
         ),
@@ -1315,7 +1315,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   alignment: Alignment.center,
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : 'C',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                       color: isPaid
@@ -1331,7 +1331,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     children: [
                       Text(
                         name,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF0F172A),
@@ -1342,12 +1342,12 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                       if (phone.isNotEmpty)
                         Text(
                           phone,
-                          style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                          style: GoogleFonts.roboto(fontSize: 11, color: const Color(0xFF64748B)),
                         ),
                       if (date.isNotEmpty)
                         Text(
                           'Referred: $date',
-                          style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.roboto(fontSize: 10, color: const Color(0xFF94A3B8)),
                         ),
                     ],
                   ),
@@ -1357,7 +1357,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   children: [
                     Text(
                       '+₹75.00',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
                         color: isEligible || isPaid ? const Color(0xFF16A34A) : const Color(0xFF64748B),
@@ -1374,7 +1374,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                       ),
                       child: Text(
                         isPaid ? 'PAID' : (isEligible ? 'ELIGIBLE' : 'PENDING'),
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 9.5,
                           fontWeight: FontWeight.w800,
                           color: isPaid
@@ -1416,13 +1416,13 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
             const SizedBox(height: 14),
             Text(
               'No payout history yet',
-              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+              style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
             ),
             const SizedBox(height: 4),
             Text(
               'Referral earnings will appear here once settled offline by admin.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF64748B)),
+              style: GoogleFonts.roboto(fontSize: 12, color: const Color(0xFF64748B)),
             ),
           ],
         ),
@@ -1467,23 +1467,23 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                     children: [
                       Text(
                         'Payout: $ref',
-                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                        style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
                       ),
                       Text(
                         'Referee: $referee',
-                        style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF64748B)),
+                        style: GoogleFonts.roboto(fontSize: 11, color: const Color(0xFF64748B)),
                       ),
                       if (date.isNotEmpty)
                         Text(
                           'Paid on $date',
-                          style: GoogleFonts.poppins(fontSize: 10, color: const Color(0xFF94A3B8)),
+                          style: GoogleFonts.roboto(fontSize: 10, color: const Color(0xFF94A3B8)),
                         ),
                     ],
                   ),
                 ),
                 Text(
                   '₹${amount.toStringAsFixed(2)}',
-                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
+                  style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF15803D)),
                 ),
               ],
             ),
@@ -1517,7 +1517,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
               const SizedBox(width: 8),
               Text(
                 'Frequently Asked Questions',
-                style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                style: GoogleFonts.roboto(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
               ),
             ],
           ),
@@ -1547,12 +1547,12 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
         childrenPadding: const EdgeInsets.only(bottom: 8),
         title: Text(
           question,
-          style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+          style: GoogleFonts.roboto(fontSize: 12.5, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
         ),
         children: [
           Text(
             answer,
-            style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF64748B), height: 1.4),
+            style: GoogleFonts.roboto(fontSize: 11.5, color: const Color(0xFF64748B), height: 1.4),
           ),
         ],
       ),
@@ -1586,7 +1586,7 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 13.5),
+                  textStyle: GoogleFonts.roboto(fontWeight: FontWeight.w800, fontSize: 13.5),
                 ),
               ),
             ),
@@ -1631,7 +1631,7 @@ class GestureCarbonQrButton extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               'QR Code',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 11.5,

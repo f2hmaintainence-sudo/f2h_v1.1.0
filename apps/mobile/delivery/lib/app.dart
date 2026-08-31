@@ -38,7 +38,7 @@ class F2HApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.light,
         scaffoldBackgroundColor: kBg,
-        textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme),
+        textTheme: GoogleFonts.robotoTextTheme(ThemeData.light().textTheme),
         colorScheme: ColorScheme.fromSeed(
           seedColor: kPrimary,
           brightness: Brightness.light,
@@ -242,7 +242,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                         ),
                                         child: Text(
                                           'REFERRAL',
-                                          style: GoogleFonts.poppins(
+                                          style: GoogleFonts.roboto(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w900,
                                             letterSpacing: -0.4,
@@ -282,7 +282,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                           ),
                                           child: Text(
                                             '₹75',
-                                            style: GoogleFonts.poppins(
+                                            style: GoogleFonts.roboto(
                                               fontSize: 8.5,
                                               fontWeight: FontWeight.w900,
                                               color: const Color(0xFF4ADE80),

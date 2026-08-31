@@ -163,7 +163,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
                           const SizedBox(width: 8),
                           Text(
                             'F2H FRESH',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: kPrimary,
@@ -188,7 +188,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
                         },
                         child: Text(
                           'Skip',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             color: kTextSub,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
@@ -331,7 +331,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
         top: 52,
         child: Text(
           '₹',
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 36,
             fontWeight: FontWeight.w900,
             color: const Color(0xFFFF8F00),
@@ -433,7 +433,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
                         ),
                         child: Text(
                           '5:00 AM',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             color: const Color(0xFFFF8C00),
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -548,7 +548,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
         Text(
           title,
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 24,
             fontWeight: FontWeight.w700,
             color: kText,
@@ -560,7 +560,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
         Text(
           subtitle,
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 14.5,
             color: kTextSub,
             height: 1.6,
@@ -623,7 +623,7 @@ class _WelcomeIntroScreenState extends State<WelcomeIntroScreen>
                     _currentPage == 2
                         ? (widget.afterSignup ? 'Get Started' : 'Find My Hub')
                         : 'Continue',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,

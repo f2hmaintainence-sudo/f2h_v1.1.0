@@ -53,7 +53,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       children: [
                         Text(
                           'Edit Personal Details',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF0F172A),
@@ -118,7 +118,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
                     Text(
                       'Emergency Contact',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFF0F172A),
@@ -167,7 +167,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         ),
                         child: Text(
                           'Save Changes',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -201,7 +201,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF475569),
@@ -215,14 +215,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           keyboardType: keyboardType,
           onTap: onTap,
           validator: validator,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF0F172A),
           ),
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF94A3B8)),
+            hintStyle: GoogleFonts.roboto(fontSize: 12, color: const Color(0xFF94A3B8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
@@ -398,7 +398,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 ),
                 child: Text(
                   'Edit Information',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -415,7 +415,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: GoogleFonts.poppins(
+      style: GoogleFonts.roboto(
         fontSize: 15,
         fontWeight: FontWeight.w700,
         color: const Color(0xFF0F172A),
@@ -476,7 +476,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   children: [
                     Text(
                       label,
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                         color: const Color(0xFF64748B),
@@ -486,7 +486,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       const SizedBox(height: 2),
                       Text(
                         value,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF0F172A),

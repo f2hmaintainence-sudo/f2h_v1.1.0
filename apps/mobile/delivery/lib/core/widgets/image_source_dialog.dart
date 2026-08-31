@@ -30,7 +30,7 @@ Future<void> showImageSourceDialog({
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: const Color(0xFF0F172A),
@@ -75,7 +75,7 @@ Future<void> showImageSourceDialog({
                           children: [
                             Text(
                               'Live Camera',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 color: const Color(0xFF1E293B),
@@ -83,7 +83,7 @@ Future<void> showImageSourceDialog({
                             ),
                             Text(
                               'Capture a new photo now',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontSize: 11,
                                 color: const Color(0xFF64748B),
                               ),
@@ -128,7 +128,7 @@ Future<void> showImageSourceDialog({
                           children: [
                             Text(
                               'Choose from Gallery',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                                 color: const Color(0xFF1E293B),
@@ -136,7 +136,7 @@ Future<void> showImageSourceDialog({
                             ),
                             Text(
                               'Select an existing image',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontSize: 11,
                                 color: const Color(0xFF64748B),
                               ),
@@ -182,7 +182,7 @@ Future<void> showImageSourceDialog({
                             children: [
                               Text(
                                 'Crop / Fix Photo',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                   color: const Color(0xFF1E293B),
@@ -190,7 +190,7 @@ Future<void> showImageSourceDialog({
                               ),
                               Text(
                                 'Re-adjust cropped boundaries',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 11,
                                   color: const Color(0xFF64748B),
                                 ),
@@ -237,7 +237,7 @@ Future<void> showImageSourceDialog({
                             children: [
                               Text(
                                 'Remove Photo',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                   color: const Color(0xFF991B1B),
@@ -245,7 +245,7 @@ Future<void> showImageSourceDialog({
                               ),
                               Text(
                                 'Delete current image selection',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 11,
                                   color: const Color(0xFFEF4444),
                                 ),
@@ -289,7 +289,7 @@ Future<void> showProfilePhotoNotificationDialog(BuildContext context, String mes
               Text(
                 isSuccess ? 'Photo Updated' : 'Photo Update Failed',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                   color: const Color(0xFF0F172A),
@@ -299,7 +299,7 @@ Future<void> showProfilePhotoNotificationDialog(BuildContext context, String mes
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 13,
                   color: const Color(0xFF64748B),
                 ),
@@ -318,7 +318,7 @@ Future<void> showProfilePhotoNotificationDialog(BuildContext context, String mes
                   ),
                   child: Text(
                     'OK',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),

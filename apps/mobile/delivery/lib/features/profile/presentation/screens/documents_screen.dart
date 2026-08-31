@@ -55,7 +55,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       children: [
                         Text(
                           document == null ? 'Upload Document Proof' : 'Update Document',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF0F172A),
@@ -72,7 +72,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     // Doc Type Dropdown
                     Text(
                       'Document Type',
-                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                      style: GoogleFonts.roboto(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
@@ -82,7 +82,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                               if (val != null) setModalState(() => selectedType = val);
                             }
                           : null,
-                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
+                      style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         filled: true,
@@ -220,7 +220,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                         ),
                         child: Text(
                           'Submit Verification Proof',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -313,7 +313,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                             children: [
                               Text(
                                 '$verifiedCount/$totalRequiredDocs Documents Verified',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFF0F172A),
@@ -324,7 +324,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                 verifiedCount == totalRequiredDocs
                                     ? 'All 5 documents verified. Your profile is fully approved.'
                                     : '$verifiedCount of $totalRequiredDocs documents verified. Upload remaining proofs.',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w500,
                                   color: const Color(0xFF64748B),
@@ -342,7 +342,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   // ── SECTION HEADER ─────────────────────────────────────
                   Text(
                     'Uploaded Verification Proofs',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: const Color(0xFF0F172A),
@@ -365,7 +365,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                           const SizedBox(height: 12),
                           Text(
                             'No Verification Proofs Found',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                               color: const Color(0xFF0F172A),
@@ -374,7 +374,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                           const SizedBox(height: 6),
                           Text(
                             'Please upload identification documents (Aadhaar, PAN, DL) to verify your rider account.',
-                            style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontSize: 12),
+                            style: GoogleFonts.roboto(color: const Color(0xFF64748B), fontSize: 12),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -407,7 +407,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
                 label: Text(
                   'Upload Document',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -474,7 +474,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             children: [
               Text(
                 doc.documentType.toUpperCase().replaceAll('_', ' '),
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF15803D),
@@ -498,7 +498,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     const SizedBox(width: 4),
                     Text(
                       chipLabel,
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: chipColor,
@@ -514,7 +514,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           // Document Number
           Text(
             'No: ${doc.documentNumber != null && doc.documentNumber!.isNotEmpty ? doc.documentNumber! : "Not provided"}',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.roboto(
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: const Color(0xFF0F172A),
@@ -532,7 +532,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   children: [
                     Text(
                       'Issue Date',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w500,
                         color: const Color(0xFF64748B),
@@ -540,7 +540,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     ),
                     Text(
                       doc.issueDate?.split('T')[0] ?? '2026-08-04',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFF0F172A),
@@ -555,7 +555,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   children: [
                     Text(
                       'Expiry Date',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w500,
                         color: const Color(0xFF64748B),
@@ -563,7 +563,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     ),
                     Text(
                       doc.expiryDate?.split('T')[0] ?? '2027-08-21',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFF0F172A),
@@ -654,7 +654,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       const SizedBox(width: 4),
                       Text(
                         'Remove',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFFEF4444),
@@ -677,7 +677,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       const SizedBox(width: 4),
                       Text(
                         'Replace',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF16A34A),

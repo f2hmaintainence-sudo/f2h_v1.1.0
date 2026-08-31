@@ -153,7 +153,7 @@ class QueueItemTile extends StatelessWidget {
                           const SizedBox(width: 3),
                           Text(
                             'NEXT DELIVERY STOP',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               color: Colors.white,
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
@@ -172,7 +172,7 @@ class QueueItemTile extends StatelessWidget {
                       ),
                       child: Text(
                         distanceStr,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           color: const Color(0xFF15803D),
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -202,7 +202,7 @@ class QueueItemTile extends StatelessWidget {
                             ? Icon(Icons.close_rounded, color: const Color(0xFFDC2626), size: isHighlightedNext ? 20 : 16)
                             : Text(
                                 '#${stop.stop}',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontWeight: FontWeight.w900,
                                   color: isHighlightedNext ? const Color(0xFF15803D) : const Color(0xFF0F172A),
                                   fontSize: isHighlightedNext ? 13 : 11.5,
@@ -218,7 +218,7 @@ class QueueItemTile extends StatelessWidget {
                       children: [
                         Text(
                           stop.customerName,
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontWeight: FontWeight.w800,
                             fontSize: isHighlightedNext ? 15 : 13.5,
                             color: isDelivered || isFailed ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
@@ -231,7 +231,7 @@ class QueueItemTile extends StatelessWidget {
                           const SizedBox(height: 1),
                           Text(
                             stop.customerPhone,
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontSize: isHighlightedNext ? 12 : 11,
                               color: const Color(0xFF64748B),
                               fontWeight: FontWeight.w600,
@@ -343,7 +343,7 @@ class QueueItemTile extends StatelessWidget {
                     Expanded(
                       child: Text(
                         stop.address,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: isHighlightedNext ? 12 : 11,
                           color: isHighlightedNext ? const Color(0xFF334155) : const Color(0xFF64748B),
                           height: 1.3,

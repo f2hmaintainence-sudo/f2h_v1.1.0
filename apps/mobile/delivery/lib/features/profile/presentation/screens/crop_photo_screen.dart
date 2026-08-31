@@ -46,25 +46,25 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
       builder: (context) => AlertDialog(
         title: Text(
           widget.title,
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.roboto(fontWeight: FontWeight.bold),
         ),
         content: Text(
           widget.message,
-          style: GoogleFonts.poppins(),
+          style: GoogleFonts.roboto(),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey, fontWeight: FontWeight.w600),
+              style: GoogleFonts.roboto(color: Colors.grey, fontWeight: FontWeight.w600),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Save',
-              style: GoogleFonts.poppins(color: const Color(0xFF09AD42), fontWeight: FontWeight.bold),
+              style: GoogleFonts.roboto(color: const Color(0xFF09AD42), fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -121,7 +121,7 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
         ),
         title: Text(
           widget.title,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             color: Colors.white,
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -143,7 +143,7 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
                 onPressed: _confirmAndCrop,
                 child: Text(
                   'Confirm',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     color: const Color(0xFF09AD42),
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -250,7 +250,7 @@ class _CropPhotoScreenState extends State<CropPhotoScreen> {
                         const SizedBox(width: 8),
                         Text(
                           'Pinch to zoom · Drag to position',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             color: Colors.white70,
                             fontSize: 11,
                             fontWeight: FontWeight.w500,

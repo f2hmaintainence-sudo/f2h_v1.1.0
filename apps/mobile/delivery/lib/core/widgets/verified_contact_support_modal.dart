@@ -61,7 +61,7 @@ void showVerifiedContactSupportModal(BuildContext context, String itemLabel) {
                       children: [
                         Text(
                           '$itemLabel is Verified',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                             color: const Color(0xFF0F172A),
@@ -69,7 +69,7 @@ void showVerifiedContactSupportModal(BuildContext context, String itemLabel) {
                         ),
                         Text(
                           'Contact support to request changes',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 11.5,
                             color: const Color(0xFF64748B),
                           ),
@@ -107,7 +107,7 @@ void showVerifiedContactSupportModal(BuildContext context, String itemLabel) {
                     Expanded(
                       child: Text(
                         'To protect partner security, verified documents cannot be directly edited or deleted. Please call partner support to request an update.',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 12,
                           color: const Color(0xFF334155),
                           height: 1.4,
@@ -178,7 +178,7 @@ void showVerifiedContactSupportModal(BuildContext context, String itemLabel) {
                             children: [
                               Text(
                                 'Call Partner Support',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14.5,
                                   color: Colors.white,
@@ -187,7 +187,7 @@ void showVerifiedContactSupportModal(BuildContext context, String itemLabel) {
                               const SizedBox(height: 1),
                               Text(
                                 'Speak with helpline (+91 91487 73591)',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 11.5,
                                   color: Colors.white.withValues(alpha: 0.9),
                                 ),

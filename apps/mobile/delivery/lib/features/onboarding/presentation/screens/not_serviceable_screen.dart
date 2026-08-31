@@ -97,7 +97,7 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.poppins()),
+      content: Text(msg, style: GoogleFonts.roboto()),
       backgroundColor: isError ? kRed : kPrimary,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -236,7 +236,7 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
                   ),
                   child: Text(
                     '🚀  COMING SOON TO YOUR AREA',
-                    style: GoogleFonts.poppins(color: const Color(0xFFD68A00), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
+                    style: GoogleFonts.roboto(color: const Color(0xFFD68A00), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
                   ),
                 ),
               ),
@@ -245,12 +245,12 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
 
               Text(
                 'We\'re Expanding!',
-                style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
+                style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
               ),
               const SizedBox(height: 8),
               Text(
                 'We don\'t cover your location near ${widget.branchName} yet. Join the waitlist and we\'ll notify you the moment we launch nearby.',
-                style: GoogleFonts.poppins(fontSize: 14, color: kTextSub, height: 1.55),
+                style: GoogleFonts.roboto(fontSize: 14, color: kTextSub, height: 1.55),
               ),
 
               const SizedBox(height: 28),
@@ -269,10 +269,10 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
                   children: [
                     Text(
                       'Join the Waitlist',
-                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: kText),
+                      style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.w700, color: kText),
                     ),
                     const SizedBox(height: 4),
-                    Text('Be first in line when we launch near you', style: GoogleFonts.poppins(color: kTextSub, fontSize: 12)),
+                    Text('Be first in line when we launch near you', style: GoogleFonts.roboto(color: kTextSub, fontSize: 12)),
                     const SizedBox(height: 20),
 
                     _WaitlistField(controller: _nameCtrl, hint: 'Full Name', icon: Icons.person_outline_rounded,
@@ -360,13 +360,13 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
               const SizedBox(height: 32),
               Text(
                 'You\'re on the List! 🎉',
-                style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
+                style: GoogleFonts.roboto(fontSize: 26, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
                 'We\'ve saved your details. You\'ll receive a notification the moment we launch F2H Fresh deliveries near you.',
-                style: GoogleFonts.poppins(fontSize: 14, color: kTextSub, height: 1.6),
+                style: GoogleFonts.roboto(fontSize: 14, color: kTextSub, height: 1.6),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
@@ -380,7 +380,7 @@ class _NotServiceableScreenState extends State<NotServiceableScreen>
                     boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
                   ),
                   child: Center(
-                    child: Text('Got It', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
+                    child: Text('Got It', style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
                   ),
                 ),
               ),
@@ -430,14 +430,14 @@ class _WaitlistFieldState extends State<_WaitlistField> {
           controller: widget.controller,
           keyboardType: widget.keyboard,
           validator: widget.validator,
-          style: GoogleFonts.poppins(color: kText, fontSize: 14, fontWeight: FontWeight.w500),
+          style: GoogleFonts.roboto(color: kText, fontSize: 14, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             prefixIcon: Icon(widget.icon, color: _focused ? kPrimaryMid : kMuted, size: 18),
             hintText: widget.hint,
-            hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 13),
+            hintStyle: GoogleFonts.roboto(color: kMuted, fontSize: 13),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            errorStyle: GoogleFonts.poppins(color: kRed, fontSize: 11),
+            errorStyle: GoogleFonts.roboto(color: kRed, fontSize: 11),
           ),
         ),
       ),
@@ -456,7 +456,7 @@ class _PerkRow extends StatelessWidget {
       children: [
         Icon(icon, color: kPrimaryMid, size: 18),
         const SizedBox(width: 10),
-        Expanded(child: Text(text, style: GoogleFonts.poppins(color: kTextSub, fontSize: 12, height: 1.4))),
+        Expanded(child: Text(text, style: GoogleFonts.roboto(color: kTextSub, fontSize: 12, height: 1.4))),
       ],
     );
   }
@@ -502,7 +502,7 @@ class _WaitlistButtonState extends State<_WaitlistButton> {
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Join Waitlist', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                      Text('Join Waitlist', style: GoogleFonts.roboto(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                       const SizedBox(width: 8),
                       const Icon(Icons.notifications_active_outlined, color: kAccent, size: 20),
                     ],

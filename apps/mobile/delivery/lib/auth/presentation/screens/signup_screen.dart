@@ -260,7 +260,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.poppins()),
+      content: Text(msg, style: GoogleFonts.roboto()),
       backgroundColor: isError ? kRed : kPrimary,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -409,12 +409,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
 
         Text(
           'Create Account',
-          style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
+          style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
         ),
         const SizedBox(height: 6),
         Text(
           'Let\'s start with your name and email address',
-          style: GoogleFonts.poppins(fontSize: 14, color: kTextSub, height: 1.5),
+          style: GoogleFonts.roboto(fontSize: 14, color: kTextSub, height: 1.5),
         ),
         const SizedBox(height: 32),
 
@@ -498,7 +498,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                   width: 22, height: 22,
                   decoration: const BoxDecoration(color: kAccent, shape: BoxShape.circle),
                   child: Center(
-                    child: Text('1', style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    child: Text('1', style: GoogleFonts.roboto(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
@@ -509,17 +509,17 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
 
         Text(
           'Check Your Email',
-          style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
+          style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
         ),
         const SizedBox(height: 6),
         RichText(
           text: TextSpan(
             text: 'We sent a 6-digit code to ',
-            style: GoogleFonts.poppins(color: kTextSub, fontSize: 14, height: 1.5),
+            style: GoogleFonts.roboto(color: kTextSub, fontSize: 14, height: 1.5),
             children: [
               TextSpan(
                 text: _emailCtrl.text.trim(),
-                style: GoogleFonts.poppins(color: kPrimaryMid, fontWeight: FontWeight.w600),
+                style: GoogleFonts.roboto(color: kPrimaryMid, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -574,12 +574,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
                   },
                   child: Text(
                     'Resend OTP',
-                    style: GoogleFonts.poppins(color: kPrimaryMid, fontWeight: FontWeight.w600, fontSize: 14),
+                    style: GoogleFonts.roboto(color: kPrimaryMid, fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                 )
               : Text(
                   'Resend code in ${_countdown}s',
-                  style: GoogleFonts.poppins(color: kMuted, fontSize: 14),
+                  style: GoogleFonts.roboto(color: kMuted, fontSize: 14),
                 ),
         ),
         const SizedBox(height: 40),
@@ -620,12 +620,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
 
         Text(
           'Set Your Password',
-          style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
+          style: GoogleFonts.roboto(fontSize: 28, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.5),
         ),
         const SizedBox(height: 6),
         Text(
           'Choose a strong password with 8+ characters',
-          style: GoogleFonts.poppins(fontSize: 14, color: kTextSub, height: 1.5),
+          style: GoogleFonts.roboto(fontSize: 14, color: kTextSub, height: 1.5),
         ),
         const SizedBox(height: 32),
 
@@ -660,7 +660,7 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
               const SizedBox(width: 10),
               Text(
                 strength < 0.4 ? 'Weak' : strength < 0.75 ? 'Fair' : 'Strong',
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   color: strength < 0.4 ? kRed : strength < 0.75 ? kAccent : kPrimaryLt,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -771,7 +771,7 @@ class _OtpBoxState extends State<_OtpBox> {
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         maxLength: 1,
-        style: GoogleFonts.poppins(
+        style: GoogleFonts.roboto(
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: kPrimary,
@@ -840,7 +840,7 @@ class _LightFieldState extends State<_LightField> {
                   obscureText: widget.obscure,
                   onChanged: widget.onChanged,
                   onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     color: kAuthInk,
                     fontSize: 15.5,
                     fontWeight: FontWeight.w500,
@@ -849,7 +849,7 @@ class _LightFieldState extends State<_LightField> {
                     isDense: true,
                     filled: false,
                     hintText: widget.hint,
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: GoogleFonts.roboto(
                       color: kAuthHint,
                       fontSize: 15.5,
                     ),

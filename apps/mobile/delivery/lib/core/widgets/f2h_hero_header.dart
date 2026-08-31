@@ -85,7 +85,7 @@ class F2hHeroHeader extends StatelessWidget {
                             '${AppGreeting.get()}, $firstName!',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: const Color(0xFF0F172A),
@@ -97,7 +97,7 @@ class F2hHeroHeader extends StatelessWidget {
                             children: [
                               Text(
                                 'Ready to deliver amazing today',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFF475569),
@@ -219,7 +219,7 @@ class F2hHeroHeader extends StatelessWidget {
                   errorBuilder: (_, __, ___) => Center(
                     child: Text(
                       initial,
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
@@ -230,7 +230,7 @@ class F2hHeroHeader extends StatelessWidget {
               : Center(
                   child: Text(
                     initial,
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
@@ -276,7 +276,7 @@ class F2hHeroHeader extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               isOnline ? 'Online' : 'Offline',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),

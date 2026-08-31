@@ -100,7 +100,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     children: [
                       Text(
                         n.title,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF0F172A),
@@ -109,7 +109,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       const SizedBox(height: 2),
                       Text(
                         _timeAgo(n.createdAt),
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                           color: const Color(0xFF94A3B8),
@@ -125,7 +125,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             const SizedBox(height: 12),
             Text(
               n.message,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 13.5,
                 color: const Color(0xFF334155),
                 height: 1.5,
@@ -144,7 +144,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 child: Text(
                   'Dismiss',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -321,7 +321,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   const SizedBox(height: 16),
                                   Text(
                                     _selectedFilter == 'Unread' ? 'No Unread Notifications' : 'No Notifications Yet',
-                                    style: GoogleFonts.poppins(
+                                    style: GoogleFonts.roboto(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
                                       color: const Color(0xFF0F172A),
@@ -333,7 +333,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                         ? 'You have caught up with all shift and route alerts.'
                                         : 'Important delivery and shift updates will appear here.',
                                     textAlign: TextAlign.center,
-                                    style: GoogleFonts.poppins(
+                                    style: GoogleFonts.roboto(
                                       fontSize: 12.5,
                                       color: const Color(0xFF64748B),
                                     ),
@@ -405,7 +405,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                       Expanded(
                                                         child: Text(
                                                           n.title,
-                                                          style: GoogleFonts.poppins(
+                                                          style: GoogleFonts.roboto(
                                                             fontSize: 13.5,
                                                             fontWeight: n.isRead ? FontWeight.w600 : FontWeight.w800,
                                                             color: const Color(0xFF0F172A),
@@ -416,7 +416,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                       ),
                                                       Text(
                                                         _timeAgo(n.createdAt),
-                                                        style: GoogleFonts.poppins(
+                                                        style: GoogleFonts.roboto(
                                                           fontSize: 10.5,
                                                           fontWeight: FontWeight.w500,
                                                           color: const Color(0xFF94A3B8),
@@ -427,7 +427,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                   const SizedBox(height: 4),
                                                   Text(
                                                     n.message,
-                                                    style: GoogleFonts.poppins(
+                                                    style: GoogleFonts.roboto(
                                                       fontSize: 12,
                                                       fontWeight: FontWeight.w400,
                                                       color: const Color(0xFF64748B),
@@ -494,7 +494,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           children: [
             Text(
               label,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                 color: isSelected ? Colors.white : const Color(0xFF475569),
@@ -510,7 +510,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 child: Text(
                   '$count',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: isSelected ? Colors.white : const Color(0xFF475569),

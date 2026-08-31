@@ -42,7 +42,7 @@ void showPickupRequiredDialog(
               children: [
                 Text(
                   'Pickup Required',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
                     color: const Color(0xFF0F172A),
@@ -51,7 +51,7 @@ void showPickupRequiredDialog(
                 ),
                 Text(
                   'Warehouse Handover Pending',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFFD97706),
@@ -68,7 +68,7 @@ void showPickupRequiredDialog(
         children: [
           Text(
             'You cannot deliver stops until items are picked up and confirmed from the warehouse.',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.roboto(
               fontSize: 13,
               color: const Color(0xFF334155),
               fontWeight: FontWeight.w600,
@@ -90,7 +90,7 @@ void showPickupRequiredDialog(
                 Expanded(
                   child: Text(
                     'Please verify your physical bag inventory against assigned order demand in the Delivery Basket Ledger.',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 11.5,
                       color: const Color(0xFF64748B),
                       height: 1.35,
@@ -114,7 +114,7 @@ void showPickupRequiredDialog(
                 ),
                 child: Text(
                   'Dismiss',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     color: const Color(0xFF64748B),
                     fontWeight: FontWeight.w700,
                     fontSize: 12.5,
@@ -145,7 +145,7 @@ void showPickupRequiredDialog(
                 icon: const Icon(Icons.shopping_basket_outlined, size: 15, color: Colors.white),
                 label: Text(
                   'Open Basket Ledger',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                     letterSpacing: 0.2,

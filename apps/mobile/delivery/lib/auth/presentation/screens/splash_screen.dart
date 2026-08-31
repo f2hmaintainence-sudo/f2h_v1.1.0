@@ -204,7 +204,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       const SizedBox(height: 28),
                       Text(
                         'F2H FRESH',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 32,
                           fontWeight: FontWeight.w800,
                           color: kPrimary,
@@ -214,7 +214,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       const SizedBox(height: 6),
                       Text(
                         'Delivery Partner',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: kTextSub,

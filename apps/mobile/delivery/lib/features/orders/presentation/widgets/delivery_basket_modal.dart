@@ -988,7 +988,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                             Expanded(
                               child: Text(
                                 'Dispatch Confirmed — Orders Out for Delivery',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w800,
                                   color: const Color(0xFF16A34A),
@@ -1003,7 +1003,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                           _totalExtraBuffer > 0
                               ? 'You are carrying $_totalInitialStock unit(s), including $_totalExtraBuffer extra loaded at the warehouse.'
                               : 'You are carrying $_totalInitialStock unit(s) for your assigned orders.',
-                          style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF475569)),
+                          style: GoogleFonts.roboto(fontSize: 11.5, color: const Color(0xFF475569)),
                         ),
                       ],
                     ),
@@ -1087,7 +1087,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                     Expanded(
                       child: Text(
                         title,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
                           color: accent,
@@ -1100,7 +1100,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF475569)),
+                  style: GoogleFonts.roboto(fontSize: 11.5, color: const Color(0xFF475569)),
                 ),
               ],
             ),
@@ -1121,7 +1121,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
       ),
       child: Text(
         _dispatchStatus.replaceAll('_', ' ').toUpperCase(),
-        style: GoogleFonts.poppins(
+        style: GoogleFonts.roboto(
           fontSize: 9.5,
           fontWeight: FontWeight.w900,
           color: accent,
@@ -1178,7 +1178,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                         Expanded(
                           child: Text(
                             canConfirm ? 'Dispatch Handover Ready' : 'Dispatched Quantities Insufficient',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
                               color: const Color(0xFF0F172A),
@@ -1196,7 +1196,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                               '${_totalExtraBuffer > 0 ? ' (+$_totalExtraBuffer extra)' : ''}.'
                               ' Confirm pickup to set orders Out for Delivery.'
                           : 'The warehouse has loaded less than your assigned orders need. Ask for the missing quantities before confirming.',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 11.5,
                         color: const Color(0xFF64748B),
                       ),
@@ -1224,7 +1224,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Text(
                           '• $line',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFFB91C1C),
@@ -1264,7 +1264,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                 _isConfirmingPickup
                     ? 'CONFIRMING DISPATCH...'
                     : (canConfirm ? 'CONFIRM DISPATCH & START DELIVERY' : 'INSUFFICIENT DISPATCH STOCK'),
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                   letterSpacing: 0.3,

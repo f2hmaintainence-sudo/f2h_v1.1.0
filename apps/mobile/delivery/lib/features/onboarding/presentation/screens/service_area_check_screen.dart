@@ -187,7 +187,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.poppins()),
+      content: Text(msg, style: GoogleFonts.roboto()),
       backgroundColor: isError ? kRed : kPrimary,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -280,12 +280,12 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
                             children: [
                               Text(
                                 'Find Your Hub',
-                                style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.3),
+                                style: GoogleFonts.roboto(fontSize: 22, fontWeight: FontWeight.w700, color: kText, letterSpacing: -0.3),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 'Select the F2H hub near you',
-                                style: GoogleFonts.poppins(fontSize: 13, color: kTextSub),
+                                style: GoogleFonts.roboto(fontSize: 13, color: kTextSub),
                               ),
                             ],
                           ),
@@ -309,11 +309,11 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
                       child: TextField(
                         controller: _searchController,
                         onChanged: _filterBranches,
-                        style: GoogleFonts.poppins(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.roboto(color: kText, fontSize: 15, fontWeight: FontWeight.w500),
                         decoration: InputDecoration(
                           prefixIcon: const Icon(Icons.search_rounded, color: kMuted, size: 20),
                           hintText: 'Search city or hub name...',
-                          hintStyle: GoogleFonts.poppins(color: kMuted, fontSize: 14),
+                          hintStyle: GoogleFonts.roboto(color: kMuted, fontSize: 14),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         ),
@@ -390,9 +390,9 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text('Verifying location...', style: GoogleFonts.poppins(color: kText, fontWeight: FontWeight.w600, fontSize: 15)),
+                      Text('Verifying location...', style: GoogleFonts.roboto(color: kText, fontWeight: FontWeight.w600, fontSize: 15)),
                       const SizedBox(height: 4),
-                      Text('Checking service area', style: GoogleFonts.poppins(color: kTextSub, fontSize: 13)),
+                      Text('Checking service area', style: GoogleFonts.roboto(color: kTextSub, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -429,7 +429,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
               ],
             ),
             const SizedBox(height: 20),
-            Text('Loading hubs...', style: GoogleFonts.poppins(color: kTextSub, fontSize: 14)),
+            Text('Loading hubs...', style: GoogleFonts.roboto(color: kTextSub, fontSize: 14)),
           ],
         ),
       ),
@@ -453,7 +453,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
               child: const Icon(Icons.cloud_off_rounded, size: 36, color: kMuted),
             ),
             const SizedBox(height: 20),
-            Text(_errorMessage, textAlign: TextAlign.center, style: GoogleFonts.poppins(color: kTextSub, fontSize: 14, height: 1.5)),
+            Text(_errorMessage, textAlign: TextAlign.center, style: GoogleFonts.roboto(color: kTextSub, fontSize: 14, height: 1.5)),
             const SizedBox(height: 24),
             GestureDetector(
               onTap: _fetchBranches,
@@ -464,7 +464,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))],
                 ),
-                child: Text('Try Again', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+                child: Text('Try Again', style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -475,7 +475,7 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
 
   Widget _buildEmptyState() {
     return Center(
-      child: Text('No hubs found', style: GoogleFonts.poppins(color: kTextSub, fontSize: 14)),
+      child: Text('No hubs found', style: GoogleFonts.roboto(color: kTextSub, fontSize: 14)),
     );
   }
 }
@@ -540,13 +540,13 @@ class _BranchCardState extends State<_BranchCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: GoogleFonts.poppins(color: kText, fontWeight: FontWeight.w600, fontSize: 15)),
+                    Text(name, style: GoogleFonts.roboto(color: kText, fontWeight: FontWeight.w600, fontSize: 15)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         const Icon(Icons.location_city_rounded, color: kTextSub, size: 13),
                         const SizedBox(width: 4),
-                        Text(city, style: GoogleFonts.poppins(color: kTextSub, fontSize: 13)),
+                        Text(city, style: GoogleFonts.roboto(color: kTextSub, fontSize: 13)),
                         const SizedBox(width: 12),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -556,7 +556,7 @@ class _BranchCardState extends State<_BranchCard> {
                           ),
                           child: Text(
                             '${radius}km radius',
-                            style: GoogleFonts.poppins(color: kPrimaryMid, fontSize: 11, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.roboto(color: kPrimaryMid, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],

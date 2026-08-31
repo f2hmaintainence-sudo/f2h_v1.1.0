@@ -228,7 +228,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   child: Center(
                     child: Text(
                       '${stop.stop}',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: isCurrentSelected ? 12 : 10,
@@ -361,7 +361,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             children: [
               Text(
                 'Map View Style',
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFF0F172A),
@@ -428,7 +428,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               const SizedBox(height: 8),
               Text(
                 title,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 11,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   color: isSelected ? const Color(0xFF15803D) : const Color(0xFF475569),
@@ -660,7 +660,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       children: [
                         Text(
                           'Google Maps',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF475569),
@@ -890,14 +890,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         }
                       });
                     },
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 13.5,
                       color: const Color(0xFF0F172A),
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Search customer name, stop #...',
-                      hintStyle: GoogleFonts.poppins(color: const Color(0xFF94A3B8), fontSize: 13),
+                      hintStyle: GoogleFonts.roboto(color: const Color(0xFF94A3B8), fontSize: 13),
                       prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF16A34A), size: 20),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? GestureDetector(
@@ -971,7 +971,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                     child: Center(
                                       child: Text(
                                         '${stop.stop}',
-                                        style: GoogleFonts.poppins(
+                                        style: GoogleFonts.roboto(
                                           color: const Color(0xFF15803D),
                                           fontWeight: FontWeight.w800,
                                           fontSize: 10,
@@ -986,7 +986,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                       children: [
                                         Text(
                                           stop.customerName,
-                                          style: GoogleFonts.poppins(
+                                          style: GoogleFonts.roboto(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 13,
                                             color: const Color(0xFF0F172A),
@@ -996,7 +996,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                                         ),
                                         Text(
                                           stop.address,
-                                          style: GoogleFonts.poppins(
+                                          style: GoogleFonts.roboto(
                                             color: const Color(0xFF64748B),
                                             fontSize: 11,
                                           ),
@@ -1062,7 +1062,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 children: [
                   Text(
                     'All Deliveries Completed! 🎉',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       color: const Color(0xFF0F172A),
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
@@ -1070,7 +1070,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                   Text(
                     'All route stops finished. Return to hub for return ledger.',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       color: const Color(0xFF64748B),
                       fontWeight: FontWeight.w500,
                       fontSize: 11,
@@ -1123,7 +1123,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     const SizedBox(width: 4),
                     Text(
                       'SHORTEST ROUTE',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: 10,
@@ -1150,7 +1150,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       const SizedBox(width: 4),
                       Text(
                         'Fit Route',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           color: const Color(0xFF475569),
                           fontWeight: FontWeight.w700,
                           fontSize: 10,
@@ -1175,7 +1175,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       children: [
                         Text(
                           '${route.totalDistanceKm.toStringAsFixed(1)} km',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
                             color: const Color(0xFF0F172A),
@@ -1183,7 +1183,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         ),
                         Text(
                           'Total Distance',
-                          style: GoogleFonts.poppins(fontSize: 9.5, color: const Color(0xFF64748B)),
+                          style: GoogleFonts.roboto(fontSize: 9.5, color: const Color(0xFF64748B)),
                         ),
                       ],
                     ),
@@ -1202,7 +1202,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       children: [
                         Text(
                           '~${route.totalDurationMinutes.round()} mins',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
                             color: const Color(0xFF0F172A),
@@ -1210,7 +1210,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         ),
                         Text(
                           'Est. Travel Time',
-                          style: GoogleFonts.poppins(fontSize: 9.5, color: const Color(0xFF64748B)),
+                          style: GoogleFonts.roboto(fontSize: 9.5, color: const Color(0xFF64748B)),
                         ),
                       ],
                     ),
@@ -1234,7 +1234,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 Expanded(
                   child: Text(
                     'Next Stop: Stop #${nextPending.stop} (${nextPending.customerName}) · ${route.activeLegDistanceKm.toStringAsFixed(1)} km',
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.roboto(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w700,
                       color: const Color(0xFF334155),
@@ -1290,12 +1290,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               const SizedBox(height: 12),
               Text(
                 'All Deliveries Cleared!',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: 17, color: const Color(0xFF0F172A)),
+                style: GoogleFonts.roboto(fontWeight: FontWeight.w800, fontSize: 17, color: const Color(0xFF0F172A)),
               ),
               const SizedBox(height: 4),
               Text(
                 'No pending orders remaining on your route sheet.',
-                style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontSize: 12.5),
+                style: GoogleFonts.roboto(color: const Color(0xFF64748B), fontSize: 12.5),
               ),
             ],
           ),

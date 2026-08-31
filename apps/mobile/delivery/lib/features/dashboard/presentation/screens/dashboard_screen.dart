@@ -499,7 +499,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(height: 16),
                               Text(
                                 'You are Currently Offline',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFF0F172A),
@@ -509,7 +509,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Text(
                                 'Turn on the Online switch in the header to go online and receive your assigned delivery batches.',
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 12.5,
                                   color: const Color(0xFF64748B),
                                   height: 1.4,
@@ -536,7 +536,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Text(
                               "Today's Progress",
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0F172A),
@@ -552,7 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               },
                               child: Text(
                                 'View Details',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFF16A34A),
@@ -624,7 +624,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Text(
                               'Stops (${displayedStops.length})',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0F172A),
@@ -666,7 +666,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               : (_selectedStatusFilter == 'delivered'
                                                   ? 'Delivered ($deliveredCount)'
                                                   : 'Failed ($failedCount)')),
-                                      style: GoogleFonts.poppins(
+                                      style: GoogleFonts.roboto(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.w700,
                                         color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
@@ -765,7 +765,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 _selectedStatusFilter == 'all'
                                     ? 'No stops assigned for today.'
                                     : 'No $_selectedStatusFilter stops found.',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   color: const Color(0xFF64748B),
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -846,7 +846,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 8),
           Text(
             '$count',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.roboto(
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: const Color(0xFF0F172A),
@@ -856,7 +856,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 3),
           Text(
             label,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.roboto(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
               color: labelColor,
@@ -974,7 +974,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Text(
               label,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF0F172A),

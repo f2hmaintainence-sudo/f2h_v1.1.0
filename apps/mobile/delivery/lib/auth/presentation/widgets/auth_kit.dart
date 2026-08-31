@@ -97,7 +97,7 @@ class DeliveryAuthScaffold extends StatelessWidget {
                         Text(
                           subtitle,
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 14.5,
                             color: kAuthSubtitle,
                             height: 1.4,
@@ -130,7 +130,7 @@ class _Headline extends StatelessWidget {
     textAlign: TextAlign.center,
     text: TextSpan(
       text: '$title ',
-      style: GoogleFonts.poppins(
+      style: GoogleFonts.roboto(
         fontSize: 33,
         fontWeight: FontWeight.w800,
         color: kAuthInk,
@@ -140,7 +140,7 @@ class _Headline extends StatelessWidget {
       children: [
         TextSpan(
           text: accent,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 33,
             fontWeight: FontWeight.w800,
             color: kPrimary,
@@ -211,7 +211,7 @@ class _BrandLockup extends StatelessWidget {
         fit: BoxFit.scaleDown,
         child: Text(
           'F2H DELIVERY',
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 15,
             fontWeight: FontWeight.w700,
             color: kPrimaryMid,
@@ -383,7 +383,7 @@ class _DeliveryAuthFieldState extends State<DeliveryAuthField> {
                   onSubmitted: widget.onSubmitted,
                   onChanged: widget.onChanged,
                   onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.roboto(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w500,
                     color: kAuthInk,
@@ -393,7 +393,7 @@ class _DeliveryAuthFieldState extends State<DeliveryAuthField> {
                     isDense: true,
                     filled: false,
                     hintText: widget.hint,
-                    hintStyle: GoogleFonts.poppins(
+                    hintStyle: GoogleFonts.roboto(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w400,
                       color: kAuthHint,
@@ -509,7 +509,7 @@ class _DeliveryPrimaryButtonState extends State<DeliveryPrimaryButton> {
                         children: [
                           Text(
                             widget.label,
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
@@ -542,7 +542,7 @@ class DeliveryAuthDivider extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 18),
         child: Text(
           label,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: kAuthHint,
@@ -616,7 +616,7 @@ class DeliveryGoogleButton extends StatelessWidget {
                       const SizedBox(width: 14),
                       Text(
                         label,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.roboto(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                           color: const Color(0xFF3C4A42),
@@ -654,11 +654,11 @@ class DeliveryAuthFooter extends StatelessWidget {
         child: RichText(
           text: TextSpan(
             text: '$question ',
-            style: GoogleFonts.poppins(color: kAuthSubtitle, fontSize: 14.5),
+            style: GoogleFonts.roboto(color: kAuthSubtitle, fontSize: 14.5),
             children: [
               TextSpan(
                 text: action,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   color: kPrimaryMid,
                   fontSize: 14.5,
                   fontWeight: FontWeight.w700,
@@ -695,7 +695,7 @@ class DeliveryTextLink extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(
           label,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: kPrimaryMid,

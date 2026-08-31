@@ -64,7 +64,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: GoogleFonts.poppins()),
+        content: Text(msg, style: GoogleFonts.roboto()),
         backgroundColor: isError ? kRed : kPrimary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -218,7 +218,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                 : _step == 1
                     ? 'Verify OTP'
                     : 'Reset Password',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.roboto(
               fontSize: 24,
               fontWeight: FontWeight.w800,
               color: kAuthInk,
@@ -233,7 +233,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                 : _step == 1
                     ? 'Enter the 6-digit OTP sent to ${_emailCtrl.text}'
                     : 'Set a secure new password for your account.',
-            style: GoogleFonts.poppins(fontSize: 13.5, color: kAuthSubtitle, height: 1.4),
+            style: GoogleFonts.roboto(fontSize: 13.5, color: kAuthSubtitle, height: 1.4),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -287,7 +287,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                 Expanded(
                   child: Text(
                     _errorMessage!,
-                    style: GoogleFonts.poppins(color: kRed, fontSize: 13, fontWeight: FontWeight.w500),
+                    style: GoogleFonts.roboto(color: kRed, fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
@@ -326,7 +326,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
                   maxLength: 1,
-                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: kPrimary),
+                  style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.w700, color: kPrimary),
                   decoration: const InputDecoration(
                     counterText: '',
                     filled: false,
@@ -354,7 +354,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
             onPressed: _canResend ? _sendOtp : null,
             child: Text(
               _canResend ? 'Resend OTP' : 'Resend in ${_countdown}s',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 color: _canResend ? kAccent : kMuted,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,

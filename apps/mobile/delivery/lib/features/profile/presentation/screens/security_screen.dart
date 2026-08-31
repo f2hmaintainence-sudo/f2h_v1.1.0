@@ -65,18 +65,18 @@ class _SecurityScreenState extends State<SecurityScreen> {
             const SizedBox(width: 10),
             Text(
               'Logout All Devices',
-              style: GoogleFonts.poppins(color: const Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
+              style: GoogleFonts.roboto(color: const Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ],
         ),
         content: Text(
           'Are you sure you want to terminate all active sessions? You will be logged out of this device as well.',
-          style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF475569), height: 1.4),
+          style: GoogleFonts.roboto(fontSize: 13, color: const Color(0xFF475569), height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: kTextSub, fontWeight: FontWeight.w600)),
+            child: Text('Cancel', style: GoogleFonts.roboto(color: kTextSub, fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -89,7 +89,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: Text('Logout All', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text('Logout All', style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -116,7 +116,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
             Expanded(
               child: Text(
                 'Delete Account',
-                style: GoogleFonts.poppins(color: const Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 16),
+                style: GoogleFonts.roboto(color: const Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 16),
               ),
             ),
           ],
@@ -127,7 +127,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
           children: [
             Text(
               'Are you sure you want to permanently delete your delivery partner account?',
-              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A), height: 1.4),
+              style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A), height: 1.4),
             ),
             const SizedBox(height: 10),
             Container(
@@ -145,7 +145,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                   Expanded(
                     child: Text(
                       'This action cannot be undone. All your delivery history, verified credentials, and active data will be permanently removed.',
-                      style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF991B1B), height: 1.3),
+                      style: GoogleFonts.roboto(fontSize: 11.5, color: const Color(0xFF991B1B), height: 1.3),
                     ),
                   ),
                 ],
@@ -156,7 +156,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: kTextSub, fontWeight: FontWeight.w700)),
+            child: Text('Cancel', style: GoogleFonts.roboto(color: kTextSub, fontWeight: FontWeight.w700)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -175,7 +175,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: Text('Delete Permanently', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700)),
+            child: Text('Delete Permanently', style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -249,7 +249,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                         const SizedBox(width: 8),
                         Text(
                           'CHANGE PASSWORD',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF475569),
@@ -314,7 +314,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                         ),
                         child: Text(
                           'Update Password',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -357,7 +357,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                         const SizedBox(width: 8),
                         Text(
                           'ACTIVE SESSIONS & SECURITY',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF475569),
@@ -370,7 +370,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
                     Text(
                       'Logging out of all devices will invalidate all active access tokens across your mobile devices.',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 12.5,
                         color: const Color(0xFF64748B),
                         height: 1.4,
@@ -389,7 +389,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                               icon: const Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 16),
                               label: Text(
                                 'Log Out',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   color: const Color(0xFFDC2626),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -412,7 +412,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                               icon: const Icon(Icons.phonelink_erase_rounded, color: Colors.white, size: 16),
                               label: Text(
                                 'Logout All Devices',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   color: Colors.white,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -463,7 +463,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                         const SizedBox(width: 8),
                         Text(
                           'DANGER ZONE / DELETE ACCOUNT',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
                             color: const Color(0xFFDC2626),
@@ -476,7 +476,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
                     Text(
                       'Permanently delete your partner account, personal details, delivery records, and active credentials. This action is irreversible.',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 12.5,
                         color: const Color(0xFF64748B),
                         height: 1.4,
@@ -492,7 +492,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                         icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 18),
                         label: Text(
                           'Delete Account',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             color: const Color(0xFFDC2626),
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,
@@ -528,7 +528,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF0F172A),
@@ -539,14 +539,14 @@ class _SecurityScreenState extends State<SecurityScreen> {
           controller: controller,
           obscureText: obscureText,
           validator: validator,
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.roboto(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF0F172A),
           ),
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: GoogleFonts.poppins(fontSize: 12.5, color: const Color(0xFF94A3B8)),
+            hintStyle: GoogleFonts.roboto(fontSize: 12.5, color: const Color(0xFF94A3B8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
             fillColor: Colors.white,

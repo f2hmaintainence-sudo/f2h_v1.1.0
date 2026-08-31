@@ -296,7 +296,7 @@ class ProfileScreen extends StatelessWidget {
                                 const SizedBox(width: 10),
                                 Text(
                                   'Log Out of Account',
-                                  style: GoogleFonts.poppins(
+                                  style: GoogleFonts.roboto(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                     color: const Color(0xFFDC2626),
@@ -317,7 +317,7 @@ class ProfileScreen extends StatelessWidget {
                         children: [
                           Text(
                             '🇮🇳 F2H Fresh Partner App · v2.5.0',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: const Color(0xFF94A3B8),
@@ -326,7 +326,7 @@ class ProfileScreen extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             'Made in India with Pride',
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.roboto(
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                               color: const Color(0xFFCBD5E1),
@@ -348,7 +348,7 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: GoogleFonts.poppins(
+      style: GoogleFonts.roboto(
         fontSize: 15,
         fontWeight: FontWeight.w700,
         color: const Color(0xFF0F172A),
@@ -464,7 +464,7 @@ class ProfileScreen extends StatelessWidget {
                               Flexible(
                                 child: Text(
                                   partnerName,
-                                  style: GoogleFonts.poppins(
+                                  style: GoogleFonts.roboto(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                     color: const Color(0xFF0F172A),
@@ -508,7 +508,7 @@ class ProfileScreen extends StatelessWidget {
                             children: [
                               Text(
                                 'ID: $partnerId',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                   color: const Color(0xFF64748B),
@@ -577,7 +577,7 @@ class ProfileScreen extends StatelessWidget {
                           children: [
                             Text(
                               'Partner Status',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
                                 color: const Color(0xFF94A3B8),
@@ -585,7 +585,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                             Text(
                               isVerified ? 'Verified Delivery Partner' : 'Standard Delivery Partner',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.roboto(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0F172A),
@@ -602,7 +602,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         child: Text(
                           isVerified ? 'ACTIVE' : 'PENDING',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.roboto(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w800,
                             color: isVerified ? const Color(0xFF15803D) : const Color(0xFF64748B),
@@ -803,7 +803,7 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 7),
                     Text(
                       item.label,
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.roboto(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF0F172A),
@@ -926,7 +926,7 @@ class ProfileScreen extends StatelessWidget {
                             children: [
                               Text(
                                 item.title,
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFF0F172A),
@@ -935,7 +935,7 @@ class ProfileScreen extends StatelessWidget {
                               const SizedBox(height: 1),
                               Text(
                                 item.subtitle,
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w400,
                                   color: const Color(0xFF64748B),
@@ -987,7 +987,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               'Log Out',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.roboto(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
                 color: const Color(0xFF0F172A),
@@ -997,14 +997,14 @@ class ProfileScreen extends StatelessWidget {
         ),
         content: Text(
           'Are you sure you want to log out of your delivery partner account?',
-          style: GoogleFonts.poppins(fontSize: 13, color: const Color(0xFF64748B), height: 1.4),
+          style: GoogleFonts.roboto(fontSize: 13, color: const Color(0xFF64748B), height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: const Color(0xFF64748B), fontWeight: FontWeight.w700),
+              style: GoogleFonts.roboto(color: const Color(0xFF64748B), fontWeight: FontWeight.w700),
             ),
           ),
           ElevatedButton(
@@ -1019,7 +1019,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             child: Text(
               'Log Out',
-              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700),
+              style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.w700),
             ),
           ),
         ],

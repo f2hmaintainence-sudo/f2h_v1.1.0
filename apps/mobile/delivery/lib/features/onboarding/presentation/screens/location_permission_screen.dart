@@ -46,7 +46,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Please enable GPS Location Services in your settings', style: GoogleFonts.poppins()),
+            content: Text('Please enable GPS Location Services in your settings', style: GoogleFonts.roboto()),
             backgroundColor: kRed,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -66,7 +66,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Location permission is required to operate as a delivery boy', style: GoogleFonts.poppins()),
+              content: Text('Location permission is required to operate as a delivery boy', style: GoogleFonts.roboto()),
               backgroundColor: kRed,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -83,7 +83,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Location permission is permanently denied. Please enable it in device settings.', style: GoogleFonts.poppins()),
+            content: Text('Location permission is permanently denied. Please enable it in device settings.', style: GoogleFonts.roboto()),
             backgroundColor: kRed,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -105,7 +105,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error requesting permission: $e', style: GoogleFonts.poppins()),
+            content: Text('Error requesting permission: $e', style: GoogleFonts.roboto()),
             backgroundColor: kRed,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -180,7 +180,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               Text(
                 'Enable Precise Location',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
                   color: kText,
@@ -191,7 +191,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               Text(
                 'F2H Fresh relies on your device location to streamline your deliveries and calculate daily payouts.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 14,
                   color: kTextSub,
                   height: 1.6,
@@ -256,7 +256,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                             children: [
                               Text(
                                 'Grant Location Access',
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.roboto(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
@@ -309,7 +309,7 @@ class _PermissionReasonRow extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: kText,
@@ -318,7 +318,7 @@ class _PermissionReasonRow extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.roboto(
                   fontSize: 13,
                   color: kTextSub,
                   height: 1.4,
