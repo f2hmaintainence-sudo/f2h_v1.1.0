@@ -13,6 +13,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+export 'package:f2h_customer/core/session/customer_session_cubit.dart' show slotTimingsOf;
 import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
 
 // ===== Effective Price Resolution =====
@@ -64,14 +65,6 @@ class SlotWindowStatus {
     required this.timeRangeText,
     required this.isOpen,
   });
-}
-
-Map<String, dynamic>? slotTimingsOf(BuildContext context) {
-  try {
-    return context.read<CustomerSessionCubit>().state.slotTimings;
-  } catch (_) {
-    return null;
-  }
 }
 
 int parseTimeToMinutes(dynamic timeStr, int defaultMinutes) {
