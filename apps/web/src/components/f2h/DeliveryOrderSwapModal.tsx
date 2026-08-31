@@ -207,6 +207,8 @@ export default function DeliveryOrderSwapModal({
           address_b_id: targetAddressIdToSwap,
           order_a_id: sourceOrder.order_id,
           order_b_id: targetOrderIdToSwap,
+          run_a_id: sourceOrder.delivery_run_id || sourceOrder.current_run_id || undefined,
+          run_b_id: selectedPartner.run_id || undefined,
           reason: reason.trim() || undefined,
         });
 
@@ -328,9 +330,9 @@ export default function DeliveryOrderSwapModal({
                       Orders at this address ({sourceOrdersList.length}):
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {sourceOrdersList.map((ord) => (
+                      {sourceOrdersList.map((ord, ordIdx) => (
                         <div
-                          key={ord.order_id}
+                          key={`src-ord-${ord.order_id || ordIdx}-${ordIdx}`}
                           className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 shadow-2xs"
                         >
                           <Package size={11} className="text-emerald-600" />
@@ -403,14 +405,15 @@ export default function DeliveryOrderSwapModal({
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 gap-2 max-h-52 overflow-y-auto pr-1">
-                        {eligiblePartners.map((partner) => {
+                        {eligiblePartners.map((partner, pIdx) => {
                           const isSelected = selectedPartnerId === partner.delivery_partner_id;
                           const isSwapDisabled = mode === "swap" && (!partner.has_existing_run || partner.address_stops.length === 0);
                           const pShift = getShiftInfo(partner.delivery_slot, partner.run_id ?? undefined);
+                          const uniqueKey = `eligible-partner-${partner.delivery_partner_id}-${partner.run_id || 'no_run'}-${pIdx}`;
 
                           return (
                             <div
-                              key={partner.delivery_partner_id}
+                              key={uniqueKey}
                               onClick={() => {
                                 if (isSwapDisabled) return;
                                 setSelectedPartnerId(partner.delivery_partner_id);
@@ -508,15 +511,16 @@ export default function DeliveryOrderSwapModal({
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
-                          {selectedPartner.address_stops.map((stop) => {
+                          {selectedPartner.address_stops.map((stop, sIdx) => {
                             const isSelected = selectedAddressId === stop.address_id;
                             const stopOrders = stop.orders || [];
                             const stopStatus = (stop.delivery_status || "pending").toLowerCase();
                             const isTransferable = ["pending", "in_transit", "in-transit"].includes(stopStatus);
+                            const stopKey = `target-stop-${stop.address_id || stop.run_address_id || sIdx}-${sIdx}`;
 
                             return (
                               <div
-                                key={stop.address_id}
+                                key={stopKey}
                                 onClick={() => {
                                   if (!isTransferable) return;
                                   setSelectedAddressId(stop.address_id);

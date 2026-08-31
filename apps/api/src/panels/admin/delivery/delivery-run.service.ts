@@ -19,13 +19,13 @@ function todayIST(): string {
 // `in_transit` only means the run was started — starting a run bulk-flips every
 // still-waiting stop from 'pending' to 'in_transit' — so an in-transit stop is still
 // freely movable. Only 'arrived' (partner is at the door) and the terminal outcomes lock it.
-const REASSIGNABLE_STOP_STATUSES = ['pending', 'in_transit'];
+const REASSIGNABLE_STOP_STATUSES = ['pending', 'in_transit', 'in-transit'];
 
 function assertStopIsReassignable(stop: any, label: string, verb: string): void {
-  const status = stop.delivery_status || 'pending';
+  const status = (stop?.delivery_status || 'pending').toLowerCase();
   if (!REASSIGNABLE_STOP_STATUSES.includes(status)) {
     throw new BadRequestException(
-      `${label} has status '${status}' and can no longer be ${verb}.`,
+      `${label} has status '${stop?.delivery_status || status}' and can no longer be ${verb}.`,
     );
   }
 }
@@ -2145,7 +2145,7 @@ export class DeliveryRunService {
           throw new BadRequestException(`Cannot move address across different branches (${sourceRun.branch_id} vs ${targetRun.branch_id})`);
         }
 
-        // 5. Target partner active & leave check
+        // 5. Target partner active check
         const partnerRes = await client.query<any>(
           `SELECT dp.delivery_partner_id, dp.is_active, dp.is_available,
                   COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Partner') AS partner_name
@@ -2155,8 +2155,8 @@ export class DeliveryRunService {
           [targetRun.delivery_partner_id],
         );
         const targetPartner = partnerRes.rows[0];
-        if (!targetPartner || !targetPartner.is_active || !targetPartner.is_available) {
-          throw new BadRequestException(`Target delivery partner is currently inactive or unavailable`);
+        if (!targetPartner || targetPartner.is_active === false) {
+          throw new BadRequestException(`Target delivery partner is currently inactive`);
         }
 
         // 6. Warehouse collection is deliberately NOT a blocker here.
@@ -2365,11 +2365,13 @@ export class DeliveryRunService {
     address_b_id?: string;
     order_a_id?: string;
     order_b_id?: string;
+    run_a_id?: string;
+    run_b_id?: string;
     reason?: string;
     admin_id?: string;
   }) {
-    const { address_a_id, address_b_id, order_a_id, order_b_id, reason, admin_id } = body;
-    this.developer.debug('DeliveryRunService.swapOrdersBetweenRuns called', { address_a_id, address_b_id, order_a_id, order_b_id });
+    const { address_a_id, address_b_id, order_a_id, order_b_id, run_a_id, run_b_id, reason, admin_id } = body;
+    this.developer.debug('DeliveryRunService.swapOrdersBetweenRuns called', { address_a_id, address_b_id, order_a_id, order_b_id, run_a_id, run_b_id });
 
     if ((!address_a_id && !order_a_id) || (!address_b_id && !order_b_id)) {
       throw new BadRequestException('address_a_id and address_b_id (or order IDs) are required');
@@ -2382,7 +2384,18 @@ export class DeliveryRunService {
       return await this.db.transaction(async (client) => {
         // 1. Locate Stop A in delivery_run_addresses
         let stopA: any = null;
-        if (address_a_id) {
+        if (address_a_id && run_a_id) {
+          const resA = await client.query<any>(
+            `SELECT dra.* FROM delivery_run_addresses dra
+             WHERE dra.address_id = $1
+               AND (dra.run_id = $2 OR dra.run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $2 LIMIT 1))
+               AND dra.deleted_at IS NULL
+             ORDER BY dra.created_at DESC LIMIT 1 FOR UPDATE`,
+            [address_a_id, run_a_id],
+          );
+          stopA = resA.rows[0];
+        }
+        if (!stopA && address_a_id) {
           const resA = await client.query<any>(
             `SELECT * FROM delivery_run_addresses WHERE address_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
             [address_a_id],
@@ -2406,7 +2419,18 @@ export class DeliveryRunService {
 
         // 2. Locate Stop B in delivery_run_addresses
         let stopB: any = null;
-        if (address_b_id) {
+        if (address_b_id && run_b_id) {
+          const resB = await client.query<any>(
+            `SELECT dra.* FROM delivery_run_addresses dra
+             WHERE dra.address_id = $1
+               AND (dra.run_id = $2 OR dra.run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $2 LIMIT 1))
+               AND dra.deleted_at IS NULL
+             ORDER BY dra.created_at DESC LIMIT 1 FOR UPDATE`,
+            [address_b_id, run_b_id],
+          );
+          stopB = resB.rows[0];
+        }
+        if (!stopB && address_b_id) {
           const resB = await client.query<any>(
             `SELECT * FROM delivery_run_addresses WHERE address_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
             [address_b_id],
@@ -2470,7 +2494,7 @@ export class DeliveryRunService {
         if (dateAStr !== dateBStr) {
           throw new BadRequestException(`Cannot swap address stops across different dates (${dateAStr} vs ${dateBStr})`);
         }
-        if (runA.delivery_slot !== runB.delivery_slot) {
+        if ((runA.delivery_slot || '').toLowerCase() !== (runB.delivery_slot || '').toLowerCase()) {
           throw new BadRequestException(`Cannot swap address stops across different delivery slots (${runA.delivery_slot} vs ${runB.delivery_slot})`);
         }
         if (runA.branch_id && runB.branch_id && runA.branch_id !== runB.branch_id) {
@@ -2487,8 +2511,8 @@ export class DeliveryRunService {
           [runA.delivery_partner_id, runB.delivery_partner_id],
         );
         for (const p of partnersRes.rows) {
-          if (!p.is_active || !p.is_available) {
-            throw new BadRequestException(`Delivery partner ${p.partner_name} is inactive or unavailable`);
+          if (p.is_active === false) {
+            throw new BadRequestException(`Delivery partner ${p.partner_name} is inactive`);
           }
         }
 

@@ -982,15 +982,16 @@ export default function DeliveryRunsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredRuns.map((run) => {
+              {filteredRuns.map((run, rIdx) => {
                 const isExpanded = expandedRunIds[run.run_id] ?? false;
                 const addressStops = run.address_stops || [];
                 const stopsCount = addressStops.length > 0 ? addressStops.length : (run.total_addresses || 0);
                 const ordersCount = run.orders?.length || 0;
+                const runKey = `run-item-${run.run_id || run.id || rIdx}-${rIdx}`;
 
                 return (
                   <div
-                    key={run.id || run.run_id}
+                    key={runKey}
                     className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden transition-all hover:border-slate-300"
                   >
                     {/* Run Header */}
@@ -1067,8 +1068,9 @@ export default function DeliveryRunsPage() {
                               const stopStatus = (stop.delivery_status || "pending").toLowerCase();
                               const isTransferable = ["pending", "in_transit", "in-transit"].includes(stopStatus);
                               const firstOrderId = stop.orders?.[0]?.order_id;
+                              const rowKey = `run-stop-${run.run_id}-${stop.address_id || stop.run_address_id || idx}-${idx}`;
                               return (
-                                <tr key={idx} className="hover:bg-white transition-colors">
+                                <tr key={rowKey} className="hover:bg-white transition-colors">
                                   <td className="px-2 py-2.5 font-mono font-bold text-slate-600">#{stop.sequence_no || idx + 1}</td>
                                   <td className="px-2 py-2.5 font-bold text-slate-800">{stop.customer_name}</td>
                                   <td className="px-2 py-2.5 text-slate-600 max-w-[200px] truncate">{stop.address_line}</td>

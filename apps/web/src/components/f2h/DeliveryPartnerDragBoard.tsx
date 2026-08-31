@@ -639,13 +639,13 @@ export default function DeliveryPartnerDragBoard({
                     ? `-- Select Partner in ${partnerB.branch_name} (${eligiblePartnersForA.length}) --`
                     : "-- Select any Delivery Partner A --"}
                 </option>
-                {eligiblePartnersForA.map((p) => {
+                {eligiblePartnersForA.map((p, pIdx) => {
                   const key = getRunKey(p);
                   const hasRun = Boolean(p.run_id);
                   const stopsCount = p.address_stops?.length || 0;
                   const shift = getShiftInfo(p.delivery_slot, p.run_id);
                   return (
-                    <option key={key} value={key}>
+                    <option key={`opt-a-${key}-${pIdx}`} value={key}>
                       {p.partner_name} ({p.branch_name || "No Branch"}) {hasRun ? `• [${shift.code}] ${stopsCount} stops (${p.run_id})` : "• No run (Ready for Drop)"}
                     </option>
                   );
@@ -723,10 +723,11 @@ export default function DeliveryPartnerDragBoard({
                 const isDragOverThis = dragOverStopId === stop.address_id;
                 const isBeingDragged = draggedStop?.stop.address_id === stop.address_id;
                 const normStatus = (stop.delivery_status || "pending").toLowerCase();
+                const cardKey = `stop-a-${stop.address_id || stop.run_address_id || idx}-${idx}`;
 
                 return (
                   <div
-                    key={stop.address_id || idx}
+                    key={cardKey}
                     draggable={isMovable && !processing}
                     onDragStart={(e) => handleDragStart(e, stop, partnerA)}
                     onDragEnd={handleDragEnd}
@@ -786,9 +787,9 @@ export default function DeliveryPartnerDragBoard({
 
                     <div className="mt-2.5 pl-6 flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-bold text-slate-400">Orders ({stop.orders.length}):</span>
-                      {stop.orders.map((ord) => (
+                      {stop.orders.map((ord, ordIdx) => (
                         <span
-                          key={ord.order_id}
+                          key={`ord-a-${ord.order_id || ordIdx}-${ordIdx}`}
                           className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] font-bold text-slate-700"
                         >
                           #{ord.order_id}
@@ -880,13 +881,13 @@ export default function DeliveryPartnerDragBoard({
                     ? `-- Select Partner in ${partnerA.branch_name} (${eligiblePartnersForB.length}) --`
                     : "-- Select any Delivery Partner B --"}
                 </option>
-                {eligiblePartnersForB.map((p) => {
+                {eligiblePartnersForB.map((p, pIdx) => {
                   const key = getRunKey(p);
                   const hasRun = Boolean(p.run_id);
                   const stopsCount = p.address_stops?.length || 0;
                   const shift = getShiftInfo(p.delivery_slot, p.run_id);
                   return (
-                    <option key={key} value={key}>
+                    <option key={`opt-b-${key}-${pIdx}`} value={key}>
                       {p.partner_name} ({p.branch_name || "No Branch"}) {hasRun ? `• [${shift.code}] ${stopsCount} stops (${p.run_id})` : "• No run (Ready for Drop)"}
                     </option>
                   );
@@ -968,10 +969,11 @@ export default function DeliveryPartnerDragBoard({
                 const isDragOverThis = dragOverStopId === stop.address_id;
                 const isBeingDragged = draggedStop?.stop.address_id === stop.address_id;
                 const normStatus = (stop.delivery_status || "pending").toLowerCase();
+                const cardKey = `stop-b-${stop.address_id || stop.run_address_id || idx}-${idx}`;
 
                 return (
                   <div
-                    key={stop.address_id || idx}
+                    key={cardKey}
                     draggable={isMovable && !processing}
                     onDragStart={(e) => handleDragStart(e, stop, partnerB)}
                     onDragEnd={handleDragEnd}
@@ -1031,9 +1033,9 @@ export default function DeliveryPartnerDragBoard({
 
                     <div className="mt-2.5 pl-6 flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-bold text-slate-400">Orders ({stop.orders.length}):</span>
-                      {stop.orders.map((ord) => (
+                      {stop.orders.map((ord, ordIdx) => (
                         <span
-                          key={ord.order_id}
+                          key={`ord-b-${ord.order_id || ordIdx}-${ordIdx}`}
                           className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] font-bold text-slate-700"
                         >
                           #{ord.order_id}
