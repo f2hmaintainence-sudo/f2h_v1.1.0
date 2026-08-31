@@ -3,6 +3,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { generateId } from '../../../../helpers/RandomHelper';
 import { FormHelper } from '../../../../helpers/FormHelper';
 import { DataService } from '../../../../shared/database/Data.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
@@ -52,8 +53,8 @@ export class CustomerSaveAddService {
         }
       }
 
-      // Generate unique user_id / customer_id
-      const customerId = `USER${Math.random().toString(36).substring(2, 12).toUpperCase()}${Date.now().toString(36).toUpperCase()}`;
+      // Generate unique user_id / customer_id (starts with F2H, length 9)
+      const customerId = generateId('F2H', 9);
 
       const nameParts = String(body.full_name || body.name || '').trim().split(/\s+/);
       const firstName = nameParts[0] || 'Customer';

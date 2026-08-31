@@ -6,9 +6,20 @@
 | **Test Case ID(s)** | CUST-REF-001, CUST-REF-002, REF-CUST-001, REF-CUST-002, REF-PART-001, DP-REF-001, E2E-003, E2E-009 |
 | **Module** | Referrals / Reward Engine |
 | **Severity** | **Critical** |
-| **Status** | Open — reported, not fixed |
+| **Status** | **Partially fixed** — re-tested live 2026-08-31 |
 | **Environment** | Live application, `f2h_fresh` database, API `:5001`, Admin Web `:5002` |
 | **Detected** | 2026-08-29 |
+
+> **Re-test 2026-08-31 (live).** Root cause #2 is **fixed**: the reward engine now queries the real
+> `referrals` columns and pays ₹100 to a customer referrer / ₹75 to a delivery-partner referrer with
+> ₹0 to the referee, transactionally and idempotently. Verified end to end — see
+> `../09-referrals-live-test-2026-08-31.md`.
+>
+> Root causes **#1, #3 and #4 remain unfixed** and are now tracked separately:
+> **ISS-048** (`createReferral` role inversion + swallowed `23502`), **ISS-047**
+> (`referred_by` missing from the referee select, auto-create branch dead),
+> and the self-referral write path (covered in ISS-048). Five further defects were found in the
+> same run: ISS-045, ISS-046, ISS-049, ISS-050, ISS-051.
 
 ## Title
 

@@ -9,7 +9,8 @@ Real-time execution of the master test plan in `.claude/test/29-08-2026/test-pla
 |---|---|
 | **[test-summary.md](test-summary.md)** | Headline numbers, per-module coverage, findings by area, overall status and the recommended fix sequence. |
 | **[test-execution-report.md](test-execution-report.md)** | Every test case: preconditions, steps actually performed, expected vs actual, verdict, evidence and root cause. |
-| **[issues/](issues/)** | 44 defect reports, one file per issue (`ISS-001` … `ISS-044`). |
+| **[09-referrals-live-test-2026-08-31.md](09-referrals-live-test-2026-08-31.md)** | **Re-run 2026-08-31** — live re-execution of the referrals plan against the rebuilt reward engine. 8 pass, 1 partial, 6 fail. |
+| **[issues/](issues/)** | 51 defect reports, one file per issue (`ISS-001` … `ISS-051`). |
 | **[feature-updates/](feature-updates/)** | 7 change requests where the implementation does not satisfy the documented requirement (`FU-001` … `FU-007`). |
 | **[api-results/](api-results/)** | Raw API responses, including the full 120-endpoint admin sweep. |
 | **[database-results/](database-results/)** | SQL verification output for subscriptions, billing, delivery, containers, wallet and referrals. |
@@ -25,6 +26,14 @@ subscription schedule/pause engine all work correctly. **Every money-out path do
 bill, prepaid refund, cancellation refund or referral reward has ever been produced in this system,
 and no delivery run has ever completed its handover. All of these fail silently — the API reports
 success — which is why they have not surfaced as user complaints. See `test-summary.md` §12.
+
+> **Update — 2026-08-31.** The referrals module was re-tested live after the reward-engine rebuild.
+> The **payout** half of ISS-008 is fixed and proven: ₹100 to the customer referrer, ₹75 to the
+> delivery partner, ₹0 to the new user, with working `SELECT ... FOR UPDATE` idempotency. The
+> **referrer-resolution** half is not — a referral only pays out when a correct `referrals` row
+> already exists, and both paths that should create one still fail (ISS-047, ISS-048). Seven new
+> defects: ISS-045 … ISS-051. See
+> [09-referrals-live-test-2026-08-31.md](09-referrals-live-test-2026-08-31.md).
 
 ---
 

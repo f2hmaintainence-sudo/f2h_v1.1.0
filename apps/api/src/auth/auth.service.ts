@@ -437,7 +437,7 @@ export class AuthService {
       await this.consumeVerifiedOtp(body.verification_token, email || phone!, 'registration');
     }
 
-    const userId = existingUser ? existingUser.user_id : generateId('USER', 10);
+    const userId = existingUser ? existingUser.user_id : generateId('F2H', 9);
     const rawPassword = (body.password && body.password.trim() !== '')
       ? body.password.trim()
       : this.generateRandomPassword(email || undefined, phone || undefined);
@@ -800,7 +800,7 @@ export class AuthService {
 
     // 5. Create a placeholder customer row for legacy referral codes not yet in the system
     if (cleanCode.length >= 3 && cleanCode.startsWith('F2H')) {
-      const newCustId = `USER_${cleanCode}`;
+      const newCustId = cleanCode.length === 9 ? cleanCode : generateId('F2H', 9);
 
       const existing = await this.Data.query('customers', {
         where: [{ column: 'customer_id', operator: '=', value: newCustId }],
@@ -953,7 +953,7 @@ export class AuthService {
     const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
 
     if (!user) {
-      const userId = generateId('USER', 20);
+      const userId = generateId('F2H', 9);
       const temporaryPassword = crypto.randomBytes(32).toString('hex');
       const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
       const now = new Date();
@@ -1620,7 +1620,7 @@ export class AuthService {
     let user = allUsersResult?.data?.[0];
 
     if (!user) {
-      const userId = `USER${Date.now().toString(36).toUpperCase()}`;
+      const userId = generateId('F2H', 9);
       const roleId = signupRole;
       await this.Data.insert('users', {
         user_id: userId,

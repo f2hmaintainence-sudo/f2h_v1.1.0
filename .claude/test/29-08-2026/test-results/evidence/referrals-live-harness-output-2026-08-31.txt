@@ -1,0 +1,133 @@
+Verbatim console output — live referral test run, 2026-08-31
+Harnesses: apps/api/src/scripts/qa-referral-live-test.ts
+           apps/api/src/scripts/qa-referral-live-test-2.ts
+Command:   npx ts-node -r tsconfig-paths/register src/scripts/qa-referral-live-test.ts
+Target:    live PostgreSQL f2h_fresh (same DB the running API on :5001 uses)
+
+══════════════════════════════════════════════════════════════════════════════
+PART 1 — main specification cases
+══════════════════════════════════════════════════════════════════════════════
+
+QA REFERRAL LIVE TEST — run HIY719 — 2026-08-31T17:40:51.394Z
+
+Baseline: referrer F2HQFK7NH wallet=798 referral_bonus_tx=2
+
+[PASS] REF-CUST-001 — Existing customer referrer gets Rs.100, new user gets Rs.0
+  expected: referrer wallet 798 -> 898; referee wallet 0.00; referrals.status=rewarded (100.00/0.00); 1 credit tx reference_type=referral_bonus
+  actual  : engine={"status":true,"referrer_type":"customer","referrer_reward":100,"referee_reward":0,"referee_new_balance":0,"message":"Rewards processed: ₹100 credited to referrer wallet."}; referrer wallet 798 -> 898; referee wallet 0; referrals={"status":"rewarded","referrer_reward_amount":"100","referred_reward_amount":"0","rewarded_at":"2026-08-31T17:40:51.410Z"}; tx={"amount":"100.00","balance_after":"898.00","transaction_type":"credit","reference_type":"referral_bonus","reference_id":"QAORDHIY719B1"}; referee.first_order_completed=true
+
+[PASS] REF-CUST-001b — Referrer receives referral bonus push notification
+  expected: notifications row of type referral_bonus addressed to the referrer
+  actual  : 🎉 Referral Bonus Received! | ₹100 credited to your wallet! Your friend Nandu278867 completed their 1st delivered order.
+
+[PASS] REF-CUST-003 — Double reward / duplicate delivery callback is rejected
+  expected: both re-invocations return status:false "already processed"; wallet stays 898; referral_bonus tx count stays 3
+  actual  : 2nd={"status":false,"message":"No eligible referral record found or reward already processed."}; 3rd={"status":false,"message":"No eligible referral record found or reward already processed."}; wallet=898; tx count=3
+
+[PASS] REF-CUST-003c — Concurrent delivery callbacks credit exactly once (SELECT ... FOR UPDATE)
+  expected: wallet 898 -> 998 (exactly one credit)
+  actual  : race=[true,false]; wallet 898 -> 998
+
+[PASS] REF-PART-001 — Delivery partner referrer accrues Rs.75 bonus, new user gets Rs.0
+  expected: delivery_partner_referral_bonuses row partner_id=F2HFUGZ6H amount=75.00 status=pending order_id=QAORDHIY719C1; referrals 75.00/0.00 rewarded; referee wallet 0.00; DP customer wallet unchanged (295)
+  actual  : engine={"status":true,"referrer_type":"delivery_partner","referrer_reward":75,"referee_reward":0,"referee_new_balance":0,"message":"Rewards processed: ₹75 DP bonus recorded for salary."}; bonus={"bonus_id":"DPBTKNAG34573","partner_id":"F2HFUGZ6H","refer_id":"QAREF6C6OPE","order_id":"QAORDHIY719C1","amount":"75.00","status":"pending"}; referrals={"status":"rewarded","referrer_reward_amount":"75","referred_reward_amount":"0"}; referee wallet=0; DP customer wallet 295 -> 295
+
+[FAIL] REF-PART-002 — Delivery partner receives the Rs.75 acquisition-bonus push
+  expected: spec sequence diagram: ENG->>REF: "Rs.75 New Customer Acquisition Bonus Accrued!"
+  actual  : no notification row created for the delivery partner
+
+[FAIL] REF-CUST-005 — Signup-only referral (users.referred_by set, no referrals row) still rewards
+  expected: engine auto-creates the referrals row and credits the referrer (wallet 998 -> 1098)
+  actual  : engine={"status":false,"message":"No eligible referral record found or reward already processed."}; referrals row=null; wallet 998 -> 998
+
+[PASS] REF-CUST-004 — Self-referral is rejected on the write path
+  expected: validate returns valid:false; createReferral rejects; no referrals row where referrer = referred
+  actual  : validate={"status":true,"valid":false,"message":"Self-referral is not allowed"}; add={"status":true,"message":"Referral recorded successfully","data":null}; row=null
+
+[FAIL] REF-CUST-006 — Referral submission records caller as REFEREE and code owner as REFERRER
+  expected: referrals row referrer_customer_id=F2HQFK7NH, referred_customer_id=QAREFFHIY719, status=pending; users.referred_by=F2HQFK7NH
+  actual  : api={"status":true,"message":"Referral recorded successfully","data":null}; row=null; users.referred_by=NULL
+
+[FAIL] REF-CODE-001 — Referral code lookup for the supplied customer code "ashokroman007"
+  expected: resolves to customer F2HQFK7NH (ashokroman007@gmail.com)
+  actual  : not resolved — returns null / "Invalid referral code"
+
+[FAIL] REF-CODE-002 — Referral code lookup for the supplied partner code "ashoknanda130120@gmail.com"
+  expected: resolves to delivery partner F2HFUGZ6H
+  actual  : not resolved — returns null / "Invalid referral code"
+
+[PASS] REF-CUST-002 — No automatic first-order refund/cashback credited to a new customer
+  expected: no wallet credit is created for any referee during first-order processing
+  actual  : referee credits in this run = []; historical welcome/cashback credits in DB = [{"reference_type":"referral_bonus","n":1}]
+
+[PASS] REF-CUST-007 — Referral code is locked before first delivered order, active after
+  expected: referee whose first order just completed => active code; totals reflect real rewarded referrals
+  actual  : referee QAREFCHIY719: status=active code=QAREFCHIY719; referrer F2HQFK7NH: status=active code=F2HQFK7NH total_referrals=5 total_earnings=350
+
+SUMMARY
+  PASS     REF-CUST-001  Existing customer referrer gets Rs.100, new user gets Rs.0
+  PASS     REF-CUST-001b  Referrer receives referral bonus push notification
+  PASS     REF-CUST-003  Double reward / duplicate delivery callback is rejected
+  PASS     REF-CUST-003c  Concurrent delivery callbacks credit exactly once (SELECT ... FOR UPDATE)
+  PASS     REF-PART-001  Delivery partner referrer accrues Rs.75 bonus, new user gets Rs.0
+  FAIL     REF-PART-002  Delivery partner receives the Rs.75 acquisition-bonus push
+  FAIL     REF-CUST-005  Signup-only referral (users.referred_by set, no referrals row) still rewards
+  PASS     REF-CUST-004  Self-referral is rejected on the write path
+  FAIL     REF-CUST-006  Referral submission records caller as REFEREE and code owner as REFERRER
+  FAIL     REF-CODE-001  Referral code lookup for the supplied customer code "ashokroman007"
+  FAIL     REF-CODE-002  Referral code lookup for the supplied partner code "ashoknanda130120@gmail.com"
+  PASS     REF-CUST-002  No automatic first-order refund/cashback credited to a new customer
+  PASS     REF-CUST-007  Referral code is locked before first delivered order, active after
+
+Created QA ids (run HIY719): QAREFBHIY719, QAREFB2HIY719, QAREFCHIY719, QAREFDHIY719, QAREFEHIY719, QAREFFHIY719
+Referrer F2HQFK7NH wallet: 798 -> 998
+
+══════════════════════════════════════════════════════════════════════════════
+PART 2 — referrer-resolution edge cases
+══════════════════════════════════════════════════════════════════════════════
+
+[EDG-REF-A] Referrer id that owns no customers row ("APP INVITE" general code)
+  engine        : {"status":true,"referrer_type":"customer","referrer_reward":100,"referee_reward":0,"referee_new_balance":0,"message":"Rewards processed: ₹100 credited to referrer wallet."}
+  customers row : DOES NOT EXIST — nothing was credited
+  ledger rows   : [{"transaction_id":"WTtknajr7130","customer_id":"APP_INVITE_GENERAL","amount":"100.00","balance_after":"100.00","reference_type":"referral_bonus"},{"transaction_id":"WTtknakj8022","customer_id":"APP_INVITE_GENERAL","amount":"100.00","balance_after":"100.00","reference_type":"referral_bonus"}]
+  referral state: {"status":"rewarded","rewarded_at":"2026-08-31T17:43:31.534Z"}
+
+[EDG-REF-B] Circular referral A->B and B->A
+  B first order : {"status":true,"referrer_type":"customer","referrer_reward":100,"referee_reward":0,"referee_new_balance":0,"message":"Rewards processed: ₹100 credited to referrer wallet."}
+  A first order : {"status":true,"referrer_type":"customer","referrer_reward":100,"referee_reward":0,"referee_new_balance":100,"message":"Rewards processed: ₹100 credited to referrer wallet."}
+  balances      : [{"customer_id":"QAEDGYHJ1MLM","wallet_balance":"100.00"},{"customer_id":"QAEDGXHJ1MLM","wallet_balance":"100.00"}] (each mutually mined Rs.100 from the other)
+
+Created QA ids (run HJ1MLM): QAEDGAHJ1MLM, QAEDGXHJ1MLM, QAEDGYHJ1MLM
+
+══════════════════════════════════════════════════════════════════════════════
+PART 3 — public referral-code validate endpoint (HTTP, unauthenticated)
+══════════════════════════════════════════════════════════════════════════════
+
+$ curl -s http://127.0.0.1:5001/api/v1/customer/referrals/validate/<code>
+
+ashokroman007              -> {"status":true,"valid":false,"message":"Invalid referral code"}
+ashoknanda130120@gmail.com -> {"status":true,"valid":false,"message":"Invalid referral code"}
+F2HQFK7NH                  -> {"status":true,"valid":true,"message":"Referral code is valid","referrer_name":"Ashok"}
+F2HFUGZ6H                  -> {"status":true,"valid":true,"message":"Referral code is valid","referrer_name":"Allen"}
+GARBAGECODE999             -> {"status":true,"valid":false,"message":"Invalid referral code"}
+9169                       -> {"status":true,"valid":false,"message":"Invalid referral code"}
+REF9169                    -> {"status":true,"valid":false,"message":"Invalid referral code"}
+F2H9169                    -> {"status":true,"valid":true,"message":"Referral code is valid","referrer_name":"F2H Referrer"}
+0644                       -> {"status":true,"valid":true,"message":"Referral code is valid","referrer_name":"Allen"}
+ASHOK0644                  -> {"status":true,"valid":true,"message":"Referral code is valid","referrer_name":"Allen"}
+
+Side effect of the F2H9169 probe (ISS-045):
+
+        user_id         |  first_name   |          email           |   phone    |         created_at
+------------------------+---------------+--------------------------+------------+----------------------------
+ USER_F2H9169           | F2H Referrer  | ref_f2h9169@f2hfresh.com | 9992916900 | 2026-08-31 19:41:47.802+02
+
+══════════════════════════════════════════════════════════════════════════════
+PART 4 — swallowed insert failure behind POST /customer/referrals/add (ISS-048)
+══════════════════════════════════════════════════════════════════════════════
+
+apps/api/logs/app.log
+[2026-08-31 23:10:51] ERROR : Database Error {"table":"referrals","errorCode":"23502","error":"null value in column \"referred_customer_id\" of relation \"referrals\" violates not-null constraint"}
+[2026-08-31 23:10:51] ERROR : Database Error {"table":"referrals","errorCode":"23502","error":"null value in column \"referred_customer_id\" of relation \"referrals\" violates not-null constraint"}
+
+Both correspond to calls that returned HTTP-level {"status":true,"message":"Referral recorded successfully"}.

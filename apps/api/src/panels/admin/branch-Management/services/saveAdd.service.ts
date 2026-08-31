@@ -3,6 +3,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { generateId } from '../../../../helpers/RandomHelper';
 import { FormHelper, FormResponse, FieldDef } from '../../../../helpers/FormHelper';
 import { DataService } from '../../../../shared/database/Data.service';
 import { DatabaseService } from '../../../../shared/database/Database.service';
@@ -163,7 +164,7 @@ export class StaffsSaveAddService {
         throw new BadRequestException('Phone number is already registered');
       }
 
-      const userId = this.idGenerator.generateId('USR', 12);
+      const userId = generateId('F2H', 9);
       const managementId = this.idGenerator.generateId('MNG', 12);
 
       const bcrypt = require('bcrypt');

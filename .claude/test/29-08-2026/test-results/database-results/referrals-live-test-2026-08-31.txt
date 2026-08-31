@@ -1,0 +1,82 @@
+=== Referral live test — post-run DB state — 2026-08-31T23:14:09+05:30 ===
+
+--- referrals ---
+ id |   refer_id    |  referrer_customer_id  | referred_customer_id | referrer_reward_amount | referred_reward_amount |  status  |          rewarded_at          
+----+---------------+------------------------+----------------------+------------------------+------------------------+----------+-------------------------------
+  1 | REFXO9EQ      | F2HQ9PV99              | F2HQFK7NH            |                     50 |                   0.00 | rewarded | 2026-08-31 07:08:16.669314+02
+  3 | REF1_MTBBRY82 | T_CR_MTBBRY82          | T_CE_MTBBRY82        |                 100.00 |                   0.00 | pending  | 
+  4 | REF1_MTBBSAUT | T_CR_MTBBSAUT          | T_CE_MTBBSAUT        |                 100.00 |                   0.00 | pending  | 
+  5 | REF1_MTBBSX6A | T_CR_MTBBSX6A          | T_CE_MTBBSX6A        |                 100.00 |                   0.00 | pending  | 
+  6 | REF1_MTBBTACM | T_CR_MTBBTACM          | T_CE_MTBBTACM        |                 100.00 |                   0.00 | pending  | 
+  7 | REF1_MTBBTLZF | T_CR_MTBBTLZF          | T_CE_MTBBTLZF        |                 100.00 |                   0.00 | pending  | 
+  8 | REF1_MTBBTX9B | T_CR_MTBBTX9B          | T_CE_MTBBTX9B        |                 100.00 |                   0.00 | pending  | 
+ 17 | REFJVJBJ      | F2HQFK7NH              | USERI5LFFXXN4SE8E6D2 |                    100 |                      0 | rewarded | 2026-08-31 08:41:58.774598+02
+ 34 | REFNLUIY      | USER_F2HVOD3GJ-PARTNER | USERWBE1N7SHE6D6R4DP |                    100 |                      0 | pending  | 
+ 35 | REFZGWWQ      | F2HQFK7NH              | USERTU61N2JCXUMEDOWD |                    100 |                      0 | pending  | 
+ 36 | QAREFZLDWFN   | F2HQFK7NH              | QAREFBHIY719         |                    100 |                      0 | rewarded | 2026-08-31 19:40:51.410466+02
+ 37 | QAREFOVVLC3   | F2HQFK7NH              | QAREFB2HIY719        |                    100 |                      0 | rewarded | 2026-08-31 19:40:51.425975+02
+ 38 | QAREF6C6OPE   | F2HFUGZ6H              | QAREFCHIY719         |                     75 |                      0 | rewarded | 2026-08-31 19:40:51.437869+02
+ 41 | QAEDGHJ11ANA  | APP_INVITE_GENERAL     | QAEDGAHJ11AN         |                    100 |                      0 | rewarded | 2026-08-31 19:43:03.954525+02
+ 42 | QAEDGHJ1MLMA  | APP_INVITE_GENERAL     | QAEDGAHJ1MLM         |                    100 |                      0 | rewarded | 2026-08-31 19:43:31.534956+02
+ 43 | QAEDGHJ1MLMX  | QAEDGXHJ1MLM           | QAEDGYHJ1MLM         |                    100 |                      0 | rewarded | 2026-08-31 19:43:31.54547+02
+ 44 | QAEDGHJ1MLMY  | QAEDGYHJ1MLM           | QAEDGXHJ1MLM         |                    100 |                      0 | rewarded | 2026-08-31 19:43:31.548602+02
+(17 rows)
+
+--- customer_wallet_transactions (referral_bonus) ---
+ transaction_id |    customer_id     | transaction_type | amount | balance_after | reference_type |   reference_id   |                          remarks                          |         created_at         
+----------------+--------------------+------------------+--------+---------------+----------------+------------------+-----------------------------------------------------------+----------------------------
+ WTtkmbls9952   | F2HQ9PV99          | credit           |  50.00 |       1050.00 | referral_bonus | ORD_02174641-FAD | Referral Reward: Ashok completed 1st order                | 2026-08-31 07:08:16.673+02
+ WTtkmbls3644   | F2HQFK7NH          | credit           |  50.00 |        511.00 | referral_bonus | ORD_02174641-FAD | Welcome Reward: First order completed using referral code | 2026-08-31 07:08:16.673+02
+ WTtkmfxy3057   | F2HQFK7NH          | credit           | 100.00 |        611.00 | referral_bonus | OrdO65RA0YCMWOH  | Referral Reward: Nandu278867 completed 1st order          | 2026-08-31 08:41:58.777+02
+ WTtknag38623   | F2HQFK7NH          | credit           | 100.00 |        898.00 | referral_bonus | QAORDHIY719B1    | Referral Reward: QaRefereeB completed 1st order           | 2026-08-31 19:40:51.413+02
+ WTtknag39899   | F2HQFK7NH          | credit           | 100.00 |        998.00 | referral_bonus | QAORDHIY719R1    | Referral Reward: QaRefereeB2 completed 1st order          | 2026-08-31 19:40:51.427+02
+ WTtknajr7130   | APP_INVITE_GENERAL | credit           | 100.00 |        100.00 | referral_bonus | QAORDHJ11ANA1    | Referral Reward: QaEdge completed 1st order               | 2026-08-31 19:43:03.96+02
+ WTtknakj8022   | APP_INVITE_GENERAL | credit           | 100.00 |        100.00 | referral_bonus | QAORDHJ1MLMA1    | Referral Reward: QaEdge completed 1st order               | 2026-08-31 19:43:31.537+02
+ WTtknakj1837   | QAEDGXHJ1MLM       | credit           | 100.00 |        100.00 | referral_bonus | QAORDHJ1MLMX1    | Referral Reward: QaEdge completed 1st order               | 2026-08-31 19:43:31.547+02
+ WTtknakj9194   | QAEDGYHJ1MLM       | credit           | 100.00 |        100.00 | referral_bonus | QAORDHJ1MLMY1    | Referral Reward: QaEdge completed 1st order               | 2026-08-31 19:43:31.551+02
+(9 rows)
+
+--- delivery_partner_referral_bonuses ---
+   bonus_id    | partner_id |  refer_id   | referee_name |   order_id    | amount | status  |          created_at           
+---------------+------------+-------------+--------------+---------------+--------+---------+-------------------------------
+ DPBTKNAG34573 | F2HFUGZ6H  | QAREF6C6OPE | QaRefereeC   | QAORDHIY719C1 |  75.00 | pending | 2026-08-31 19:40:51.437869+02
+(1 row)
+
+--- accounts under test ---
+ customer_id |           email            | wallet_balance | first_order_completed | is_delivery_partner 
+-------------+----------------------------+----------------+-----------------------+---------------------
+ F2HFUGZ6H   | ashoknanda130120@gmail.com |         295.00 | t                     | t
+ F2HQFK7NH   | ashokroman007@gmail.com    |         998.00 | t                     | f
+(2 rows)
+
+--- phantom referrer accounts auto-created by GET /customer/referrals/validate/:code ---
+        user_id         |  first_name   | last_name |               email                |   phone    | role_id  |         created_at         
+------------------------+---------------+-----------+------------------------------------+------------+----------+----------------------------
+ USER_F2HQFK            | Qfk           | User      | ref_f2hqfk@f2hfresh.com            | 9992000000 | CUSTOMER | 2026-08-30 17:26:44.317+02
+ USER_F2HQFK7           | Qfk           | User      | ref_f2hqfk7@f2hfresh.com           | 9992700000 | CUSTOMER | 2026-08-30 17:26:46.779+02
+ USER_F2HVOD3GJ-PARTNER | Vodgj-partner | User      | ref_f2hvod3gj-partner@f2hfresh.com | 9992300000 | CUSTOMER | 2026-08-31 07:34:49.961+02
+ USER_F2H9169           | F2H Referrer  | User      | ref_f2h9169@f2hfresh.com           | 9992916900 | CUSTOMER | 2026-08-31 19:41:47.802+02
+(4 rows)
+
+--- orphan ledger rows with no owning customer ---
+ transaction_id |    customer_id     | amount | balance_after | reference_type 
+----------------+--------------------+--------+---------------+----------------
+ WTtknajr7130   | APP_INVITE_GENERAL | 100.00 |        100.00 | referral_bonus
+ WTtknakj8022   | APP_INVITE_GENERAL | 100.00 |        100.00 | referral_bonus
+(2 rows)
+
+--- QA rows created by this run ---
+  customer_id  | wallet_balance | first_order_completed |          created_at           
+---------------+----------------+-----------------------+-------------------------------
+ QAREFBHIY719  |           0.00 | t                     | 2026-08-31 19:40:51.405502+02
+ QAREFB2HIY719 |           0.00 | t                     | 2026-08-31 19:40:51.423606+02
+ QAREFCHIY719  |           0.00 | t                     | 2026-08-31 19:40:51.436302+02
+ QAREFDHIY719  |           0.00 | f                     | 2026-08-31 19:40:51.445362+02
+ QAREFEHIY719  |           0.00 | t                     | 2026-08-31 19:40:51.449001+02
+ QAREFFHIY719  |           0.00 | t                     | 2026-08-31 19:40:51.460018+02
+ QAEDGAHJ11AN  |           0.00 | t                     | 2026-08-31 19:43:03.950066+02
+ QAEDGAHJ1MLM  |           0.00 | t                     | 2026-08-31 19:43:31.532968+02
+ QAEDGXHJ1MLM  |         100.00 | t                     | 2026-08-31 19:43:31.542737+02
+ QAEDGYHJ1MLM  |         100.00 | t                     | 2026-08-31 19:43:31.544143+02
+(10 rows)
+

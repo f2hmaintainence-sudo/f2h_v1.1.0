@@ -115,7 +115,7 @@ export class ReferralRepository implements IReferralRepository {
       const namePart = raw.slice(3).replace(/\d/g, '');
       const firstName = raw === 'F2HASH647' || namePart.toUpperCase().includes('ASH') ? 'Ashok' : (namePart.length > 0 ? namePart.charAt(0).toUpperCase() + namePart.slice(1).toLowerCase() : 'F2H Referrer');
       const lastName = raw === 'F2HASH647' ? 'Roman' : 'User';
-      const newCustId = `USER_${raw}`;
+      const newCustId = raw.length === 9 ? raw : generateId('F2H', 9);
       const placeholderEmail = raw === 'F2HASH647' ? 'ashokroman007@gmail.com' : `ref_${raw.toLowerCase()}@f2hfresh.com`;
       const placeholderPhone = `999${digitsOnly.padEnd(7, '0').slice(-7)}`;
 
