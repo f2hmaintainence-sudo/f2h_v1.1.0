@@ -107,51 +107,27 @@ class F2hHeroHeader extends StatelessWidget {
             ),
           ),
 
-          // 2. Delivery Background Image moved to bottom (never overlaps top controls)
+          // 2. Delivery Background Illustration Banner at bottom (clearly visible, no overlap)
           SizedBox(
             width: double.infinity,
-            height: 95,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  'assets/home_bg.png',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.bottomCenter,
-                  errorBuilder: (_, __, ___) => Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFFDCFCE7),
-                          Color(0xFFF0FDF4),
-                          Color(0xFFE2E8F0),
-                        ],
-                      ),
-                    ),
+            height: 130,
+            child: Image.asset(
+              'assets/home_bg.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              errorBuilder: (_, __, ___) => Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFDCFCE7),
+                      Color(0xFFF0FDF4),
+                      Color(0xFFE2E8F0),
+                    ],
                   ),
                 ),
-                // Smooth top gradient to blend cleanly with top white area
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 24,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white,
-                          Colors.white.withOpacity(0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],

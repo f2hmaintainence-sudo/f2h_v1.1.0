@@ -316,13 +316,17 @@ export class DiscountEngineService {
       [customerId || ''],
     );
 
+    this.logger.log(`[listAvailableCoupons] customerId=${customerId}, subtotal=${subtotal}, rows=${rows?.length ?? 0}, codes=${(rows || []).map(r => r.code).join(',')}`);
     const available: Array<any> = [];
 
     for (const row of rows ?? []) {
       if (orderSource === 'subscription' && !row.allow_subscription_orders) continue;
 
       const perCustLimit = Number(row.coupon_upc ?? row.promo_upc ?? 1);
-      if (customerId && Number(row.customer_used ?? 0) >= perCustLimit) continue;
+      if (customerId && Number(row.customer_used ?? 0) >= perCustLimit) {
+        this.logger.log(`[listAvailableCoupons] Skipping ${row.code}: customer_used=${row.customer_used} >= limit=${perCustLimit}`);
+        continue;
+      }
 
       let isFirstOrderEligible = true;
       let firstOrderReason: string | null = null;
@@ -341,6 +345,10 @@ export class DiscountEngineService {
       const minAmount = Number(row.minimum_order_amount || 0);
       const meetsMinimum = minAmount <= 0 || subtotal >= minAmount;
       const isEligible = meetsMinimum && isFirstOrderEligible;
+
+      this.logger.log(
+        `[listAvailableCoupons] ${row.code}: isEligible=${isEligible}, meetsMin=${meetsMinimum} (min=${minAmount}, subtotal=${subtotal}), isFirstOrder=${isFirstOrderEligible} (firstOrderOnly=${row.first_order_only})`,
+      );
 
       // Show only eligible coupons that the customer qualifies for and cart subtotal meets minimum
       if (!isEligible) continue;

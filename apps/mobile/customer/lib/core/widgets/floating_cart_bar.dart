@@ -7,6 +7,7 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/features/catalog/presentation/helpers/cart_navigation_helper.dart';
 
 /// Bottom offset for the [AnimatedPositioned] that hosts a [FloatingCartBar].
 ///
@@ -232,12 +233,7 @@ class _FloatingCartBarState extends State<FloatingCartBar>
               child: ScaleTransition(
                 scale: _scaleAnim,
                 child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartScreen()),
-                    );
-                  },
+                  onTap: () => CartNavHelper.openCart(context),
                   child: compactListenable == null
                       ? _buildPill(
                           isCompact: false,

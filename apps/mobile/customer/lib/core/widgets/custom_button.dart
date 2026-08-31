@@ -4,6 +4,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
+import 'package:f2h_customer/features/catalog/presentation/helpers/cart_navigation_helper.dart';
 // ══════════════════════════════════════════════════════════
 //  MICRO HELPERS
 // ══════════════════════════════════════════════════════════
@@ -73,12 +74,7 @@ class CartBtn extends StatelessWidget {
         }
 
         return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CartScreen()),
-            );
-          },
+          onTap: () => CartNavHelper.openCart(context),
           behavior: HitTestBehavior.opaque,
           child: Stack(
             clipBehavior: Clip.none,
