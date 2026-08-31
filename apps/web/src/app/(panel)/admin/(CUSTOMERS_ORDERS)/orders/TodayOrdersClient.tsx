@@ -153,6 +153,10 @@ export default function TodayOrdersClient({
       if (selectedDate) url.searchParams.append('date', selectedDate);
       if (fromDate)     url.searchParams.append('fromDate', fromDate);
       if (toDate)       url.searchParams.append('toDate', toDate);
+      if (activeStatusFilter) url.searchParams.append('status', activeStatusFilter.toLowerCase());
+      if (searchQuery) url.searchParams.append('search', searchQuery);
+      if (slotFilter && slotFilter !== 'all') url.searchParams.append('slot', slotFilter);
+      if (urgentOnly) url.searchParams.append('urgent', '1');
       return url.pathname + url.search;
     };
 
@@ -177,7 +181,7 @@ export default function TodayOrdersClient({
       return appendFilters(`/admin/orders/today/table`);
     }
     return appendFilters(`/admin/orders/table`);
-  }, [activeTab, endpointOverride, filters, fromDate, scope, selectedDate, toDate]);
+  }, [activeStatusFilter, activeTab, endpointOverride, filters, fromDate, scope, searchQuery, selectedDate, slotFilter, toDate, urgentOnly]);
 
   // ── View Order (opens drawer) ─────────────────────────────────────────────
   const handleViewOrder = useCallback((row: Record<string, any>) => {

@@ -173,6 +173,7 @@ export class OrdersService {
           COUNT(*) FILTER (WHERE status = 'pending')::int            AS pending,
           COUNT(*) FILTER (WHERE status = 'placed')::int             AS placed,
           COUNT(*) FILTER (WHERE status = 'confirmed')::int          AS confirmed,
+          COUNT(*) FILTER (WHERE status = 'assigned')::int           AS assigned,
           COUNT(*) FILTER (WHERE status = 'packed')::int             AS packed,
           COUNT(*) FILTER (WHERE status = 'out_for_delivery')::int   AS out_for_delivery,
           COUNT(*) FILTER (WHERE status = 'delivered')::int          AS delivered,

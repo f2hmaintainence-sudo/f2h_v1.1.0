@@ -28,6 +28,7 @@ export interface DashboardSummary {
   pending: number;
   placed: number;
   confirmed: number;
+  assigned: number;
   packed: number;
   out_for_delivery: number;
   delivered: number;
