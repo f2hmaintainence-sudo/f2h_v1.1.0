@@ -307,7 +307,7 @@ export class CustomerBootstrapController {
           dra.delivered_at,
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
-          u.profile_photo AS partner_photo,
+          dp.profile_photo_url AS partner_photo,
           ca.address_type,
           ca.address_line,
           ca.flat_no,
@@ -318,14 +318,15 @@ export class CustomerBootstrapController {
         FROM delivery_run_addresses dra
         JOIN delivery_runs dr ON (dr.run_id = dra.run_id OR dr.id::varchar = dra.run_id)
         LEFT JOIN customer_addresses ca ON (ca.address_id = dra.address_id OR ca.id::varchar = dra.address_id)
-        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.id::varchar = dr.delivery_partner_id)
-        LEFT JOIN users u ON (u.user_id = dr.delivery_partner_id OR u.user_id = dp.delivery_partner_id OR u.user_id = dp.id::varchar)
+        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.user_id = dr.delivery_partner_id)
+        LEFT JOIN users u ON (u.user_id = dp.user_id OR u.user_id = dr.delivery_partner_id)
         WHERE (
           dra.customer_id = $1 
+          OR dra.customer_id IN (SELECT customer_id FROM customers WHERE user_id = $1)
           OR dra.address_id IN (
-            SELECT address_id FROM customer_addresses WHERE customer_id = $1
+            SELECT address_id FROM customer_addresses WHERE customer_id = $1 OR user_id = $1
             UNION
-            SELECT id::varchar FROM customer_addresses WHERE customer_id = $1
+            SELECT id::varchar FROM customer_addresses WHERE customer_id = $1 OR user_id = $1
           )
         )
         AND dr.run_date = $2
@@ -337,6 +338,12 @@ export class CustomerBootstrapController {
       `;
 
       const rows = await this.db.query(sql, [customerId, todayDate, currentSlot]);
+      this.Developer.log('[CustomerBootstrapController] getTodayDeliveryPartners', {
+        customerId,
+        todayDate,
+        currentSlot,
+        rowsFound: rows?.length || 0,
+      });
 
       const partnerMap = new Map<string, any>();
 

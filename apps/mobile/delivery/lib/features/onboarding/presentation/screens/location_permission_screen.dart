@@ -50,8 +50,14 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
             backgroundColor: kRed,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            action: SnackBarAction(
+              label: 'SETTINGS',
+              textColor: Colors.white,
+              onPressed: () => Geolocator.openLocationSettings(),
+            ),
           ),
         );
+        await Geolocator.openLocationSettings();
         setState(() {
           _isRequesting = false;
         });
@@ -66,7 +72,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Location permission is required to operate as a delivery boy', style: GoogleFonts.roboto()),
+              content: Text('Location permission is required to operate as a delivery partner', style: GoogleFonts.roboto()),
               backgroundColor: kRed,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -83,12 +89,18 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Location permission is permanently denied. Please enable it in device settings.', style: GoogleFonts.roboto()),
+            content: Text('Location permission is permanently denied. Please enable it in app settings.', style: GoogleFonts.roboto()),
             backgroundColor: kRed,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            action: SnackBarAction(
+              label: 'SETTINGS',
+              textColor: Colors.white,
+              onPressed: () => Geolocator.openAppSettings(),
+            ),
           ),
         );
+        await Geolocator.openAppSettings();
         setState(() {
           _isRequesting = false;
         });

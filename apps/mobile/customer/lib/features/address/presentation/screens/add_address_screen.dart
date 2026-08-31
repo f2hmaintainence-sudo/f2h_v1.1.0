@@ -16,6 +16,7 @@ import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/core/config/app_config.dart';
+import 'package:f2h_customer/core/services/location_helper.dart';
 
 enum MapLayerType { googleRoadmap, googleSatellite, googleTerrain }
 
@@ -712,45 +713,10 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     });
 
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          F2HToast.error(
-            context,
-            'Location services are disabled on your device.',
-          );
-        }
-        setState(() => isLoadingLocation = false);
-        return;
-      }
+      final Position? position =
+          await LocationHelper.getCurrentPositionWithPrompt(context);
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            F2HToast.error(context, 'Location permission denied.');
-          }
-          setState(() => isLoadingLocation = false);
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          F2HToast.error(context, 'Location permission is permanently denied.');
-        }
-        setState(() => isLoadingLocation = false);
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-
-      if (mounted) {
+      if (position != null && mounted) {
         setState(() {
           selectedLat = position.latitude;
           selectedLng = position.longitude;
