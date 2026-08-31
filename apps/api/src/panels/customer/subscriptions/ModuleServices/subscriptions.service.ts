@@ -12,6 +12,7 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
 import { NotificationService } from 'src/notifications/notification.service';
 import { MailService } from 'src/mail/mail.service';
 import { CustomerPaymentService } from '../../payment/payment.service';
+import { StockAvailabilityService } from 'src/shared/services/stock-availability.service';
 
 const DEFAULT_BRANCH_ID = 'ALL';
 const DEFAULT_ADDRESS_ID = 'ADDR_DEFAULT';
@@ -37,6 +38,7 @@ export class SubscriptionsService {
     private readonly notificationService: NotificationService,
     private readonly mailService: MailService,
     private readonly customerPaymentService: CustomerPaymentService,
+    private readonly stockAvailability: StockAvailabilityService,
   ) { }
 
   async checkout(body: CreateSubscriptionDto, req?: any) {
@@ -153,6 +155,22 @@ export class SubscriptionsService {
         status: false,
         error_code: 'outstanding_bills_exist',
         message: `You have ${unpaidCount} unpaid bill(s) totaling ₹${unpaidDue.toFixed(2)} in customer bills. Please clear outstanding bills before placing new postpaid subscriptions.`,
+      };
+    }
+
+    // A sold-out variant must be refused before money moves, not after.
+    const unavailableItems = await this.stockAvailability.findUnavailableVariants(
+      (body.items || [])
+        .map((item) => item.product_variant_id)
+        .filter((id): id is string => Boolean(id)),
+      await this.stockAvailability.resolveWarehouseId(body.branch_id || DEFAULT_BRANCH_ID),
+    );
+    if (unavailableItems.length > 0) {
+      return {
+        status: false,
+        error_code: 'out_of_stock',
+        message: this.stockAvailability.describe(unavailableItems),
+        unavailable_items: unavailableItems,
       };
     }
 
@@ -465,6 +483,14 @@ export class SubscriptionsService {
     }
 
     const branchId = body.branch_id || DEFAULT_BRANCH_ID;
+
+    // `checkout` already refuses these before taking payment; this guards every
+    // other caller so no subscription row can name a variant the catalog is
+    // showing as out of stock.
+    await this.stockAvailability.assertAllPurchasable(
+      validItems.map((item) => item.product_variant_id),
+      await this.stockAvailability.resolveWarehouseId(branchId),
+    );
 
     return this.db.transaction(async (client) => {
       let addressId = body.address_id?.trim();

@@ -17,6 +17,7 @@ import { CustomerPaymentService } from '../../payment/payment.service';
 import { FirstOrderDetectorService } from '../../referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../referral/services/referral-reward-engine.service';
 import { DiscountEngineService } from 'src/shared/services/discount-engine.service';
+import { StockAvailabilityService } from 'src/shared/services/stock-availability.service';
 
 @Injectable()
 export class CartService {
@@ -30,14 +31,38 @@ export class CartService {
     private readonly referralRewardEngine: ReferralRewardEngineService,
     private readonly discountEngine: DiscountEngineService,
     private readonly customerPaymentService: CustomerPaymentService,
+    private readonly stockAvailability: StockAvailabilityService,
   ) { }
 
   async syncCart(body: CartDto, customerId: string) {
-    const items = body.items || [];
+    const incoming = body.items || [];
     let itemsSubtotal = 0;
 
     if (!customerId) {
       throw new BadRequestException('Authenticated customer is required');
+    }
+
+    // An out-of-stock variant must never reach the stored cart, no matter what
+    // the client sends. This endpoint replaces the whole cart rather than
+    // adding one line, so rejecting the request outright would wedge a customer
+    // whose existing cart item sold out — they could no longer sync anything,
+    // including the removal. Dropping the offending lines and naming them back
+    // is the stronger guarantee: the bad item cannot be persisted, and the rest
+    // of the cart keeps working.
+    const unavailable = await this.stockAvailability.findUnavailableVariants(
+      incoming.map((item) => item.product_variant_id).filter(Boolean),
+      await this.resolveCustomerWarehouseId(customerId),
+    );
+    const rejectedIds = new Set(unavailable.map((u) => u.variantId));
+    const items = rejectedIds.size
+      ? incoming.filter((item) => !rejectedIds.has(item.product_variant_id))
+      : incoming;
+
+    if (rejectedIds.size) {
+      this.developer?.debug('[CartService] Dropped unpurchasable cart lines', {
+        customerId,
+        rejected: unavailable,
+      });
     }
 
     await this.Data.upsert(
@@ -74,7 +99,36 @@ export class CartService {
 
     return {
       billSummary: await this.calculateBillSummary(itemsSubtotal, customerId),
+      // Present only when lines were refused, so the app can tell the customer
+      // why an item disappeared from their cart.
+      ...(unavailable.length
+        ? {
+            rejected_items: unavailable,
+            message: this.stockAvailability.describe(unavailable),
+          }
+        : {}),
     };
+  }
+
+  /**
+   * Cart sync carries no branch, so the customer's own branch decides which
+   * warehouse's stock applies. Null falls back to all-warehouse aggregation,
+   * matching the catalog's behaviour for an unknown branch.
+   */
+  private async resolveCustomerWarehouseId(customerId: string): Promise<string | null> {
+    try {
+      const rows = await this.db.query<{ branch_id: string | null }>(
+        `SELECT branch_id FROM customers WHERE customer_id = $1 LIMIT 1`,
+        [customerId],
+      );
+      return await this.stockAvailability.resolveWarehouseId(rows?.[0]?.branch_id ?? null);
+    } catch (e: any) {
+      this.developer?.error('[CartService] Failed to resolve customer warehouse', {
+        customerId,
+        error: e?.message || e,
+      });
+      return null;
+    }
   }
 
   async getCartItems(userId: string) {
@@ -538,6 +592,14 @@ export class CartService {
         `These products are unavailable: ${unavailable.join(', ')}`,
       );
     }
+
+    // Stock is warehouse-scoped, and this is the one write path that already
+    // knows the delivery branch — so the same rule the catalog uses to grey a
+    // variant out is applied here before any order row is written.
+    await this.stockAvailability.assertAllPurchasable(
+      variantIds,
+      await this.stockAvailability.resolveWarehouseId(branchId),
+    );
 
     // Resolve discounts & coupons for one-time checkout
     const discountItems = itemsToCheckout.map((item) => {

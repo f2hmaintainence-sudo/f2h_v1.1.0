@@ -14,11 +14,12 @@ import { NotificationModule } from 'src/notifications/notification.module';
 import { ReferralModule } from '../referral/referral.module';
 import { DiscountEngineModule } from 'src/shared/services/discount-engine.module';
 import { CustomerPaymentModule } from '../payment/payment.module';
+import { StockAvailabilityService } from 'src/shared/services/stock-availability.service';
 
 @Module({
   imports: [ConfigModule, NotificationModule, ReferralModule, DiscountEngineModule, CustomerPaymentModule],
   controllers: [CartController],
-  providers: [DatabaseService, DataService, DeveloperService, CartService, PricingService, PushNotificationService],
+  providers: [DatabaseService, DataService, DeveloperService, CartService, PricingService, PushNotificationService, StockAvailabilityService],
   exports: [CartService, PricingService],
 })
 export class CartAndCheckoutModule { }

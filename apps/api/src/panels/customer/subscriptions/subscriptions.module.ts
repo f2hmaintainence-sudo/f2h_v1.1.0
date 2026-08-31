@@ -11,6 +11,7 @@ import {
   SubscriptionsController,
 } from './controllers/subscriptions.controller';
 import { SubscriptionsService } from './ModuleServices/subscriptions.service';
+import { StockAvailabilityService } from 'src/shared/services/stock-availability.service';
 
 @Module({
   imports: [ConfigModule, NotificationModule, CustomerPaymentModule],
@@ -22,6 +23,7 @@ import { SubscriptionsService } from './ModuleServices/subscriptions.service';
     SubscriptionsService,
     PushNotificationService,
     MailService,
+    StockAvailabilityService,
   ],
 })
 export class CustomerSubscriptionsModule { }
