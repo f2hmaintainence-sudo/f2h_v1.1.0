@@ -127,7 +127,7 @@ export class NotificationService {
         type: dto.type || 'info',
         priority: normalizedPriority,
         sender_id: dto.senderId || null,
-        status: true,
+        status: 'active',
         created_by: dto.senderId || 'SYSTEM',
         updated_by: dto.senderId || 'SYSTEM',
         created_at: now,

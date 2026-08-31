@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import '../../data/models/product_model.dart';
@@ -999,6 +1000,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
   Widget _buildAddButton(Product p) {
     return BlocBuilder<CartBloc, CartState>(
       builder: (ctx, state) {
+        // Delivery slot windows and cutoffs are configured in the admin panel;
+        // the helpers' built-in defaults sit hours away from them, so the
+        // session values are threaded through every stamp below.
+        final slotTimings = slotTimingsOf(ctx);
+        final now = DateTime.now();
         int qty = 0;
         if (state is CartLoadedState) {
           qty = state.items
@@ -1023,8 +1029,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             purchaseType: 'onetime',
             quantity: 1,
             schedules: null,
-            deliveryDate: getDefaultDeliveryDate(DateTime.now()).toString().split(' ')[0],
-            deliverySlot: getDefaultSlot(getDefaultDeliveryDate(DateTime.now()), DateTime.now()),
+            deliveryDate:
+                getDefaultDeliveryDate(now, slotTimings).toString().split(' ')[0],
+            deliverySlot:
+                getDefaultSlot(getDefaultDeliveryDate(now, slotTimings), now, slotTimings),
             imageAsset: p.imageAsset,
             isSubscribable: p.isSubscribable,
             isOneTime: p.isOneTime,
@@ -1063,9 +1071,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                 ? [SubscriptionSchedule(day: 0, mQuantity: 1, eQuantity: 0)]
                 : null,
             deliveryDate: !isSub
-                ? getDefaultDeliveryDate(DateTime.now()).toString().split(' ')[0]
+                ? getDefaultDeliveryDate(now, slotTimings).toString().split(' ')[0]
                 : null,
-            deliverySlot: !isSub ? getDefaultSlot(getDefaultDeliveryDate(DateTime.now()), DateTime.now()) : null,
+            deliverySlot: !isSub
+                ? getDefaultSlot(getDefaultDeliveryDate(now, slotTimings), now, slotTimings)
+                : null,
             imageAsset: p.imageAsset,
             isSubscribable: p.isSubscribable,
             isOneTime: p.isOneTime,

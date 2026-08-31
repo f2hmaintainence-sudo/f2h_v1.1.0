@@ -22,6 +22,7 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/widgets/product_tile.dart';
 import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/subscription_setup_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
@@ -537,6 +538,9 @@ class _CardAction extends StatelessWidget {
   void _remove(BuildContext context) {
     context.runWithAuth(() {
       HapticFeedback.lightImpact();
+      final now = DateTime.now();
+      // Slot windows/cutoffs come from admin Configurations.
+      final slotTimings = slotTimingsOf(context);
       final items = context.read<CartBloc>().currentItems;
       CartItemEntity? matched;
       for (final item in items) {
@@ -563,8 +567,9 @@ class _CardAction extends StatelessWidget {
             quantity: 1,
             deliveryDate:
                 matched?.deliveryDate ??
-                getDefaultDeliveryDate(DateTime.now()).toString().split(' ')[0],
-            deliverySlot: matched?.deliverySlot ?? getDefaultSlot(getDefaultDeliveryDate(DateTime.now()), DateTime.now()),
+                getDefaultDeliveryDate(now, slotTimings).toString().split(' ')[0],
+            deliverySlot: matched?.deliverySlot ??
+                getDefaultSlot(getDefaultDeliveryDate(now, slotTimings), now, slotTimings),
           ),
         ),
       );

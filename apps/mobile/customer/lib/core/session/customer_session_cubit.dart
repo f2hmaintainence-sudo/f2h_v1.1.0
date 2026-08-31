@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/core/session/customer_bootstrap_api.dart';
@@ -112,4 +113,19 @@ class CustomerSessionCubit extends Cubit<CustomerSessionState> {
   }
 
 
+}
+
+/// Admin-configured delivery slot windows and cutoffs for the current session.
+///
+/// Returns null when the session cubit is not in scope, which makes the slot
+/// helpers fall back to their built-in defaults rather than throwing. Those
+/// defaults are only a safety net — every ordering decision should be driven
+/// by the values configured in the admin panel, so prefer passing this in.
+Map<String, dynamic>? slotTimingsOf(BuildContext context) {
+  try {
+    final timings = context.read<CustomerSessionCubit>().state.slotTimings;
+    return timings.isEmpty ? null : timings;
+  } catch (_) {
+    return null;
+  }
 }

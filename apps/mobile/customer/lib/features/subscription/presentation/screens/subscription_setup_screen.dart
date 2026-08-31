@@ -148,7 +148,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       for (final d in _kDays) d: {'morning': 0, 'evening': 0},
     };
 
-    // Load default address from session
+    // Load default address from session and initialize default quantities based on open slots
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final session = context.read<CustomerSessionCubit>().state;
       if (session.addresses.isNotEmpty) {
@@ -157,6 +157,29 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             (a) => a.isDefault,
             orElse: () => session.addresses.first,
           );
+        });
+      }
+
+      // Initialize default quantities based on configured open slot windows
+      final timings = session.slotTimings;
+      final now = DateTime.now();
+      final morningWin = getMorningSlotWindow(now, timings);
+      final eveningWin = getEveningSlotWindow(now, timings);
+
+      if (morningWin.isOpen && !eveningWin.isOpen) {
+        setState(() {
+          _morningQty = 1;
+          _eveningQty = 0;
+        });
+      } else if (!morningWin.isOpen && eveningWin.isOpen) {
+        setState(() {
+          _morningQty = 0;
+          _eveningQty = 1;
+        });
+      } else if (!morningWin.isOpen && !eveningWin.isOpen) {
+        setState(() {
+          _morningQty = 0;
+          _eveningQty = 0;
         });
       }
 
@@ -433,6 +456,32 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         0,
         (s, d) => s + (d['evening'] ?? 0),
       );
+    }
+
+    final slotTimings = slotTimingsOf(context);
+    final now = DateTime.now();
+    final morningWin = getMorningSlotWindow(now, slotTimings);
+    final eveningWin = getEveningSlotWindow(now, slotTimings);
+
+    if (morningQty > 0 && !morningWin.isOpen) {
+      F2HToast.error(
+        context,
+        'Morning delivery slot is currently closed (${morningWin.timeRangeText})',
+      );
+      return;
+    }
+
+    if (eveningQty > 0 && !eveningWin.isOpen) {
+      F2HToast.error(
+        context,
+        'Evening delivery slot is currently closed (${eveningWin.timeRangeText})',
+      );
+      return;
+    }
+
+    if (morningQty == 0 && eveningQty == 0) {
+      F2HToast.error(context, 'Set at least 1 unit in an active delivery window');
+      return;
     }
 
     final deliverySlot = morningQty > 0 && eveningQty > 0
@@ -997,6 +1046,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     const morningColor = Color(0xFF14532D); // Dark green
     const eveningColor = Color(0xFF16A34A); // Light green
 
+    final slotTimings = slotTimingsOf(context);
+    final now = DateTime.now();
+    final morningWin = getMorningSlotWindow(now, slotTimings);
+    final eveningWin = getEveningSlotWindow(now, slotTimings);
+    final isMorningOpen = morningWin.isOpen;
+    final isEveningOpen = eveningWin.isOpen;
+    final bothClosed = !isMorningOpen && !isEveningOpen;
+
     return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1033,216 +1090,268 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           const Divider(color: Color(0xFFE5E7EB), height: 1),
           const SizedBox(height: 14),
 
-          // ── DAILY: single shared morning + evening qty ─
-          if (_frequency == 'daily') ...[
-            // Header
-            const Row(
-              children: [
-                SizedBox(width: 80),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'MORNING',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w900,
-                        color: morningColor,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'EVENING',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w900,
-                        color: eveningColor,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Single qty row (applies to every day)
-            Row(
-              children: [
-                const SizedBox(
-                  width: 80,
-                  child: Text(
-                    'Every Day',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: kText,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: _MiniQtyControl(
-                    qty: _morningQty,
-                    accentColor: morningColor,
-                    onDecrement: () => setState(() {
-                      if (_morningQty > 0) _morningQty--;
-                    }),
-                    onIncrement: () => setState(() => _morningQty++),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _MiniQtyControl(
-                    qty: _eveningQty,
-                    accentColor: eveningColor,
-                    onDecrement: () => setState(() {
-                      if (_eveningQty > 0) _eveningQty--;
-                    }),
-                    onIncrement: () => setState(() => _eveningQty++),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            // Validation hint
-            if (_morningQty + _eveningQty == 0)
-              Text(
-                'Set at least 1 unit (morning or evening)',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.red.shade400,
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            else
-              Text(
-                'Daily: ${_morningQty + _eveningQty} items/day · ₹${((_morningQty + _eveningQty) * _subscriptionUnitPrice).toStringAsFixed(0)}/day',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: kText,
-                ),
+          if (bothClosed) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
               ),
-          ],
-
-          // ── WEEKLY: individual per-day qty controls ────
-          if (_frequency == 'weekly') ...[
-            // Header
-            const Row(
-              children: [
-                SizedBox(width: 80),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'MORNING',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w900,
-                        color: morningColor,
-                        letterSpacing: 0.6,
+              child: Column(
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.schedule_rounded, size: 16, color: Color(0xFFDC2626)),
+                      SizedBox(width: 6),
+                      Text(
+                        'Delivery Windows Currently Closed',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF991B1B),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Deliveries can only be scheduled during active configured delivery windows:\n'
+                    '• Morning: ${morningWin.timeRangeText}\n'
+                    '• Evening: ${eveningWin.timeRangeText}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF7F1D1D),
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
                     ),
                   ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'EVENING',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w900,
-                        color: eveningColor,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            ..._kDays.map((day) {
-              final morQty = _weeklySchedule[day]?['morning'] ?? 0;
-              final eveQty = _weeklySchedule[day]?['evening'] ?? 0;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 80,
-                      child: Text(
-                        _dayFull(day),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: kText,
+          ] else ...[
+            // ── DAILY: single shared morning + evening qty ─
+            if (_frequency == 'daily') ...[
+              // Header
+              Row(
+                children: [
+                  const SizedBox(width: 80),
+                  if (isMorningOpen)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'MORNING (${morningWin.timeRangeText})',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: morningColor,
+                            letterSpacing: 0.6,
+                          ),
                         ),
                       ),
                     ),
+                  if (isMorningOpen && isEveningOpen) const SizedBox(width: 8),
+                  if (isEveningOpen)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'EVENING (${eveningWin.timeRangeText})',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: eveningColor,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Single qty row (applies to every day)
+              Row(
+                children: [
+                  const SizedBox(
+                    width: 80,
+                    child: Text(
+                      'Every Day',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: kText,
+                      ),
+                    ),
+                  ),
+                  if (isMorningOpen)
                     Expanded(
                       child: _MiniQtyControl(
-                        qty: morQty,
+                        qty: _morningQty,
                         accentColor: morningColor,
                         onDecrement: () => setState(() {
-                          if (morQty > 0)
-                            _weeklySchedule[day]!['morning'] = morQty - 1;
+                          if (_morningQty > 0) _morningQty--;
                         }),
-                        onIncrement: () => setState(() {
-                          _weeklySchedule[day]!['morning'] = morQty + 1;
-                        }),
+                        onIncrement: () => setState(() => _morningQty++),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                  if (isMorningOpen && isEveningOpen) const SizedBox(width: 8),
+                  if (isEveningOpen)
                     Expanded(
                       child: _MiniQtyControl(
-                        qty: eveQty,
+                        qty: _eveningQty,
                         accentColor: eveningColor,
                         onDecrement: () => setState(() {
-                          if (eveQty > 0)
-                            _weeklySchedule[day]!['evening'] = eveQty - 1;
+                          if (_eveningQty > 0) _eveningQty--;
                         }),
-                        onIncrement: () => setState(() {
-                          _weeklySchedule[day]!['evening'] = eveQty + 1;
-                        }),
+                        onIncrement: () => setState(() => _eveningQty++),
                       ),
                     ),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Validation hint
+              if (_morningQty + _eveningQty == 0)
+                Text(
+                  'Set at least 1 unit in an active delivery window',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.red.shade400,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                Text(
+                  'Daily: ${_morningQty + _eveningQty} items/day · ₹${((_morningQty + _eveningQty) * _subscriptionUnitPrice).toStringAsFixed(0)}/day',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: kText,
+                  ),
                 ),
-              );
-            }),
-            const SizedBox(height: 4),
-            const Divider(color: Color(0xFFE5E7EB)),
-            // Weekly total summary or validation
-            Builder(
-              builder: (_) {
-                final weekTotal = _weeklySchedule.values.fold(
-                  0,
-                  (s, d) => s + (d['morning'] ?? 0) + (d['evening'] ?? 0),
+            ],
+
+            // ── WEEKLY: individual per-day qty controls ────
+            if (_frequency == 'weekly') ...[
+              // Header
+              Row(
+                children: [
+                  const SizedBox(width: 80),
+                  if (isMorningOpen)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'MORNING (${morningWin.timeRangeText})',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: morningColor,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (isMorningOpen && isEveningOpen) const SizedBox(width: 8),
+                  if (isEveningOpen)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'EVENING (${eveningWin.timeRangeText})',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: eveningColor,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ..._kDays.map((day) {
+                final morQty = _weeklySchedule[day]?['morning'] ?? 0;
+                final eveQty = _weeklySchedule[day]?['evening'] ?? 0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          _dayFull(day),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: kText,
+                          ),
+                        ),
+                      ),
+                      if (isMorningOpen)
+                        Expanded(
+                          child: _MiniQtyControl(
+                            qty: morQty,
+                            accentColor: morningColor,
+                            onDecrement: () => setState(() {
+                              if (morQty > 0)
+                                _weeklySchedule[day]!['morning'] = morQty - 1;
+                            }),
+                            onIncrement: () => setState(() {
+                              _weeklySchedule[day]!['morning'] = morQty + 1;
+                            }),
+                          ),
+                        ),
+                      if (isMorningOpen && isEveningOpen) const SizedBox(width: 8),
+                      if (isEveningOpen)
+                        Expanded(
+                          child: _MiniQtyControl(
+                            qty: eveQty,
+                            accentColor: eveningColor,
+                            onDecrement: () => setState(() {
+                              if (eveQty > 0)
+                                _weeklySchedule[day]!['evening'] = eveQty - 1;
+                            }),
+                            onIncrement: () => setState(() {
+                              _weeklySchedule[day]!['evening'] = eveQty + 1;
+                            }),
+                          ),
+                        ),
+                    ],
+                  ),
                 );
-                return weekTotal == 0
-                    ? Text(
-                        'Set at least 1 unit for any day in the week',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.red.shade400,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      )
-                    : Text(
-                        'Weekly: $weekTotal items · ₹${(_weeklySchedule.values.fold(0.0, (s, d) => s + ((d['morning'] ?? 0) + (d['evening'] ?? 0)) * _subscriptionUnitPrice)).toStringAsFixed(0)}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: kText,
-                        ),
-                      );
-              },
-            ),
+              }),
+              const SizedBox(height: 4),
+              const Divider(color: Color(0xFFE5E7EB)),
+              // Weekly total summary or validation
+              Builder(
+                builder: (_) {
+                  final weekTotal = _weeklySchedule.values.fold(
+                    0,
+                    (s, d) => s + (d['morning'] ?? 0) + (d['evening'] ?? 0),
+                  );
+                  return weekTotal == 0
+                      ? Text(
+                          'Set at least 1 unit for any day in an active window',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.red.shade400,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      : Text(
+                          'Weekly: $weekTotal items · ₹${(_weeklySchedule.values.fold(0.0, (s, d) => s + ((d['morning'] ?? 0) + (d['evening'] ?? 0)) * _subscriptionUnitPrice)).toStringAsFixed(0)}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: kText,
+                          ),
+                        );
+                },
+              ),
+            ],
           ],
         ],
       ),
@@ -1578,6 +1687,12 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     estimate,
   ) {
     final total = estimate.total;
+    final slotTimings = slotTimingsOf(context);
+    final now = DateTime.now();
+    final morningWin = getMorningSlotWindow(now, slotTimings);
+    final eveningWin = getEveningSlotWindow(now, slotTimings);
+    final allSlotsClosed = !morningWin.isOpen && !eveningWin.isOpen;
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -1619,7 +1734,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: (_isLoading || total <= 0 || _variantOutOfStock)
+            onPressed: (_isLoading || total <= 0 || _variantOutOfStock || allSlotsClosed)
                 ? null
                 : _confirmSubscription,
             style: ElevatedButton.styleFrom(
@@ -1645,6 +1760,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 : Text(
                     _variantOutOfStock
                         ? 'Out of Stock'
+                        : allSlotsClosed
+                        ? 'Delivery Windows Closed'
                         : total <= 0
                         ? 'Set Quantity to Continue'
                         : 'Confirm Subscription',

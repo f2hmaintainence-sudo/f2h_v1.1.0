@@ -166,15 +166,15 @@ export class PushNotificationService implements OnModuleInit {
                 const notifId = `NTF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
                 const now = new Date();
                 await this.db.query(
-                    `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_at, updated_at)
-                     VALUES ($1, $2, $3, 'push', 'info', 'high', true, $4, $4)`,
+                    `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_by, created_at, updated_at)
+                     VALUES ($1, $2, $3, 'push', 'info', 'high', 'active', 'system', $4, $4)`,
                     [notifId, message.title, message.body, now]
                 );
 
                 for (const uid of resolvedUserIds) {
                     await this.db.query(
-                        `INSERT INTO notification_recipients (notification_id, user_id, status, notified_at, created_at, updated_at)
-                         VALUES ($1, $2, 'unread', $3, $3, $3)
+                        `INSERT INTO notification_recipients (notification_id, user_id, status, notified_at, created_by, created_at, updated_at)
+                         VALUES ($1, $2, 'unread', $3, 'system', $3, $3)
                          ON CONFLICT DO NOTHING`,
                         [notifId, uid, now]
                     );

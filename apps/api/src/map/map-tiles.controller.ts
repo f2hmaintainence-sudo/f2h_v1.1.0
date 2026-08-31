@@ -8,11 +8,13 @@
 // ============================================================================
 
 import {
+  Body,
   Controller,
   Get,
   Header,
   NotFoundException,
   Param,
+  Post,
   Query,
   Res,
   ServiceUnavailableException,
@@ -21,10 +23,15 @@ import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { MapTilesService } from './map-tiles.service';
+import { DirectionsService } from './directions.service';
+import type { DirectionsRequestDto } from './dto/directions.dto';
 
 @Controller({ path: 'map', version: '1' })
 export class MapTilesController {
-  constructor(private readonly tiles: MapTilesService) {}
+  constructor(
+    private readonly tiles: MapTilesService,
+    private readonly directionsService: DirectionsService,
+  ) {}
 
   /**
    * A single 256px raster tile.
@@ -86,4 +93,17 @@ export class MapTilesController {
     }
     return this.tiles.reverseGeocode(parsedLat, parsedLng);
   }
+
+  /**
+   * Road routing & waypoint sequence optimization proxy endpoint.
+   * Computes driving road polylines, duration, distance, and optimal stop order.
+   */
+  @Public()
+  @Throttle({ short: { limit: 120, ttl: 60_000 } })
+  @Post('directions')
+  async directions(@Body() body: DirectionsRequestDto) {
+    return this.directionsService.computeRoute(body);
+  }
 }
+
+

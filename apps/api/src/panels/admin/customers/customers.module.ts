@@ -12,6 +12,8 @@ import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { FieldEncryptionModule } from '../../../encryption/field-encryption.module';
 
+import { PushNotificationService } from '../../../shared/pushNotifications/pushNotification.service';
+
 @Module({
   imports: [HelpersModule, FieldEncryptionModule],
   controllers: [CustomersController],
@@ -23,7 +25,9 @@ import { FieldEncryptionModule } from '../../../encryption/field-encryption.modu
     CustomerShowEditService,
     CustomerSaveEditService,
     DatabaseService,
-    DeveloperService],
+    DeveloperService,
+    PushNotificationService,
+  ],
   exports: [CustomersService],
 })
 export class CustomersModule {}

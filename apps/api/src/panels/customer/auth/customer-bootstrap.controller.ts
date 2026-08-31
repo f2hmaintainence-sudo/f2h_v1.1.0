@@ -253,7 +253,15 @@ export class CustomerBootstrapController {
     return h * 60 + m;
   }
 
-  private getCurrentKolkataDateAndSlot(slotTimings?: any): { todayDate: string; currentSlot: string; timeMinutes: number } {
+  private getCurrentKolkataDateAndSlot(slotTimings?: any): {
+    todayDate: string;
+    currentSlot: string;
+    timeMinutes: number;
+    morningStart: number;
+    morningEnd: number;
+    eveningStart: number;
+    eveningEnd: number;
+  } {
     const todayDate = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -271,10 +279,33 @@ export class CustomerBootstrapController {
     const m = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
     const timeMinutes = h * 60 + m;
 
-    const eveningCutoff = this.parseSlotTimeMinutes(slotTimings?.evening_slot?.customer_cutoff_time, 14 * 60);
-    const currentSlot = timeMinutes < eveningCutoff ? 'morning' : 'evening';
+    const morningStart = this.parseSlotTimeMinutes(slotTimings?.morning_slot?.delivery_window_start, 6 * 60);
+    const morningEnd = this.parseSlotTimeMinutes(slotTimings?.morning_slot?.delivery_window_end, 8 * 60 + 30);
+    const eveningStart = this.parseSlotTimeMinutes(slotTimings?.evening_slot?.delivery_window_start, 17 * 60);
+    const eveningEnd = this.parseSlotTimeMinutes(slotTimings?.evening_slot?.delivery_window_end, 20 * 60);
 
-    return { todayDate, currentSlot, timeMinutes };
+    let currentSlot = 'closed';
+    if (timeMinutes >= morningStart && timeMinutes <= morningEnd) {
+      currentSlot = 'morning';
+    } else if (timeMinutes >= eveningStart && timeMinutes <= eveningEnd) {
+      currentSlot = 'evening';
+    } else if (timeMinutes < morningStart) {
+      currentSlot = 'morning';
+    } else if (timeMinutes > morningEnd && timeMinutes < eveningStart) {
+      currentSlot = 'evening';
+    } else {
+      currentSlot = 'closed';
+    }
+
+    return {
+      todayDate,
+      currentSlot,
+      timeMinutes,
+      morningStart,
+      morningEnd,
+      eveningStart,
+      eveningEnd,
+    };
   }
 
   async getTodayDeliveryPartners(customerId: string) {
@@ -289,7 +320,13 @@ export class CustomerBootstrapController {
         }
       } catch (_) { }
 
-      const { todayDate, currentSlot } = this.getCurrentKolkataDateAndSlot(slotTimings);
+      const {
+        todayDate,
+        currentSlot,
+        timeMinutes,
+        morningEnd,
+        eveningEnd,
+      } = this.getCurrentKolkataDateAndSlot(slotTimings);
 
       // Query delivery_run_addresses grouped/matched by customer addresses & customer_id for today
       // Follows DB rule: identity fields (first_name, last_name, phone) are joined from users table.
@@ -350,6 +387,16 @@ export class CustomerBootstrapController {
       for (const row of rows || []) {
         const partnerId = row.delivery_partner_id;
         if (!partnerId) continue;
+
+        const slot = (row.delivery_slot || '').toLowerCase();
+        // If morning delivery window has ended, do not return morning delivery partner for today
+        if (slot === 'morning' && timeMinutes > morningEnd) {
+          continue;
+        }
+        // If evening delivery window has ended, do not return evening delivery partner for today
+        if (slot === 'evening' && timeMinutes > eveningEnd) {
+          continue;
+        }
 
         const isCurrentSlot = (row.delivery_slot || '').toLowerCase() === currentSlot.toLowerCase();
 

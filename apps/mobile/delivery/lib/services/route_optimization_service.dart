@@ -86,7 +86,7 @@ class OptimizedRouteResult {
     );
   }
 
-  bool get hasRoute => fullRoutePoints.length >= 2;
+  bool get hasRoute => isRoadGeometry && fullRoutePoints.length >= 2;
 }
 
 /// Deliveries run on two-wheelers, which Google routes differently from cars —
@@ -100,14 +100,9 @@ const Duration _kResultCacheTtl = Duration(seconds: 45);
 /// ~11 m. Below this the rider has not moved enough to change the road route.
 const int _kOriginKeyPrecision = 4;
 
-/// Minimum floor for the geometry-vs-distance ceiling. Even a very short run
-/// can have a diagonal that exceeds a tight road distance, because the overview
-/// polyline simplifies curves.
-const double _kGeometryFloorKm = 5.0;
-
-/// Proportional factor: the bounding-box diagonal may be up to this fraction
-/// of the road distance.
-const double _kGeometryRatioMax = 1.5;
+/// Tolerance on the geometry-versus-distance check, absorbing rounding and the
+/// simplification Google applies to an overview polyline.
+const double _kGeometrySlackKm = 1.0;
 
 class RouteOptimizationService {
   final LocationService _locationService;
@@ -274,6 +269,7 @@ class RouteOptimizationService {
       completed: completed,
     );
 
+
     if (result.hasRoute) {
       _cacheKey = cacheKey;
       _cachedResult = result;
@@ -321,11 +317,12 @@ class RouteOptimizationService {
     final geometrySpanKm =
         _geometrySpanKm([fullPoints, for (final leg in legs) leg.points]);
     final ceilingKm = totalDistanceKmRaw > 0
-        ? (totalDistanceKmRaw * _kGeometryRatioMax)
-            .clamp(_kGeometryFloorKm, double.infinity)
-        : _kGeometryFloorKm;
+        ? (totalDistanceKmRaw * 1.5).clamp(5.0, double.infinity)
+        : 5.0;
 
     if (geometrySpanKm > ceilingKm) {
+      // Rider-facing text stays generic; the numbers that identify the bad
+      // payload go to the debug log.
       devLog('[route] rejected geometry: spans '
           '${geometrySpanKm.toStringAsFixed(1)} km (ceiling ${ceilingKm.toStringAsFixed(1)} km) but provider '
           '${data['provider']} reported '
@@ -336,6 +333,7 @@ class RouteOptimizationService {
         reason: 'Routing service returned inconsistent road geometry',
       );
     }
+
 
     // Leg 0 is origin → next stop; the rest is what the rider still has to do
     // after that. Both come from Google, so the split lands on a real junction.
@@ -469,51 +467,12 @@ class RouteOptimizationService {
     required List<GroupedStop> stops,
     required String reason,
   }) {
-    final ordered = computeShortestStopSequence(
-      currentPosition: currentPosition,
-      stops: stops,
-    );
-
-    final pending = ordered.where((s) => _isPending(s) && _hasValidCoords(s)).toList();
-    final List<LatLng> fallbackPoints = [];
-    if (currentPosition != null && _isValidPosition(currentPosition)) {
-      fallbackPoints.add(currentPosition);
-    }
-    for (final s in pending) {
-      fallbackPoints.add(LatLng(s.addressLat, s.addressLng));
-    }
-
-    double totalDist = 0;
-    for (int i = 0; i < fallbackPoints.length - 1; i++) {
-      totalDist += _locationService.haversineDistanceKm(
-        fallbackPoints[i].latitude,
-        fallbackPoints[i].longitude,
-        fallbackPoints[i + 1].latitude,
-        fallbackPoints[i + 1].longitude,
-      );
-    }
-
-    final activeDist = fallbackPoints.length >= 2
-        ? _locationService.haversineDistanceKm(
-            fallbackPoints[0].latitude,
-            fallbackPoints[0].longitude,
-            fallbackPoints[1].latitude,
-            fallbackPoints[1].longitude,
-          )
-        : 0.0;
-
-    return OptimizedRouteResult(
-      orderedStops: ordered,
-      activeLegPoints: fallbackPoints.length >= 2 ? fallbackPoints.sublist(0, 2) : const [],
-      remainingRoutePoints: fallbackPoints.length >= 3 ? fallbackPoints.sublist(1) : const [],
-      fullRoutePoints: fallbackPoints,
-      totalDistanceKm: totalDist,
-      totalDurationMinutes: (totalDist / 25.0) * 60.0,
-      activeLegDistanceKm: activeDist,
-      activeLegDurationMinutes: (activeDist / 25.0) * 60.0,
-      isRoadGeometry: false,
-      status: RouteStatus.ok,
-      unavailableReason: reason,
+    return OptimizedRouteResult.unavailable(
+      orderedStops: computeShortestStopSequence(
+        currentPosition: currentPosition,
+        stops: stops,
+      ),
+      reason: reason,
     );
   }
 

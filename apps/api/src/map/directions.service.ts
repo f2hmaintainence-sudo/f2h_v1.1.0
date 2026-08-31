@@ -4,9 +4,9 @@
 //
 // Project     : F2H Fresh
 // File        : directions.service.ts
-// Description : Server-side proxy for Google road routing. Returns drivable,
-//               traffic-aware road geometry and the fastest stop order for the
-//               delivery partner app.
+// Description : Server-side proxy for road routing. Returns drivable,
+//               road geometry and fastest stop order for the delivery partner app.
+//               Multi-tier routing: Google Routes v2 -> Google Directions -> OSRM.
 // ============================================================================
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -14,9 +14,9 @@ import { MapTilesService } from './map-tiles.service';
 import type { DirectionsRequestDto, RoutePointDto } from './dto/directions.dto';
 
 export interface RouteLeg {
-  /** Road distance of this leg, in metres, as measured by Google. */
+  /** Road distance of this leg, in metres. */
   distanceMeters: number;
-  /** Travel time of this leg, in seconds, traffic-aware where available. */
+  /** Travel time of this leg, in seconds. */
   durationSeconds: number;
   /** Google-encoded polyline (precision 5) for this leg only. */
   polyline: string;
@@ -24,8 +24,8 @@ export interface RouteLeg {
 
 export interface DirectionsResult {
   status: 'OK' | 'ZERO_RESULTS' | 'UNAVAILABLE';
-  /** Which Google engine answered, so clients can log routing quality. */
-  provider: 'google-routes-v2' | 'google-directions' | null;
+  /** Which engine answered, so clients can log routing quality. */
+  provider: 'google-routes-v2' | 'google-directions' | 'osrm' | null;
   distanceMeters: number;
   durationSeconds: number;
   /** Google-encoded polyline (precision 5) for the whole route. */
@@ -44,6 +44,8 @@ const ROUTES_API_URL =
   'https://routes.googleapis.com/directions/v2:computeRoutes';
 const DIRECTIONS_API_URL =
   'https://maps.googleapis.com/maps/api/directions/json';
+const OSRM_ROUTER_URL =
+  'https://router.project-osrm.org/route/v1/driving';
 
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
@@ -53,15 +55,8 @@ const UPSTREAM_TIMEOUT_MS = 8_000;
  */
 export const POLYLINE_SEGMENT_SEPARATOR = ';';
 
-/**
- * A rider's screen recomputes on rebuild, on location tap and on every order
- * status change; without this the same route would be billed several times a
- * minute. Short enough that live traffic still moves the ETA.
- */
 const CACHE_TTL_MS = 30_000;
 const CACHE_MAX_ENTRIES = 500;
-
-/** ~1 m of positional resolution — finer than that is GPS noise, not a new route. */
 const CACHE_COORD_PRECISION = 5;
 
 const UNAVAILABLE: DirectionsResult = {
@@ -85,15 +80,7 @@ export class DirectionsService {
   constructor(private readonly maps: MapTilesService) {}
 
   /**
-   * Resolves a drivable route through Google.
-   *
-   * Routes API v2 is preferred — it is the engine that returns traffic-aware
-   * durations and optimised waypoint order in one call. The legacy Directions
-   * API is tried second because a project may only have that one enabled; it is
-   * the same road network, so a fallback still satisfies "road geometry from
-   * Google". There is deliberately no local fallback: a straight line between
-   * two points is not a driving route, and returning one would put a road the
-   * rider cannot take on the map.
+   * Resolves a drivable road route through Google Directions API or OSRM fallback.
    */
   async computeRoute(request: DirectionsRequestDto): Promise<DirectionsResult> {
     const cacheKey = this.cacheKey(request);
@@ -101,16 +88,21 @@ export class DirectionsService {
     if (cached && cached.expiresAt > Date.now()) return cached.result;
 
     const apiKey = await this.maps.getApiKey();
-    if (!apiKey) {
-      this.logger.error('No Google Maps API key configured; cannot route');
-      return { ...UNAVAILABLE, message: 'Routing is not configured' };
+
+    let result: DirectionsResult = { ...UNAVAILABLE };
+
+    // 1. Try Google Routes API v2 if apiKey is available
+    if (apiKey) {
+      result = await this.viaRoutesApi(request, apiKey);
+      // 2. Try Google Directions API (Legacy) if Routes API returned UNAVAILABLE
+      if (result.status === 'UNAVAILABLE') {
+        result = await this.viaDirectionsApi(request, apiKey);
+      }
     }
 
-    let result = await this.viaRoutesApi(request, apiKey);
-    // ZERO_RESULTS is a definitive answer about the same road graph, so only a
-    // provider failure is worth a second billed request.
+    // 3. Fallback to OSRM Driving Router if Google APIs are unavailable
     if (result.status === 'UNAVAILABLE') {
-      result = await this.viaDirectionsApi(request, apiKey);
+      result = await this.viaOsrmApi(request);
     }
 
     if (result.status === 'OK') this.putCache(cacheKey, result);
@@ -118,7 +110,7 @@ export class DirectionsService {
   }
 
   // ---------------------------------------------------------------------------
-  // Routes API v2
+  // 1. Google Routes API v2
   // ---------------------------------------------------------------------------
 
   private async viaRoutesApi(
@@ -126,15 +118,13 @@ export class DirectionsService {
     apiKey: string,
   ): Promise<DirectionsResult> {
     const intermediates = request.intermediates ?? [];
-    const optimize = Boolean(request.optimizeWaypointOrder) && intermediates.length > 1;
+    const optimize = Boolean(request.optimizeWaypointOrder) && intermediates.length > 0;
 
     const body = {
       origin: this.routesWaypoint(request.origin, false),
-      destination: this.routesWaypoint(request.destination, false),
-      intermediates: intermediates.map((p) => this.routesWaypoint(p, false)),
+      destination: this.routesWaypoint(request.destination, true),
+      intermediates: intermediates.map((p) => this.routesWaypoint(p, true)),
       travelMode: request.travelMode ?? 'TWO_WHEELER',
-      // Live traffic is what makes the returned order the *fastest* one rather
-      // than merely the shortest.
       routingPreference: 'TRAFFIC_AWARE',
       optimizeWaypointOrder: optimize,
       computeAlternativeRoutes: false,
@@ -167,8 +157,6 @@ export class DirectionsService {
       });
 
       if (!response.ok) {
-        // The upstream body can echo the API key back in error text, so only
-        // the status is logged.
         this.logger.warn(`Routes API responded ${response.status}`);
         return { ...UNAVAILABLE, message: 'Routing provider error' };
       }
@@ -218,13 +206,10 @@ export class DirectionsService {
         latLng: { latitude: point.lat, longitude: point.lng },
       },
     };
-    // Tells Google the rider actually parks here, so it routes to the kerb side
-    // rather than to the nearest point on the road.
     if (stopover) waypoint.vehicleStopover = true;
     return waypoint;
   }
 
-  /** Routes API returns durations as protobuf strings such as `"432s"`. */
   private parseProtoDuration(value: unknown): number {
     if (typeof value === 'number') return value;
     if (typeof value !== 'string') return 0;
@@ -233,7 +218,7 @@ export class DirectionsService {
   }
 
   // ---------------------------------------------------------------------------
-  // Legacy Directions API
+  // 2. Google Directions API (Legacy)
   // ---------------------------------------------------------------------------
 
   private async viaDirectionsApi(
@@ -241,13 +226,12 @@ export class DirectionsService {
     apiKey: string,
   ): Promise<DirectionsResult> {
     const intermediates = request.intermediates ?? [];
-    const optimize = Boolean(request.optimizeWaypointOrder) && intermediates.length > 1;
+    const optimize = Boolean(request.optimizeWaypointOrder) && intermediates.length > 0;
 
     const params = new URLSearchParams({
       origin: this.latLngParam(request.origin),
       destination: this.latLngParam(request.destination),
       mode: 'driving',
-      // Without this the API returns free-flow times, not traffic-aware ones.
       departure_time: 'now',
       region: 'in',
       units: 'metric',
@@ -289,10 +273,8 @@ export class DirectionsService {
       const rawLegs = Array.isArray(route.legs) ? route.legs : [];
       const legs: RouteLeg[] = rawLegs.map((leg: any) => ({
         distanceMeters: Number(leg?.distance?.value) || 0,
-        // duration_in_traffic is only present with departure_time set.
         durationSeconds:
           Number(leg?.duration_in_traffic?.value ?? leg?.duration?.value) || 0,
-        // Legacy responses carry geometry per step, not per leg.
         polyline: this.joinStepPolylines(leg?.steps),
       }));
 
@@ -314,14 +296,64 @@ export class DirectionsService {
     }
   }
 
-  /**
-   * Concatenates a leg's step geometries into one payload the client can
-   * decode. Steps are already encoded, and each starts where the previous
-   * ended, so decoding and re-encoding here would only lose precision.
-   *
-   * The separator must sit outside the encoded alphabet, which spans ASCII
-   * 63-126 (`?` to `~`) — `|` is ASCII 124 and occurs inside real geometry.
-   */
+  // ---------------------------------------------------------------------------
+  // 3. OSRM Driving Router Fallback
+  // ---------------------------------------------------------------------------
+
+  private async viaOsrmApi(
+    request: DirectionsRequestDto,
+  ): Promise<DirectionsResult> {
+    const intermediates = request.intermediates ?? [];
+    const allWaypoints = [request.origin, ...intermediates, request.destination];
+    const coordsParam = allWaypoints.map((p) => `${p.lng},${p.lat}`).join(';');
+
+    try {
+      const url = `${OSRM_ROUTER_URL}/${coordsParam}?overview=full&geometries=polyline&steps=true`;
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'F2HFresh/1.0 (+https://f2hfresh.com)' },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`OSRM responded ${response.status}`);
+        return { ...UNAVAILABLE, message: 'Routing provider error' };
+      }
+
+      const data = (await response.json()) as any;
+      if (data?.code !== 'Ok' || !Array.isArray(data?.routes) || data.routes.length === 0) {
+        return { ...UNAVAILABLE, message: 'OSRM returned no route' };
+      }
+
+      const route = data.routes[0];
+      const polyline = route.geometry;
+      if (typeof polyline !== 'string' || polyline.length === 0) {
+        return { ...UNAVAILABLE, message: 'OSRM returned no road geometry' };
+      }
+
+      const rawLegs = Array.isArray(route.legs) ? route.legs : [];
+      const legs: RouteLeg[] = rawLegs.map((leg: any) => ({
+        distanceMeters: Number(leg?.distance) || 0,
+        durationSeconds: Number(leg?.duration) || 0,
+        polyline: this.joinStepPolylines(
+          (leg?.steps ?? []).map((st: any) => ({ polyline: { points: st?.geometry } })),
+        ),
+      }));
+
+      return {
+        status: 'OK',
+        provider: 'osrm',
+        distanceMeters: Number(route.distance) || 0,
+        durationSeconds: Number(route.duration) || 0,
+        polyline,
+        optimizedOrder: [],
+        legs,
+      };
+    } catch (error) {
+      this.logger.warn(`OSRM request failed: ${String(error)}`);
+      return { ...UNAVAILABLE, message: 'OSRM router unreachable' };
+    }
+  }
+
   private joinStepPolylines(steps: unknown): string {
     if (!Array.isArray(steps)) return '';
     const encoded = steps
@@ -338,12 +370,6 @@ export class DirectionsService {
   // Shared helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Google returns the optimised sequence as original-waypoint indices. A
-   * malformed or partial list would silently drop or duplicate a customer's
-   * stop, so anything that is not a complete permutation is discarded and the
-   * caller keeps its own order.
-   */
   private sanitizeOrder(raw: unknown, expectedLength: number): number[] {
     if (!Array.isArray(raw) || raw.length !== expectedLength) return [];
     const seen = new Set<number>();
@@ -372,7 +398,6 @@ export class DirectionsService {
 
   private putCache(key: string, result: DirectionsResult): void {
     if (this.cache.size >= CACHE_MAX_ENTRIES) {
-      // Map iterates in insertion order, so this drops the oldest entry.
       const oldest = this.cache.keys().next();
       if (!oldest.done) this.cache.delete(oldest.value);
     }

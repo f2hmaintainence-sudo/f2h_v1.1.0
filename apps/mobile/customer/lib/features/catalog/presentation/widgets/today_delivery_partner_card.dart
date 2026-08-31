@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/features/catalog/data/models/today_delivery_partner_model.dart';
+import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.dart';
 
 class TodayDeliveryPartnerCard extends StatelessWidget {
   final TodayDeliveryPartner partner;
@@ -372,13 +373,38 @@ class TodayDeliveryPartnersSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (partners.isEmpty) return const SizedBox.shrink();
 
-    if (partners.length == 1) {
-      return TodayDeliveryPartnerCard(partner: partners.first);
+    final slotTimings = slotTimingsOf(context);
+    final now = DateTime.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    final morningEnd = parseTimeToMinutes(
+      slotTimings?['morning_slot']?['delivery_window_end'],
+      8 * 60 + 30,
+    );
+    final eveningEnd = parseTimeToMinutes(
+      slotTimings?['evening_slot']?['delivery_window_end'],
+      20 * 60,
+    );
+
+    final activePartners = partners.where((p) {
+      final slot = p.deliverySlot.toLowerCase();
+      if (slot == 'morning' && nowMinutes > morningEnd) {
+        return false;
+      }
+      if (slot == 'evening' && nowMinutes > eveningEnd) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    if (activePartners.isEmpty) return const SizedBox.shrink();
+
+    if (activePartners.length == 1) {
+      return TodayDeliveryPartnerCard(partner: activePartners.first);
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: partners
+      children: activePartners
           .map((partner) => TodayDeliveryPartnerCard(partner: partner))
           .toList(),
     );

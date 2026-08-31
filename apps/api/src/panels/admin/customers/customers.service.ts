@@ -13,6 +13,7 @@ import {
 import { DataService } from '../../../shared/database/Data.service';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
+import { PushNotificationService } from '../../../shared/pushNotifications/pushNotification.service';
 
 @Injectable()
 export class CustomersService {
@@ -21,6 +22,7 @@ export class CustomersService {
     private readonly dataService: DataService,
     private readonly developer: DeveloperService,
     private readonly databaseService: DatabaseService,
+    private readonly pushNotificationService: PushNotificationService,
   ) { }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1564,6 +1566,21 @@ export class CustomersService {
         }).catch(() => {});
       }
 
+      // Send push & in-app notification to the customer
+      this.pushNotificationService.sendNotificationToUsers([customerId], {
+        title: isEnabled ? '💳 Postpaid Credit Limit Activated!' : '💳 Postpaid Limit Updated',
+        body: isEnabled
+          ? `Your postpaid credit limit of ₹${limit} is now active. You can now place subscription orders with postpaid billing!`
+          : `Your postpaid credit limit has been updated to ₹0.`,
+        data: {
+          type: 'postpaid_limit_update',
+          limit: String(limit),
+          is_enabled: String(isEnabled),
+        },
+      }).catch((err) => {
+        this.developer.warn('Failed to send postpaid limit push notification', err);
+      });
+
       return { status: true, message: `Postpaid credit limit set to ₹${limit}` };
     } catch (error) {
       this.developer.error('CustomersService.setPostpaidLimit error', {
@@ -1913,7 +1930,7 @@ export class CustomersService {
          JOIN product_variants pv ON pv.product_id = p.product_id
          WHERE p.deleted_at IS NULL 
            AND p.is_active = true 
-           AND (p.is_subscribable = true OR (pv.subscription_price IS NOT NULL AND pv.subscription_price > 0))
+           AND p.is_subscribable = true
            AND pv.deleted_at IS NULL 
            AND pv.status = 'active'
          ORDER BY p.name ASC`,
@@ -1938,7 +1955,7 @@ export class CustomersService {
          WHERE pv.product_id = $1 
            AND pv.deleted_at IS NULL 
            AND pv.status = 'active'
-           AND (p.is_subscribable = true OR (pv.subscription_price IS NOT NULL AND pv.subscription_price > 0))
+           AND p.is_subscribable = true
          ORDER BY pv.sort_order ASC, pv.name ASC`,
         [productId],
       );
@@ -2065,12 +2082,26 @@ export class CustomersService {
            ON CONFLICT (customer_id, product_variant_id)
            DO UPDATE SET discount = EXCLUDED.discount,
                          discount_percentage = EXCLUDED.discount_percentage,
-                         special_price = EXCLUDED.special_price,
-                         updated_at = NOW(),
-                         deleted_at = NULL`,
+                          special_price = EXCLUDED.special_price,
+                          updated_at = NOW(),
+                          deleted_at = NULL`,
           [customerId, variantId, discount, calculatedFinalPrice],
         );
       }
+
+      // Send push & in-app notification to the customer
+      this.pushNotificationService.sendNotificationToUsers([customerId], {
+        title: '🎉 Special Subscription Price Unlocked!',
+        body: `Exclusive special subscription prices have been configured for your account on Fresh Cow Milk. Check your subscription options now!`,
+        data: {
+          type: 'special_price_update',
+          customer_id: customerId,
+          items_count: String(items.length),
+        },
+      }).catch((err) => {
+        this.developer.warn('Failed to send special price push notification', err);
+      });
+
       return { status: true, message: `Special prices saved for ${items.length} variant(s)` };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
@@ -2218,7 +2249,7 @@ export class CustomersService {
         JOIN products p ON p.product_id = pv.product_id
         WHERE pv.deleted_at IS NULL AND p.deleted_at IS NULL
           AND p.is_active = true AND pv.status = 'active'
-          AND (p.is_subscribable = true OR (pv.subscription_price IS NOT NULL AND pv.subscription_price > 0))
+          AND p.is_subscribable = true
         ORDER BY p.name ASC, pv.name ASC
       `);
 

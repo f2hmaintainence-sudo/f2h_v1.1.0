@@ -65,12 +65,13 @@ class ApiEndpoints {
   static const String resetPassword    = '$_auth/reset-password';
 
   // ---------------------------------------------------------------------------
-  // Delivery Partner Location & SOS
+  // Delivery Partner Location, SOS & Route Optimization
   // ---------------------------------------------------------------------------
-  static const String mapDirections    = '/map/directions';
   static const String locationUpdate   = '/delivery-partner/location/update';
   static const String sos              = '/delivery-partner/location/sos';
   static const String clearSos         = '/delivery-partner/location/clear-sos';
+  static const String mapDirections    = '/map/directions';
+
 
   // ---------------------------------------------------------------------------
   // Profile & Onboarding

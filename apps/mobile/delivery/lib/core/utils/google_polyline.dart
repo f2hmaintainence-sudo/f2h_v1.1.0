@@ -4,102 +4,98 @@
 //
 // Project     : F2H Fresh
 // File        : google_polyline.dart
-// Description : Decoder for Google's Encoded Polyline Algorithm Format, the
-//               wire format the Routes and Directions APIs return road
-//               geometry in.
+// Description : Decodes Google Encoded Polylines (5-decimal precision) into
+//               latlong2 LatLng coordinates for road rendering.
 // ============================================================================
 
 import 'package:latlong2/latlong.dart';
 
-/// Separator the API layer uses to concatenate a leg's per-step polylines.
-///
-/// Encoded polylines only ever use ASCII 63–126 (`?` to `~`), so a character
-/// below that range is unambiguous. `|` would not be: it is ASCII 124 and
-/// appears inside real encoded geometry.
-const String kPolylineSegmentSeparator = ';';
-
-/// Decodes one encoded polyline into its road-following coordinate list.
-///
-/// Coordinates are deltas encoded at precision 5 (1e-5 degrees), each split
-/// into 5-bit chunks, so a value is accumulated until a chunk without the
-/// continuation bit arrives.
+/// Decodes a standard Google Encoded Polyline string (precision 1e5).
+/// Returns a list of [LatLng] points along the road path.
 List<LatLng> decodeGooglePolyline(String encoded) {
-  if (encoded.isEmpty) return const [];
+  if (encoded.trim().isEmpty) return const [];
 
   final List<LatLng> points = [];
   int index = 0;
   int lat = 0;
   int lng = 0;
 
-  while (index < encoded.length) {
-    final latDelta = _decodeValue(encoded, index);
-    if (latDelta == null) break;
-    index = latDelta.nextIndex;
-    lat += latDelta.value;
+  final codeUnits = encoded.codeUnits;
+  final length = codeUnits.length;
 
-    final lngDelta = _decodeValue(encoded, index);
-    if (lngDelta == null) break;
-    index = lngDelta.nextIndex;
-    lng += lngDelta.value;
+  while (index < length) {
+    int b;
+    int shift = 0;
+    int result = 0;
+    do {
+      if (index >= length) break;
+      b = codeUnits[index++] - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
 
-    points.add(LatLng(lat / 1e5, lng / 1e5));
-  }
+    final int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
 
-  return points;
-}
+    shift = 0;
+    result = 0;
+    do {
+      if (index >= length) break;
+      b = codeUnits[index++] - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
 
-/// Decodes a `;`-joined run of encoded polylines into one continuous path.
-///
-/// The legacy Directions API carries geometry per step rather than per leg, so
-/// a leg arrives as its steps joined by [kPolylineSegmentSeparator]. Each step
-/// starts where the previous ended, so the shared point is dropped on the join.
-List<LatLng> decodeGooglePolylineSegments(String encoded) {
-  if (encoded.isEmpty) return const [];
-  if (!encoded.contains(kPolylineSegmentSeparator)) {
-    return decodeGooglePolyline(encoded);
-  }
+    final int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
 
-  final List<LatLng> points = [];
-  for (final segment in encoded.split(kPolylineSegmentSeparator)) {
-    final decoded = decodeGooglePolyline(segment);
-    if (decoded.isEmpty) continue;
-    if (points.isNotEmpty && _isSamePoint(points.last, decoded.first)) {
-      points.addAll(decoded.skip(1));
-    } else {
-      points.addAll(decoded);
+    final double latitude = lat / 1e5;
+    final double longitude = lng / 1e5;
+
+    if (latitude.isFinite &&
+        longitude.isFinite &&
+        latitude >= -90.0 &&
+        latitude <= 90.0 &&
+        longitude >= -180.0 &&
+        longitude <= 180.0) {
+      points.add(LatLng(latitude, longitude));
     }
   }
+
   return points;
 }
 
-bool _isSamePoint(LatLng a, LatLng b) {
-  return (a.latitude - b.latitude).abs() < 1e-6 &&
-      (a.longitude - b.longitude).abs() < 1e-6;
-}
+/// Decodes semicolon-separated polyline segments into a continuous road path.
+List<LatLng> decodeGooglePolylineSegments(
+  String encodedJoined, {
+  String separator = ';',
+}) {
+  if (encodedJoined.trim().isEmpty) return const [];
 
-class _DecodedValue {
-  final int value;
-  final int nextIndex;
+  final segments = encodedJoined.split(separator);
+  final List<LatLng> allPoints = [];
 
-  const _DecodedValue(this.value, this.nextIndex);
-}
+  for (final seg in segments) {
+    final clean = seg.trim();
+    if (clean.isEmpty) continue;
 
-/// Returns null when the string ends mid-value, which means the payload was
-/// truncated and the points decoded so far are all that can be trusted.
-_DecodedValue? _decodeValue(String encoded, int startIndex) {
-  int index = startIndex;
-  int shift = 0;
-  int result = 0;
-  int chunk;
+    final pts = decodeGooglePolyline(clean);
+    if (pts.isEmpty) continue;
 
-  do {
-    if (index >= encoded.length) return null;
-    chunk = encoded.codeUnitAt(index++) - 63;
-    result |= (chunk & 0x1F) << shift;
-    shift += 5;
-  } while (chunk >= 0x20);
+    if (allPoints.isNotEmpty) {
+      final last = allPoints.last;
+      final first = pts.first;
+      // Skip duplicate consecutive junction point
+      if ((last.latitude - first.latitude).abs() < 1e-6 &&
+          (last.longitude - first.longitude).abs() < 1e-6) {
+        allPoints.addAll(pts.skip(1));
+      } else {
+        allPoints.addAll(pts);
+      }
+    } else {
+      allPoints.addAll(pts);
+    }
+  }
 
-  // The low bit is the sign flag; the rest is the magnitude.
-  final value = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-  return _DecodedValue(value, index);
+  return allPoints;
 }

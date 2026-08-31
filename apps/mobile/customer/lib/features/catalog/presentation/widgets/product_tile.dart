@@ -12,6 +12,7 @@ import '../../domain/entities/cart/cart_item_entity.dart';
 import '../../../../core/guards/auth_guard.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
 import '../helpers/cart_helpers.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 
 // ── Product image widget ─────────────────────────────────
 Widget _productImage(Product p, {BoxFit fit = BoxFit.cover, double padding = 0.0}) {
@@ -286,8 +287,12 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
 
               void dispatchAdd({int quantity = 1}) {
                 final now = DateTime.now();
-                final defDate = getDefaultDeliveryDate(now);
-                final defSlot = getDefaultSlot(defDate, now);
+                // Slot windows/cutoffs come from admin Configurations; the
+                // helper's built-in defaults are only a fallback and are
+                // hours away from the configured cutoffs.
+                final slotTimings = slotTimingsOf(ctx);
+                final defDate = getDefaultDeliveryDate(now, slotTimings);
+                final defSlot = getDefaultSlot(defDate, now, slotTimings);
                 final cartItem = CartItemEntity(
                   productId: _selected.id,
                   variantId: _selected.id,
@@ -308,8 +313,12 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
 
               void dispatchRemove() {
                 final now = DateTime.now();
-                final defDate = getDefaultDeliveryDate(now);
-                final defSlot = getDefaultSlot(defDate, now);
+                // Slot windows/cutoffs come from admin Configurations; the
+                // helper's built-in defaults are only a fallback and are
+                // hours away from the configured cutoffs.
+                final slotTimings = slotTimingsOf(ctx);
+                final defDate = getDefaultDeliveryDate(now, slotTimings);
+                final defSlot = getDefaultSlot(defDate, now, slotTimings);
                 final cartItem = CartItemEntity(
                   productId: _selected.id,
                   variantId: _selected.id,

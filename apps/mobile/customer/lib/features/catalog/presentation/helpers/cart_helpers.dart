@@ -10,6 +10,9 @@
 //    - One-time totals use simple: unitPrice × quantity
 // ═══════════════════════════════════════════════════════════════════════════
 
+import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
 
 // ===== Effective Price Resolution =====
@@ -37,28 +40,117 @@ double getEffectivePrice(CartItemEntity item) {
   return item.unitPrice;
 }
 
-// ===== One-Time Delivery Date Rules =====
+// ===== Slot Window Status & Timing Helpers =====
 
-int _parseCutoffMinutes(dynamic timeStr, int defaultMinutes) {
-  if (timeStr == null || timeStr is! String) return defaultMinutes;
-  final parts = timeStr.split(':');
-  if (parts.length < 2) return defaultMinutes;
-  final h = int.tryParse(parts[0]) ?? 0;
-  final m = int.tryParse(parts[1]) ?? 0;
+class SlotWindowStatus {
+  final String slotKey; // 'morning' | 'evening'
+  final String slotName; // 'Morning' | 'Evening'
+  final bool isEnabled;
+  final int startMinutes; // e.g. 6*60 = 360
+  final int endMinutes; // e.g. 8*60+30 = 510, or 11*60 = 660
+  final String startFormatted; // "06:00 AM"
+  final String endFormatted; // "08:30 AM"
+  final String timeRangeText; // "06:00 AM – 08:30 AM"
+  final bool isOpen; // nowMinutes >= startMinutes && nowMinutes <= endMinutes
+
+  const SlotWindowStatus({
+    required this.slotKey,
+    required this.slotName,
+    required this.isEnabled,
+    required this.startMinutes,
+    required this.endMinutes,
+    required this.startFormatted,
+    required this.endFormatted,
+    required this.timeRangeText,
+    required this.isOpen,
+  });
+}
+
+Map<String, dynamic>? slotTimingsOf(BuildContext context) {
+  try {
+    return context.read<CustomerSessionCubit>().state.slotTimings;
+  } catch (_) {
+    return null;
+  }
+}
+
+int parseTimeToMinutes(dynamic timeStr, int defaultMinutes) {
+  if (timeStr == null || timeStr is! String || timeStr.trim().isEmpty) {
+    return defaultMinutes;
+  }
+  final clean = timeStr.trim().toUpperCase();
+  final isPM = clean.contains('PM');
+  final isAM = clean.contains('AM');
+  final digitsOnly = clean.replaceAll(RegExp(r'[^0-9:]'), '');
+  final parts = digitsOnly.split(':');
+  if (parts.isEmpty) return defaultMinutes;
+  int h = int.tryParse(parts[0]) ?? 0;
+  final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+  if (isPM && h < 12) h += 12;
+  if (isAM && h == 12) h = 0;
   return h * 60 + m;
 }
 
+String formatMinutesTo12Hour(int totalMinutes) {
+  final h = (totalMinutes ~/ 60) % 24;
+  final m = totalMinutes % 60;
+  final period = h >= 12 ? 'PM' : 'AM';
+  final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+  final mStr = m.toString().padLeft(2, '0');
+  return '$h12:$mStr $period';
+}
+
+SlotWindowStatus getMorningSlotWindow(DateTime now, [Map<String, dynamic>? slotTimings]) {
+  final slot = slotTimings?['morning_slot'];
+  final isEnabled = slot?['is_enabled'] != false;
+  final startMin = parseTimeToMinutes(slot?['delivery_window_start'], 6 * 60); // default 06:00 AM
+  final endMin = parseTimeToMinutes(slot?['delivery_window_end'], 8 * 60 + 30); // default 08:30 AM
+  final nowMin = now.hour * 60 + now.minute;
+  final isOpen = isEnabled && nowMin >= startMin && nowMin <= endMin;
+  final startFmt = formatMinutesTo12Hour(startMin);
+  final endFmt = formatMinutesTo12Hour(endMin);
+  return SlotWindowStatus(
+    slotKey: 'morning',
+    slotName: 'Morning',
+    isEnabled: isEnabled,
+    startMinutes: startMin,
+    endMinutes: endMin,
+    startFormatted: startFmt,
+    endFormatted: endFmt,
+    timeRangeText: '$startFmt – $endFmt',
+    isOpen: isOpen,
+  );
+}
+
+SlotWindowStatus getEveningSlotWindow(DateTime now, [Map<String, dynamic>? slotTimings]) {
+  final slot = slotTimings?['evening_slot'];
+  final isEnabled = slot?['is_enabled'] != false;
+  final startMin = parseTimeToMinutes(slot?['delivery_window_start'], 17 * 60); // default 05:00 PM
+  final endMin = parseTimeToMinutes(slot?['delivery_window_end'], 20 * 60); // default 08:00 PM
+  final nowMin = now.hour * 60 + now.minute;
+  final isOpen = isEnabled && nowMin >= startMin && nowMin <= endMin;
+  final startFmt = formatMinutesTo12Hour(startMin);
+  final endFmt = formatMinutesTo12Hour(endMin);
+  return SlotWindowStatus(
+    slotKey: 'evening',
+    slotName: 'Evening',
+    isEnabled: isEnabled,
+    startMinutes: startMin,
+    endMinutes: endMin,
+    startFormatted: startFmt,
+    endFormatted: endFmt,
+    timeRangeText: '$startFmt – $endFmt',
+    isOpen: isOpen,
+  );
+}
+
+// ===== One-Time Delivery Date Rules =====
+
+int _parseCutoffMinutes(dynamic timeStr, int defaultMinutes) {
+  return parseTimeToMinutes(timeStr, defaultMinutes);
+}
+
 /// Returns the list of allowed delivery dates based on current time and slot cutoffs.
-///
-/// RULES:
-///   - Before Evening Customer Cutoff (default 16:00 / 4:00 PM):
-///       • Today is allowed (Evening slot only — enforced by [getAvailableSlots])
-///       • Tomorrow and next 30 days
-///   - After Evening Customer Cutoff (16:00 onwards):
-///       • Today is NOT allowed
-///       • Tomorrow (default) and next 30 days
-///
-/// Returns a list of [DateTime] objects (date-only, no time component).
 List<DateTime> getAllowedDeliveryDates(DateTime now, [Map<String, dynamic>? slotTimings]) {
   final List<DateTime> dates = [];
   final nowMinutes = now.hour * 60 + now.minute;
@@ -85,9 +177,6 @@ List<DateTime> getAllowedDeliveryDates(DateTime now, [Map<String, dynamic>? slot
 }
 
 /// Returns the default delivery date based on current time.
-///
-/// - Before Evening Cutoff (16:00) → Today (user can get Evening delivery same day)
-/// - After Evening Cutoff → Tomorrow
 DateTime getDefaultDeliveryDate(DateTime now, [Map<String, dynamic>? slotTimings]) {
   final nowMinutes = now.hour * 60 + now.minute;
   final eveningCutoffMinutes = _parseCutoffMinutes(
@@ -103,9 +192,6 @@ DateTime getDefaultDeliveryDate(DateTime now, [Map<String, dynamic>? slotTimings
 }
 
 /// Returns the first allowed date (used as `firstDate` in date pickers).
-///
-/// - Before Evening Cutoff (16:00) → Today
-/// - After Evening Cutoff → Tomorrow
 DateTime getFirstAllowedDate(DateTime now, [Map<String, dynamic>? slotTimings]) {
   return getDefaultDeliveryDate(now, slotTimings);
 }
@@ -115,42 +201,38 @@ DateTime getFirstAllowedDate(DateTime now, [Map<String, dynamic>? slotTimings]) 
 /// Returns available delivery slots for the given [selectedDate].
 ///
 /// RULES:
-///   - If [selectedDate] == Today → ['Evening'] if before Evening Cutoff (16:00), else []
-///   - If [selectedDate] == Tomorrow → ['Morning', 'Evening'] if before Morning Cutoff (23:00), else ['Evening']
-///   - If [selectedDate] >= Day+2 → ['Morning', 'Evening']
-///
-/// Compares date-only (ignores time component).
+///   - If [selectedDate] == Today:
+///       • Include 'Morning' ONLY if within configured Morning window
+///       • Include 'Evening' ONLY if within configured Evening window
+///   - If [selectedDate] == Tomorrow:
+///       • 'Morning' available if before morning cutoff (23:00)
+///       • 'Evening' always available
+///   - If [selectedDate] >= Day+2:
+///       • Both ['Morning', 'Evening'] available
 List<String> getAvailableSlots(DateTime selectedDate, DateTime now, [Map<String, dynamic>? slotTimings]) {
   final today = DateTime(now.year, now.month, now.day);
   final tomorrow = today.add(const Duration(days: 1));
   final selected = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
   final nowMinutes = now.hour * 60 + now.minute;
 
-  final eveningCutoffMinutes = _parseCutoffMinutes(
-    slotTimings?['evening_slot']?['customer_cutoff_time'],
-    16 * 60, // 16:00 (4:00 PM)
-  );
+  if (selected.isAtSameMomentAs(today)) {
+    final morningWin = getMorningSlotWindow(now, slotTimings);
+    final eveningWin = getEveningSlotWindow(now, slotTimings);
+    final slots = <String>[];
+    if (morningWin.isOpen) slots.add('Morning');
+    if (eveningWin.isOpen) slots.add('Evening');
+    return slots;
+  }
 
   final morningCutoffMinutes = _parseCutoffMinutes(
     slotTimings?['morning_slot']?['customer_cutoff_time'],
     23 * 60, // 23:00 (11:00 PM)
   );
 
-  if (selected.isAtSameMomentAs(today)) {
-    // Today: only Evening slot available if before evening cutoff (16:00)
-    // Morning slot was closed yesterday night and is NEVER available on same-day.
-    if (nowMinutes < eveningCutoffMinutes) {
-      return ['Evening'];
-    }
-    return [];
-  }
-
   if (selected.isAtSameMomentAs(tomorrow)) {
-    // Tomorrow: Morning slot available only before morning cutoff (23:00 today)
     if (nowMinutes < morningCutoffMinutes) {
       return ['Morning', 'Evening'];
     }
-    // After 23:00, tomorrow morning is closed, only tomorrow evening is available
     return ['Evening'];
   }
 
@@ -159,21 +241,20 @@ List<String> getAvailableSlots(DateTime selectedDate, DateTime now, [Map<String,
 }
 
 /// Returns the default slot for a given date.
-///
-/// - Today → ALWAYS 'Evening' (Morning is never available on same-day)
-/// - Tomorrow+ → 'Morning' (or 'Evening' if morning is closed after 23:00)
 String getDefaultSlot(DateTime selectedDate, DateTime now, [Map<String, dynamic>? slotTimings]) {
   final today = DateTime(now.year, now.month, now.day);
   final selected = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
   final available = getAvailableSlots(selectedDate, now, slotTimings);
 
   if (selected.isAtSameMomentAs(today)) {
-    return available.contains('Evening') ? 'Evening' : '';
+    if (available.contains('Morning')) return 'Morning';
+    if (available.contains('Evening')) return 'Evening';
+    return '';
   }
 
   if (available.contains('Morning')) return 'Morning';
   if (available.contains('Evening')) return 'Evening';
-  return 'Morning';
+  return available.isNotEmpty ? available.first : '';
 }
 
 // ===== Quantity Helpers =====
