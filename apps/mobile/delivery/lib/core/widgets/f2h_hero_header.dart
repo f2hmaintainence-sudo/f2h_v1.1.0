@@ -223,7 +223,7 @@ class F2hHeroHeader extends StatelessWidget {
       onTap: () => onToggleOnline(!isOnline),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isOnline ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(20),
@@ -253,16 +253,10 @@ class F2hHeroHeader extends StatelessWidget {
             Text(
               isOnline ? 'Online' : 'Offline',
               style: GoogleFonts.roboto(
-                fontSize: 12,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w700,
                 color: isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 16,
-              color: isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
             ),
           ],
         ),

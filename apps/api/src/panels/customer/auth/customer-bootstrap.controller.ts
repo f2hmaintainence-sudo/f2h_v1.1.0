@@ -34,7 +34,7 @@ export class CustomerBootstrapController {
     private readonly db: DatabaseService,
     private readonly Developer: DeveloperService,
     private readonly authService: AuthService,
-  ) {}
+  ) { }
 
   private columnCache: Map<string, { columns: Set<string>; cachedAt: number }> = new Map();
   private readonly COLUMN_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -287,7 +287,7 @@ export class CustomerBootstrapController {
         if (slotTimingsRes?.[0]?.config_data) {
           slotTimings = slotTimingsRes[0].config_data;
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const { todayDate, currentSlot } = this.getCurrentKolkataDateAndSlot(slotTimings);
 
@@ -318,8 +318,8 @@ export class CustomerBootstrapController {
         FROM delivery_run_addresses dra
         JOIN delivery_runs dr ON (dr.run_id = dra.run_id OR dr.id::varchar = dra.run_id)
         LEFT JOIN customer_addresses ca ON (ca.address_id = dra.address_id OR ca.id::varchar = dra.address_id)
-        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.user_id = dr.delivery_partner_id)
-        LEFT JOIN users u ON (u.user_id = dp.user_id OR u.user_id = dr.delivery_partner_id)
+        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id )
+        LEFT JOIN users u ON ( u.user_id = dr.delivery_partner_id)
         WHERE (
           dra.customer_id = $1 
           OR dra.customer_id IN (SELECT customer_id FROM customers WHERE user_id = $1)
@@ -438,7 +438,7 @@ export class CustomerBootstrapController {
       if (res?.[0]?.config_data) {
         slotTimings = res[0].config_data;
       }
-    } catch (_) {}
+    } catch (_) { }
     return {
       status: true,
       slot_timings: slotTimings,
