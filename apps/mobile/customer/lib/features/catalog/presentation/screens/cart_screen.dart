@@ -16,6 +16,9 @@ import '../bloc/cart/cart_bloc.dart';
 import '../bloc/cart/cart_state.dart';
 import '../bloc/cart/cart_event.dart';
 import '../../../../core/session/customer_session_cubit.dart';
+import '../../../../core/session/customer_session_state.dart';
+import '../../../address/presentation/widgets/address_selector_drawer.dart';
+import '../../../address/data/models/profile_address.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/cart/cart_item_entity.dart';
@@ -342,6 +345,12 @@ class _CartScreenState extends State<CartScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
+                                      // ===== Delivery Address Card =====
+                                      _buildDeliveryAddressCard(
+                                        context,
+                                        sessionState,
+                                      ),
+
                                       // ===== Cart Items List (One-Time Only) =====
                                       _buildItemsCard(
                                         context,
@@ -799,14 +808,34 @@ class _CartScreenState extends State<CartScreen> {
                     }
 
                     // Navigate to Checkout Screen
-                    context.runWithAuth(() {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              CheckoutScreen(selectedItemIds: selectedKeys),
-                        ),
-                      );
+                    context.runWithAuth(() async {
+                      final sessionCubit = context.read<CustomerSessionCubit>();
+                      final session = sessionCubit.state;
+                      if (session.addresses.isEmpty) {
+                        final chosen =
+                            await AddressSelectorDrawer.show(context);
+                        if (context.mounted) {
+                          await sessionCubit.refreshSilently();
+                          final updatedSession = sessionCubit.state;
+                          if (updatedSession.addresses.isEmpty) {
+                            F2HToast.error(
+                              context,
+                              'Please select or add a delivery address to proceed.',
+                            );
+                            return;
+                          }
+                        }
+                      }
+
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                CheckoutScreen(selectedItemIds: selectedKeys),
+                          ),
+                        );
+                      }
                     });
                   },
                   style: ElevatedButton.styleFrom(
@@ -837,6 +866,217 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDeliveryAddressCard(
+    BuildContext context,
+    CustomerSessionState sessionState,
+  ) {
+    final list = sessionState.addresses;
+    if (list.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: kRed.withValues(alpha: 0.35)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: kRed.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.location_off_rounded,
+                size: 20,
+                color: kRed,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No Delivery Address',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kRed,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Add an address to proceed with order',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: kTextSub,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final chosen = await AddressSelectorDrawer.show(context);
+                if (chosen != null && context.mounted) {
+                  await context.read<CustomerSessionCubit>().refreshSilently();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text(
+                'Add Address',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final primaryAddress = list.firstWhere(
+      (a) => a.isDefault,
+      orElse: () => list.first,
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: kPrimaryPl,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.location_on_rounded,
+              size: 20,
+              color: kPrimary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Delivery to ${primaryAddress.addressType.toUpperCase()}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: kTextSub,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    if (primaryAddress.isDefault) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: kPrimaryPl,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'DEFAULT',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: kPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  primaryAddress.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: kText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  primaryAddress.detail,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: kTextSub,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () async {
+              final chosen = await AddressSelectorDrawer.show(context);
+              if (chosen != null && context.mounted) {
+                await context.read<CustomerSessionCubit>().refreshSilently();
+              }
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: kPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text(
+              'Change',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

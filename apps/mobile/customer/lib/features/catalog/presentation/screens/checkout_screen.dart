@@ -1299,17 +1299,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     disabled:
                                         _selectedPayment == 'wallet' &&
                                         payableNow > walletBalance,
-                                    onSwipeCompleted: () {
+                                    onSwipeCompleted: () async {
                                       final list = sessionState.addresses;
-                                      final addressId = list.isEmpty
-                                          ? null
-                                          : list
-                                                .firstWhere(
-                                                  (a) => a.isDefault,
-                                                  orElse: () => list.first,
-                                                )
-                                                .id
-                                                ?.toString();
+                                      if (list.isEmpty) {
+                                        final selectedAddress =
+                                            await AddressSelectorDrawer.show(
+                                              context,
+                                            );
+                                        if (selectedAddress == null &&
+                                            context.mounted) {
+                                          final currentSession = context
+                                              .read<CustomerSessionCubit>()
+                                              .state;
+                                          if (currentSession.addresses.isEmpty) {
+                                            F2HToast.error(
+                                              context,
+                                              'Please add a delivery address to complete your order.',
+                                            );
+                                            setState(() {
+                                              _dragKey++;
+                                            });
+                                            return;
+                                          }
+                                        }
+                                      }
+
+                                      final updatedList = context
+                                          .read<CustomerSessionCubit>()
+                                          .state
+                                          .addresses;
+                                      if (updatedList.isEmpty) {
+                                        if (context.mounted) {
+                                          F2HToast.error(
+                                            context,
+                                            'Please add a delivery address to complete your order.',
+                                          );
+                                          setState(() {
+                                            _dragKey++;
+                                          });
+                                        }
+                                        return;
+                                      }
+
+                                      final selectedAddr = updatedList.firstWhere(
+                                        (a) => a.isDefault,
+                                        orElse: () => updatedList.first,
+                                      );
+                                      final addressId =
+                                          (selectedAddr.id != null &&
+                                                  selectedAddr.id!.isNotEmpty)
+                                              ? selectedAddr.id!
+                                              : (selectedAddr.addressId ??
+                                                  selectedAddr.uniqueId);
                                       final customerId =
                                           sessionState.profile?.customerId ?? '';
 

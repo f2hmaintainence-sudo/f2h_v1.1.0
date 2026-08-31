@@ -7,6 +7,8 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import 'package:f2h_customer/features/address/presentation/widgets/address_selector_drawer.dart';
 
 /// Bottom offset for the [AnimatedPositioned] that hosts a [FloatingCartBar].
 ///
@@ -232,11 +234,21 @@ class _FloatingCartBarState extends State<FloatingCartBar>
               child: ScaleTransition(
                 scale: _scaleAnim,
                 child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartScreen()),
-                    );
+                  onTap: () async {
+                    final sessionCubit = context.read<CustomerSessionCubit>();
+                    final session = sessionCubit.state;
+                    if (session.addresses.isEmpty) {
+                      final chosen = await AddressSelectorDrawer.show(context);
+                      if (chosen != null && context.mounted) {
+                        await sessionCubit.refreshSilently();
+                      }
+                    }
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CartScreen()),
+                      );
+                    }
                   },
                   child: compactListenable == null
                       ? _buildPill(
