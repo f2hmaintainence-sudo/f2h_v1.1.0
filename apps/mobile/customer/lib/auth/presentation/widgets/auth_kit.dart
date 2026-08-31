@@ -65,7 +65,6 @@ class AuthScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final heroHeight = math.min(media.size.height * 0.38, 320.0);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -77,26 +76,44 @@ class AuthScaffold extends StatelessWidget {
         backgroundColor: Colors.white,
         resizeToAvoidBottomInset: true,
         body: Stack(
+          fit: StackFit.expand,
           children: [
             const Positioned.fill(child: _LeafyHeroBackground()),
 
-            // Hero and sheet scroll together, so nothing ever slides under
-            // the curve and gets clipped.
+            // Hero and sheet sit within a bounded viewport.
+            // ClampingScrollPhysics ensures the screen is locked in place
+            // and only scrolls when the keyboard is open or on very small devices.
             SafeArea(
               bottom: false,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-                child: Column(
-                  children: [
-                    SizedBox(height: heroHeight, child: const _HeroBrand()),
-                    _FormSheet(
-                      title: title,
-                      subtitle: subtitle,
-                      minHeight: media.size.height - heroHeight,
-                      children: children,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableHeight = constraints.maxHeight;
+                  final heroHeight = (availableHeight * 0.28).clamp(130.0, 200.0);
+                  final sheetMinHeight = math.max(0.0, availableHeight - heroHeight);
+
+                  return SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: availableHeight),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height: heroHeight,
+                            child: const _HeroBrand(),
+                          ),
+                          _FormSheet(
+                            title: title,
+                            subtitle: subtitle,
+                            minHeight: sheetMinHeight,
+                            children: children,
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
 
@@ -152,7 +169,7 @@ class _FormSheet extends StatelessWidget {
       color: Colors.white,
       constraints: BoxConstraints(minHeight: math.max(minHeight, 0)),
       // Top padding clears the curve so no field is ever cut by it.
-      padding: const EdgeInsets.fromLTRB(24, 78, 24, 32),
+      padding: const EdgeInsets.fromLTRB(24, 50, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -160,25 +177,25 @@ class _FormSheet extends StatelessWidget {
             title,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 21,
+              fontSize: 20,
               fontWeight: FontWeight.w800,
               color: Color(0xFF17211B),
               letterSpacing: -0.3,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             subtitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 13.5,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               color: kAuthSubtitle,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           const Center(child: _AccentRule()),
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
@@ -207,40 +224,43 @@ class _HeroBrand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 92,
-          height: 92,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: kPrimaryMid.withValues(alpha: 0.14),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: kPrimaryMid.withValues(alpha: 0.14),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(12),
+            child: const _BrandMark(),
           ),
-          padding: const EdgeInsets.all(14),
-          child: const _BrandMark(),
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'F2H',
-          style: TextStyle(
-            fontSize: 42,
-            height: 1.0,
-            fontWeight: FontWeight.w900,
-            color: kAuthBrandInk,
-            letterSpacing: 1.0,
+          const SizedBox(height: 10),
+          const Text(
+            'F2H',
+            style: TextStyle(
+              fontSize: 34,
+              height: 1.0,
+              fontWeight: FontWeight.w900,
+              color: kAuthBrandInk,
+              letterSpacing: 1.0,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        const _WordmarkRule(),
-      ],
+          const SizedBox(height: 6),
+          const _WordmarkRule(),
+        ],
+      ),
     ),
   );
 }
@@ -458,8 +478,8 @@ class _AuthSheetClipper extends CustomClipper<Path> {
     final w = size.width;
     return Path()
       ..moveTo(0, size.height)
-      ..lineTo(0, 62)
-      ..cubicTo(w * 0.22, 0, w * 0.78, 0, w, 62)
+      ..lineTo(0, 44)
+      ..cubicTo(w * 0.22, 0, w * 0.78, 0, w, 44)
       ..lineTo(w, size.height)
       ..close();
   }
