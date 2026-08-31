@@ -35,17 +35,39 @@ class F2hHeroHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFD7F7E1),
+            Color(0xFFEAF9EE),
+            Colors.white,
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          // 1. Top white spacing with safe area & clean header actions (no overlap)
+          // 1. Delivery Background Illustration anchored to bottom (no overlap with top bar)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 120,
+            child: Image.asset(
+              'assets/home_bg.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+
+          // 2. Header Content on transparent top area (Greeting, Bell, Avatar, Online Pill)
           Padding(
-            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 12),
+            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 125),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Top Bar with Greeting, Notification Icon, and Profile Avatar
                 Row(
@@ -104,30 +126,6 @@ class F2hHeroHeader extends StatelessWidget {
                 // Online / Offline Status Dropdown Pill
                 _buildOnlineStatusPill(context),
               ],
-            ),
-          ),
-
-          // 2. Delivery Background Illustration Banner at bottom (clearly visible, no overlap)
-          SizedBox(
-            width: double.infinity,
-            height: 130,
-            child: Image.asset(
-              'assets/home_bg.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-              errorBuilder: (_, __, ___) => Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFDCFCE7),
-                      Color(0xFFF0FDF4),
-                      Color(0xFFE2E8F0),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ),
         ],

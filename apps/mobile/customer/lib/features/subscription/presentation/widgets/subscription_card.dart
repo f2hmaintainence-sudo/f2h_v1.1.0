@@ -8,6 +8,7 @@ import '../../../catalog/domain/entities/cart/cart_item_entity.dart';
 import '../../../catalog/presentation/bloc/cart/cart_bloc.dart';
 import '../../../catalog/presentation/bloc/cart/cart_event.dart';
 import '../../../catalog/presentation/screens/cart_screen.dart';
+import '../../../catalog/presentation/helpers/cart_navigation_helper.dart';
 import '../screens/subscription_detail_screen.dart';
 
 
@@ -383,12 +384,7 @@ class SubCard extends StatelessWidget {
                       );
                       context.read<CartBloc>().add(AddToCartEvent(cartItem));
                       F2HToast.success(context, 'Subscription added to cart for renewal!');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const CartScreen(),
-                        ),
-                      );
+                      CartNavHelper.openCart(context);
                     },
                     icon: const Icon(Icons.replay_rounded, size: 15, color: Colors.white),
                     label: const Text(
