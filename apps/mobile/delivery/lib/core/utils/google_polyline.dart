@@ -12,7 +12,11 @@
 import 'package:latlong2/latlong.dart';
 
 /// Separator the API layer uses to concatenate a leg's per-step polylines.
-const String kPolylineSegmentSeparator = '|';
+///
+/// Encoded polylines only ever use ASCII 63–126 (`?` to `~`), so a character
+/// below that range is unambiguous. `|` would not be: it is ASCII 124 and
+/// appears inside real encoded geometry.
+const String kPolylineSegmentSeparator = ';';
 
 /// Decodes one encoded polyline into its road-following coordinate list.
 ///

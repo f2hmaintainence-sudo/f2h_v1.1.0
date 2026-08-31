@@ -36,14 +36,17 @@ class LocationHelper {
           isPermanentlyDenied: false,
         );
         if (opened == true) {
-          try {
-            permission = await Geolocator.requestPermission();
-          } catch (_) {}
+          if (!kIsWeb) {
+            try {
+              await Geolocator.openAppSettings();
+            } catch (_) {}
+          } else {
+            try {
+              permission = await Geolocator.requestPermission();
+            } catch (_) {}
+          }
         }
-        if (permission != LocationPermission.whileInUse &&
-            permission != LocationPermission.always) {
-          return null;
-        }
+        return null;
       }
     }
 
@@ -233,7 +236,7 @@ class LocationHelper {
                       : 'Please allow browser location permission when prompted so we can pinpoint your delivery address.')
                   : (isPermanentlyDenied
                       ? 'Location permission is turned off for this app. Please enable Location in App Settings to detect your delivery address.'
-                      : 'F2H needs your location permission to accurately deliver milk and fresh produce to your doorstep.'),
+                      : 'Location permission is needed to accurately detect your delivery address and find nearby products. Please enable it in Settings.'),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -272,9 +275,7 @@ class LocationHelper {
                       ),
                     ),
                     child: Text(
-                      kIsWeb
-                          ? (isPermanentlyDenied ? 'Got it' : 'Allow Location')
-                          : (isPermanentlyDenied ? 'Open Settings' : 'Allow Location'),
+                      kIsWeb ? 'Got it' : 'Open Settings',
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),

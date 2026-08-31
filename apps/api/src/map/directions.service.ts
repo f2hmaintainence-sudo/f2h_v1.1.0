@@ -48,6 +48,12 @@ const DIRECTIONS_API_URL =
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
 /**
+ * Joins a leg's per-step polylines for clients. Must stay outside the encoded
+ * polyline alphabet (ASCII 63-126) and in sync with the mobile decoder.
+ */
+export const POLYLINE_SEGMENT_SEPARATOR = ';';
+
+/**
  * A rider's screen recomputes on rebuild, on location tap and on every order
  * status change; without this the same route would be billed several times a
  * minute. Short enough that live traffic still moves the ETA.
@@ -101,12 +107,10 @@ export class DirectionsService {
     }
 
     let result = await this.viaRoutesApi(request, apiKey);
-    if (result.status !== 'OK') {
-      const legacy = await this.viaDirectionsApi(request, apiKey);
-      // Keep the Routes API answer when it was a definitive "no route exists".
-      if (legacy.status === 'OK' || result.status === 'UNAVAILABLE') {
-        result = legacy;
-      }
+    // ZERO_RESULTS is a definitive answer about the same road graph, so only a
+    // provider failure is worth a second billed request.
+    if (result.status === 'UNAVAILABLE') {
+      result = await this.viaDirectionsApi(request, apiKey);
     }
 
     if (result.status === 'OK') this.putCache(cacheKey, result);
@@ -311,17 +315,19 @@ export class DirectionsService {
   }
 
   /**
-   * Concatenates a leg's step geometries into one encoded polyline. Steps are
-   * already encoded, and each starts where the previous ended, so decoding and
-   * re-encoding would only lose precision — the client stitches the decoded
-   * point lists instead, and this preserves the step boundaries it needs.
+   * Concatenates a leg's step geometries into one payload the client can
+   * decode. Steps are already encoded, and each starts where the previous
+   * ended, so decoding and re-encoding here would only lose precision.
+   *
+   * The separator must sit outside the encoded alphabet, which spans ASCII
+   * 63-126 (`?` to `~`) — `|` is ASCII 124 and occurs inside real geometry.
    */
   private joinStepPolylines(steps: unknown): string {
     if (!Array.isArray(steps)) return '';
     const encoded = steps
       .map((step: any) => step?.polyline?.points)
       .filter((points: unknown): points is string => typeof points === 'string');
-    return encoded.join('|');
+    return encoded.join(POLYLINE_SEGMENT_SEPARATOR);
   }
 
   private latLngParam(point: RoutePointDto): string {

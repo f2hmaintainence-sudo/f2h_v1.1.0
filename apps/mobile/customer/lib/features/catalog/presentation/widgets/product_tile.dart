@@ -242,8 +242,11 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
           BlocBuilder<CartBloc, CartState>(
             builder: (ctx, state) {
               final items = ctx.read<CartBloc>().currentItems;
+              // variantId is the real key (the server resolves everything by
+              // product_variants.variant_id), and matching on it alone also
+              // counts rows added before the sheet tracked the selected pack.
               int qty = items
-                  .where((item) => item.productId == p.id && item.variantId == _selected.id)
+                  .where((item) => item.variantId == _selected.id)
                   .fold(0, (sum, item) => sum + (item.purchaseType == 'subscription' ? (item.schedules?.fold<int>(0, (s, sc) => s + sc.mQuantity + sc.eQuantity) ?? 1) : (item.quantity ?? 0)));
               final displayPrice = _selected.price;
 
@@ -252,9 +255,9 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 final defDate = getDefaultDeliveryDate(now);
                 final defSlot = getDefaultSlot(defDate, now);
                 final cartItem = CartItemEntity(
-                  productId: p.id,
+                  productId: _selected.id,
                   variantId: _selected.id,
-                  productName: p.name,
+                  productName: _selectedName,
                   variantName: _selected.label,
                   unitPrice: _selected.price,
                   purchaseType: 'onetime',
@@ -274,9 +277,9 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 final defDate = getDefaultDeliveryDate(now);
                 final defSlot = getDefaultSlot(defDate, now);
                 final cartItem = CartItemEntity(
-                  productId: p.id,
+                  productId: _selected.id,
                   variantId: _selected.id,
-                  productName: p.name,
+                  productName: _selectedName,
                   variantName: _selected.label,
                   unitPrice: _selected.price,
                   purchaseType: 'onetime',
