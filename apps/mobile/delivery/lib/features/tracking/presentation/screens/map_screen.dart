@@ -132,6 +132,32 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   Future<void> _goToCurrentLocation() async {
     try {
       final locationService = sl<LocationService>();
+      final isAllowed = await locationService.ensureLocationPermission(context);
+      if (!isAllowed) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('GPS Location access is needed to show your current location.'),
+            backgroundColor: kDanger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            action: SnackBarAction(
+              label: 'SETTINGS',
+              textColor: Colors.white,
+              onPressed: () async {
+                bool serviceEnabled = await locationService.isLocationServiceEnabled();
+                if (!serviceEnabled) {
+                  await locationService.openLocationSettings();
+                } else {
+                  await locationService.openAppSettings();
+                }
+              },
+            ),
+          ),
+        );
+        return;
+      }
+
       final position = await locationService.getCurrentPosition();
       if (position != null) {
         final newPos = LatLng(position.latitude, position.longitude);
@@ -148,10 +174,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Failed to get current GPS location.'),
+            content: const Text('Failed to get current GPS location. Please check settings.'),
             backgroundColor: kDanger,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            action: SnackBarAction(
+              label: 'SETTINGS',
+              textColor: Colors.white,
+              onPressed: () => locationService.openLocationSettings(),
+            ),
           ),
         );
       }

@@ -90,6 +90,11 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               backgroundColor: kRed,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              action: SnackBarAction(
+                label: 'SETTINGS',
+                textColor: Colors.white,
+                onPressed: () => Geolocator.openAppSettings(),
+              ),
             ),
           );
           setState(() {

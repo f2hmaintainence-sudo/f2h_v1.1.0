@@ -129,7 +129,15 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showSnack('Please enable GPS Location Services', isError: true);
+        _showSnack(
+          'Please enable GPS Location Services in settings',
+          isError: true,
+          action: SnackBarAction(
+            label: 'SETTINGS',
+            textColor: Colors.white,
+            onPressed: () => Geolocator.openLocationSettings(),
+          ),
+        );
         setState(() => _isSelecting = false);
         return;
       }
@@ -137,10 +145,31 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          _showSnack('Location permission is required', isError: true);
+          _showSnack(
+            'Location permission is required',
+            isError: true,
+            action: SnackBarAction(
+              label: 'SETTINGS',
+              textColor: Colors.white,
+              onPressed: () => Geolocator.openAppSettings(),
+            ),
+          );
           setState(() => _isSelecting = false);
           return;
         }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        _showSnack(
+          'Location permission is permanently denied. Please enable in settings.',
+          isError: true,
+          action: SnackBarAction(
+            label: 'SETTINGS',
+            textColor: Colors.white,
+            onPressed: () => Geolocator.openAppSettings(),
+          ),
+        );
+        setState(() => _isSelecting = false);
+        return;
       }
       final Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       final double? branchLat = branch['lat'] != null ? double.tryParse(branch['lat'].toString()) : null;
@@ -185,12 +214,13 @@ class _ServiceAreaCheckScreenState extends State<ServiceAreaCheckScreen>
     Navigator.push(context, MaterialPageRoute(builder: (_) => const LocationPermissionScreen()));
   }
 
-  void _showSnack(String msg, {bool isError = false}) {
+  void _showSnack(String msg, {bool isError = false, SnackBarAction? action}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: GoogleFonts.roboto()),
       backgroundColor: isError ? kRed : kPrimary,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      action: action,
     ));
   }
 

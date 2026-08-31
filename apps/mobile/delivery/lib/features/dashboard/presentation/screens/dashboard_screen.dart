@@ -299,30 +299,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _handleOnlineToggle(bool val) async {
     if (val) {
-      try {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
-          if (!kIsWeb) {
-            if (mounted) AppSnackBar.error(context, 'GPS/Location services are disabled. Please enable them to go online.');
-            return;
-          }
-        }
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-          if (permission == LocationPermission.denied) {
-            if (mounted) AppSnackBar.error(context, 'Location permission is required to track live location while online.');
-            return;
-          }
-        }
-        if (permission == LocationPermission.deniedForever) {
-          if (!kIsWeb) {
-            if (mounted) AppSnackBar.error(context, 'Location permissions are permanently denied. Please enable them in settings.');
-            return;
-          }
-        }
-      } catch (e) {
-        print('Location check exception during toggle: $e');
+      final isLocationReady = await _locationService.ensureLocationPermission(context);
+      if (!isLocationReady) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Location permission and GPS are required to go online and track deliveries.',
+              style: GoogleFonts.roboto(),
+            ),
+            backgroundColor: kDanger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            action: SnackBarAction(
+              label: 'SETTINGS',
+              textColor: Colors.white,
+              onPressed: () async {
+                bool serviceEnabled = await _locationService.isLocationServiceEnabled();
+                if (!serviceEnabled) {
+                  await _locationService.openLocationSettings();
+                } else {
+                  await _locationService.openAppSettings();
+                }
+              },
+            ),
+          ),
+        );
+        return;
       }
     }
     if (!mounted) return;
