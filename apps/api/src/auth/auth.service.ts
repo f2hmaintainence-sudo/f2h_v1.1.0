@@ -1653,10 +1653,66 @@ export class AuthService {
         } catch (custErr) {
           console.error('[AuthService] Auto customer record creation failed during Google login:', custErr);
         }
+      } else if (roleId === ROLE.DELIVERY_PARTNER) {
+        try {
+          const now = new Date();
+          const activeBranchRes = await this.Data.query('branches', {
+            select: ['branch_id'],
+            where: [{ column: 'is_active', operator: '=', value: true }],
+            limit: 1,
+          });
+          const targetBranchId = activeBranchRes?.data?.[0]?.branch_id || null;
+
+          await this.Data.insert('delivery_partners', {
+            delivery_partner_id: userId,
+            branch_id: targetBranchId,
+            is_active: true,
+            is_verified: true,
+            is_available: true,
+            is_online: false,
+            vehicle_type: 'BIKE',
+            vehicle_number: 'N/A',
+            created_at: now,
+            updated_at: now,
+          });
+        } catch (dpErr) {
+          console.error('[AuthService] Auto delivery partner record creation failed during Google login:', dpErr);
+        }
       }
 
       user = { user_id: userId, email: email.toLowerCase().trim(), role_id: roleId };
     } else {
+      if (user.role_id === ROLE.DELIVERY_PARTNER || signupRole === ROLE.DELIVERY_PARTNER) {
+        try {
+          const dpCheck = await this.DataBase.query(
+            `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+            [user.user_id],
+          );
+          if (!dpCheck?.length) {
+            const activeBranchRes = await this.Data.query('branches', {
+              select: ['branch_id'],
+              where: [{ column: 'is_active', operator: '=', value: true }],
+              limit: 1,
+            });
+            const targetBranchId = activeBranchRes?.data?.[0]?.branch_id || null;
+            await this.Data.insert('delivery_partners', {
+              delivery_partner_id: user.user_id,
+              branch_id: targetBranchId,
+              is_active: true,
+              is_verified: true,
+              is_available: true,
+              is_online: false,
+              vehicle_type: 'BIKE',
+              vehicle_number: 'N/A',
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+          }
+        } catch (dpErr) {
+          console.error('[AuthService] Auto delivery partner sync failed during Google login:', dpErr);
+        }
+      }
+
       const isSatelliteActive = await this.checkSatelliteIsActive(user.user_id, user.role_id || 'CUSTOMER');
       if (!isSatelliteActive) {
         throw new UnauthorizedException('Your account is inactive. Please contact support.');

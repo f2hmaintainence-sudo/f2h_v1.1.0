@@ -42,7 +42,7 @@ export class DeliveryOrderService {
     // delivery_partners has no surrogate `id` and no separate `user_id` — the
     // partner is keyed by delivery_partner_id, which is also the users.user_id.
     // The `id`/`user_id` aliases keep the shape callers in this service expect.
-    const boyRes = await this.db.query(
+    let boyRes = await this.db.query(
       `SELECT dp.delivery_partner_id AS id,
               dp.delivery_partner_id AS user_id,
               dp.delivery_partner_id,
@@ -59,6 +59,43 @@ export class DeliveryOrderService {
        LIMIT 1`,
       [userId],
     );
+
+    if (!boyRes?.length) {
+      const [userRow] = await this.db.query(
+        `SELECT user_id, first_name, last_name, email, phone FROM users WHERE user_id = $1 LIMIT 1`,
+        [userId],
+      );
+      if (userRow) {
+        const [activeBranch] = await this.db.query(
+          `SELECT branch_id FROM branches WHERE is_active = true ORDER BY created_at ASC LIMIT 1`,
+        );
+        const branchId = activeBranch?.branch_id || null;
+        await this.db.query(
+          `INSERT INTO delivery_partners (delivery_partner_id, branch_id, is_active, is_verified, is_available, is_online, vehicle_type, vehicle_number, created_at, updated_at)
+           VALUES ($1, $2, true, true, true, false, 'BIKE', 'N/A', NOW(), NOW())
+           ON CONFLICT (delivery_partner_id) DO NOTHING`,
+          [userId, branchId],
+        );
+        boyRes = await this.db.query(
+          `SELECT dp.delivery_partner_id AS id,
+                  dp.delivery_partner_id AS user_id,
+                  dp.delivery_partner_id,
+                  dp.branch_id,
+                  COALESCE(
+                    NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''),
+                    u.user_name,
+                    dp.delivery_partner_id
+                  ) AS full_name
+           FROM delivery_partners dp
+           LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+           WHERE dp.delivery_partner_id = $1
+             AND dp.deleted_at IS NULL
+           LIMIT 1`,
+          [userId],
+        );
+      }
+    }
+
     if (!boyRes?.length) {
       throw new NotFoundException('Delivery boy profile not found for this account');
     }

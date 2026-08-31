@@ -33,7 +33,7 @@ export class ProfileService {
   async getPersonalInfo(deliveryPartnerId: string) {
     try {
       // JOIN delivery_partners + users to get combined personal info
-      const result = await this.db.query(
+      let result = await this.db.query(
         `SELECT
           dp.*,
           u.email,
@@ -52,6 +52,44 @@ export class ProfileService {
         LIMIT 1`,
         [deliveryPartnerId],
       );
+
+      if (!result?.length) {
+        const [userRow] = await this.db.query(
+          `SELECT user_id, first_name, last_name, email, phone FROM users WHERE user_id = $1 LIMIT 1`,
+          [deliveryPartnerId],
+        );
+        if (userRow) {
+          const [activeBranch] = await this.db.query(
+            `SELECT branch_id, branch_name FROM branches WHERE is_active = true ORDER BY created_at ASC LIMIT 1`,
+          );
+          const branchId = activeBranch?.branch_id || null;
+          await this.db.query(
+            `INSERT INTO delivery_partners (delivery_partner_id, branch_id, is_active, is_verified, is_available, is_online, vehicle_type, vehicle_number, created_at, updated_at)
+             VALUES ($1, $2, true, true, true, false, 'BIKE', 'N/A', NOW(), NOW())
+             ON CONFLICT (delivery_partner_id) DO NOTHING`,
+            [deliveryPartnerId, branchId],
+          );
+          result = await this.db.query(
+            `SELECT
+              dp.*,
+              u.email,
+              u.phone,
+              u.first_name,
+              u.last_name,
+              u.first_name || ' ' || u.last_name AS full_name,
+              u.profile_image_url,
+              u.last_login_at,
+              u.account_status,
+              b.branch_name
+            FROM delivery_partners dp
+            LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+            LEFT JOIN branches b ON b.branch_id = dp.branch_id
+            WHERE dp.delivery_partner_id = $1
+            LIMIT 1`,
+            [deliveryPartnerId],
+          );
+        }
+      }
 
       if (!result?.length) {
         throw new NotFoundException('Delivery partner profile not found');
@@ -871,7 +909,7 @@ export class ProfileService {
    */
   async getDeliveryPartnerReferrals(deliveryPartnerId: string) {
     try {
-      const [partnerUser] = await this.db.query(
+      let [partnerUser] = await this.db.query(
         `SELECT u.user_id, u.first_name, u.last_name, u.phone, dp.delivery_partner_id
          FROM delivery_partners dp
          LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
@@ -879,6 +917,34 @@ export class ProfileService {
          LIMIT 1`,
         [deliveryPartnerId],
       );
+
+      if (!partnerUser) {
+        const [userRow] = await this.db.query(
+          `SELECT user_id, first_name, last_name, phone FROM users WHERE user_id = $1 LIMIT 1`,
+          [deliveryPartnerId],
+        );
+        if (userRow) {
+          const [activeBranch] = await this.db.query(
+            `SELECT branch_id FROM branches WHERE is_active = true ORDER BY created_at ASC LIMIT 1`,
+          );
+          const branchId = activeBranch?.branch_id || null;
+          await this.db.query(
+            `INSERT INTO delivery_partners (delivery_partner_id, branch_id, is_active, is_verified, is_available, is_online, vehicle_type, vehicle_number, created_at, updated_at)
+             VALUES ($1, $2, true, true, true, false, 'BIKE', 'N/A', NOW(), NOW())
+             ON CONFLICT (delivery_partner_id) DO NOTHING`,
+            [deliveryPartnerId, branchId],
+          );
+          const [refreshed] = await this.db.query(
+            `SELECT u.user_id, u.first_name, u.last_name, u.phone, dp.delivery_partner_id
+             FROM delivery_partners dp
+             LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
+             WHERE dp.delivery_partner_id = $1
+             LIMIT 1`,
+            [deliveryPartnerId],
+          );
+          partnerUser = refreshed;
+        }
+      }
 
       if (!partnerUser) {
         throw new NotFoundException('Delivery partner not found');
