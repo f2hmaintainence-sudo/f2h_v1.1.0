@@ -1230,6 +1230,7 @@ export default function PromotionsCouponsOffersPage() {
               <option value="active">Active</option>
               <option value="paused">Paused / Inactive</option>
               <option value="draft">Draft</option>
+              <option value="expired">Expired</option>
             </select>
 
             <div className="relative w-full sm:w-64">
@@ -2934,6 +2935,7 @@ export default function PromotionsCouponsOffersPage() {
                     <option value="active">Active</option>
                     <option value="paused">Paused</option>
                     <option value="draft">Draft</option>
+                    <option value="expired">Expired</option>
                   </select>
                 </div>
               </div>
@@ -3107,6 +3109,7 @@ export default function PromotionsCouponsOffersPage() {
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
                   <option value="draft">Draft</option>
+                  <option value="expired">Expired</option>
                 </select>
               </div>
             </form>

@@ -38,8 +38,8 @@ class F2hHeroHeader extends StatelessWidget {
         Positioned.fill(
           child: Image.asset(
             'assets/home_bg.png',
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
+            fit: BoxFit.fitWidth,
+            alignment: Alignment.topCenter,
             errorBuilder: (_, __, ___) => Container(color: const Color(0xFFE8F5E9)),
           ),
         ),

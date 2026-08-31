@@ -10,7 +10,6 @@ import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_ent
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
-import 'package:f2h_customer/features/catalog/presentation/helpers/cart_navigation_helper.dart';
 import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/core/widgets/custom_date_picker.dart';
@@ -449,7 +448,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     context.read<CartBloc>().add(AddToCartEvent(cartItem));
     F2HToast.success(context, 'Subscription added to cart for renewal!');
 
-    CartNavHelper.openCart(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CartScreen()),
+    );
   }
 
   void _handleCancel() {

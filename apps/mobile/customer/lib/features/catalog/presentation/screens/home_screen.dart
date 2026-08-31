@@ -24,7 +24,6 @@ import '../widgets/product_grid_card.dart';
 import '../widgets/promo_banner.dart';
 import '../widgets/today_delivery_partner_card.dart';
 import 'cart_screen.dart';
-import '../helpers/cart_navigation_helper.dart';
 import 'product_detail_view_screen.dart';
 import '../../../../core/widgets/floating_cart_bar.dart';
 import 'product_detail_screen.dart';
@@ -1528,7 +1527,12 @@ class _HomeScreenState extends State<HomeScreen>
           duration: const Duration(milliseconds: 250),
           curve: Curves.elasticOut,
           child: GestureDetector(
-            onTap: () => CartNavHelper.openCart(context),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              );
+            },
             child: Stack(
               clipBehavior: Clip.none,
               children: [

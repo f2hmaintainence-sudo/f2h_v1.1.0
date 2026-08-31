@@ -33,9 +33,6 @@ import '../helpers/cart_helpers.dart';
 import '../widgets/cart_widgets.dart';
 import '../widgets/product_grid_card.dart';
 import 'home_screen.dart';
-import 'package:f2h_customer/features/address/presentation/widgets/address_selector_drawer.dart';
-import 'package:f2h_customer/features/address/data/models/profile_address.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
 
 
 
@@ -345,10 +342,6 @@ class _CartScreenState extends State<CartScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // ===== Delivery Address Selection Card =====
-                                      _buildDeliveryAddressCard(context, sessionState),
-                                      const SizedBox(height: 14),
-
                                       // ===== Cart Items List (One-Time Only) =====
                                       _buildItemsCard(
                                         context,
@@ -792,7 +785,7 @@ class _CartScreenState extends State<CartScreen> {
               child: SizedBox(
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () async {
+                  onPressed: () {
                     final selectedKeys = itemKeys
                         .where((k) => _selectedItems[k] ?? true)
                         .toList();
@@ -805,33 +798,16 @@ class _CartScreenState extends State<CartScreen> {
                       return;
                     }
 
-                    final sessionCubit = context.read<CustomerSessionCubit>();
-                    final session = sessionCubit.state;
-                    if (session.addresses.isEmpty) {
-                      final chosen = await AddressSelectorDrawer.show(context);
-                      if (!context.mounted) return;
-                      await sessionCubit.refreshSilently();
-                      if (sessionCubit.state.addresses.isEmpty && chosen == null) {
-                        F2HToast.error(
-                          context,
-                          'Please select or add a delivery address to proceed.',
-                        );
-                        return;
-                      }
-                    }
-
                     // Navigate to Checkout Screen
-                    if (context.mounted) {
-                      context.runWithAuth(() {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                CheckoutScreen(selectedItemIds: selectedKeys),
-                          ),
-                        );
-                      });
-                    }
+                    context.runWithAuth(() {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CheckoutScreen(selectedItemIds: selectedKeys),
+                        ),
+                      );
+                    });
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimary,
@@ -861,136 +837,6 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDeliveryAddressCard(
-    BuildContext context,
-    CustomerSessionState sessionState,
-  ) {
-    AddressModel? defaultAddress;
-    if (sessionState.addresses.isNotEmpty) {
-      try {
-        defaultAddress = sessionState.addresses.firstWhere((a) => a.isDefault);
-      } catch (_) {
-        defaultAddress = sessionState.addresses.first;
-      }
-    }
-
-    final hasAddress = defaultAddress != null;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasAddress ? kBorderLt : const Color(0xFF16A34A).withValues(alpha: 0.5),
-          width: hasAddress ? 1.0 : 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (hasAddress ? kText : kPrimary).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: hasAddress ? kPrimaryPl : const Color(0xFFDCFCE7),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.location_on_rounded,
-              size: 18,
-              color: hasAddress ? kPrimary : const Color(0xFF15803D),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      hasAddress ? 'Deliver to ${defaultAddress.name.isNotEmpty ? defaultAddress.name : 'Home'}' : 'Delivery Address Required',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: hasAddress ? kText : const Color(0xFF15803D),
-                      ),
-                    ),
-                    if (hasAddress && defaultAddress.label.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: kPrimaryPl,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          defaultAddress.label.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: kPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  hasAddress
-                      ? (defaultAddress.detail.isNotEmpty
-                          ? defaultAddress.detail
-                          : '${defaultAddress.city} ${defaultAddress.pincode}'.trim())
-                      : 'Tap to select or add your delivery address',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: hasAddress ? FontWeight.w500 : FontWeight.w700,
-                    color: hasAddress ? kTextSub : const Color(0xFF16A34A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: () async {
-              final chosen = await AddressSelectorDrawer.show(context);
-              if (context.mounted) {
-                await context.read<CustomerSessionCubit>().refreshSilently();
-                if (chosen != null && chosen.branchId.isNotEmpty) {
-                  context.read<CatalogBloc>().add(LoadCatalog(branchId: chosen.branchId));
-                }
-              }
-            },
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              backgroundColor: kPrimaryPl,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              hasAddress ? 'Change' : 'Select',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: kPrimary,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -22,7 +22,33 @@ export class PromotionsCouponsService implements OnModuleInit {
   ) { }
 
   async onModuleInit() {
-    // Deprecated: First order 50% off promotion is removed.
+    try {
+      // Ensure PROMO_FIRST_MILK is active if it exists
+      await this.db.query(
+        `UPDATE promotions
+         SET status = 'active', updated_at = NOW()
+         WHERE promotion_id = 'PROMO_FIRST_MILK' AND status = 'expired'`,
+      );
+
+      // Ensure active milk product variants are linked to PROMO_FIRST_MILK
+      const milkVariants = await this.db.query(
+        `SELECT pv.variant_id
+         FROM product_variants pv
+         JOIN products p ON p.product_id = pv.product_id
+         WHERE LOWER(p.name) LIKE '%milk%' AND pv.deleted_at IS NULL AND p.deleted_at IS NULL`,
+      );
+
+      for (const row of milkVariants || []) {
+        await this.db.query(
+          `INSERT INTO promotion_products (promotion_id, product_variant_id, created_at)
+           VALUES ('PROMO_FIRST_MILK', $1, NOW())
+           ON CONFLICT (promotion_id, product_variant_id) DO NOTHING`,
+          [row.variant_id],
+        );
+      }
+    } catch (e) {
+      console.error('[PromotionsCouponsService] onModuleInit activation failed', e);
+    }
   }
 
 
