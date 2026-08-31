@@ -50,12 +50,46 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
   @override
   void initState() {
     super.initState();
-    final vars = widget.product.allVariants;
-    _selected = vars.firstWhere(
-      (v) => v.id == widget.selectedVariantId,
-      orElse: () => vars.isNotEmpty ? vars.first : ProductVariant(id: widget.product.id, label: widget.product.unit, price: widget.product.price, originalPrice: widget.product.originalPrice, subscriptionPrice: widget.product.subscriptionPrice),
-    );
+    // The pills below render from `product.variants`, so resolve the initial
+    // selection from that same list — `allVariants` de-dupes by unit and can
+    // drop the very entry the tapped card stands for.
+    final vars = widget.product.variants.isNotEmpty
+        ? widget.product.variants
+        : widget.product.allVariants;
+
+    // A product card IS a single variant (Product.id holds a variant_id) and
+    // carries its siblings in `variants`. Default to the variant the user
+    // actually tapped; falling back to `vars.first` preselected whichever
+    // sibling happened to be listed first, so opening the 1L card came up on
+    // an unrelated pack at the wrong price.
+    _selected = _variantById(vars, widget.selectedVariantId) ??
+        _variantById(vars, widget.product.id) ??
+        (vars.isNotEmpty
+            ? vars.first
+            : ProductVariant(
+                id: widget.product.id,
+                label: widget.product.unit,
+                price: widget.product.price,
+                originalPrice: widget.product.originalPrice,
+                subscriptionPrice: widget.product.subscriptionPrice,
+              ));
   }
+
+  static ProductVariant? _variantById(List<ProductVariant> vars, String? id) {
+    if (id == null || id.isEmpty) return null;
+    for (final v in vars) {
+      if (v.id == id) return v;
+    }
+    return null;
+  }
+
+  /// Name for the pack the user currently has selected. Each pill is a
+  /// separately named product row, so the header and the cart entry have to
+  /// follow the selection rather than the card that opened the sheet.
+  String get _selectedName =>
+      _selected.id == widget.product.id || _selected.label.trim().isEmpty
+          ? widget.product.name
+          : _selected.label;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +135,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.name,
+                    Text(_selectedName,
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: kText)),
                     Text(p.vendor,
                         style: const TextStyle(fontSize: 11, color: kTextSub)),

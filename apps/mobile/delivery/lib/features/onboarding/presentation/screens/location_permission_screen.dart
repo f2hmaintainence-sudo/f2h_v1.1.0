@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -44,20 +45,33 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please enable GPS Location Services in your settings', style: GoogleFonts.roboto()),
-            backgroundColor: kRed,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            action: SnackBarAction(
-              label: 'SETTINGS',
-              textColor: Colors.white,
-              onPressed: () => Geolocator.openLocationSettings(),
+        if (!kIsWeb) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please enable GPS Location Services in your settings', style: GoogleFonts.roboto()),
+              backgroundColor: kRed,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              action: SnackBarAction(
+                label: 'SETTINGS',
+                textColor: Colors.white,
+                onPressed: () => Geolocator.openLocationSettings(),
+              ),
             ),
-          ),
-        );
-        await Geolocator.openLocationSettings();
+          );
+          try {
+            await Geolocator.openLocationSettings();
+          } catch (_) {}
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please enable GPS / Location in your browser settings', style: GoogleFonts.roboto()),
+              backgroundColor: kRed,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
         setState(() {
           _isRequesting = false;
         });
@@ -87,20 +101,33 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
 
       if (permission == LocationPermission.deniedForever) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Location permission is permanently denied. Please enable it in app settings.', style: GoogleFonts.roboto()),
-            backgroundColor: kRed,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            action: SnackBarAction(
-              label: 'SETTINGS',
-              textColor: Colors.white,
-              onPressed: () => Geolocator.openAppSettings(),
+        if (!kIsWeb) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Location permission is permanently denied. Please enable it in app settings.', style: GoogleFonts.roboto()),
+              backgroundColor: kRed,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              action: SnackBarAction(
+                label: 'SETTINGS',
+                textColor: Colors.white,
+                onPressed: () => Geolocator.openAppSettings(),
+              ),
             ),
-          ),
-        );
-        await Geolocator.openAppSettings();
+          );
+          try {
+            await Geolocator.openAppSettings();
+          } catch (_) {}
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Location permission is blocked in your browser. Please allow Location in browser site settings.', style: GoogleFonts.roboto()),
+              backgroundColor: kRed,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
         setState(() {
           _isRequesting = false;
         });

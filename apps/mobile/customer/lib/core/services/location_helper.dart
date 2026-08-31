@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
@@ -7,6 +8,8 @@ class LocationHelper {
   /// are active. If either is disabled or denied, shows a clear, user-friendly
   /// prompt with a direct 1-tap button to open device location settings or app settings.
   ///
+  /// Works safely on both Mobile (Android/iOS) and Flutter Web (`kIsWeb`).
+  ///
   /// Returns the current [Position] if successful, or `null` if the user dismissed or refused.
   static Future<Position?> getCurrentPositionWithPrompt(BuildContext context) async {
     // 1. Check if device location service (GPS) is enabled
@@ -14,8 +17,10 @@ class LocationHelper {
     if (!serviceEnabled) {
       if (!context.mounted) return null;
       final bool? opened = await showLocationServiceDialog(context);
-      if (opened == true) {
-        await Geolocator.openLocationSettings();
+      if (opened == true && !kIsWeb) {
+        try {
+          await Geolocator.openLocationSettings();
+        } catch (_) {}
       }
       return null;
     }
@@ -31,7 +36,9 @@ class LocationHelper {
           isPermanentlyDenied: false,
         );
         if (opened == true) {
-          permission = await Geolocator.requestPermission();
+          try {
+            permission = await Geolocator.requestPermission();
+          } catch (_) {}
         }
         if (permission != LocationPermission.whileInUse &&
             permission != LocationPermission.always) {
@@ -46,8 +53,10 @@ class LocationHelper {
         context,
         isPermanentlyDenied: true,
       );
-      if (opened == true) {
-        await Geolocator.openAppSettings();
+      if (opened == true && !kIsWeb) {
+        try {
+          await Geolocator.openAppSettings();
+        } catch (_) {}
       }
       return null;
     }
@@ -114,10 +123,12 @@ class LocationHelper {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Please turn ON your device GPS / Location Services so we can find your exact delivery address and assign your nearest branch.',
+            Text(
+              kIsWeb
+                  ? 'Please enable GPS / Location on your device or browser so we can find your delivery address.'
+                  : 'Please turn ON your device GPS / Location Services so we can find your exact delivery address and assign your nearest branch.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
                 color: kTextSub,
                 height: 1.4,
@@ -153,9 +164,9 @@ class LocationHelper {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Text(
-                      'Turn ON Location',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                    child: Text(
+                      kIsWeb ? 'Got it' : 'Turn ON Location',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),
@@ -216,9 +227,13 @@ class LocationHelper {
             ),
             const SizedBox(height: 8),
             Text(
-              isPermanentlyDenied
-                  ? 'Location permission is turned off for this app. Please enable Location in App Settings to detect your delivery address.'
-                  : 'F2H needs your location permission to accurately deliver milk and fresh produce to your doorstep.',
+              kIsWeb
+                  ? (isPermanentlyDenied
+                      ? 'Location permission is blocked in your browser. Please tap the lock / tune icon in your browser URL address bar and allow Location.'
+                      : 'Please allow browser location permission when prompted so we can pinpoint your delivery address.')
+                  : (isPermanentlyDenied
+                      ? 'Location permission is turned off for this app. Please enable Location in App Settings to detect your delivery address.'
+                      : 'F2H needs your location permission to accurately deliver milk and fresh produce to your doorstep.'),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -257,7 +272,9 @@ class LocationHelper {
                       ),
                     ),
                     child: Text(
-                      isPermanentlyDenied ? 'Open Settings' : 'Allow Location',
+                      kIsWeb
+                          ? (isPermanentlyDenied ? 'Got it' : 'Allow Location')
+                          : (isPermanentlyDenied ? 'Open Settings' : 'Allow Location'),
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),

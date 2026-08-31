@@ -138,4 +138,10 @@ class ApiEndpoints {
   static const String notificationsMarkAllRead  = '/notifications/mark-all-read';
   static const String notificationsDismissAll   = '/notifications/dismiss-all';
   static String notificationItem(String id)     => '/notifications/$id';
+
+  // ---------------------------------------------------------------------------
+  // Maps & Routing
+  // ---------------------------------------------------------------------------
+  /// Google road-routing proxy: drivable geometry and fastest stop order.
+  static const String mapDirections             = '/map/directions';
 }
