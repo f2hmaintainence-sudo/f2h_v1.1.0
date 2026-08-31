@@ -209,159 +209,167 @@ class PopupBannerWidget {
               backgroundColor: Colors.transparent,
               insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               elevation: 0,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  // Main Banner Card Container: Top Image -> Next Details
-                  Container(
-                    width: double.infinity,
-                    constraints: BoxConstraints(maxWidth: containerWidth),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 28,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // 1. TOP: Banner Image (Full width, edge-to-edge)
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pop(dialogContext);
-                            _handleRedirection(context, actionType, actionValue);
-                          },
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                            child: imageWidget,
+              // The Stack is capped at the card width so the close button can be
+              // positioned against the card's own corner. Constraining the card
+              // instead would leave the Stack full-width and strand the button
+              // out in the barrier on wide screens.
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: containerWidth),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Main Banner Card Container: Top Image -> Next Details
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 28,
+                            offset: const Offset(0, 10),
                           ),
-                        ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 1. TOP: Banner Image (Full width, edge-to-edge)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pop(dialogContext);
+                              _handleRedirection(context, actionType, actionValue);
+                            },
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                              child: imageWidget,
+                            ),
+                          ),
 
-                        // 2. NEXT: Banner Details Section
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (discountText != null && discountText.isNotEmpty) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF3C7),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFF59E0B), width: 1),
-                                  ),
-                                  child: Text(
-                                    discountText.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFFB45309),
-                                      letterSpacing: 0.5,
+                          // 2. NEXT: Banner Details Section
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (discountText != null && discountText.isNotEmpty) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFF59E0B), width: 1),
+                                    ),
+                                    child: Text(
+                                      discountText.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFFB45309),
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                              ],
+                                  const SizedBox(height: 8),
+                                ],
 
-                              Text(
-                                title,
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                  color: kText,
-                                  height: 1.25,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-
-                              if (description != null && description.isNotEmpty) ...[
-                                const SizedBox(height: 6),
                                 Text(
-                                  description,
+                                  title,
                                   style: const TextStyle(
-                                    fontSize: 12,
-                                    color: kTextSub,
-                                    height: 1.4,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: kText,
+                                    height: 1.25,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                              ],
 
-                              const SizedBox(height: 16),
+                                if (description != null && description.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    description,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: kTextSub,
+                                      height: 1.4,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
 
-                              // Full-width CTA Button
-                              SizedBox(
-                                width: double.infinity,
-                                height: 46,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.pop(dialogContext);
-                                    _handleRedirection(context, actionType, actionValue);
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: bannerBgColor,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
+                                const SizedBox(height: 16),
+
+                                // Full-width CTA Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 46,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pop(dialogContext);
+                                      _handleRedirection(context, actionType, actionValue);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: bannerBgColor,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          ctaLabel,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Icon(Icons.arrow_forward_rounded, size: 16),
+                                      ],
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        ctaLabel,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.3,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Icon(Icons.arrow_forward_rounded, size: 16),
-                                    ],
-                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Floating circular Close 'X' button on top-right corner
-                  Positioned(
-                    top: -12,
-                    right: -12,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(dialogContext),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF1E293B)),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+
+                    // Close 'X' sits inside the card's top-right corner. Hanging
+                    // it outside the card notched the rounded corner and risked
+                    // being clipped by the dialog inset on narrow screens.
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(dialogContext),
+                        behavior: HitTestBehavior.opaque,
+                        // Padding keeps the visible circle small while giving the
+                        // tap target a comfortable 44x44.
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              // Translucent scrim so the icon stays legible over
+                              // whatever artwork the banner image happens to use.
+                              color: Colors.black.withValues(alpha: 0.45),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close_rounded, size: 18, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }, // end StatefulBuilder builder

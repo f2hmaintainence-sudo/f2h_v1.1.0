@@ -32,94 +32,82 @@ class F2hHeroHeader extends StatelessWidget {
     final firstName = driverName.trim().split(' ').first;
     final topInset = MediaQuery.of(context).padding.top;
 
-    return Container(
-      width: double.infinity,
-      color: Colors.transparent,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // 1. Delivery Background Illustration anchored to bottom (no overlap with top bar)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 120,
-            child: Image.asset(
-              'assets/home_bg.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-            ),
+    return Stack(
+      children: [
+        // ── FULL BACKGROUND: delivery illustration covers entire header ──
+        Positioned.fill(
+          child: Image.asset(
+            'assets/home_bg.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            errorBuilder: (_, __, ___) => Container(color: const Color(0xFFE8F5E9)),
           ),
+        ),
 
-          // 2. Header Content on transparent top area (Greeting, Bell, Avatar, Online Pill)
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 125),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Bar with Greeting, Notification Icon, and Profile Avatar
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${AppGreeting.get()}, $firstName!',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.roboto(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF0F172A),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              Text(
-                                'Ready to deliver amazing today',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF475569),
-                                ),
-                              ),
-                              const SizedBox(width: 3),
-                              const Text('📍', style: TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Top Right Actions: Bell + Profile Avatar
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+        // ── FOREGROUND: greeting, bell, avatar, online pill ──
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top Bar
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
-                        const SizedBox(width: 8),
-                        _buildProfileButton(onTap: onProfile, driverName: driverName, avatarUrl: avatarUrl),
+                        Text(
+                          '${AppGreeting.get()}, $firstName!',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.roboto(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF0F172A),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Text(
+                              'Ready to deliver amazing today',
+                              style: GoogleFonts.roboto(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF475569),
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Text('📍', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildBellButton(onTap: onNotifications, unreadCount: unreadCount),
+                      const SizedBox(width: 8),
+                      _buildProfileButton(onTap: onProfile, driverName: driverName, avatarUrl: avatarUrl),
+                    ],
+                  ),
+                ],
+              ),
 
-                const SizedBox(height: 14),
+              const SizedBox(height: 14),
 
-                // Online / Offline Status Dropdown Pill
-                _buildOnlineStatusPill(context),
-              ],
-            ),
+              _buildOnlineStatusPill(context),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
