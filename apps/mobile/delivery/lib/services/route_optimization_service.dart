@@ -100,9 +100,14 @@ const Duration _kResultCacheTtl = Duration(seconds: 45);
 /// ~11 m. Below this the rider has not moved enough to change the road route.
 const int _kOriginKeyPrecision = 4;
 
-/// Tolerance on the geometry-versus-distance check, absorbing rounding and the
-/// simplification Google applies to an overview polyline.
-const double _kGeometrySlackKm = 1.0;
+/// Minimum floor for the geometry-vs-distance ceiling. Even a very short run
+/// can have a diagonal that exceeds a tight road distance, because the overview
+/// polyline simplifies curves.
+const double _kGeometryFloorKm = 5.0;
+
+/// Proportional factor: the bounding-box diagonal may be up to this fraction
+/// of the road distance.
+const double _kGeometryRatioMax = 1.5;
 
 class RouteOptimizationService {
   final LocationService _locationService;
@@ -194,15 +199,20 @@ class RouteOptimizationService {
         ? currentPosition
         : LatLng(pending.first.addressLat, pending.first.addressLng);
 
+    final initialOrdered = computeShortestStopSequence(
+      currentPosition: origin,
+      stops: pending,
+    );
+
     // Without a fix the rider's own position cannot start the route, so the
     // first stop stands in as the origin and is not itself routed to.
     final bool originIsRider = _isValidPosition(currentPosition);
     final List<GroupedStop> routable =
-        originIsRider ? pending : pending.sublist(1);
+        originIsRider ? initialOrdered : initialOrdered.sublist(1);
 
     if (routable.isEmpty) {
       return OptimizedRouteResult.unavailable(
-        orderedStops: [...pending, ...completed],
+        orderedStops: [...initialOrdered, ...completed],
         reason: 'Waiting for your location to draw the route',
       );
     }
@@ -226,7 +236,7 @@ class RouteOptimizationService {
           'intermediates': intermediates
               .map((s) => {'lat': s.addressLat, 'lng': s.addressLng})
               .toList(),
-          'optimizeWaypointOrder': intermediates.length > 1,
+          'optimizeWaypointOrder': intermediates.isNotEmpty,
           'travelMode': _kTravelMode,
         },
       );
@@ -258,7 +268,7 @@ class RouteOptimizationService {
 
     final result = _buildResult(
       data: data,
-      leadingStop: originIsRider ? null : pending.first,
+      leadingStop: originIsRider ? null : initialOrdered.first,
       intermediates: intermediates,
       destination: destination,
       completed: completed,
@@ -310,11 +320,14 @@ class RouteOptimizationService {
         ((data['distanceMeters'] as num?)?.toDouble() ?? 0) / 1000.0;
     final geometrySpanKm =
         _geometrySpanKm([fullPoints, for (final leg in legs) leg.points]);
-    if (geometrySpanKm > totalDistanceKmRaw + _kGeometrySlackKm) {
-      // Rider-facing text stays generic; the numbers that identify the bad
-      // payload go to the debug log.
+    final ceilingKm = totalDistanceKmRaw > 0
+        ? (totalDistanceKmRaw * _kGeometryRatioMax)
+            .clamp(_kGeometryFloorKm, double.infinity)
+        : _kGeometryFloorKm;
+
+    if (geometrySpanKm > ceilingKm) {
       devLog('[route] rejected geometry: spans '
-          '${geometrySpanKm.toStringAsFixed(1)} km but provider '
+          '${geometrySpanKm.toStringAsFixed(1)} km (ceiling ${ceilingKm.toStringAsFixed(1)} km) but provider '
           '${data['provider']} reported '
           '${totalDistanceKmRaw.toStringAsFixed(3)} km '
           '(${fullPoints.length} route points, ${legs.length} legs)');

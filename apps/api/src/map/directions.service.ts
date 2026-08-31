@@ -130,8 +130,8 @@ export class DirectionsService {
 
     const body = {
       origin: this.routesWaypoint(request.origin, false),
-      destination: this.routesWaypoint(request.destination, true),
-      intermediates: intermediates.map((p) => this.routesWaypoint(p, true)),
+      destination: this.routesWaypoint(request.destination, false),
+      intermediates: intermediates.map((p) => this.routesWaypoint(p, false)),
       travelMode: request.travelMode ?? 'TWO_WHEELER',
       // Live traffic is what makes the returned order the *fastest* one rather
       // than merely the shortest.

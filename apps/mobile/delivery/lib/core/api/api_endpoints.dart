@@ -67,6 +67,7 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   // Delivery Partner Location & SOS
   // ---------------------------------------------------------------------------
+  static const String mapDirections    = '/map/directions';
   static const String locationUpdate   = '/delivery-partner/location/update';
   static const String sos              = '/delivery-partner/location/sos';
   static const String clearSos         = '/delivery-partner/location/clear-sos';
