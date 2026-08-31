@@ -79,6 +79,57 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     (Icons.card_giftcard_rounded, ''),
   ];
 
+  static List<TextSpan> _buildMultiColorReferralSpans(bool on, bool isEnabled) {
+    if (!isEnabled) {
+      return [
+        TextSpan(
+          text: 'REFERRAL',
+          style: GoogleFonts.roboto(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.3,
+            color: kMuted,
+          ),
+        ),
+      ];
+    }
+
+    const letters = ['R', 'E', 'F', 'E', 'R', 'R', 'A', 'L'];
+    final colors = on
+        ? const [
+            Color(0xFFFF5252), // R - Coral Red
+            Color(0xFFFFA726), // E - Bright Amber/Orange
+            Color(0xFF4ADE80), // F - Emerald Mint Green
+            Color(0xFF38BDF8), // E - Electric Sky Blue
+            Color(0xFF818CF8), // R - Indigo
+            Color(0xFFC084FC), // R - Violet/Purple
+            Color(0xFFF472B6), // A - Hot Pink
+            Color(0xFFFACC15), // L - Neon Gold
+          ]
+        : const [
+            Color(0xFFDC2626), // R - Rich Red
+            Color(0xFFEA580C), // E - Vibrant Orange
+            Color(0xFF16A34A), // F - Vivid Green
+            Color(0xFF0284C7), // E - Vivid Sky Blue
+            Color(0xFF4F46E5), // R - Vivid Indigo
+            Color(0xFF9333EA), // R - Vivid Purple
+            Color(0xFFDB2777), // A - Vivid Pink
+            Color(0xFFD97706), // L - Vivid Amber
+          ];
+
+    return List.generate(letters.length, (idx) {
+      return TextSpan(
+        text: letters[idx],
+        style: GoogleFonts.roboto(
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.3,
+          color: colors[idx],
+        ),
+      );
+    });
+  }
+
   Future<bool> _handlePop() async {
     final now = DateTime.now();
     const backButtonInterval = Duration(seconds: 2);
@@ -202,14 +253,14 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                             children: [
                               if (isReferral)
                                 Container(
-                                  height: 36,
+                                  height: 42,
                                   alignment: Alignment.center,
                                   child: Stack(
                                     clipBehavior: Clip.none,
                                     alignment: Alignment.center,
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                                         decoration: BoxDecoration(
                                           gradient: on
                                               ? const LinearGradient(
@@ -221,42 +272,48 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                                   begin: Alignment.topLeft,
                                                   end: Alignment.bottomRight,
                                                 )
-                                              : null,
-                                          color: on ? null : const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(10),
+                                              : const LinearGradient(
+                                                  colors: [
+                                                    Color(0xFFFFFFFF),
+                                                    Color(0xFFF1F5F9),
+                                                  ],
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                ),
+                                          borderRadius: BorderRadius.circular(12),
                                           border: Border.all(
                                             color: on
-                                                ? const Color(0xFF22C55E).withValues(alpha: 0.5)
-                                                : const Color(0xFFE2E8F0),
-                                            width: 1.2,
+                                                ? const Color(0xFF22C55E).withValues(alpha: 0.8)
+                                                : const Color(0xFFCBD5E1),
+                                            width: on ? 1.8 : 1.4,
                                           ),
                                           boxShadow: on
                                               ? [
                                                   BoxShadow(
-                                                    color: const Color(0xFF064E3B).withValues(alpha: 0.25),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 2),
+                                                    color: const Color(0xFF064E3B).withValues(alpha: 0.35),
+                                                    blurRadius: 10,
+                                                    offset: const Offset(0, 3),
                                                   ),
                                                 ]
-                                              : null,
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.black.withValues(alpha: 0.06),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
                                         ),
-                                        child: Text(
-                                          'REFERRAL',
-                                          style: GoogleFonts.roboto(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: -0.4,
-                                            color: on
-                                                ? const Color(0xFF4ADE80)
-                                                : (isTabEnabled ? const Color(0xFF16A34A) : kMuted),
+                                        child: RichText(
+                                          text: TextSpan(
+                                            children: _buildMultiColorReferralSpans(on, isTabEnabled),
                                           ),
                                         ),
                                       ),
                                       Positioned(
-                                        top: -6,
-                                        right: -6,
+                                        top: -9,
+                                        right: -8,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                          padding: const EdgeInsets.symmetric(horizontal: 7.5, vertical: 2),
                                           decoration: BoxDecoration(
                                             gradient: const LinearGradient(
                                               colors: [
@@ -267,25 +324,26 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
                                             ),
-                                            borderRadius: BorderRadius.circular(6),
+                                            borderRadius: BorderRadius.circular(8),
                                             border: Border.all(
-                                              color: const Color(0xFF22C55E).withValues(alpha: 0.7),
-                                              width: 0.8,
+                                              color: const Color(0xFF4ADE80),
+                                              width: 1.2,
                                             ),
-                                            boxShadow: const [
+                                            boxShadow: [
                                               BoxShadow(
-                                                color: Color(0x33064E3B),
-                                                blurRadius: 4,
-                                                offset: Offset(0, 1.5),
+                                                color: const Color(0xFF064E3B).withValues(alpha: 0.4),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 2),
                                               ),
                                             ],
                                           ),
                                           child: Text(
                                             '₹75',
                                             style: GoogleFonts.roboto(
-                                              fontSize: 8.5,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w900,
                                               color: const Color(0xFF4ADE80),
+                                              letterSpacing: -0.2,
                                             ),
                                           ),
                                         ),
