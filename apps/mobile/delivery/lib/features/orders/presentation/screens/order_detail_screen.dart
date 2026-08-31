@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui_web' as ui_web;
-import 'package:web/web.dart' as web;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
@@ -18,6 +19,7 @@ import 'package:f2h_delivery/core/config/app_config.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_result_dialog.dart';
+
 
 class OrderDetailScreen extends StatefulWidget {
   final GroupedStop stop;
@@ -903,79 +905,129 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget _buildMapRoutePreviewCard() {
     final lat = _currentStop.addressLat;
     final lng = _currentStop.addressLng;
-    final apiKey = AppConfig.googleMapsApiKey;
-    final viewId = 'gmaps-stop-${_currentStop.stop}-${lat.toStringAsFixed(5)}';
-
-    if (kIsWeb) {
-      // Register the Google Maps Embed iframe once per unique stop
-      try {
-        ui_web.platformViewRegistry.registerViewFactory(
-          viewId,
-          (int id) {
-            final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
-            iframe.src = 'https://www.google.com/maps/embed/v1/place?key=$apiKey&q=$lat,$lng&zoom=16&maptype=roadmap';
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = '0';
-            iframe.loading = 'lazy';
-            iframe.referrerPolicy = 'no-referrer-when-downgrade';
-            iframe.allowFullscreen = true;
-            return iframe;
-          },
-        );
-      } catch (_) {
-        // Already registered — safe to ignore
-      }
-    }
+    final isValidCoords = lat.isFinite && !lat.isNaN && lng.isFinite && !lng.isNaN && !(lat == 0 && lng == 0);
+    final stopPos = isValidCoords ? LatLng(lat, lng) : const LatLng(12.9125, 77.6430);
 
     return Container(
-      height: 200,
+      height: 220,
       decoration: BoxDecoration(
         color: kSurface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: kBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          )
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (kIsWeb)
-              HtmlElementView(viewType: viewId)
-            else
-              // Fallback for native: open Google Maps in browser
-              InkWell(
-                onTap: () => _openNav(lat, lng),
-                child: Container(
-                  color: const Color(0xFFE8F5E9),
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.map_rounded, color: kPrimary, size: 48),
-                      const SizedBox(height: 8),
-                      Text('Tap to open in Google Maps',
-                          style: TextStyle(color: kPrimary, fontWeight: FontWeight.w700)),
-                    ],
+            // 1. Google Maps Raster Tile Map
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: stopPos,
+                initialZoom: 16.0,
+                maxZoom: 19.0,
+                minZoom: 4.0,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.none,
+                ),
+                onTap: (_, __) => _openNav(lat, lng),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                  userAgentPackageName: 'com.f2h.delivery',
+                  subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: stopPos,
+                      width: 50,
+                      height: 50,
+                      child: GestureDetector(
+                        onTap: () => _openNav(lat, lng),
+                        child: Center(
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF16A34A),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2.5),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x33000000),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                )
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${_currentStop.stop}',
+                                style: GoogleFonts.roboto(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // 2. Google Maps Attribution / Watermark pill
+            Positioned(
+              top: 10,
+              left: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
+                  ],
+                ),
+                child: Text(
+                  'Google Maps',
+                  style: GoogleFonts.roboto(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF475569),
                   ),
                 ),
               ),
-            
-            // ETA Overlay Card
+            ),
+
+            // 3. ETA & Navigate Action Overlay Card
             Positioned(
-              bottom: 12,
-              left: 12,
-              right: 12,
+              bottom: 10,
+              left: 10,
+              right: 10,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Colors.white.withValues(alpha: 0.98),
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
+                  border: Border.all(color: const Color(0xFFDCFCE7), width: 1.2),
+                  boxShadow: const [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
+                      color: Color(0x1F000000),
                       blurRadius: 10,
-                      offset: const Offset(0, 4),
+                      offset: Offset(0, 4),
                     )
                   ],
                 ),
@@ -984,7 +1036,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.directions_bike_rounded, color: kPrimary, size: 20),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFDCFCE7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.directions_bike_rounded, color: Color(0xFF16A34A), size: 18),
+                        ),
                         const SizedBox(width: 8),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -992,11 +1051,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           children: [
                             Text(
                               _calculatedDistanceText,
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: kText),
+                              style: GoogleFonts.roboto(fontWeight: FontWeight.w800, fontSize: 12.5, color: const Color(0xFF0F172A)),
                             ),
                             Text(
                               _calculatedEtaText,
-                              style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.bold),
+                              style: GoogleFonts.roboto(fontSize: 10.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -1007,16 +1066,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: kPrimary,
+                          color: const Color(0xFF16A34A),
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x3316A34A),
+                              blurRadius: 6,
+                              offset: Offset(0, 2),
+                            )
+                          ],
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.navigation_rounded, color: Colors.white, size: 14),
-                            SizedBox(width: 6),
+                            const Icon(Icons.navigation_rounded, color: Colors.white, size: 14),
+                            const SizedBox(width: 5),
                             Text(
                               'NAVIGATE',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+                              style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
                             ),
                           ],
                         ),
@@ -1031,6 +1097,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
     );
   }
+
 
   List<Widget> _buildOrderWiseCards() {
     if (_currentStop.orders.isEmpty) {

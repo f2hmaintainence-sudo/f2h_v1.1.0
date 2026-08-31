@@ -652,6 +652,12 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
                   )
                 : null,
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            filled: false,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
           ),
           style: const TextStyle(color: kText, fontSize: 14),

@@ -26,6 +26,7 @@ import { ReferralModule } from '../../customer/referral/referral.module';
 import { RefundCandidatesModule } from '../customers-orders/subscriptions/refund-candidates/refund-candidates.module';
 import { AdminBasketController } from './admin-basket.controller';
 import { DeliveryOrdersModule } from '../../delivery-partner/orders/orders.module';
+import { PaymentGatewayModule } from 'src/shared/payments/payment-gateway.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { DeliveryOrdersModule } from '../../delivery-partner/orders/orders.modul
     // A failed delivery on a prepaid subscription raises a refund candidate.
     RefundCandidatesModule,
     DeliveryOrdersModule,
+    PaymentGatewayModule,
   ],
   controllers: [DeliveryManagementController, AdminBasketController],
   providers: [

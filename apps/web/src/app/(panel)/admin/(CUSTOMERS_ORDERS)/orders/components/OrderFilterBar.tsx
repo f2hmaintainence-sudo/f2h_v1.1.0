@@ -19,12 +19,13 @@ import {
   Sun,
   Moon,
   AlertTriangle,
+  AlertOctagon,
   X,
   Calendar,
 } from 'lucide-react';
 
 export type ViewMode = 'grid' | 'table';
-export type OrderTypeTab = 'all' | 'one-time' | 'subscription';
+export type OrderTypeTab = 'all' | 'one-time' | 'subscription' | 'undelivered';
 export type DeliverySlotFilter = 'all' | 'morning' | 'evening';
 
 interface OrderFilterBarProps {
@@ -74,9 +75,10 @@ export default function OrderFilterBar({
         {!fixedTab && (
           <div className="inline-flex h-9 rounded-xl bg-gray-100/90 p-1 border border-gray-200/80 items-center shrink-0">
             {([
-              { key: 'all',          label: 'All Orders', icon: BarChart3   },
-              { key: 'one-time',     label: 'One-Time',   icon: ShoppingCart },
-              { key: 'subscription', label: 'Subscription', icon: Repeat    },
+              { key: 'all',          label: 'All Orders',   icon: BarChart3    },
+              { key: 'one-time',     label: 'One-Time',     icon: ShoppingCart  },
+              { key: 'subscription', label: 'Subscription', icon: Repeat        },
+              { key: 'undelivered',  label: 'Undelivered',  icon: AlertOctagon  },
             ] as const).map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -84,8 +86,12 @@ export default function OrderFilterBar({
                 onClick={() => onOrderTypeChange(key)}
                 className={`inline-flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                   orderType === key
-                    ? 'bg-emerald-700 text-white shadow-2xs font-bold'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? key === 'undelivered'
+                      ? 'bg-amber-600 text-white shadow-2xs font-bold'
+                      : 'bg-emerald-700 text-white shadow-2xs font-bold'
+                    : key === 'undelivered'
+                      ? 'text-amber-700 hover:text-amber-900 hover:bg-amber-50'
+                      : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 <Icon size={13} />

@@ -82,7 +82,11 @@ Future<void> init() async {
 
   // Services
   sl.registerLazySingleton(() => LocationService());
-  sl.registerLazySingleton(() => RouteOptimizationService(locationService: sl()));
+  sl.registerLazySingleton(() => RouteOptimizationService(
+    locationService: sl(),
+    dio: sl<DioClient>().dio,
+  ));
+
   sl.registerLazySingleton(() => LocationTrackingService(
     locationService: sl(),
     dioClient: sl(),

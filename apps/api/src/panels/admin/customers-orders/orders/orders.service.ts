@@ -163,8 +163,9 @@ export class OrdersService {
           COUNT(*) FILTER (WHERE status = 'packed')::int             AS packed,
           COUNT(*) FILTER (WHERE status = 'out_for_delivery')::int   AS out_for_delivery,
           COUNT(*) FILTER (WHERE status = 'delivered')::int          AS delivered,
+          COUNT(*) FILTER (WHERE status = 'failed')::int             AS failed,
           COUNT(*) FILTER (WHERE status = 'cancelled')::int          AS cancelled,
-          COALESCE(SUM(total_amount) FILTER (WHERE status != 'cancelled'), 0) AS revenue,
+          COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('cancelled', 'failed')), 0) AS revenue,
           COUNT(*) FILTER (WHERE order_source = 'subscription')::int AS subscription_count,
           COUNT(*) FILTER (WHERE order_source = 'one-time')::int     AS one_time_count
         FROM orders

@@ -49,6 +49,9 @@ function normalizeOrderType(value: unknown): string {
   if (['subscription', 'subscriptions'].includes(type)) {
     return 'subscription';
   }
+  if (['undelivered', 'failed'].includes(type)) {
+    return 'undelivered';
+  }
   return '';
 }
 
@@ -136,7 +139,13 @@ export class OrdersTableService {
         }
       }
 
-      if (orderType) {
+      if (orderType === 'undelivered' || scope === 'undelivered') {
+        conditions.push({
+          column: 'orders.status',
+          operator: '=',
+          value: 'failed',
+        });
+      } else if (orderType) {
         conditions.push({
           column: 'orders.order_source',
           operator: '=',
@@ -144,7 +153,7 @@ export class OrdersTableService {
         });
       }
 
-      if (status) {
+      if (status && orderType !== 'undelivered' && scope !== 'undelivered') {
         conditions.push({
           column: 'orders.status',
           operator: '=',

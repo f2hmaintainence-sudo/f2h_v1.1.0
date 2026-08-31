@@ -7,6 +7,7 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
 import { FirstOrderDetectorService } from '../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../customer/referral/services/referral-reward-engine.service';
 import { RedisService } from 'src/shared/redis/redis.service';
+import { WalletLedgerService } from 'src/shared/payments/wallet-ledger.service';
 
 function todayIST(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -29,6 +30,7 @@ export class DeliveryManagementService {
     private readonly firstOrderDetector: FirstOrderDetectorService,
     private readonly referralRewardEngine: ReferralRewardEngineService,
     private readonly redisService: RedisService,
+    private readonly walletLedger: WalletLedgerService,
   ) { }
 
   async notifyPartner(partnerId: string, title: string, messageBody: string): Promise<void> {
@@ -1065,40 +1067,105 @@ export class DeliveryManagementService {
         return { status: false, message: `Invalid status. Valid: ${validStatuses.join(', ')}` };
       }
 
+      const existingOrderRows = await this.db.query(
+        `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, status 
+         FROM orders 
+         WHERE order_id = $1 OR id::text = $1 LIMIT 1`,
+        [orderId],
+      );
+      if (!existingOrderRows?.length) {
+        return { status: false, message: `Order not found: ${orderId}` };
+      }
+      const existingOrder = existingOrderRows[0];
+
       const updateFields: string[] = [
         `status = $2`,
         `updated_at = NOW()`,
       ];
-      const params: any[] = [orderId, normStatus];
+      const params: any[] = [existingOrder.order_id, normStatus];
 
-      // Note: delivered_at column does not exist on orders table; status update only.
+      let isRefunded = false;
+      if (normStatus === 'failed') {
+        const totalAmount = Number(existingOrder.total_amount || 0);
+        const paymentMode = String(existingOrder.payment_mode || '').toLowerCase();
+        const paymentStatus = String(existingOrder.payment_status || '').toLowerCase();
+        const isPrepaid = (paymentStatus === 'paid' || ['wallet', 'prepaid', 'razorpay', 'online'].includes(paymentMode)) && totalAmount > 0 && paymentStatus !== 'refunded';
+
+        if (isPrepaid) {
+          try {
+            await this.walletLedger.credit({
+              customerId: existingOrder.customer_id,
+              amount: totalAmount,
+              referenceType: 'order_refund',
+              referenceId: existingOrder.order_id,
+              remarks: `Refund for failed delivery of Order #${existingOrder.order_id}`,
+              createdBy: 'admin',
+            });
+            updateFields.push(`payment_status = 'refunded'`);
+            isRefunded = true;
+          } catch (refundError) {
+            this.developer.error('Failed to process wallet refund for failed order', {
+              orderId: existingOrder.order_id,
+              customerId: existingOrder.customer_id,
+              totalAmount,
+              refundError,
+            });
+          }
+        }
+      }
 
       const sql = `
         UPDATE orders
         SET ${updateFields.join(', ')}
-        WHERE order_id = $1 OR id::text = $1
-        RETURNING order_id, customer_id, status
+        WHERE order_id = $1
+        RETURNING order_id, customer_id, status, payment_status
       `;
 
       const rows = await this.db.query(sql, params);
       const updatedOrder = rows?.[0];
 
-      if (status === 'delivered' && updatedOrder?.customer_id) {
+      if (normStatus === 'delivered' && updatedOrder?.customer_id) {
         try {
-          await this.firstOrderDetector.detectAndMarkFirstOrder(updatedOrder.customer_id, orderId);
+          await this.firstOrderDetector.detectAndMarkFirstOrder(updatedOrder.customer_id, updatedOrder.order_id);
           await this.firstOrderDetector.unlockReferralCode(updatedOrder.customer_id);
-          await this.referralRewardEngine.processReferralReward(updatedOrder.customer_id, orderId);
+          await this.referralRewardEngine.processReferralReward(updatedOrder.customer_id, updatedOrder.order_id);
         } catch (refErr) {
           this.developer.error('DeliveryManagementService: Failed to process referral reward', refErr);
         }
       }
 
-      await this.broadcastOrderUpdate(updatedOrder?.order_id || orderId);
+      if (normStatus === 'failed' && existingOrder.customer_id) {
+        const totalAmount = Number(existingOrder.total_amount || 0);
+        if (isRefunded) {
+          this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
+            title: '📦 Order Delivery Failed & Refunded',
+            body: `Your order #${existingOrder.order_id} could not be delivered. ₹${totalAmount.toFixed(2)} has been refunded to your wallet.`,
+            data: {
+              type: 'order_failed_refund',
+              order_id: existingOrder.order_id,
+              refund_amount: String(totalAmount),
+            },
+          }).catch((err) => this.developer.warn('Failed to send order failed refund notification', err));
+        } else {
+          this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
+            title: '📦 Order Delivery Failed',
+            body: `Your order #${existingOrder.order_id} could not be delivered.`,
+            data: {
+              type: 'order_failed',
+              order_id: existingOrder.order_id,
+            },
+          }).catch((err) => this.developer.warn('Failed to send order failed notification', err));
+        }
+      }
+
+      await this.broadcastOrderUpdate(updatedOrder?.order_id || existingOrder.order_id);
 
       return {
         status: true,
         data: updatedOrder ?? null,
-        message: `Order ${orderId} status updated to ${status}`,
+        message: isRefunded 
+          ? `Order ${existingOrder.order_id} marked as failed and ₹${Number(existingOrder.total_amount || 0).toFixed(2)} refunded to customer wallet.`
+          : `Order ${existingOrder.order_id} status updated to ${status}`,
       };
     } catch (error) {
       this.developer.error('updateDeliveryStatus error', { error });

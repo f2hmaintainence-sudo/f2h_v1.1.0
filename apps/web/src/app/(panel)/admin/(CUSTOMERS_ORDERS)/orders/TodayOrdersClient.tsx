@@ -145,6 +145,11 @@ export default function TodayOrdersClient({
 
     if (endpointOverride) return appendFilters(endpointOverride);
 
+    if (activeTab === 'undelivered') {
+      const p = new URLSearchParams({ status: 'failed' });
+      if (scope === 'today' && !selectedDate && !fromDate && !toDate) p.set('today', '1');
+      return appendFilters(`/admin/orders/table?${p}`);
+    }
     if (activeTab === 'subscription') {
       const p = new URLSearchParams({ type: 'subscription' });
       if (scope === 'today' && !selectedDate && !fromDate && !toDate) p.set('today', '1');

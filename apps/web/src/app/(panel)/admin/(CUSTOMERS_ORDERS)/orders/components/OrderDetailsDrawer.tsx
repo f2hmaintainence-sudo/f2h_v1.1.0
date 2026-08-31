@@ -108,6 +108,9 @@ function getLightStatusBadge(statusRaw: unknown) {
   if (status.includes('confirm')) {
     return { label: 'Confirmed', bg: 'bg-teal-50 text-teal-900 border-teal-200', icon: CheckCircle2 };
   }
+  if (status.includes('fail') || status.includes('undeliver')) {
+    return { label: 'Failed / Undelivered', bg: 'bg-amber-50 text-amber-900 border-amber-200', icon: AlertCircle };
+  }
   if (status.includes('cancel')) {
     return { label: 'Cancelled', bg: 'bg-rose-50 text-rose-900 border-rose-200', icon: AlertCircle };
   }
@@ -346,11 +349,47 @@ export default function OrderDetailsDrawer({
         </div>
 
         {/* Light Drawer Footer */}
-        <div className="px-6 py-3.5 bg-white border-t border-gray-200 flex justify-end shrink-0">
+        <div className="px-6 py-3.5 bg-white border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            {onUpdateStatus && statusInfo.label !== 'Failed / Undelivered' && statusInfo.label !== 'Cancelled' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const isPrepaid = (String(order.payment_status || '').toLowerCase() === 'paid' || ['wallet', 'prepaid', 'razorpay', 'online'].includes(String(order.payment_mode || '').toLowerCase())) && Number(order.total_amount || 0) > 0;
+                  const confirmMsg = isPrepaid
+                    ? `Mark Order #${orderId} as Failed / Undelivered?\n\n💰 Automated Refund: ₹${Number(order.total_amount || 0).toFixed(2)} will be immediately credited to the customer's wallet balance.`
+                    : `Mark Order #${orderId} as Failed / Undelivered?`;
+                  if (window.confirm(confirmMsg)) {
+                    onUpdateStatus(orderId, 'failed');
+                  }
+                }}
+                className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <AlertCircle size={14} className="text-amber-700" />
+                <span>Mark as Failed</span>
+              </button>
+            )}
+
+            {onUpdateStatus && statusInfo.label !== 'Delivered' && statusInfo.label !== 'Cancelled' && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Mark Order #${orderId} as Delivered?`)) {
+                    onUpdateStatus(orderId, 'delivered');
+                  }
+                }}
+                className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 size={14} className="text-emerald-700" />
+                <span>Mark as Delivered</span>
+              </button>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow-2xs transition-colors"
+            className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow-2xs transition-colors cursor-pointer"
           >
             Close Details
           </button>
