@@ -24,6 +24,7 @@ import '../widgets/product_grid_card.dart';
 import '../widgets/image_banner.dart';
 import '../widgets/home_coupon_banner.dart';
 import '../widgets/promo_banner.dart';
+import '../widgets/today_delivery_partner_card.dart';
 import 'cart_screen.dart';
 import 'product_detail_view_screen.dart';
 import '../../../../core/widgets/floating_cart_bar.dart';
@@ -155,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen>
                     context.read<CartBloc>().add(LoadCartEvent(customerId));
                     context.read<NotificationsBloc>().add(LoadNotifications());
                   }
+                  await context.read<CustomerSessionCubit>().refreshSilently();
 
                   await Future.wait([
                     context.read<CatalogBloc>().stream.firstWhere(
@@ -195,6 +197,23 @@ class _HomeScreenState extends State<HomeScreen>
 
                     // 2. Delivery Address Prompt (if no default address/branch set)
                     SliverToBoxAdapter(child: _noAddressPromptCard(context)),
+
+                    // 2B. Today & Current Slot Delivery Partner Card(s)
+                    SliverToBoxAdapter(
+                      child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+                        builder: (context, session) {
+                          if (session.todayDeliveryPartners.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4, bottom: 4),
+                            child: TodayDeliveryPartnersSection(
+                              partners: session.todayDeliveryPartners,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
 
                     // 3. Category Shortcuts Row
                     SliverToBoxAdapter(child: _categoryShortcuts()),

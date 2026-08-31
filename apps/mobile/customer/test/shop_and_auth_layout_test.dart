@@ -220,6 +220,33 @@ void main() {
         textScale: 1.3,
       );
     });
+
+    testWidgets('pins heroAction (skip button) at the top of the screen', (tester) async {
+      await _pump(
+        tester,
+        MaterialApp(
+          home: AuthScaffold(
+            title: 'Welcome to F2H Fresh!',
+            subtitle: 'Login to access fresh dairy & more!',
+            heroAction: AuthSkipButton(onTap: () {}),
+            children: [
+              AuthField(
+                controller: TextEditingController(),
+                hint: 'Email or Phone',
+                icon: Icons.mail_outline_rounded,
+              ),
+            ],
+          ),
+        ),
+        size: const Size(390, 844),
+      );
+
+      final skipFinder = find.byType(AuthSkipButton);
+      expect(skipFinder, findsOneWidget);
+      final topPos = tester.getTopLeft(skipFinder).dy;
+      // Skip button must be near the top (< 60px), not in the middle of the screen
+      expect(topPos, lessThan(60.0));
+    });
   });
 
   group('AuthField owns its own box', () {

@@ -117,26 +117,32 @@ class AuthScaffold extends StatelessWidget {
               ),
             ),
 
-            // Back and Skip stay pinned while the page scrolls beneath them.
-            SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 16, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (showBack)
-                      _HeroCircleButton(
-                        icon: Icons.arrow_back_rounded,
-                        onTap: () => Navigator.maybePop(context),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    if (heroAction != null)
-                      heroAction!
-                    else
-                      const SizedBox.shrink(),
-                  ],
+            // Back and Skip stay pinned strictly at the top of the screen.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 16, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (showBack)
+                        _HeroCircleButton(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.maybePop(context),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      if (heroAction != null)
+                        heroAction!
+                      else
+                        const SizedBox.shrink(),
+                    ],
+                  ),
                 ),
               ),
             ),

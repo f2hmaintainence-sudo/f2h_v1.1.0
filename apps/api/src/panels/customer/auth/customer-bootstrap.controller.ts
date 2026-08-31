@@ -205,6 +205,8 @@ export class CustomerBootstrapController {
       this.Developer.error('[CustomerBootstrapController] Failed to load slot_timings', err);
     }
 
+    const todayPartnersData = await this.getTodayDeliveryPartners(customerId);
+
     return {
       profile,
       addresses: (addressesResult?.data || []).map((addr: any) => this.normalizeAddress(addr)),
@@ -219,7 +221,196 @@ export class CustomerBootstrapController {
       firebase_config: firebaseConfig,
       delivery_rules: deliveryRules,
       slot_timings: slotTimings,
+      today_delivery_partners: todayPartnersData.delivery_partners,
+      current_delivery_slot: todayPartnersData.current_slot,
+      today_date: todayPartnersData.today_date,
     };
+  }
+
+  /**
+   * GET /customer/today-delivery-partners
+   * Returns assigned delivery partner(s) for the customer's addresses for today and current slot.
+   */
+  @Get('today-delivery-partners')
+  @UseGuards(AuthGuard('jwt'))
+  async getTodayDeliveryPartnersEndpoint(@Req() req: Request) {
+    const user = req.user as any;
+    const userId = user?.user_id;
+    const email = user?.email;
+    const profile = await this.resolveCustomer(userId, email);
+    const customerId = profile?.customer_id || userId;
+
+    return await this.getTodayDeliveryPartners(customerId);
+  }
+
+  private parseSlotTimeMinutes(timeStr?: string, defaultMinutes = 840): number {
+    if (!timeStr || typeof timeStr !== 'string') return defaultMinutes;
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return defaultMinutes;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return defaultMinutes;
+    return h * 60 + m;
+  }
+
+  private getCurrentKolkataDateAndSlot(slotTimings?: any): { todayDate: string; currentSlot: string; timeMinutes: number } {
+    const todayDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    const timeParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(new Date());
+    const h = parseInt(timeParts.find((p) => p.type === 'hour')?.value || '0', 10);
+    const m = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
+    const timeMinutes = h * 60 + m;
+
+    const eveningCutoff = this.parseSlotTimeMinutes(slotTimings?.evening_slot?.customer_cutoff_time, 14 * 60);
+    const currentSlot = timeMinutes < eveningCutoff ? 'morning' : 'evening';
+
+    return { todayDate, currentSlot, timeMinutes };
+  }
+
+  async getTodayDeliveryPartners(customerId: string) {
+    try {
+      let slotTimings: any = null;
+      try {
+        const slotTimingsRes = await this.db.query(
+          `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+        );
+        if (slotTimingsRes?.[0]?.config_data) {
+          slotTimings = slotTimingsRes[0].config_data;
+        }
+      } catch (_) {}
+
+      const { todayDate, currentSlot } = this.getCurrentKolkataDateAndSlot(slotTimings);
+
+      // Query delivery_run_addresses grouped/matched by customer addresses & customer_id for today
+      // Follows DB rule: identity fields (first_name, last_name, phone) are joined from users table.
+      const sql = `
+        SELECT 
+          dr.delivery_partner_id,
+          dr.run_id,
+          dr.run_date,
+          dr.delivery_slot,
+          dr.status AS run_status,
+          dra.id AS run_address_id,
+          dra.address_id,
+          dra.sequence_no,
+          COALESCE(dra.delivery_status, 'pending') AS address_delivery_status,
+          dra.delivered_at,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS partner_name,
+          COALESCE(u.phone, '') AS partner_phone,
+          u.profile_photo AS partner_photo,
+          ca.address_type,
+          ca.address_line,
+          ca.flat_no,
+          ca.building_name,
+          ca.area,
+          ca.landmark,
+          ca.city
+        FROM delivery_run_addresses dra
+        JOIN delivery_runs dr ON (dr.run_id = dra.run_id OR dr.id::varchar = dra.run_id)
+        LEFT JOIN customer_addresses ca ON (ca.address_id = dra.address_id OR ca.id::varchar = dra.address_id)
+        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id OR dp.id::varchar = dr.delivery_partner_id)
+        LEFT JOIN users u ON (u.user_id = dr.delivery_partner_id OR u.user_id = dp.delivery_partner_id OR u.user_id = dp.id::varchar)
+        WHERE (
+          dra.customer_id = $1 
+          OR dra.address_id IN (
+            SELECT address_id FROM customer_addresses WHERE customer_id = $1
+            UNION
+            SELECT id::varchar FROM customer_addresses WHERE customer_id = $1
+          )
+        )
+        AND dr.run_date = $2
+        AND dr.status != 'cancelled'
+        AND dra.deleted_at IS NULL
+        ORDER BY 
+          CASE WHEN dr.delivery_slot = $3 THEN 0 ELSE 1 END,
+          dra.sequence_no ASC
+      `;
+
+      const rows = await this.db.query(sql, [customerId, todayDate, currentSlot]);
+
+      const partnerMap = new Map<string, any>();
+
+      for (const row of rows || []) {
+        const partnerId = row.delivery_partner_id;
+        if (!partnerId) continue;
+
+        const isCurrentSlot = (row.delivery_slot || '').toLowerCase() === currentSlot.toLowerCase();
+
+        if (!partnerMap.has(partnerId)) {
+          const slotLabel = row.delivery_slot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
+          partnerMap.set(partnerId, {
+            partner_id: partnerId,
+            partner_name: row.partner_name || 'Delivery Partner',
+            phone: row.partner_phone || '',
+            profile_photo: row.partner_photo || null,
+            delivery_slot: row.delivery_slot || currentSlot,
+            slot_label: slotLabel,
+            is_current_slot: isCurrentSlot,
+            run_status: row.run_status || 'planned',
+            delivery_status: row.address_delivery_status || 'pending',
+            run_date: row.run_date,
+            addresses: [],
+          });
+        }
+
+        const partner = partnerMap.get(partnerId);
+
+        const addrId = row.address_id || String(row.run_address_id || '');
+        if (addrId && !partner.addresses.some((a: any) => a.address_id === addrId)) {
+          const fallbackLine = [row.flat_no ? `Flat ${row.flat_no}` : '', row.building_name, row.area, row.city]
+            .filter(Boolean)
+            .join(', ');
+
+          partner.addresses.push({
+            address_id: addrId,
+            address_type: row.address_type || 'home',
+            address_line: row.address_line || fallbackLine,
+            area: row.area || '',
+            delivery_status: row.address_delivery_status || 'pending',
+            delivered_at: row.delivered_at || null,
+            sequence_no: row.sequence_no || 0,
+          });
+        }
+
+        if (row.address_delivery_status === 'in_transit') {
+          partner.delivery_status = 'in_transit';
+        } else if (row.address_delivery_status === 'arrived' && partner.delivery_status !== 'in_transit') {
+          partner.delivery_status = 'arrived';
+        } else if (row.address_delivery_status === 'delivered' && partner.delivery_status === 'pending') {
+          partner.delivery_status = 'delivered';
+        }
+      }
+
+      const deliveryPartners = Array.from(partnerMap.values());
+
+      return {
+        status: true,
+        today_date: todayDate,
+        current_slot: currentSlot,
+        delivery_partners: deliveryPartners,
+      };
+    } catch (err: any) {
+      this.Developer.error('[CustomerBootstrapController] Failed to get today delivery partners', {
+        error: err?.message || err,
+        customerId,
+      });
+      return {
+        status: false,
+        today_date: new Date().toISOString().split('T')[0],
+        current_slot: 'morning',
+        delivery_partners: [],
+      };
+    }
   }
 
   /** Public endpoint — no auth required. Returns active Firebase client config for the requested app panel. */

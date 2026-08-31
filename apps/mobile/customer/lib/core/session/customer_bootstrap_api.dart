@@ -3,6 +3,7 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/features/profile/data/models/profile_model.dart';
+import 'package:f2h_customer/features/catalog/data/models/today_delivery_partner_model.dart';
 import 'package:f2h_customer/core/session/customer_session_state.dart';
 
 class CustomerBootstrapApi {
@@ -18,6 +19,10 @@ class CustomerBootstrapApi {
     );
     final addresses = (data['addresses'] as List? ?? [])
         .map((e) => AddressModel.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final todayPartners = (data['today_delivery_partners'] as List? ?? [])
+        .map((e) =>
+            TodayDeliveryPartner.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
 
     return CustomerSessionState(
@@ -39,7 +44,22 @@ class CustomerBootstrapApi {
       slotTimings: Map<String, dynamic>.from(
         data['slot_timings'] as Map? ?? {},
       ),
+      todayDeliveryPartners: todayPartners,
     );
+  }
+
+  Future<List<TodayDeliveryPartner>> fetchTodayDeliveryPartners() async {
+    try {
+      final response =
+          await dioClient.dio.get(ApiEndpoints.todayDeliveryPartners);
+      final data = Map<String, dynamic>.from(response.data as Map);
+      return (data['delivery_partners'] as List? ?? [])
+          .map((e) =>
+              TodayDeliveryPartner.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> updateProfile(Map<String, dynamic> payload) async {

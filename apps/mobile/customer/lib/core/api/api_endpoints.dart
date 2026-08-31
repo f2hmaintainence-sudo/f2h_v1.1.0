@@ -72,6 +72,7 @@ class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String _customer = '/customer';
   static const String customerBootstrap = '$_customer/bootstrap';
+  static const String todayDeliveryPartners = '$_customer/today-delivery-partners';
   static const String customerAssets = '$_customer/assets';
   static const String wallet = '$_customer/wallet';
   static const String walletTopup = '$wallet/topup';

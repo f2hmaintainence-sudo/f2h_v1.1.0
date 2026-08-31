@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/features/profile/data/models/profile_model.dart';
+import 'package:f2h_customer/features/catalog/data/models/today_delivery_partner_model.dart';
 
 enum CustomerSessionStatus {
   initial,
@@ -21,6 +22,7 @@ class CustomerSessionState extends Equatable {
   final int notificationsCount;
   final Map<String, dynamic> deliveryRules;
   final Map<String, dynamic> slotTimings;
+  final List<TodayDeliveryPartner> todayDeliveryPartners;
   final String? error;
 
   const CustomerSessionState({
@@ -33,6 +35,7 @@ class CustomerSessionState extends Equatable {
     this.notificationsCount = 0,
     this.deliveryRules = const {},
     this.slotTimings = const {},
+    this.todayDeliveryPartners = const [],
     this.error,
   });
 
@@ -51,6 +54,7 @@ class CustomerSessionState extends Equatable {
     int? notificationsCount,
     Map<String, dynamic>? deliveryRules,
     Map<String, dynamic>? slotTimings,
+    List<TodayDeliveryPartner>? todayDeliveryPartners,
     String? error,
   }) {
     return CustomerSessionState(
@@ -63,6 +67,8 @@ class CustomerSessionState extends Equatable {
       notificationsCount: notificationsCount ?? this.notificationsCount,
       deliveryRules: deliveryRules ?? this.deliveryRules,
       slotTimings: slotTimings ?? this.slotTimings,
+      todayDeliveryPartners:
+          todayDeliveryPartners ?? this.todayDeliveryPartners,
       error: error,
     );
   }
@@ -78,6 +84,7 @@ class CustomerSessionState extends Equatable {
         notificationsCount,
         deliveryRules,
         slotTimings,
+        todayDeliveryPartners,
         error,
       ];
 }

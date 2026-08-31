@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/features/profile/data/models/profile_model.dart';
+import 'package:f2h_customer/features/catalog/data/models/today_delivery_partner_model.dart';
 import 'package:f2h_customer/core/session/customer_session_state.dart';
 
 class CustomerSessionCache {
@@ -10,6 +11,7 @@ class CustomerSessionCache {
   static const _walletKey = 'customer_session_wallet'; 
   static const _deliveryRulesKey = 'customer_session_delivery_rules';
   static const _slotTimingsKey = 'customer_session_slot_timings';
+  static const _todayDeliveryPartnersKey = 'customer_session_today_delivery_partners';
 
   Future<void> save(CustomerSessionState session) async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,6 +28,10 @@ class CustomerSessionCache {
     await prefs.setString(_walletKey, jsonEncode(session.wallet));
     await prefs.setString(_deliveryRulesKey, jsonEncode(session.deliveryRules));
     await prefs.setString(_slotTimingsKey, jsonEncode(session.slotTimings));
+    await prefs.setString(
+      _todayDeliveryPartnersKey,
+      jsonEncode(session.todayDeliveryPartners.map((p) => p.toJson()).toList()),
+    );
   }
 
   Future<CustomerSessionState?> read() async {
@@ -62,6 +68,14 @@ class CustomerSessionCache {
         ? <String, dynamic>{}
         : Map<String, dynamic>.from(jsonDecode(slotTimingsJson) as Map);
 
+    final todayPartnersJson = prefs.getString(_todayDeliveryPartnersKey);
+    final todayPartners = todayPartnersJson == null
+        ? <TodayDeliveryPartner>[]
+        : (jsonDecode(todayPartnersJson) as List)
+            .map((e) =>
+                TodayDeliveryPartner.fromJson(e as Map<String, dynamic>))
+            .toList();
+
     return CustomerSessionState(
       status: CustomerSessionStatus.cached,
       profile: profile,
@@ -69,6 +83,7 @@ class CustomerSessionCache {
       wallet: wallet,
       deliveryRules: deliveryRules,
       slotTimings: slotTimings,
+      todayDeliveryPartners: todayPartners,
     );
   }
 
@@ -79,6 +94,7 @@ class CustomerSessionCache {
     await prefs.remove(_walletKey);
     await prefs.remove(_deliveryRulesKey);
     await prefs.remove(_slotTimingsKey);
+    await prefs.remove(_todayDeliveryPartnersKey);
   }
 
   Map<String, dynamic> _profileToJson(ProfileModel profile) {
