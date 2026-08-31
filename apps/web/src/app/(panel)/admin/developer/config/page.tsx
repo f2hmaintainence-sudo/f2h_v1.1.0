@@ -35,6 +35,41 @@ import {
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
+// Helper to convert time and day offset into absolute timeline minutes (relative to delivery day 00:00)
+function getAbsoluteMinutes(timeStr?: string, dayOffset: number = 0): number {
+  if (!timeStr) return 0;
+  const [h, m] = String(timeStr).split(":").map((v) => parseInt(v, 10) || 0);
+  return (dayOffset * 24 * 60) + (h * 60) + m;
+}
+
+function getSlotValidationErrors(slot: any, slotName: string): string[] {
+  if (!slot) return [];
+  const errors: string[] = [];
+  const cutoffOffset = Number(slot.customer_cutoff_day_offset ?? (slot.slot_key === "morning" ? -1 : 0));
+  const cronOffset = Number(slot.cron_run_day_offset ?? (slot.slot_key === "morning" ? -1 : 0));
+  const dispatchOffset = Number(slot.dispatch_start_day_offset ?? 0);
+
+  const cutoffMins = getAbsoluteMinutes(slot.customer_cutoff_time, cutoffOffset);
+  const cronMins = getAbsoluteMinutes(slot.cron_run_time, cronOffset);
+  const dispatchMins = getAbsoluteMinutes(slot.dispatch_start_time, dispatchOffset);
+  const windowStartMins = getAbsoluteMinutes(slot.delivery_window_start, 0);
+  const windowEndMins = getAbsoluteMinutes(slot.delivery_window_end, 0);
+
+  if (slot.customer_cutoff_time && slot.cron_run_time && cutoffMins >= cronMins) {
+    errors.push(`Customer Order Cutoff (${slot.customer_cutoff_time}) must be BEFORE Delivery Run Generation Cron (${slot.cron_run_time}).`);
+  }
+  if (slot.cron_run_time && slot.dispatch_start_time && cronMins >= dispatchMins) {
+    errors.push(`Delivery Run Generation Cron (${slot.cron_run_time}) must be BEFORE Warehouse Dispatch Start (${slot.dispatch_start_time}).`);
+  }
+  if (slot.dispatch_start_time && slot.delivery_window_start && dispatchMins > windowStartMins) {
+    errors.push(`Warehouse Dispatch Start (${slot.dispatch_start_time}) must be BEFORE or AT Delivery Window Start (${slot.delivery_window_start}).`);
+  }
+  if (slot.delivery_window_start && slot.delivery_window_end && windowStartMins >= windowEndMins) {
+    errors.push(`Delivery Window Start (${slot.delivery_window_start}) must be BEFORE Window End (${slot.delivery_window_end}).`);
+  }
+  return errors;
+}
+
 export default function SystemConfigPage() {
   const [activeTab, setActiveTab] = useState<"slots" | "crons" | "ordering">("slots");
   const [loading, setLoading] = useState(true);
@@ -55,6 +90,7 @@ export default function SystemConfigPage() {
       cron_run_day_offset: -1,
       cron_run_description: "Runs at 8:30 PM previous evening to generate morning runs",
       dispatch_start_time: "05:00",
+      dispatch_start_day_offset: 0,
       is_enabled: true,
     },
     evening_slot: {
@@ -69,6 +105,7 @@ export default function SystemConfigPage() {
       cron_run_day_offset: 0,
       cron_run_description: "Runs at 2:30 PM same day to generate evening runs",
       dispatch_start_time: "16:00",
+      dispatch_start_day_offset: 0,
       is_enabled: true,
     },
   });
@@ -161,6 +198,19 @@ export default function SystemConfigPage() {
   // ── Save Current Active Section ──
   const handleSaveSection = async (key: string, data: any, sectionName: string) => {
     try {
+      if (key === "slot_timings") {
+        const morningErrors = getSlotValidationErrors(data.morning_slot, "Morning");
+        if (morningErrors.length > 0) {
+          showErrorToast(morningErrors[0]);
+          return;
+        }
+        const eveningErrors = getSlotValidationErrors(data.evening_slot, "Evening");
+        if (eveningErrors.length > 0) {
+          showErrorToast(eveningErrors[0]);
+          return;
+        }
+      }
+
       setSaving(true);
       const res = await api.put<any>(`/admin/developer/config/${key}`, {
         config_data: data,
@@ -182,6 +232,17 @@ export default function SystemConfigPage() {
 
   const handleSaveAll = async () => {
     try {
+      const morningErrors = getSlotValidationErrors(slotTimings.morning_slot, "Morning");
+      if (morningErrors.length > 0) {
+        showErrorToast(morningErrors[0]);
+        return;
+      }
+      const eveningErrors = getSlotValidationErrors(slotTimings.evening_slot, "Evening");
+      if (eveningErrors.length > 0) {
+        showErrorToast(eveningErrors[0]);
+        return;
+      }
+
       setSaving(true);
       await Promise.all([
         api.put("/admin/developer/config/slot_timings", { config_data: slotTimings }),
@@ -503,19 +564,78 @@ export default function SystemConfigPage() {
                   {/* Warehouse Dispatch Start Time */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">Warehouse Dispatch Start Time</label>
-                    <input
-                      type="time"
-                      value={slotTimings.morning_slot.dispatch_start_time}
-                      onChange={(e) =>
-                        setSlotTimings({
-                          ...slotTimings,
-                          morning_slot: { ...slotTimings.morning_slot, dispatch_start_time: e.target.value },
-                        })
-                      }
-                      className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="time"
+                        value={slotTimings.morning_slot.dispatch_start_time}
+                        onChange={(e) =>
+                          setSlotTimings({
+                            ...slotTimings,
+                            morning_slot: { ...slotTimings.morning_slot, dispatch_start_time: e.target.value },
+                          })
+                        }
+                        className="flex-1 text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                      />
+                      <select
+                        value={slotTimings.morning_slot.dispatch_start_day_offset ?? 0}
+                        onChange={(e) =>
+                          setSlotTimings({
+                            ...slotTimings,
+                            morning_slot: { ...slotTimings.morning_slot, dispatch_start_day_offset: parseInt(e.target.value, 10) },
+                          })
+                        }
+                        className="text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white"
+                      >
+                        <option value="0">Same Day (D)</option>
+                        <option value="-1">Previous Day (D-1)</option>
+                      </select>
+                    </div>
                     <p className="text-[11px] text-slate-400 mt-1">Warehouse partners start vehicle loading & verification.</p>
                   </div>
+
+                  {/* Execution Timeline Sequence */}
+                  {(() => {
+                    const morningErrors = getSlotValidationErrors(slotTimings.morning_slot, "Morning");
+                    return (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                          <span>Timeline Sequence Check</span>
+                          {morningErrors.length === 0 ? (
+                            <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
+                              <CheckCircle2 size={11} /> Sequence Valid
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
+                              <AlertCircle size={11} /> Sequence Invalid
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600 font-medium overflow-x-auto py-1">
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            1. Cutoff ({slotTimings.morning_slot.customer_cutoff_time || "--:--"})
+                          </span>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            2. Cron ({slotTimings.morning_slot.cron_run_time || "--:--"})
+                          </span>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            3. Dispatch ({slotTimings.morning_slot.dispatch_start_time || "--:--"})
+                          </span>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            4. Delivery ({slotTimings.morning_slot.delivery_window_start || "--:--"})
+                          </span>
+                        </div>
+                        {morningErrors.length > 0 && (
+                          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-800 flex items-start gap-2">
+                            <AlertCircle size={14} className="text-rose-600 shrink-0 mt-0.5" />
+                            <span>{morningErrors[0]}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -670,19 +790,78 @@ export default function SystemConfigPage() {
                   {/* Warehouse Dispatch Start Time */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">Warehouse Dispatch Start Time</label>
-                    <input
-                      type="time"
-                      value={slotTimings.evening_slot.dispatch_start_time}
-                      onChange={(e) =>
-                        setSlotTimings({
-                          ...slotTimings,
-                          evening_slot: { ...slotTimings.evening_slot, dispatch_start_time: e.target.value },
-                        })
-                      }
-                      className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="time"
+                        value={slotTimings.evening_slot.dispatch_start_time}
+                        onChange={(e) =>
+                          setSlotTimings({
+                            ...slotTimings,
+                            evening_slot: { ...slotTimings.evening_slot, dispatch_start_time: e.target.value },
+                          })
+                        }
+                        className="flex-1 text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-1 focus:ring-emerald-500"
+                      />
+                      <select
+                        value={slotTimings.evening_slot.dispatch_start_day_offset ?? 0}
+                        onChange={(e) =>
+                          setSlotTimings({
+                            ...slotTimings,
+                            evening_slot: { ...slotTimings.evening_slot, dispatch_start_day_offset: parseInt(e.target.value, 10) },
+                          })
+                        }
+                        className="text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white"
+                      >
+                        <option value="0">Same Day (D)</option>
+                        <option value="-1">Previous Day (D-1)</option>
+                      </select>
+                    </div>
                     <p className="text-[11px] text-slate-400 mt-1">Warehouse handover & partner vehicle loading window starts.</p>
                   </div>
+
+                  {/* Execution Timeline Sequence */}
+                  {(() => {
+                    const eveningErrors = getSlotValidationErrors(slotTimings.evening_slot, "Evening");
+                    return (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                          <span>Timeline Sequence Check</span>
+                          {eveningErrors.length === 0 ? (
+                            <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
+                              <CheckCircle2 size={11} /> Sequence Valid
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
+                              <AlertCircle size={11} /> Sequence Invalid
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600 font-medium overflow-x-auto py-1">
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            1. Cutoff ({slotTimings.evening_slot.customer_cutoff_time || "--:--"})
+                          </span>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            2. Cron ({slotTimings.evening_slot.cron_run_time || "--:--"})
+                          </span>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            3. Dispatch ({slotTimings.evening_slot.dispatch_start_time || "--:--"})
+                          </span>
+                          <span className="text-slate-400 font-bold">&rarr;</span>
+                          <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg shrink-0 font-bold">
+                            4. Delivery ({slotTimings.evening_slot.delivery_window_start || "--:--"})
+                          </span>
+                        </div>
+                        {eveningErrors.length > 0 && (
+                          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-800 flex items-start gap-2">
+                            <AlertCircle size={14} className="text-rose-600 shrink-0 mt-0.5" />
+                            <span>{eveningErrors[0]}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

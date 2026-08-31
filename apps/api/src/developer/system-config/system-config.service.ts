@@ -7,7 +7,7 @@
 // Description : Service for managing developer system configurations & rules
 // ============================================================================
 
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../shared/database/Database.service';
 import { DeveloperService } from '../../shared/logger/Developer.service';
 import { UpdateSystemConfigDto } from './system-config.dto';
@@ -24,6 +24,7 @@ export interface SlotTimingSlot {
   cron_run_day_offset: number;
   cron_run_description?: string;
   dispatch_start_time: string;
+  dispatch_start_day_offset?: number;
   is_enabled: boolean;
 }
 
@@ -289,6 +290,56 @@ export class SystemConfigService implements OnModuleInit {
    */
   async updateConfig(configKey: string, dto: UpdateSystemConfigDto, updatedBy?: string) {
     try {
+      if (configKey === 'slot_timings' && dto.config_data) {
+        const data = dto.config_data;
+        const getMinutes = (timeStr?: string, offset: number = 0) => {
+          if (!timeStr) return null;
+          const parts = String(timeStr).split(':');
+          if (parts.length < 2) return null;
+          const h = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          if (isNaN(h) || isNaN(m)) return null;
+          return (offset * 24 * 60) + (h * 60) + m;
+        };
+
+        const validateSlot = (slot: any, name: string) => {
+          if (!slot) return;
+          const cutoffOffset = Number(slot.customer_cutoff_day_offset ?? (name === 'Morning' ? -1 : 0));
+          const cronOffset = Number(slot.cron_run_day_offset ?? (name === 'Morning' ? -1 : 0));
+          const dispatchOffset = Number(slot.dispatch_start_day_offset ?? 0);
+
+          const cutoffMins = getMinutes(slot.customer_cutoff_time, cutoffOffset);
+          const cronMins = getMinutes(slot.cron_run_time, cronOffset);
+          const dispatchMins = getMinutes(slot.dispatch_start_time, dispatchOffset);
+          const windowStartMins = getMinutes(slot.delivery_window_start, 0);
+          const windowEndMins = getMinutes(slot.delivery_window_end, 0);
+
+          if (cutoffMins !== null && cronMins !== null && cutoffMins >= cronMins) {
+            throw new BadRequestException(
+              `${name} Delivery Slot: Customer Order Cutoff Time (${slot.customer_cutoff_time}) must be BEFORE Delivery Run Generation Cron Time (${slot.cron_run_time}).`,
+            );
+          }
+          if (cronMins !== null && dispatchMins !== null && cronMins >= dispatchMins) {
+            throw new BadRequestException(
+              `${name} Delivery Slot: Delivery Run Generation Cron Time (${slot.cron_run_time}) must be BEFORE Warehouse Dispatch Start Time (${slot.dispatch_start_time}).`,
+            );
+          }
+          if (dispatchMins !== null && windowStartMins !== null && dispatchMins > windowStartMins) {
+            throw new BadRequestException(
+              `${name} Delivery Slot: Warehouse Dispatch Start Time (${slot.dispatch_start_time}) must be BEFORE or at Delivery Window Start Time (${slot.delivery_window_start}).`,
+            );
+          }
+          if (windowStartMins !== null && windowEndMins !== null && windowStartMins >= windowEndMins) {
+            throw new BadRequestException(
+              `${name} Delivery Slot: Delivery Window Start Time (${slot.delivery_window_start}) must be BEFORE Window End Time (${slot.delivery_window_end}).`,
+            );
+          }
+        };
+
+        if (data.morning_slot) validateSlot(data.morning_slot, 'Morning');
+        if (data.evening_slot) validateSlot(data.evening_slot, 'Evening');
+      }
+
       const existing = await this.db.query(
         `SELECT id, config_data FROM system_configurations WHERE config_key = $1 AND deleted_at IS NULL LIMIT 1`,
         [configKey],
