@@ -34,17 +34,7 @@ class F2hHeroHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFD7F7E1),
-            Color(0xFFEAF9EE),
-            Colors.white,
-          ],
-        ),
-      ),
+      color: Colors.transparent,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
