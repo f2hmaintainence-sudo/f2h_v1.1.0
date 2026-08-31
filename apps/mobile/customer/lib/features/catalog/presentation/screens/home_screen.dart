@@ -21,8 +21,6 @@ import '../../../address/data/models/profile_address.dart';
 import '../../data/models/product_model.dart';
 import '../widgets/product_tile.dart';
 import '../widgets/product_grid_card.dart';
-import '../widgets/image_banner.dart';
-import '../widgets/home_coupon_banner.dart';
 import '../widgets/promo_banner.dart';
 import '../widgets/today_delivery_partner_card.dart';
 import 'cart_screen.dart';
@@ -37,7 +35,6 @@ import '../../../notifications/presentation/bloc/notifications_state.dart';
 import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../wallet/presentation/screens/wallet_screen.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import '../../../../core/widgets/popup_banner_widget.dart';
 
 // ══════════════════════════════════════════════════════════
