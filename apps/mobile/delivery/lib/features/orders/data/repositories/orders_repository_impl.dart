@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart' show XFile;
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
@@ -32,6 +32,42 @@ class OrdersRepositoryImpl implements OrdersRepository {
     }
   }
 
+  /// Uploads a locally captured proof photo and returns the stored URL, or null
+  /// if the upload did not succeed.
+  ///
+  /// Reads the picture through [XFile] instead of dart:io so the web build
+  /// (partner.f2hfresh.com) can upload the blob URL image_picker hands back
+  /// there. A failed upload must never block the delivery from being marked
+  /// complete, so errors are swallowed and reported as null.
+  Future<String?> _uploadProofPhoto(String orderId, String localPath) async {
+    try {
+      final bytes = await XFile(localPath).readAsBytes();
+      if (bytes.isEmpty) return null;
+
+      final fileName = 'proof_${orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      });
+
+      final uploadResponse = await _dioClient.dio.post(
+        '${ApiEndpoints.updateOrderStatus}/$orderId/upload-proof',
+        data: formData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      if (uploadResponse.data != null && uploadResponse.data['success'] == true) {
+        return uploadResponse.data['url'] as String?;
+      }
+      print('Proof photo upload failed: ${uploadResponse.data}');
+    } catch (e) {
+      print('Proof photo upload failed: $e');
+    }
+    return null;
+  }
+
   @override
   Future<bool> updateOrderStatus(
     String orderId,
@@ -50,31 +86,10 @@ class OrdersRepositoryImpl implements OrdersRepository {
     try {
       String? resolvedImageUrl = deliveryImage;
 
-      // If deliveryImage is a local file path (i.e. not empty and does not start with http), upload it first
+      // A local capture (not already an http URL) has to be uploaded first so
+      // only the stored URL is persisted on the order.
       if (deliveryImage != null && deliveryImage.isNotEmpty && !deliveryImage.startsWith('http')) {
-        final file = File(deliveryImage);
-        if (await file.exists()) {
-          final fileName = 'proof_${orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          final multipartFile = await MultipartFile.fromFile(file.path, filename: fileName);
-          final formData = FormData.fromMap({
-            'file': multipartFile,
-          });
-
-          final uploadResponse = await _dioClient.dio.post(
-            '${ApiEndpoints.updateOrderStatus}/$orderId/upload-proof',
-            data: formData,
-            options: Options(
-              sendTimeout: const Duration(seconds: 60),
-              receiveTimeout: const Duration(seconds: 30),
-            ),
-          );
-
-          if (uploadResponse.data != null && uploadResponse.data['success'] == true) {
-            resolvedImageUrl = uploadResponse.data['url'] as String?;
-          } else {
-            print('Proof photo upload failed: ${uploadResponse.data}');
-          }
-        }
+        resolvedImageUrl = await _uploadProofPhoto(orderId, deliveryImage);
       }
 
       final response = await _dioClient.dio.patch(
@@ -153,31 +168,10 @@ class OrdersRepositoryImpl implements OrdersRepository {
     try {
       String? resolvedImageUrl = deliveryImage;
 
-      // If deliveryImage is a local file path, upload it first using orderId as context
+      // A local capture (not already an http URL) has to be uploaded first so
+      // only the stored URL is persisted on the order.
       if (deliveryImage != null && deliveryImage.isNotEmpty && !deliveryImage.startsWith('http') && orderId != null) {
-        final file = File(deliveryImage);
-        if (await file.exists()) {
-          final fileName = 'proof_${orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          final multipartFile = await MultipartFile.fromFile(file.path, filename: fileName);
-          final formData = FormData.fromMap({
-            'file': multipartFile,
-          });
-
-          final uploadResponse = await _dioClient.dio.post(
-            '${ApiEndpoints.updateOrderStatus}/$orderId/upload-proof',
-            data: formData,
-            options: Options(
-              sendTimeout: const Duration(seconds: 60),
-              receiveTimeout: const Duration(seconds: 30),
-            ),
-          );
-
-          if (uploadResponse.data != null && uploadResponse.data['success'] == true) {
-            resolvedImageUrl = uploadResponse.data['url'] as String?;
-          } else {
-            print('Proof photo upload failed: ${uploadResponse.data}');
-          }
-        }
+        resolvedImageUrl = await _uploadProofPhoto(orderId, deliveryImage);
       }
 
       final response = await _dioClient.dio.patch(
