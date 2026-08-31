@@ -87,7 +87,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           style: GoogleFonts.roboto(
             fontSize: 14,
             fontWeight: FontWeight.w900,
-            letterSpacing: 0.3,
+            letterSpacing: 0.4,
             color: kMuted,
           ),
         ),
@@ -95,26 +95,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
 
     const letters = ['R', 'E', 'F', 'E', 'R', 'R', 'A', 'L'];
+    // When active on Gold: rich jewel & royal tones contrasting with gold
+    // When unselected on Flag: deep vibrant tones that pop over the tricolor flag
     final colors = on
         ? const [
-            Color(0xFFFF5252), // R - Coral Red
-            Color(0xFFFFA726), // E - Bright Amber/Orange
-            Color(0xFF4ADE80), // F - Emerald Mint Green
-            Color(0xFF38BDF8), // E - Electric Sky Blue
-            Color(0xFF818CF8), // R - Indigo
-            Color(0xFFC084FC), // R - Violet/Purple
-            Color(0xFFF472B6), // A - Hot Pink
-            Color(0xFFFACC15), // L - Neon Gold
+            Color(0xFF451A03), // R - Deep Bronze
+            Color(0xFF7C2D12), // E - Deep Russet
+            Color(0xFF14532D), // F - Deep Emerald
+            Color(0xFF0F766E), // E - Deep Teal
+            Color(0xFF1E3A8A), // R - Deep Royal Navy
+            Color(0xFF581C87), // R - Deep Royal Purple
+            Color(0xFF831843), // A - Deep Ruby Pink
+            Color(0xFF713F12), // L - Deep Amber
           ]
         : const [
-            Color(0xFFDC2626), // R - Rich Red
-            Color(0xFFEA580C), // E - Vibrant Orange
-            Color(0xFF16A34A), // F - Vivid Green
-            Color(0xFF0284C7), // E - Vivid Sky Blue
-            Color(0xFF4F46E5), // R - Vivid Indigo
-            Color(0xFF9333EA), // R - Vivid Purple
-            Color(0xFFDB2777), // A - Vivid Pink
-            Color(0xFFD97706), // L - Vivid Amber
+            Color(0xFFB91C1C), // R - Vivid Crimson
+            Color(0xFFC2410C), // E - Saffron Orange
+            Color(0xFF15803D), // F - Forest Green
+            Color(0xFF0369A1), // E - Ocean Blue
+            Color(0xFF4338CA), // R - Indigo
+            Color(0xFF7E22CE), // R - Purple
+            Color(0xFFBE185D), // A - Ruby Pink
+            Color(0xFF15803D), // L - Dark Green
           ];
 
     return List.generate(letters.length, (idx) {
@@ -123,8 +125,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         style: GoogleFonts.roboto(
           fontSize: 14,
           fontWeight: FontWeight.w900,
-          letterSpacing: 0.3,
+          letterSpacing: 0.4,
           color: colors[idx],
+          shadows: on
+              ? [
+                  Shadow(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    offset: const Offset(0, 1),
+                    blurRadius: 1,
+                  ),
+                ]
+              : [
+                  Shadow(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    offset: const Offset(0, 1),
+                    blurRadius: 2,
+                  ),
+                ],
         ),
       );
     });
@@ -265,39 +282,53 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                           gradient: on
                                               ? const LinearGradient(
                                                   colors: [
-                                                    Color(0xFF0F172A),
-                                                    Color(0xFF1E293B),
-                                                    Color(0xFF064E3B),
+                                                    Color(0xFFFFFBEB), // Pale bright gold highlight
+                                                    Color(0xFFFDE68A), // Radiant yellow gold
+                                                    Color(0xFFF59E0B), // Vibrant amber gold
+                                                    Color(0xFFD97706), // Rich deep gold
                                                   ],
                                                   begin: Alignment.topLeft,
                                                   end: Alignment.bottomRight,
                                                 )
                                               : const LinearGradient(
                                                   colors: [
-                                                    Color(0xFFFFFFFF),
-                                                    Color(0xFFF1F5F9),
+                                                    Color(0xFFFF9933), // Saffron (India Flag Top)
+                                                    Color(0xFFFFFFFF), // White (India Flag Middle)
+                                                    Color(0xFFFFFFFF), // White
+                                                    Color(0xFF138808), // Green (India Flag Bottom)
                                                   ],
+                                                  stops: [0.0, 0.38, 0.62, 1.0],
                                                   begin: Alignment.topCenter,
                                                   end: Alignment.bottomCenter,
                                                 ),
                                           borderRadius: BorderRadius.circular(12),
                                           border: Border.all(
                                             color: on
-                                                ? const Color(0xFF22C55E).withValues(alpha: 0.8)
+                                                ? const Color(0xFFB45309)
                                                 : const Color(0xFFCBD5E1),
-                                            width: on ? 1.8 : 1.4,
+                                            width: on ? 2.0 : 1.4,
                                           ),
                                           boxShadow: on
                                               ? [
                                                   BoxShadow(
-                                                    color: const Color(0xFF064E3B).withValues(alpha: 0.35),
-                                                    blurRadius: 10,
+                                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                                                    blurRadius: 12,
                                                     offset: const Offset(0, 3),
+                                                  ),
+                                                  BoxShadow(
+                                                    color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, 1),
                                                   ),
                                                 ]
                                               : [
                                                   BoxShadow(
-                                                    color: Colors.black.withValues(alpha: 0.06),
+                                                    color: const Color(0xFFFF9933).withValues(alpha: 0.25),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, -1),
+                                                  ),
+                                                  BoxShadow(
+                                                    color: const Color(0xFF138808).withValues(alpha: 0.25),
                                                     blurRadius: 6,
                                                     offset: const Offset(0, 2),
                                                   ),
@@ -315,23 +346,37 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 7.5, vertical: 2),
                                           decoration: BoxDecoration(
-                                            gradient: const LinearGradient(
-                                              colors: [
-                                                Color(0xFF0F172A),
-                                                Color(0xFF1E293B),
-                                                Color(0xFF064E3B),
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ),
+                                            gradient: on
+                                                ? const LinearGradient(
+                                                    colors: [
+                                                      Color(0xFF78350F),
+                                                      Color(0xFF451A03),
+                                                      Color(0xFF291102),
+                                                    ],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  )
+                                                : const LinearGradient(
+                                                    colors: [
+                                                      Color(0xFF0F172A),
+                                                      Color(0xFF064E3B),
+                                                      Color(0xFF052E16),
+                                                    ],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
                                             borderRadius: BorderRadius.circular(8),
                                             border: Border.all(
-                                              color: const Color(0xFF4ADE80),
-                                              width: 1.2,
+                                              color: on
+                                                  ? const Color(0xFFFFD700)
+                                                  : const Color(0xFF4ADE80),
+                                              width: 1.3,
                                             ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: const Color(0xFF064E3B).withValues(alpha: 0.4),
+                                                color: on
+                                                    ? const Color(0xFFD97706).withValues(alpha: 0.5)
+                                                    : const Color(0xFF064E3B).withValues(alpha: 0.4),
                                                 blurRadius: 6,
                                                 offset: const Offset(0, 2),
                                               ),
@@ -342,7 +387,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                             style: GoogleFonts.roboto(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w900,
-                                              color: const Color(0xFF4ADE80),
+                                              color: on
+                                                  ? const Color(0xFFFFD700)
+                                                  : const Color(0xFF4ADE80),
                                               letterSpacing: -0.2,
                                             ),
                                           ),
