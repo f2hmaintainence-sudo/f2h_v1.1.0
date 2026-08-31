@@ -113,6 +113,9 @@ export class DirectionsService {
       result = await this.viaDirectionsApi(request, apiKey);
     }
 
+    if (result.status === 'OK') {
+      result = this.validateResult(result, request);
+    }
     if (result.status === 'OK') this.putCache(cacheKey, result);
     return result;
   }
@@ -356,6 +359,90 @@ export class DirectionsService {
       seen.add(index);
     }
     return raw.map((value) => Number(value));
+  }
+
+  /**
+   * Server-side sanity gate: catches payloads where Google returned geometry
+   * but reported zero or wildly wrong distance/duration, which would cause the
+   * client to reject the route as "inconsistent".  Logged server-side so the
+   * mismatch is visible even when the rider's device is offline.
+   */
+  private validateResult(
+    result: DirectionsResult,
+    request: DirectionsRequestDto,
+  ): DirectionsResult {
+    // A polyline without a positive distance is suspicious — the client's
+    // proportional geometry check will divide by zero or reject it.
+    if (result.polyline.length > 0 && result.distanceMeters <= 0) {
+      this.logger.warn(
+        `[validateResult] ${result.provider} returned polyline ` +
+          `(${result.polyline.length} chars) but distanceMeters=` +
+          `${result.distanceMeters}; marking UNAVAILABLE`,
+      );
+      return {
+        ...UNAVAILABLE,
+        provider: result.provider,
+        message: 'Routing provider returned zero distance with geometry',
+      };
+    }
+
+    // A polyline without positive duration is likely a broken payload too.
+    if (result.polyline.length > 0 && result.durationSeconds <= 0) {
+      this.logger.warn(
+        `[validateResult] ${result.provider} returned polyline but ` +
+          `durationSeconds=${result.durationSeconds}; marking UNAVAILABLE`,
+      );
+      return {
+        ...UNAVAILABLE,
+        provider: result.provider,
+        message: 'Routing provider returned zero duration with geometry',
+      };
+    }
+
+    // Haversine sanity: the straight-line distance between the request's
+    // origin and its farthest waypoint should not exceed the road distance.
+    // If it does the payload is likely for the wrong region.
+    const allPoints = [
+      request.destination,
+      ...(request.intermediates ?? []),
+    ];
+    let maxStraightKm = 0;
+    for (const pt of allPoints) {
+      const km = this.haversineKm(
+        request.origin.lat, request.origin.lng, pt.lat, pt.lng,
+      );
+      if (km > maxStraightKm) maxStraightKm = km;
+    }
+    const roadDistanceKm = result.distanceMeters / 1000;
+    if (maxStraightKm > roadDistanceKm * 1.5 + 5) {
+      this.logger.warn(
+        `[validateResult] Straight-line span ${maxStraightKm.toFixed(2)} km ` +
+          `exceeds road distance ${roadDistanceKm.toFixed(2)} km × 1.5 + 5; ` +
+          `marking UNAVAILABLE (provider: ${result.provider})`,
+      );
+      return {
+        ...UNAVAILABLE,
+        provider: result.provider,
+        message: 'Routing provider returned inconsistent distance',
+      };
+    }
+
+    return result;
+  }
+
+  /** Haversine distance in km — used only for sanity checks, not billing. */
+  private haversineKm(
+    lat1: number, lng1: number, lat2: number, lng2: number,
+  ): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
   private cacheKey(request: DirectionsRequestDto): string {

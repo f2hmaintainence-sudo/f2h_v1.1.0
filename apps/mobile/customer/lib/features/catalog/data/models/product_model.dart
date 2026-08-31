@@ -20,6 +20,9 @@ class ProductVariant {
   final double? availableQuantity;
   final double? lowStockThreshold;
   final bool isLowStock;
+  /// Whether THIS pack is sold out. Each sibling pill carries its own stock
+  /// state — the parent card's flag describes a different variant entirely.
+  final bool isOutOfStock;
   final String? imagePath;
   final List<String> images;
 
@@ -34,6 +37,7 @@ class ProductVariant {
     this.availableQuantity,
     this.lowStockThreshold,
     this.isLowStock = false,
+    this.isOutOfStock = false,
     this.imagePath,
     this.images = const [],
   });
@@ -73,6 +77,7 @@ class ProductVariant {
       'availableQuantity': availableQuantity,
       'lowStockThreshold': lowStockThreshold,
       'isLowStock': isLowStock,
+      'isOutOfStock': isOutOfStock,
       'imagePath': imagePath,
       'images': images,
     };
@@ -115,6 +120,7 @@ class ProductVariant {
       availableQuantity: double.tryParse(json['available_quantity']?.toString() ?? json['availableQuantity']?.toString() ?? ''),
       lowStockThreshold: double.tryParse(json['low_stock_threshold']?.toString() ?? json['lowStockThreshold']?.toString() ?? ''),
       isLowStock: json['is_low_stock'] == true || json['isLowStock'] == true,
+      isOutOfStock: json['is_out_of_stock'] == true || json['isOutOfStock'] == true,
       imagePath: imgPath,
       images: parsedImages,
     );
@@ -217,6 +223,11 @@ class Product {
         price: price,
         originalPrice: originalPrice,
         subscriptionPrice: subscriptionPrice,
+        // Carry the parent's stock state through: this synthesized variant IS
+        // the product, so reporting it as in-stock would re-enable Add on a
+        // sold-out product that simply has no variant rows.
+        isLowStock: isLowStock,
+        isOutOfStock: isOutOfStock,
       ),
     ];
   }
@@ -572,6 +583,10 @@ Product getProductById(
   String? imageAsset,
   bool isSubscribable = true,
   bool isOneTime = true,
+  // Callers that can resolve the real catalog row should pass these; the
+  // defaults only mean "unknown", and an unknown must never re-enable Add.
+  bool isOutOfStock = false,
+  bool isLowStock = false,
 }) {
   final cleanUnit = variantName != null ? formatUnitName(variantName) : 'Unit';
   return Product(
@@ -589,6 +604,8 @@ Product getProductById(
     isOrganic: false,
     isSubscribable: isSubscribable,
     isOneTime: isOneTime,
+    isOutOfStock: isOutOfStock,
+    isLowStock: isLowStock,
     badge: 'Fresh',
     badgeColor: const Color(0xFF1B4332),
     imageAsset: imageAsset,

@@ -294,6 +294,11 @@ class QuantityCounter extends StatelessWidget {
   final VoidCallback onIncrement;
   final bool isLoading;
 
+  /// When false the "+" is inert and dimmed — used to stop a line whose stock
+  /// ran out from being topped up. Decrement stays live so the customer can
+  /// always reduce or clear the item.
+  final bool canIncrement;
+
   /// Optional fixed width for the counter container.
   final double? width;
 
@@ -303,6 +308,7 @@ class QuantityCounter extends StatelessWidget {
     required this.onDecrement,
     required this.onIncrement,
     this.isLoading = false,
+    this.canIncrement = true,
     this.width,
   });
 
@@ -355,11 +361,12 @@ class QuantityCounter extends StatelessWidget {
             ),
           ),
           GestureDetector(
-            onTap: onIncrement,
+            onTap: canIncrement ? onIncrement : null,
             behavior: HitTestBehavior.opaque,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Icon(Icons.add_rounded, color: Colors.white, size: 16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Icon(Icons.add_rounded,
+                  color: canIncrement ? Colors.white : Colors.white38, size: 16),
             ),
           ),
         ],

@@ -21,7 +21,7 @@ export class CustomersService {
     private readonly dataService: DataService,
     private readonly developer: DeveloperService,
     private readonly databaseService: DatabaseService,
-  ) {}
+  ) { }
 
   // ═══════════════════════════════════════════════════════════════
   // UNIFIED CUSTOMER INTELLIGENCE LIST & 360 PORTFOLIO
@@ -495,7 +495,7 @@ export class CustomersService {
 
       const subscriptionItemsRes = subRes.length > 0
         ? await this.databaseService.query(
-            `SELECT si.*, 
+          `SELECT si.*, 
                     pv.name AS variant_name, 
                     p.name AS product_name,
                     pi.url AS product_image,
@@ -534,11 +534,11 @@ export class CustomersService {
              WHERE s.customer_id = $1
                AND si.deleted_at IS NULL
              ORDER BY si.id ASC`,
-            [customerId],
-          ).catch((err) => {
-            this.developer.error('subscriptionItemsRes error', { err });
-            return [];
-          })
+          [customerId],
+        ).catch((err) => {
+          this.developer.error('subscriptionItemsRes error', { err });
+          return [];
+        })
         : [];
 
       const subscriptionItemsById: Record<string, any[]> = {};
@@ -1290,20 +1290,20 @@ export class CustomersService {
     try {
       const profile = await this.dataService.query('customers', {
         select: [
-          'customers.fraud_score',
-          'customers.loyalty_points',
-          'customers.credit_limit',
+          'customers.customer_id',
+          'customers.postpaid_credit_limit',
+          'customers.wallet_balance',
         ],
-        where: [{ column: 'customers.id', operator: '=', value: id }],
+        where: [{ column: 'customers.customer_id', operator: '=', value: id }],
         limit: 1,
       });
 
       return {
         status: true,
         data: profile?.data?.[0] ?? {
-          fraud_score: 0,
-          loyalty_points: 0,
-          credit_limit: 0,
+          customer_id: id,
+          postpaid_credit_limit: 0,
+          wallet_balance: 0,
         },
       };
     } catch (error) {
@@ -1333,8 +1333,8 @@ export class CustomersService {
 
     try {
       const custRes = await this.databaseService.query(
-        `SELECT customer_id, wallet_balance FROM customers WHERE customer_id = ? OR id::text = ?`,
-        [customerId, customerId]
+        `SELECT customer_id, wallet_balance FROM customers WHERE customer_id = $1`,
+        [customerId]
       );
       if (!custRes || custRes.length === 0) {
         throw new BadRequestException('Customer not found');
@@ -1344,7 +1344,7 @@ export class CustomersService {
       const newBalance = currentBalance + Number(amount);
 
       await this.databaseService.query(
-        `UPDATE customers SET wallet_balance = ?, updated_at = NOW() WHERE customer_id = ?`,
+        `UPDATE customers SET wallet_balance = $1, updated_at = NOW() WHERE customer_id = $2`,
         [newBalance, actualCustId]
       );
 
@@ -1377,8 +1377,8 @@ export class CustomersService {
 
     try {
       const custRes = await this.databaseService.query(
-        `SELECT customer_id, wallet_balance FROM customers WHERE customer_id = ? OR id::text = ?`,
-        [customerId, customerId]
+        `SELECT customer_id, wallet_balance FROM customers WHERE customer_id = $1`,
+        [customerId]
       );
       if (!custRes || custRes.length === 0) {
         throw new BadRequestException('Customer not found');
@@ -1388,13 +1388,13 @@ export class CustomersService {
       const newBalance = currentBalance - Number(amount);
 
       await this.databaseService.query(
-        `UPDATE customers SET wallet_balance = ?, updated_at = NOW() WHERE customer_id = ?`,
+        `UPDATE customers SET wallet_balance = $1, updated_at = NOW() WHERE customer_id = $2`,
         [newBalance, actualCustId]
       );
 
       await this.databaseService.query(
         `INSERT INTO customer_wallet_transactions (customer_id, transaction_type, amount, balance_after, reference_type, remarks, created_by)
-         VALUES (?, 'debit', ?, ?, 'manual', ?, ?)`,
+         VALUES ($1, 'debit', $2, $3, 'manual', $4, $5)`,
         [actualCustId, amount, newBalance, reason, adminId]
       );
 
@@ -1549,10 +1549,20 @@ export class CustomersService {
     try {
       const isEnabled = limit > 0;
       await this.databaseService.query(
-        `UPDATE customers SET postpaid_credit_limit = ?, is_postpaid_enabled = ?, updated_at = NOW()
-         WHERE customer_id = ? OR id::text = ?`,
-        [limit, isEnabled, customerId, customerId]
+        `UPDATE customers SET postpaid_credit_limit = $1, is_postpaid_enabled = $2, updated_at = NOW()
+         WHERE customer_id = $3`,
+        [limit, isEnabled, customerId]
       );
+
+      if (adminId) {
+        await this.dataService.insert('admin_audit_logs', {
+          admin_id: adminId,
+          action: 'set_postpaid_limit',
+          target_type: 'customer',
+          target_id: customerId,
+          details: JSON.stringify({ postpaid_credit_limit: limit, is_postpaid_enabled: isEnabled }),
+        }).catch(() => {});
+      }
 
       return { status: true, message: `Postpaid credit limit set to ₹${limit}` };
     } catch (error) {
@@ -1630,10 +1640,10 @@ export class CustomersService {
     try {
       await this.dataService.query('customers', {
         update: {
-          status: 'deleted',
+          customer_status: 'deleted',
           deleted_at: new Date().toISOString(),
         },
-        where: [{ column: 'customers.id', operator: '=', value: customerId }],
+        where: [{ column: 'customers.customer_id', operator: '=', value: customerId }],
       });
 
       await this.dataService.insert('admin_audit_logs', {
@@ -1663,7 +1673,7 @@ export class CustomersService {
       const result = await this.dataService.query('customers', {
         select: ['customers.*'],
         where: [
-          { column: 'customers.id', operator: '=', value: id },
+          { column: 'customers.customer_id', operator: '=', value: id },
           { column: 'customers.deleted_at', operator: 'IS', value: null },
         ],
         limit: 1,
@@ -1685,7 +1695,7 @@ export class CustomersService {
       const result = await this.dataService.query('customers', {
         update: { deleted_at: new Date().toISOString() },
         where: [
-          { column: 'id', operator: '=', value: id },
+          { column: 'customer_id', operator: '=', value: id },
           { column: 'deleted_at', operator: 'IS', value: null },
         ],
       });
@@ -1788,8 +1798,8 @@ export class CustomersService {
   async logContainerTransaction(id: string, body: any, adminId: string = 'system') {
     try {
       const custRes = await this.databaseService.query(
-        `SELECT customer_id FROM customers WHERE customer_id = ? OR id::text = ?`,
-        [id, id]
+        `SELECT customer_id FROM customers WHERE customer_id = $1`,
+        [id]
       );
       if (!custRes || custRes.length === 0) {
         throw new BadRequestException('Customer not found');
@@ -1954,7 +1964,7 @@ export class CustomersService {
           const originalPrice = Number(r.original_price || 0);
           const discount = Number(r.discount || 0);
           const overallSavingsPct = originalPrice > 0
-            ? parseFloat(((( originalPrice - finalSubPrice) / originalPrice) * 100).toFixed(2))
+            ? parseFloat((((originalPrice - finalSubPrice) / originalPrice) * 100).toFixed(2))
             : 0;
           return {
             ...r,

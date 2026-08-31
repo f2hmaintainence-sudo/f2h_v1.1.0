@@ -43,6 +43,36 @@ import 'home_screen.dart';
 //  CART SCREEN WIDGET
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Finds the live catalog entry for a cart line's variant.
+///
+/// A product card IS a variant, so the id matches either a Product directly or
+/// one of its sibling variants. Returns null when the catalog has not loaded,
+/// in which case callers must not assume the item is in stock — the server
+/// revalidates on checkout regardless.
+ProductVariant? _findCatalogVariant(BuildContext context, String variantId) {
+  final state = context.read<CatalogBloc>().state;
+  if (state is! CatalogLoaded) return null;
+  for (final product in state.products) {
+    for (final v in product.variants) {
+      if (v.id == variantId) return v;
+    }
+    if (product.id == variantId) {
+      return product.allVariants.firstWhere(
+        (v) => v.id == variantId,
+        orElse: () => ProductVariant(
+          id: product.id,
+          label: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          isOutOfStock: product.isOutOfStock,
+          isLowStock: product.isLowStock,
+        ),
+      );
+    }
+  }
+  return null;
+}
+
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -563,6 +593,11 @@ class _CartScreenState extends State<CartScreen> {
                 }
                 if (matchedItem == null) return const SizedBox.shrink();
 
+                // getProductById synthesizes a Product from the cart row and
+                // knows nothing about stock, so look the variant up in the
+                // catalog and carry its real flags across. Without this the
+                // cart shows a sold-out line as freshly addable.
+                final catalogMatch = _findCatalogVariant(context, matchedItem.variantId);
                 final p = getProductById(
                   matchedItem.variantId,
                   name: matchedItem.productName,
@@ -571,6 +606,8 @@ class _CartScreenState extends State<CartScreen> {
                   imageAsset: matchedItem.imageAsset,
                   isSubscribable: matchedItem.isSubscribable,
                   isOneTime: matchedItem.isOneTime,
+                  isOutOfStock: catalogMatch?.isOutOfStock ?? false,
+                  isLowStock: catalogMatch?.isLowStock ?? false,
                 );
                 final qty = items[key] ?? 0;
                 final isChecked = _selectedItems[key] ?? true;
@@ -1444,6 +1481,7 @@ class _CartItemTileState extends State<_CartItemTile> {
       isLoading: _isUpdating,
       onDecrement: dispatchRemove,
       onIncrement: dispatchAdd,
+      canIncrement: !p.isOutOfStock,
     );
   }
 }

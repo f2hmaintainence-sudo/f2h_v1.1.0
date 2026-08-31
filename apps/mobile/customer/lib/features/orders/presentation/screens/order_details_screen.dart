@@ -9,6 +9,8 @@ import 'package:f2h_customer/features/orders/presentation/bloc/order_history_blo
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_state.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
+import '../../../catalog/presentation/bloc/catalog_bloc.dart';
+import '../../../catalog/presentation/bloc/catalog_state.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 
@@ -487,12 +489,28 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 children: [
                   GestureDetector(
                     onTap: () {
-                      final product = getProductById(
-                        item.variantId,
-                        name: item.productName,
-                        variantName: item.variantName,
-                        price: item.unitPrice,
-                      );
+                      // Prefer the live catalog row. getProductById only
+                      // synthesizes a Product from the order line and reports
+                      // no stock, which left ADD TO CART enabled on the
+                      // product page for a variant that has since sold out.
+                      final catState = context.read<CatalogBloc>().state;
+                      Product? liveProduct;
+                      if (catState is CatalogLoaded) {
+                        for (final cp in catState.products) {
+                          if (cp.id == item.variantId ||
+                              cp.variants.any((v) => v.id == item.variantId)) {
+                            liveProduct = cp;
+                            break;
+                          }
+                        }
+                      }
+                      final product = liveProduct ??
+                          getProductById(
+                            item.variantId,
+                            name: item.productName,
+                            variantName: item.variantName,
+                            price: item.unitPrice,
+                          );
                       Navigator.push(
                         context,
                         PageRouteBuilder(

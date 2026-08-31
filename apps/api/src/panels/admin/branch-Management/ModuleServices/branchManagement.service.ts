@@ -915,9 +915,10 @@ export class BranchManagementService {
       throw new BadRequestException('Invalid credit limit');
 
     try {
+      const isEnabled = limit > 0;
       await this.dataService.query('customers', {
-        update: { credit_limit: limit },
-        where: [{ column: 'customers.id', operator: '=', value: customerId }],
+        update: { postpaid_credit_limit: limit, is_postpaid_enabled: isEnabled },
+        where: [{ column: 'customers.customer_id', operator: '=', value: customerId }],
       });
 
       await this.dataService.insert('admin_audit_logs', {
@@ -925,12 +926,12 @@ export class BranchManagementService {
         action: 'set_postpaid_limit',
         target_type: 'customer',
         target_id: customerId,
-        details: JSON.stringify({ credit_limit: limit }),
-      });
+        details: JSON.stringify({ credit_limit: limit, is_postpaid_enabled: isEnabled }),
+      }).catch(() => {});
 
       return { status: true, message: `Postpaid limit set to ₹${limit}` };
     } catch (error) {
-      this.developer.error('CustomersService.setPostpaidLimit error', {
+      this.developer.error('BranchManagementService.setPostpaidLimit error', {
         error,
       });
       throw new InternalServerErrorException('Failed to set postpaid limit');

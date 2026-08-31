@@ -83,6 +83,25 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
     return null;
   }
 
+  /// Whether the pack the user currently has selected can be bought.
+  ///
+  /// The card-level flags describe the variant the sheet was opened from, which
+  /// is a different pack the moment another pill is picked — so stock is read
+  /// off `_selected`. The card's own flags are still honoured when the selection
+  /// IS the card, because the category feed reconciles master stock onto the
+  /// Product while leaving its sibling list untouched.
+  bool get _selectionUnavailable {
+    final isSelf = _selected.id == widget.product.id;
+    return _selected.isOutOfStock ||
+        _selected.isLowStock ||
+        (isSelf && (widget.product.isOutOfStock || widget.product.isLowStock)) ||
+        !widget.product.isOneTime;
+  }
+
+  bool get _selectionOutOfStock =>
+      _selected.isOutOfStock ||
+      (_selected.id == widget.product.id && widget.product.isOutOfStock);
+
   /// Name for the pack the user currently has selected. Each pill is a
   /// separately named product row, so the header and the cart entry have to
   /// follow the selection rather than the card that opened the sheet.
@@ -144,7 +163,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
               ),
             ],
           ),
-          if (p.isOutOfStock) ...[
+          if (_selectionOutOfStock) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -157,11 +176,11 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 children: [
                   Icon(Icons.error_outline_rounded, size: 14, color: Color(0xFFD32F2F)),
                   SizedBox(width: 6),
-                  Text('Product is currently Out of Stock', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
+                  Text('This pack is currently Out of Stock', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
                 ],
               ),
             ),
-          ] else if (p.isLowStock || _selected.isLowStock || !p.isOneTime) ...[
+          ] else if (_selectionUnavailable) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -195,6 +214,9 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
               runSpacing: 8,
               children: p.variants.map((v) {
                 final isSel = v.id == _selected.id;
+                final isGone = v.isOutOfStock;
+                // A sold-out pack stays selectable so the reason lands in the
+                // banner and the ADD button, rather than the tap doing nothing.
                 return GestureDetector(
                   onTap: () => setState(() {
                     _selected = v;
@@ -204,10 +226,10 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: isSel ? kPrimary : kSurface,
+                      color: isSel ? (isGone ? kMuted : kPrimary) : kSurface,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSel ? kPrimary : kBorder,
+                        color: isSel ? (isGone ? kMuted : kPrimary) : kBorder,
                         width: isSel ? 1.5 : 1.0,
                       ),
                     ),
@@ -218,7 +240,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                           v.label,
                           style: TextStyle(
                             fontSize: 13, fontWeight: FontWeight.w800,
-                            color: isSel ? Colors.white : kText,
+                            color: isSel ? Colors.white : (isGone ? kTextSub : kText),
                           ),
                         ),
                         const SizedBox(height: 3),
@@ -226,10 +248,22 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                           '₹${v.price.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w700,
-                            color: isSel ? Colors.white70 : kPrimary,
+                            color: isSel ? Colors.white70 : (isGone ? kMuted : kPrimary),
+                            decoration: isGone ? TextDecoration.lineThrough : null,
                           ),
                         ),
-                        // No discount display
+                        if (isGone) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Out of stock',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.3,
+                              color: isSel ? Colors.white : const Color(0xFFD32F2F),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -353,7 +387,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
-                          onPressed: (p.isOutOfStock || p.isLowStock || _selected.isLowStock || !p.isOneTime)
+                          onPressed: _selectionUnavailable
                               ? null
                               : () {
                                   ctx.runWithAuth(() {
@@ -363,10 +397,10 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                                   });
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: (p.isOutOfStock || p.isLowStock || _selected.isLowStock || !p.isOneTime)
+                            backgroundColor: _selectionUnavailable
                                 ? const Color(0xFFE0E0E0)
                                 : kPrimary,
-                            foregroundColor: (p.isOutOfStock || p.isLowStock || _selected.isLowStock || !p.isOneTime)
+                            foregroundColor: _selectionUnavailable
                                 ? const Color(0xFF757575)
                                 : Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
@@ -374,11 +408,9 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                             elevation: 0,
                           ),
                           child: Text(
-                            p.isOutOfStock
+                            _selectionOutOfStock
                                 ? 'OUT OF STOCK'
-                                : ((p.isLowStock || _selected.isLowStock || !p.isOneTime)
-                                    ? 'UNAVAILABLE'
-                                    : 'ADD'),
+                                : (_selectionUnavailable ? 'UNAVAILABLE' : 'ADD'),
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
                           ),
                         ),
@@ -408,15 +440,20 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                           ),
                           Text('$qty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
                           GestureDetector(
-                            onTap: () {
-                              ctx.runWithAuth(() {
-                                HapticFeedback.lightImpact();
-                                dispatchAdd();
-                              });
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 14),
-                              child: Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                            // Already-in-cart items could top up without any
+                            // stock check at all before this guard.
+                            onTap: _selectionUnavailable
+                                ? null
+                                : () {
+                                    ctx.runWithAuth(() {
+                                      HapticFeedback.lightImpact();
+                                      dispatchAdd();
+                                    });
+                                  },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              child: Icon(Icons.add_rounded,
+                                  color: _selectionUnavailable ? Colors.white38 : Colors.white, size: 18),
                             ),
                           ),
                         ],
@@ -1104,11 +1141,15 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                 Text('$qty',
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
                 GestureDetector(
-                  onTap: () => _onAdd(ctx),
+                  // The out-of-stock branch above only covers qty == 0, so
+                  // without this an item already in the cart could keep topping
+                  // up from a sold-out card.
+                  onTap: widget.p.isOutOfStock ? null : () => _onAdd(ctx),
                   behavior: HitTestBehavior.opaque,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Icon(Icons.add_rounded, color: Colors.white, size: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Icon(Icons.add_rounded,
+                        color: widget.p.isOutOfStock ? Colors.white38 : Colors.white, size: 12),
                   ),
                 ),
               ],

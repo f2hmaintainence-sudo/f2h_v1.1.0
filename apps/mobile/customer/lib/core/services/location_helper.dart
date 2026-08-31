@@ -1,84 +1,274 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
-class LocationHelper {
-  /// Ensures both device location service (GPS) and app location permission
-  /// are active. If either is disabled or denied, shows a clear, user-friendly
-  /// prompt with a direct 1-tap button to open device location settings or app settings.
-  ///
-  /// Works safely on both Mobile (Android/iOS) and Flutter Web (`kIsWeb`).
-  ///
-  /// Returns the current [Position] if successful, or `null` if the user dismissed or refused.
-  static Future<Position?> getCurrentPositionWithPrompt(BuildContext context) async {
-    // 1. Check if device location service (GPS) is enabled
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (!context.mounted) return null;
-      final bool? opened = await showLocationServiceDialog(context);
-      if (opened == true && !kIsWeb) {
-        try {
-          await Geolocator.openLocationSettings();
-        } catch (_) {}
-      }
-      return null;
-    }
+/// Waits for the app to come back to the foreground.
+///
+/// Sending the user to system settings pauses the app; the grant only becomes
+/// visible once it resumes. A bare `resumed` event is not enough to act on —
+/// the framework can deliver one before the settings screen ever appears — so
+/// this waits for a real leave-and-return: some non-resumed state first, then
+/// `resumed`.
+class _AppResumeWaiter with WidgetsBindingObserver {
+  final Completer<void> _completer = Completer<void>();
+  bool _leftForeground = false;
 
-    // 2. Check and request location permission
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        if (!context.mounted) return null;
-        final bool? opened = await showLocationPermissionDialog(
-          context,
-          isPermanentlyDenied: false,
-        );
-        if (opened == true) {
-          if (!kIsWeb) {
-            try {
-              await Geolocator.openAppSettings();
-            } catch (_) {}
-          } else {
-            try {
-              permission = await Geolocator.requestPermission();
-            } catch (_) {}
-          }
-        }
-        return null;
-      }
-    }
+  void start() => WidgetsBinding.instance.addObserver(this);
+  void dispose() => WidgetsBinding.instance.removeObserver(this);
 
-    if (permission == LocationPermission.deniedForever) {
-      if (!context.mounted) return null;
-      final bool? opened = await showLocationPermissionDialog(
-        context,
-        isPermanentlyDenied: true,
-      );
-      if (opened == true && !kIsWeb) {
-        try {
-          await Geolocator.openAppSettings();
-        } catch (_) {}
-      }
-      return null;
-    }
-
-    // 3. Get high accuracy position with a safe timeout
+  Future<bool> wait(Duration timeout) async {
     try {
-      return await Geolocator.getCurrentPosition(
+      await _completer.future.timeout(timeout);
+      return true;
+    } on TimeoutException {
+      return false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _leftForeground = true;
+      return;
+    }
+    if (_leftForeground && !_completer.isCompleted) {
+      _completer.complete();
+    }
+  }
+}
+
+/// What a position read actually produced. A refusal and a failed fix need
+/// very different messages, and the web plugin does not distinguish them.
+enum _PositionOutcome { ok, permissionDenied, unavailable }
+
+class _PositionResult {
+  final _PositionOutcome outcome;
+  final Position? position;
+  const _PositionResult(this.outcome, [this.position]);
+}
+
+class LocationHelper {
+  /// Initial check plus one re-check after the user has been to settings.
+  /// Bounded so a permission the user never grants cannot loop the prompt.
+  static const int _maxAttempts = 2;
+
+  /// How long to wait for the user to finish in settings before giving up on
+  /// the automatic re-check. They can always tap the feature again.
+  static const Duration _settingsReturnTimeout = Duration(minutes: 3);
+
+  /// Budget for a single fix.
+  static const Duration _positionTimeout = Duration(seconds: 15);
+
+  /// Ensures location access is usable, then returns the current [Position].
+  ///
+  /// State is re-read from the platform on every call and on every attempt
+  /// within a call, so the feature can never be entered on a stale grant.
+  ///
+  /// If access is off the user gets an explanatory prompt with a one-tap route
+  /// to the right settings screen. After they return, permission is re-checked
+  /// automatically and the position is delivered without the feature having to
+  /// be started again.
+  ///
+  /// Returns null if the user declined or access is still not granted — never
+  /// silently: a prompt or a message is always shown first.
+  static Future<Position?> getCurrentPositionWithPrompt(BuildContext context) async {
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      final bool isFinalAttempt = attempt == _maxAttempts - 1;
+
+      // 1. Device location service (GPS). Always reported enabled on web.
+      if (!await _isServiceEnabled()) {
+        if (!context.mounted) return null;
+        final bool? wantsToFix = await showLocationServiceDialog(context);
+        if (wantsToFix != true) return null;
+        if (isFinalAttempt) {
+          await _openSettings(serviceSettings: true);
+          return null;
+        }
+        if (!await _openSettingsAndAwaitReturn(serviceSettings: true)) return null;
+        continue;
+      }
+
+      // 2. Permission. Null means the platform could not tell us — Safari does
+      //    not accept 'geolocation' in the Permissions API, so the query throws
+      //    there. Unknown is not the same as denied: fall through and let the
+      //    browser raise its own prompt during the read below.
+      LocationPermission? permission = await _checkPermission();
+
+      if (!kIsWeb && permission == LocationPermission.denied) {
+        permission = await _requestPermission();
+      }
+
+      // On web the plugin implements requestPermission() as a position read
+      // that reports EVERY failure — including a timeout — as deniedForever,
+      // so it is never called here. Only a definite 'denied' state short
+      // circuits; anything else goes to the read and is judged on its result.
+      final bool definitelyBlocked = kIsWeb
+          ? permission == LocationPermission.deniedForever
+          : (permission == LocationPermission.denied ||
+              permission == LocationPermission.deniedForever);
+
+      if (definitelyBlocked) {
+        if (!context.mounted) return null;
+        final bool? wantsToFix = await showLocationPermissionDialog(
+          context,
+          isPermanentlyDenied: permission == LocationPermission.deniedForever,
+        );
+        if (wantsToFix != true) return null;
+        if (isFinalAttempt) {
+          await _openSettings(serviceSettings: false);
+          return null;
+        }
+        if (!await _openSettingsAndAwaitReturn(serviceSettings: false)) return null;
+        continue;
+      }
+
+      // 3. Read the position and judge the outcome.
+      final result = await _readPosition();
+
+      if (result.outcome == _PositionOutcome.ok) return result.position;
+
+      if (result.outcome == _PositionOutcome.permissionDenied) {
+        if (!context.mounted) return null;
+        final bool? wantsToFix = await showLocationPermissionDialog(
+          context,
+          isPermanentlyDenied: true,
+        );
+        if (wantsToFix != true) return null;
+        if (isFinalAttempt) {
+          await _openSettings(serviceSettings: false);
+          return null;
+        }
+        if (!await _openSettingsAndAwaitReturn(serviceSettings: false)) return null;
+        continue;
+      }
+
+      // Permission is fine, the fix just did not arrive. Saying "blocked"
+      // here would send the user to settings that are already correct.
+      if (context.mounted) {
+        _showMessage(
+          context,
+          'Could not get your location. Please move to an open area and try again.',
+        );
+      }
+      return null;
+    }
+    return null;
+  }
+
+  /// Whether location can be used right now, without prompting.
+  static Future<bool> isLocationReady() async {
+    if (!await _isServiceEnabled()) return false;
+    final permission = await _checkPermission();
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
+  }
+
+  static Future<bool> _isServiceEnabled() async {
+    try {
+      return await Geolocator.isLocationServiceEnabled();
+    } catch (_) {
+      // Never block the flow on a failed probe — the read below is the real
+      // test of whether location works.
+      return true;
+    }
+  }
+
+  /// Returns null when the platform cannot report a permission state, rather
+  /// than letting the throw escape and abort the whole flow.
+  static Future<LocationPermission?> _checkPermission() async {
+    try {
+      return await Geolocator.checkPermission();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<LocationPermission?> _requestPermission() async {
+    try {
+      return await Geolocator.requestPermission();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Reads a position, mapping the platform's typed errors onto outcomes.
+  ///
+  /// The browser timeout cannot be relied on: the web plugin passes
+  /// `Duration.inMicroseconds` into a field the browser reads as
+  /// milliseconds, turning a 15 second limit into roughly four hours. The
+  /// Dart-side timeout below is what actually bounds the wait.
+  static Future<_PositionResult> _readPosition() async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
+          timeLimit: _positionTimeout,
         ),
-      );
+      ).timeout(_positionTimeout + const Duration(seconds: 3));
+      return _PositionResult(_PositionOutcome.ok, position);
+    } on PermissionDeniedException {
+      return const _PositionResult(_PositionOutcome.permissionDenied);
     } catch (_) {
-      try {
-        return await Geolocator.getLastKnownPosition();
-      } catch (_) {
-        return null;
-      }
+      // Timed out or the fix failed. A stale position still beats nothing.
+      return _lastKnownPosition();
     }
+  }
+
+  static Future<_PositionResult> _lastKnownPosition() async {
+    try {
+      // Unsupported on web, where it throws rather than returning null.
+      final position = await Geolocator.getLastKnownPosition();
+      if (position != null) return _PositionResult(_PositionOutcome.ok, position);
+    } catch (_) {}
+    return const _PositionResult(_PositionOutcome.unavailable);
+  }
+
+  /// Sends the user where they can grant access and reports whether it is worth
+  /// re-checking afterwards.
+  ///
+  /// On mobile this opens the system settings and waits for the app to come
+  /// back. The web has no settings screen to open — permission is changed from
+  /// the browser's own address-bar control, which does not background the tab —
+  /// so the best available move is to re-check on the spot.
+  static Future<bool> _openSettingsAndAwaitReturn({required bool serviceSettings}) async {
+    if (kIsWeb) return true;
+
+    // Registered before the settings screen launches, so the app leaving the
+    // foreground cannot be missed.
+    final waiter = _AppResumeWaiter()..start();
+    if (!await _openSettings(serviceSettings: serviceSettings)) {
+      waiter.dispose();
+      return false;
+    }
+
+    try {
+      return await waiter.wait(_settingsReturnTimeout);
+    } finally {
+      waiter.dispose();
+    }
+  }
+
+  /// Launches the relevant settings screen. Returns false if the platform
+  /// refused (there is nothing to open on web).
+  static Future<bool> _openSettings({required bool serviceSettings}) async {
+    if (kIsWeb) return false;
+    try {
+      return serviceSettings
+          ? await Geolocator.openLocationSettings()
+          : await Geolocator.openAppSettings();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static void _showMessage(BuildContext context, String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
   }
 
   /// Shows a modal dialog prompting the user to turn on GPS Location Service.
@@ -168,7 +358,7 @@ class LocationHelper {
                       ),
                     ),
                     child: Text(
-                      kIsWeb ? 'Got it' : 'Turn ON Location',
+                      kIsWeb ? 'Enable Location' : 'Turn ON Location',
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
@@ -275,7 +465,7 @@ class LocationHelper {
                       ),
                     ),
                     child: Text(
-                      kIsWeb ? 'Got it' : 'Open Settings',
+                      kIsWeb ? 'Allow Location' : 'Open Settings',
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),

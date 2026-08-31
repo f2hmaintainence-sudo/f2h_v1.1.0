@@ -83,6 +83,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Estimation collapse state ─────────────────────────
   bool _estimateExpanded = false;
 
+  /// Whether the pack currently selected can be subscribed to. Stock is a
+  /// per-variant fact, so this reads the selection rather than the product the
+  /// screen was opened with.
+  bool get _variantOutOfStock =>
+      _variant.isOutOfStock ||
+      (_variant.id == widget.product.id && widget.product.isOutOfStock);
+
   @override
   void initState() {
     super.initState();
@@ -90,16 +97,25 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     _variant =
         widget.initialVariant ??
         vars.firstWhere(
-          (v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0,
-          orElse: () => vars.isNotEmpty
+          (v) =>
+              v.subscriptionPrice != null &&
+              v.subscriptionPrice! > 0 &&
+              !v.isOutOfStock,
+          // Fall back to a subscribable pack even if sold out, so the screen
+          // still explains itself rather than silently showing another pack.
+          orElse: () => vars.firstWhere(
+            (v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0,
+            orElse: () => vars.isNotEmpty
               ? vars.first
-              : ProductVariant(
-                  id: widget.product.id,
-                  label: widget.product.unit,
-                  price: widget.product.price,
-                  originalPrice: widget.product.originalPrice,
-                  subscriptionPrice: widget.product.subscriptionPrice,
-                ),
+                : ProductVariant(
+                    id: widget.product.id,
+                    label: widget.product.unit,
+                    price: widget.product.price,
+                    originalPrice: widget.product.originalPrice,
+                    subscriptionPrice: widget.product.subscriptionPrice,
+                    isOutOfStock: widget.product.isOutOfStock,
+                  ),
+          ),
         );
 
     _startDate = DateTime.now().add(const Duration(days: 1));
@@ -821,6 +837,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               children: vars.map((v) {
                 final isSel = v.id == _variant.id;
                 final subPrice = v.subscriptionPrice ?? v.price;
+                final isGone = v.isOutOfStock;
                 return GestureDetector(
                   onTap: () => setState(() => _variant = v),
                   child: AnimatedContainer(
@@ -830,10 +847,12 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: isSel ? kPrimary : Colors.white,
+                      color: isSel ? (isGone ? kMuted : kPrimary) : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSel ? kPrimary : const Color(0xFFE0E0E0),
+                        color: isSel
+                            ? (isGone ? kMuted : kPrimary)
+                            : const Color(0xFFE0E0E0),
                         width: isSel ? 1.5 : 1.0,
                       ),
                     ),
@@ -844,9 +863,22 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: isSel ? Colors.white : kText,
+                            color: isSel
+                                ? Colors.white
+                                : (isGone ? kTextSub : kText),
                           ),
                         ),
+                        if (isGone)
+                          Text(
+                            'OUT OF STOCK',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                              color: isSel
+                                  ? Colors.white
+                                  : const Color(0xFFD32F2F),
+                            ),
+                          ),
                         const SizedBox(height: 2),
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1558,7 +1590,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: (_isLoading || total <= 0) ? null : _confirmSubscription,
+            onPressed: (_isLoading || total <= 0 || _variantOutOfStock)
+                ? null
+                : _confirmSubscription,
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
               foregroundColor: Colors.white,
@@ -1580,7 +1614,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     ),
                   )
                 : Text(
-                    total <= 0
+                    _variantOutOfStock
+                        ? 'Out of Stock'
+                        : total <= 0
                         ? 'Set Quantity to Continue'
                         : 'Confirm Subscription',
                     style: const TextStyle(

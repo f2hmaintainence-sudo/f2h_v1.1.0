@@ -15,12 +15,13 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
     // Cache key is branch-specific so each branch's stock is stored separately
     final cacheKey = branchId != null && branchId.isNotEmpty
-        ? 'cached_products_v14_$branchId'
-        : 'cached_products_v14';
+        ? 'cached_products_v15_$branchId'
+        : 'cached_products_v15';
 
     // 1. Try to load from cache
     try {
-      // Bumped cache key to cached_products_v14 to force reload with special pricing
+      // Bumped to v15: cached entries from v14 have no per-variant stock flag,
+      // and decoding them would silently mark sold-out packs as available.
       final cachedData = prefs.getString(cacheKey);
       if (cachedData != null) {
         final List<dynamic> decoded = jsonDecode(cachedData);
@@ -54,7 +55,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
       final products = _mapRawProducts(rawList);
 
       if (products.isNotEmpty) {
-        final key = cacheKey ?? 'cached_products_v14';
+        final key = cacheKey ?? 'cached_products_v15';
         final encoded = jsonEncode(products.map((p) => p.toJson()).toList());
         await prefs.setString(key, encoded);
       }
@@ -153,6 +154,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
           availableQuantity: availQty,
           lowStockThreshold: lowThreshold,
           isLowStock: isVariantLowStock,
+          isOutOfStock: isVariantOutOfStock,
           imagePath: variantImagePath,
           images: parsedVarImgs,
         ));

@@ -344,9 +344,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               ],
                             ),
                           ],
-                          if (p.isLowStock ||
-                              p.isOutOfStock ||
-                              _selectedVariant.isLowStock) ...[
+                          if (_selectedVariant.isOutOfStock ||
+                              _selectedVariant.isLowStock ||
+                              (_selectedVariant.id == p.id &&
+                                  (p.isLowStock || p.isOutOfStock))) ...[
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -414,6 +415,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                 itemBuilder: (context, index) {
                                   final v = p.allVariants[index];
                                   final isSel = v.id == _selectedVariant.id;
+                                  final isGone = v.isOutOfStock;
                                   final hasSub =
                                       v.subscriptionPrice != null &&
                                       v.subscriptionPrice! > 0;
@@ -484,13 +486,31 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                                                   ),
                                                   
                                                   const SizedBox(height: 2),
+                                                  if (isGone)
+                                                    const Text(
+                                                      'OUT OF STOCK',
+                                                      style: TextStyle(
+                                                        fontSize: 8.5,
+                                                        fontWeight:
+                                                            FontWeight.w900,
+                                                        color: Color(0xFFD32F2F),
+                                                      ),
+                                                    ),
                                                   Text(
                                                     '₹${v.price.toStringAsFixed(0)}',
                                                     style: TextStyle(
                                                       fontSize: 14,
                                                       fontWeight:
                                                           FontWeight.w900,
-                                                      color: isSel
+                                                      decoration: isGone
+                                                          ? TextDecoration
+                                                                .lineThrough
+                                                          : null,
+                                                      color: isGone
+                                                          ? const Color(
+                                                              0xFF9E9E9E,
+                                                            )
+                                                          : isSel
                                                           ? const Color(
                                                               0xFF0C831F,
                                                             )
@@ -1054,11 +1074,15 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
           ctx.read<CartBloc>().add(RemoveFromCartEvent(cartItem));
         }
 
+        // `p.*` describes the variant this page was opened with; once another
+        // pack is picked, `_selectedVariant` is the one being bought. The card
+        // flags stay in the expression only while the selection IS the card.
+        final isSelfVariant = _selectedVariant.id == p.id;
         final isLowStockOrNoOneTime =
             !p.isOneTime ||
-            p.isLowStock ||
-            p.isOutOfStock ||
-            _selectedVariant.isLowStock;
+            _selectedVariant.isOutOfStock ||
+            _selectedVariant.isLowStock ||
+            (isSelfVariant && (p.isLowStock || p.isOutOfStock));
 
         if (qty == 0) {
           return SizedBox(
@@ -1125,11 +1149,16 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  ctx.runWithAuth(() => dispatchAdd());
-                },
+                icon: Icon(Icons.add,
+                    color: isLowStockOrNoOneTime ? Colors.white38 : Colors.white, size: 22),
+                // Topping up an item already in the cart skipped every stock
+                // check before this guard.
+                onPressed: isLowStockOrNoOneTime
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        ctx.runWithAuth(() => dispatchAdd());
+                      },
                 padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
             ],

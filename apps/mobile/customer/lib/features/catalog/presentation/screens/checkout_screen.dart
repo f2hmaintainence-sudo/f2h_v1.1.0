@@ -17,6 +17,8 @@ import '../../domain/entities/cart/cart_item_entity.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/session/customer_session_cubit.dart';
 import '../../../../core/session/customer_session_state.dart';
+import '../bloc/catalog_bloc.dart';
+import '../bloc/catalog_state.dart';
 import '../bloc/checkout/checkout_bloc.dart';
 import '../bloc/checkout/checkout_event.dart';
 import '../bloc/checkout/checkout_state.dart';
@@ -1945,15 +1947,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  /// Live catalog entry for a cart line's variant, or null when the catalog
+  /// has not loaded. A null must not be read as "in stock" — the server
+  /// revalidates every line on checkout regardless.
+  ProductVariant? _findCatalogVariant(BuildContext context, String? variantId) {
+    if (variantId == null || variantId.isEmpty) return null;
+    final state = context.read<CatalogBloc>().state;
+    if (state is! CatalogLoaded) return null;
+    for (final product in state.products) {
+      for (final v in product.variants) {
+        if (v.id == variantId) return v;
+      }
+    }
+    return null;
+  }
+
   // ===== Checkout Item Counter =====
 
   /// Item counter for one-time order items.
   Widget _buildCheckoutItemCounter(CartItemEntity item) {
     int qty = item.quantity ?? 1;
 
+    // Stock can run out between adding to the cart and reaching checkout, so
+    // the "+" is checked against the live catalog rather than the cart row.
+    final catalogVariant = _findCatalogVariant(context, item.variantId);
+
     return QuantityCounter(
       quantity: qty,
       width: 80,
+      canIncrement: !(catalogVariant?.isOutOfStock ?? false),
       onDecrement: () {
         context.read<CartBloc>().add(
           RemoveFromCartEvent(item.copyWith(quantity: 1)),

@@ -11,7 +11,7 @@
 import 'package:dio/dio.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
-import 'package:f2h_delivery/core/api/dio_client.dart';
+import 'package:f2h_delivery/core/utils/dev_log.dart';
 import 'package:f2h_delivery/core/utils/google_polyline.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
@@ -100,9 +100,22 @@ const Duration _kResultCacheTtl = Duration(seconds: 45);
 /// ~11 m. Below this the rider has not moved enough to change the road route.
 const int _kOriginKeyPrecision = 4;
 
+/// Minimum floor for the geometry-vs-distance ceiling.  Even a very short run
+/// can have a diagonal that exceeds a tight road distance, because the overview
+/// polyline simplifies curves.
+const double _kGeometryFloorKm = 5.0;
+
+/// Proportional factor: the bounding-box diagonal may be up to this fraction
+/// of the road distance.  A diagonal can never exceed the path it encloses, but
+/// Google's overview polyline is simplified — so in practice the straight-line
+/// span sometimes sits around 60-80 % of the driving distance.  1.5× gives
+/// ample room while still catching obviously corrupt payloads (e.g. a point on
+/// another continent).
+const double _kGeometryRatioMax = 1.5;
+
 class RouteOptimizationService {
   final LocationService _locationService;
-  final DioClient _dioClient;
+  final Dio _dio;
 
   String? _cacheKey;
   OptimizedRouteResult? _cachedResult;
@@ -110,9 +123,9 @@ class RouteOptimizationService {
 
   RouteOptimizationService({
     required LocationService locationService,
-    required DioClient dioClient,
+    required Dio dio,
   })  : _locationService = locationService,
-        _dioClient = dioClient;
+        _dio = dio;
 
   /// Orders stops by straight-line proximity.
   ///
@@ -211,7 +224,7 @@ class RouteOptimizationService {
 
     Map<String, dynamic>? data;
     try {
-      final response = await _dioClient.dio.post(
+      final response = await _dio.post(
         ApiEndpoints.mapDirections,
         data: {
           'origin': {'lat': origin.latitude, 'lng': origin.longitude},
@@ -302,6 +315,39 @@ class RouteOptimizationService {
 
     final legs = _parseLegs(data['legs']);
 
+    final totalDistanceKmRaw =
+        ((data['distanceMeters'] as num?)?.toDouble() ?? 0) / 1000.0;
+    final geometrySpanKm =
+        _geometrySpanKm([fullPoints, for (final leg in legs) leg.points]);
+
+    // Proportional ceiling: allow the diagonal to be up to _kGeometryRatioMax
+    // of the road distance, with an absolute floor so very short routes are
+    // never rejected.
+    final ceilingKm = totalDistanceKmRaw > 0
+        ? (totalDistanceKmRaw * _kGeometryRatioMax)
+            .clamp(_kGeometryFloorKm, double.infinity)
+        : _kGeometryFloorKm;
+
+    if (geometrySpanKm > ceilingKm) {
+      devLog('[route] REJECTED geometry: diagonal '
+          '${geometrySpanKm.toStringAsFixed(2)} km exceeds ceiling '
+          '${ceilingKm.toStringAsFixed(2)} km '
+          '(provider ${data['provider']}, reported '
+          '${totalDistanceKmRaw.toStringAsFixed(3)} km, '
+          '${fullPoints.length} points, ${legs.length} legs)');
+      return OptimizedRouteResult.unavailable(
+        orderedStops: orderedStops,
+        reason: 'Routing service returned inconsistent road geometry',
+      );
+    }
+
+    devLog('[route] ACCEPTED geometry: diagonal '
+        '${geometrySpanKm.toStringAsFixed(2)} km, ceiling '
+        '${ceilingKm.toStringAsFixed(2)} km '
+        '(provider ${data['provider']}, '
+        '${totalDistanceKmRaw.toStringAsFixed(1)} km, '
+        '${fullPoints.length} pts, ${legs.length} legs)');
+
     // Leg 0 is origin → next stop; the rest is what the rider still has to do
     // after that. Both come from Google, so the split lands on a real junction.
     List<LatLng> activeLeg = legs.isNotEmpty ? legs.first.points : const [];
@@ -325,8 +371,7 @@ class RouteOptimizationService {
       remaining = fullPoints.sublist(splitIndex);
     }
 
-    final totalDistanceKm =
-        ((data['distanceMeters'] as num?)?.toDouble() ?? 0) / 1000.0;
+    final totalDistanceKm = totalDistanceKmRaw;
     final totalDurationMin =
         ((data['durationSeconds'] as num?)?.toDouble() ?? 0) / 60.0;
 
@@ -381,6 +426,33 @@ class RouteOptimizationService {
     }).toList();
   }
 
+  /// The diagonal of the decoded geometry's bounding box.
+  ///
+  /// The straight line across a path is never longer than the path itself, so
+  /// this can never exceed the road distance Google reported. When it does the
+  /// payload is corrupt — and drawing it would paint a road across a continent
+  /// on the rider's map, which is worse than drawing nothing.
+  double _geometrySpanKm(List<List<LatLng>> pointSets) {
+    double minLat = double.infinity;
+    double maxLat = double.negativeInfinity;
+    double minLng = double.infinity;
+    double maxLng = double.negativeInfinity;
+    var seen = 0;
+
+    for (final points in pointSets) {
+      for (final p in points) {
+        seen++;
+        if (p.latitude < minLat) minLat = p.latitude;
+        if (p.latitude > maxLat) maxLat = p.latitude;
+        if (p.longitude < minLng) minLng = p.longitude;
+        if (p.longitude > maxLng) maxLng = p.longitude;
+      }
+    }
+    if (seen == 0) return double.infinity;
+
+    return _locationService.haversineDistanceKm(minLat, minLng, maxLat, maxLng);
+  }
+
   int _closestPointIndex(List<LatLng> points, LatLng target) {
     int bestIndex = 0;
     double best = double.infinity;
@@ -420,11 +492,17 @@ class RouteOptimizationService {
   bool _isPending(GroupedStop s) =>
       s.status != 'delivered' && s.status != 'completed' && s.status != 'failed';
 
+  /// The orders query COALESCEs a missing address latitude to `0.0`, so an
+  /// un-geocoded stop arrives as Null Island rather than as null. Sending it to
+  /// Google poisons the whole run's route, so it is excluded here.
   bool _hasValidCoords(GroupedStop s) =>
       s.addressLat.isFinite &&
       !s.addressLat.isNaN &&
       s.addressLng.isFinite &&
-      !s.addressLng.isNaN;
+      !s.addressLng.isNaN &&
+      s.addressLat.abs() <= 90 &&
+      s.addressLng.abs() <= 180 &&
+      !(s.addressLat == 0 && s.addressLng == 0);
 
   bool _isValidPosition(LatLng? p) =>
       p != null && p.latitude.isFinite && p.longitude.isFinite;
