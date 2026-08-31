@@ -34,43 +34,18 @@ class F2hHeroHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(
-        minHeight: topInset + 205,
-      ),
       decoration: const BoxDecoration(
         color: Colors.white,
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. Top Background Image (assets/home_bg.png)
-          Positioned.fill(
-            child: Image.asset(
-              'assets/home_bg.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-              errorBuilder: (_, __, ___) => Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFDCFCE7),
-                      Color(0xFFF0FDF4),
-                      Color(0xFFE2E8F0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // 2. Top Header Content (Greeting, Bell, Profile Avatar, Online Pill)
+          // 1. Top white spacing with safe area & clean header actions (no overlap)
           Padding(
-            padding: EdgeInsets.fromLTRB(16, topInset + 16, 16, 48),
+            padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Top Bar with Greeting, Notification Icon, and Profile Avatar
                 Row(
@@ -110,6 +85,7 @@ class F2hHeroHeader extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 12),
 
                     // Top Right Actions: Bell + Profile Avatar
                     Row(
@@ -123,10 +99,58 @@ class F2hHeroHeader extends StatelessWidget {
                   ],
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
 
                 // Online / Offline Status Dropdown Pill
                 _buildOnlineStatusPill(context),
+              ],
+            ),
+          ),
+
+          // 2. Delivery Background Image moved to bottom (never overlaps top controls)
+          SizedBox(
+            width: double.infinity,
+            height: 95,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/home_bg.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.bottomCenter,
+                  errorBuilder: (_, __, ___) => Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFFDCFCE7),
+                          Color(0xFFF0FDF4),
+                          Color(0xFFE2E8F0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Smooth top gradient to blend cleanly with top white area
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 24,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white,
+                          Colors.white.withOpacity(0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
