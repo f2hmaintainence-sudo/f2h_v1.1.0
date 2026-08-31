@@ -164,6 +164,184 @@ class RouteOptimizationService {
     return ordered;
   }
 
+  /// The pending stop closest to the rider in a straight line.
+  ///
+  /// Straight-line is the right measure here because this only *picks* which
+  /// stop to route to — the road distance that decides the pick would cost one
+  /// Google call per candidate stop, and the nearest by air is the nearest by
+  /// road often enough that paying for that is not worth it.
+  GroupedStop? findNearestPendingStop({
+    required LatLng? currentPosition,
+    required List<GroupedStop> stops,
+  }) {
+    final candidates = stops.where((s) => _isPending(s) && _hasValidCoords(s));
+    if (candidates.isEmpty) return null;
+    if (!_isValidPosition(currentPosition)) return candidates.first;
+
+    GroupedStop? nearest;
+    double best = double.infinity;
+    for (final s in candidates) {
+      final d = _locationService.haversineDistanceKm(
+        currentPosition!.latitude,
+        currentPosition.longitude,
+        s.addressLat,
+        s.addressLng,
+      );
+      if (d < best) {
+        best = d;
+        nearest = s;
+      }
+    }
+    return nearest;
+  }
+
+  /// Fetches the road route from the rider to **one** stop and nothing beyond it.
+  ///
+  /// This is the routing both map modes want. Navigating to a stop should draw
+  /// the way to that stop, not the whole run threaded through it; and opening
+  /// the map tab should point at the nearest stop while leaving the run's own
+  /// stop order alone. [stops] is therefore returned untouched in
+  /// [OptimizedRouteResult.orderedStops] — this call never re-sequences a run.
+  ///
+  /// [remainingRoutePoints] is empty by design: there is no onward leg to draw.
+  Future<OptimizedRouteResult> fetchDirectRoute({
+    required LatLng? currentPosition,
+    required List<GroupedStop> stops,
+    required GroupedStop destinationStop,
+    bool forceRefresh = false,
+  }) async {
+    if (!_hasValidCoords(destinationStop)) {
+      return OptimizedRouteResult.unavailable(
+        orderedStops: List.from(stops),
+        reason: 'This stop has no map location saved',
+      );
+    }
+
+    final destination = LatLng(destinationStop.addressLat, destinationStop.addressLng);
+
+    if (!_isValidPosition(currentPosition)) {
+      return OptimizedRouteResult.unavailable(
+        orderedStops: List.from(stops),
+        reason: 'Waiting for GPS location fix',
+      );
+    }
+    final origin = currentPosition!;
+
+    final cacheKey = '${_buildCacheKey(origin, [destinationStop])}#direct';
+    if (!forceRefresh && _isCacheFresh(cacheKey)) return _cachedResult!;
+
+    Map<String, dynamic>? data;
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.mapDirections,
+        data: {
+          'origin': {'lat': origin.latitude, 'lng': origin.longitude},
+          'destination': {'lat': destination.latitude, 'lng': destination.longitude},
+          'intermediates': const [],
+          'optimizeWaypointOrder': false,
+          'travelMode': _kTravelMode,
+        },
+      );
+      final body = response.data;
+      if (body is Map) data = Map<String, dynamic>.from(body);
+    } on DioException catch (e) {
+      return _buildDirectStraightLineFallback(
+        origin: origin,
+        stops: stops,
+        destinationStop: destinationStop,
+        reason: e.type == DioExceptionType.connectionError
+            ? 'Offline — showing straight line path'
+            : 'Routing service temporarily unavailable',
+      );
+    } catch (_) {
+      return _buildDirectStraightLineFallback(
+        origin: origin,
+        stops: stops,
+        destinationStop: destinationStop,
+        reason: 'Routing service temporarily unavailable',
+      );
+    }
+
+    if (data == null || data['status'] != 'OK') {
+      return _buildDirectStraightLineFallback(
+        origin: origin,
+        stops: stops,
+        destinationStop: destinationStop,
+        reason: (data?['message'] as String?) ?? 'Routing service unavailable',
+      );
+    }
+
+    final legs = _parseLegs(data['legs']);
+    final fullPoints = decodeGooglePolylineSegments((data['polyline'] as String?) ?? '');
+    final points = fullPoints.isNotEmpty ? fullPoints : legs.expand((l) => l.points).toList();
+
+    if (points.length < 2) {
+      return _buildDirectStraightLineFallback(
+        origin: origin,
+        stops: stops,
+        destinationStop: destinationStop,
+        reason: 'Routing service returned no road geometry',
+      );
+    }
+
+    final distanceKm = ((data['distanceMeters'] as num?)?.toDouble() ??
+            (legs.isNotEmpty ? legs.first.distanceMeters : 0)) /
+        1000.0;
+    final durationMin = ((data['durationSeconds'] as num?)?.toDouble() ??
+            (legs.isNotEmpty ? legs.first.durationSeconds : 0)) /
+        60.0;
+
+    final result = OptimizedRouteResult(
+      orderedStops: List.from(stops),
+      activeLegPoints: points,
+      remainingRoutePoints: const [],
+      fullRoutePoints: points,
+      totalDistanceKm: distanceKm,
+      totalDurationMinutes: durationMin,
+      activeLegDistanceKm: distanceKm,
+      activeLegDurationMinutes: durationMin,
+      isRoadGeometry: true,
+      status: RouteStatus.ok,
+      provider: data['provider'] as String?,
+    );
+
+    _cacheKey = cacheKey;
+    _cachedResult = result;
+    _cachedAt = DateTime.now();
+    return result;
+  }
+
+  OptimizedRouteResult _buildDirectStraightLineFallback({
+    required LatLng origin,
+    required List<GroupedStop> stops,
+    required GroupedStop destinationStop,
+    String? reason,
+  }) {
+    final destination = LatLng(destinationStop.addressLat, destinationStop.addressLng);
+    final points = [origin, destination];
+    final distanceKm = _locationService.haversineDistanceKm(
+      origin.latitude,
+      origin.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+
+    return OptimizedRouteResult(
+      orderedStops: List.from(stops),
+      activeLegPoints: points,
+      remainingRoutePoints: const [],
+      fullRoutePoints: points,
+      totalDistanceKm: distanceKm,
+      totalDurationMinutes: (distanceKm / 25.0) * 60.0,
+      activeLegDistanceKm: distanceKm,
+      activeLegDurationMinutes: (distanceKm / 25.0) * 60.0,
+      isRoadGeometry: false,
+      status: RouteStatus.ok,
+      unavailableReason: reason,
+      provider: 'fallback-straight-line',
+    );
+  }
+
   /// Fetches the drivable route for the run from Google.
   ///
   /// Google both draws the roads and decides the visiting order: the request

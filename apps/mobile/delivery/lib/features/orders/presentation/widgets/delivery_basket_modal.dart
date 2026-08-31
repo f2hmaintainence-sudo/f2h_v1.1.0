@@ -10,6 +10,7 @@ import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
+import 'package:f2h_delivery/core/widgets/swipe_to_action_button.dart';
 
 /// One product line of the dispatch ledger: what `order_items` demand, what
 /// `delivery_dispatch_items` physically hold, and the gap between the two.
@@ -310,38 +311,40 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
     return 'Error confirming pickup: $error';
   }
 
-  Future<void> _returnProductsToHub() async {
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Return Products to Hub?',
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
-        ),
-        content: Text(
-          'You have $_totalInBagNow remaining product unit(s) & extra items in your bag. Do you want to submit all remaining products back to the hub?',
-          style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+  Future<void> _returnProductsToHub({bool showConfirmationDialog = true}) async {
+    if (showConfirmationDialog) {
+      final bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'Return Products to Hub?',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF059669),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(
+            'You have $_totalInBagNow remaining product unit(s) & extra items in your bag. Do you want to submit all remaining products back to the hub?',
+            style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirm Return', style: TextStyle(fontWeight: FontWeight.w900)),
-          ),
-        ],
-      ),
-    );
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirm Return', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ],
+        ),
+      );
 
-    if (confirm != true) return;
+      if (confirm != true) return;
+    }
 
     setState(() {
       _isReturningProducts = true;
@@ -596,7 +599,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
               padding: const EdgeInsets.only(right: 12),
               child: Center(
                 child: InkWell(
-                  onTap: _isReturningProducts ? null : _returnProductsToHub,
+                  onTap: _isReturningProducts ? null : () => _returnProductsToHub(showConfirmationDialog: true),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -849,7 +852,7 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
               ),
               child: _dispatchStatus == 'return_pending'
                   ? Container(
-                      height: 48,
+                      height: 52,
                       decoration: BoxDecoration(
                         color: const Color(0xFFCCFBF1),
                         borderRadius: BorderRadius.circular(26),
@@ -859,12 +862,12 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.assignment_return_rounded, size: 19, color: Color(0xFF0D9488)),
+                            Icon(Icons.assignment_return_rounded, size: 20, color: Color(0xFF0D9488)),
                             SizedBox(width: 8),
                             Text(
                               'Return Pending at Warehouse',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 14.5,
                                 fontWeight: FontWeight.w900,
                                 color: Color(0xFF0F766E),
                               ),
@@ -873,46 +876,14 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                         ),
                       ),
                     )
-                  : Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF059669), Color(0xFF047857)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(26),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0x33059669), blurRadius: 10, offset: Offset(0, 4)),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _isReturningProducts ? null : _returnProductsToHub,
-                          borderRadius: BorderRadius.circular(26),
-                          child: Center(
-                            child: _isReturningProducts
-                                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.assignment_return_rounded, size: 19, color: Colors.white),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Return Items to Warehouse',
-                                        style: TextStyle(
-                                          fontSize: 14.5,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ),
+                  : SwipeToActionButton(
+                      label: 'Swipe to Return to Warehouse',
+                      loadingLabel: 'Submitting Return…',
+                      icon: Icons.assignment_return_rounded,
+                      height: 52,
+                      isLoading: _isReturningProducts,
+                      isEnabled: !_isReturningProducts,
+                      onSwipeConfirmed: () => _returnProductsToHub(showConfirmationDialog: false),
                     ),
             ),
         ],
@@ -1011,29 +982,15 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
                 ],
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 40,
-                child: ElevatedButton.icon(
-                  onPressed: _isReturningProducts ? null : _returnProductsToHub,
-                  icon: _isReturningProducts
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.assignment_return_rounded, size: 16, color: Colors.white),
-                  label: Text(
-                    _isReturningProducts ? 'Submitting Return…' : 'Initiate Shift Return to Hub',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF059669),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
+              SwipeToActionButton(
+                label: 'Swipe to Return to Hub',
+                loadingLabel: 'Submitting Return…',
+                icon: Icons.assignment_return_rounded,
+                height: 44,
+                isLoading: _isReturningProducts,
+                isEnabled: !_isReturningProducts,
+                borderRadius: BorderRadius.circular(12),
+                onSwipeConfirmed: () => _returnProductsToHub(showConfirmationDialog: false),
               ),
             ],
           ),

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -48,12 +51,48 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final MapController _mapController = MapController();
   LatLng? _currentPosition;
   GroupedStop? _selectedStop;
+
+  /// Set once the rider taps a pin or a stop row. Until then the destination is
+  /// re-picked as "nearest to me" on every route refresh.
+  bool _userPickedStop = false;
   final bool _hideAllClearedCard = false;
 
   // Shortest Path Route Optimization State
   OptimizedRouteResult? _optimizedRoute;
   bool _isCalculatingRoute = false;
   bool _hasInitialCameraFitted = false;
+
+  // Live GPS tracking
+  StreamSubscription<Position>? _positionSub;
+  DateTime? _lastRouteFetchAt;
+  LatLng? _lastRoutedFrom;
+
+  /// True when the screen was opened by tapping Navigate on one stop.
+  ///
+  /// In this mode the map is about that stop alone: one pin, one route, and a
+  /// distance that counts down as the rider rides. Every other stop is hidden,
+  /// because showing the rest of the run is what the map tab is for.
+  bool get _isFocusedNavigation => widget.focusedStop != null;
+
+  /// Re-routing cadence while moving. Google is billed per call, so a fix that
+  /// arrives sooner than this only updates the live straight-line readout.
+  static const Duration _kRouteRefreshInterval = Duration(seconds: 12);
+
+  /// Metres of movement that justify a new route regardless of the interval.
+  static const double _kRouteRefreshDistanceKm = 0.06;
+
+  /// Straight-line distance from the rider to [stop], recomputed on every GPS
+  /// fix. This is what makes the readout feel live between Google refreshes.
+  double? _liveDistanceKmTo(GroupedStop? stop) {
+    if (stop == null || _currentPosition == null) return null;
+    if (!stop.addressLat.isFinite || !stop.addressLng.isFinite) return null;
+    return sl<LocationService>().haversineDistanceKm(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      stop.addressLat,
+      stop.addressLng,
+    );
+  }
 
   // Search
   bool _showSearch = false;
@@ -73,24 +112,55 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
+  /// Picks the stop the route should lead to.
+  ///
+  /// Navigating from a stop card fixes the destination to that stop. Opening
+  /// the map tab instead points at whichever pending stop is nearest right now,
+  /// unless the rider has since tapped a different pin.
+  GroupedStop? _resolveDestination(List<GroupedStop> stops) {
+    if (_isFocusedNavigation) return widget.focusedStop;
+    if (_userPickedStop && _selectedStop != null) return _selectedStop;
+    return sl<RouteOptimizationService>().findNearestPendingStop(
+          currentPosition: _currentPosition,
+          stops: stops,
+        ) ??
+        _selectedStop;
+  }
+
+  /// Marks the destination as the rider's own choice, so the auto "nearest to
+  /// me" pick stops overriding it on the next GPS fix.
+  void _selectStop(GroupedStop stop, List<GroupedStop> stops) {
+    setState(() {
+      _selectedStop = stop;
+      _userPickedStop = true;
+    });
+    _calculateShortestPath(stops, targetedStop: stop, force: true);
+    _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
+  }
+
   Future<void> _calculateShortestPath(List<GroupedStop> stops, {GroupedStop? targetedStop, bool force = false}) async {
     if (stops.isEmpty) return;
     if (_isCalculatingRoute && !force) return;
+
+    final destination = targetedStop ?? _resolveDestination(stops);
+    if (destination == null) return;
+
     _isCalculatingRoute = true;
     try {
-      final routeService = sl<RouteOptimizationService>();
-      final target = targetedStop ?? _selectedStop;
-      final result = await routeService.fetchShortestPathRoute(
+      final result = await sl<RouteOptimizationService>().fetchDirectRoute(
         currentPosition: _currentPosition,
         stops: stops,
-        targetedStop: target,
+        destinationStop: destination,
         forceRefresh: force,
       );
 
       if (mounted) {
         setState(() {
           _optimizedRoute = result;
+          _selectedStop = destination;
         });
+        _lastRouteFetchAt = DateTime.now();
+        _lastRoutedFrom = _currentPosition;
 
         if (!_hasInitialCameraFitted) {
           _hasInitialCameraFitted = true;
@@ -98,10 +168,52 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         }
       }
     } catch (e) {
-      print('Error calculating shortest path: $e');
+      debugPrint('Error calculating route: $e');
     } finally {
       _isCalculatingRoute = false;
     }
+  }
+
+  /// Starts the live GPS feed that keeps the distance and the drawn path
+  /// current as the rider moves.
+  void _startLiveTracking() {
+    _positionSub?.cancel();
+    _positionSub = sl<LocationService>()
+        .positionStream()
+        .listen(_onPositionUpdate, onError: (_) {});
+  }
+
+  void _onPositionUpdate(Position position) {
+    if (!mounted) return;
+    final next = LatLng(position.latitude, position.longitude);
+
+    // Redraws the rider marker and the straight-line distance immediately —
+    // this is free, so it happens on every fix.
+    setState(() => _currentPosition = next);
+
+    if (_shouldRefetchRoute(next)) {
+      final state = context.read<DeliverySessionBloc>().state;
+      if (state is DeliverySessionLoaded && state.groupedStops.isNotEmpty) {
+        _calculateShortestPath(_visibleStops(state.groupedStops), force: true);
+      }
+    }
+  }
+
+  /// Google is only re-asked once the rider has actually made progress, or once
+  /// the route is old enough that traffic could have changed it.
+  bool _shouldRefetchRoute(LatLng next) {
+    if (_isCalculatingRoute) return false;
+    if (_lastRouteFetchAt == null || _lastRoutedFrom == null) return true;
+
+    final movedKm = sl<LocationService>().haversineDistanceKm(
+      _lastRoutedFrom!.latitude,
+      _lastRoutedFrom!.longitude,
+      next.latitude,
+      next.longitude,
+    );
+    if (movedKm >= _kRouteRefreshDistanceKm) return true;
+
+    return DateTime.now().difference(_lastRouteFetchAt!) >= _kRouteRefreshInterval;
   }
 
   void _fitRouteBounds() {
@@ -164,9 +276,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         });
         _mapController.move(newPos, 16.0);
 
+        // Recovers live tracking if the stream had failed for want of a
+        // permission the rider has since granted.
+        _startLiveTracking();
+
         final sessionState = context.read<DeliverySessionBloc>().state;
         if (sessionState is DeliverySessionLoaded) {
-          _calculateShortestPath(sessionState.groupedStops);
+          _calculateShortestPath(_visibleStops(sessionState.groupedStops), force: true);
         }
       } else {
         if (!mounted) return;
@@ -241,13 +357,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           height: isCurrentSelected ? 72 : 50,
           alignment: Alignment.center,
           child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedStop = stop;
-              });
-              _calculateShortestPath(groupedStops, targetedStop: stop, force: true);
-              _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
-            },
+            onTap: () => _selectStop(stop, groupedStops),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -423,7 +533,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       CurvedAnimation(parent: _refreshController, curve: Curves.easeInOut),
     );
 
-    _goToCurrentLocation();
+    // The stream is opened only after the permission prompt has resolved —
+    // started earlier it just errors out and the map never tracks.
+    _goToCurrentLocation().then((_) {
+      if (mounted) _startLiveTracking();
+    });
 
     if (widget.focusedStop != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -439,11 +553,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _positionSub?.cancel();
     _pulsateController.dispose();
     _refreshController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  /// The stops this screen is responsible for drawing.
+  ///
+  /// Focused navigation narrows the whole screen — map pins, bottom sheet and
+  /// search — to the one stop being navigated to. The map tab keeps the run's
+  /// own order rather than the router's, so stop numbering stays stable while
+  /// the rider moves and the nearest stop changes.
+  List<GroupedStop> _visibleStops(List<GroupedStop> sessionStops) {
+    if (!_isFocusedNavigation) return sessionStops;
+    final focused = widget.focusedStop!;
+    final match = sessionStops.where((s) => s.stop == focused.stop);
+    return [match.isNotEmpty ? match.first : focused];
   }
 
   Future<void> _refreshMap() async {
@@ -660,7 +788,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       },
       listener: (context, state) {
         if (state is DeliverySessionLoaded) {
-          _calculateShortestPath(state.groupedStops);
+          _calculateShortestPath(_visibleStops(state.groupedStops), force: true);
         }
       },
       child: BlocBuilder<DeliverySessionBloc, DeliverySessionState>(
@@ -673,18 +801,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             );
           }
 
-          final effectiveStops = _optimizedRoute?.orderedStops ?? state.groupedStops;
+          final effectiveStops = _visibleStops(state.groupedStops);
           final pendingStops = effectiveStops.where(
             (s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed',
           ).toList();
 
-          if (_selectedStop == null && pendingStops.isNotEmpty) {
-            _selectedStop = pendingStops.first;
-          }
-
           if (_optimizedRoute == null && effectiveStops.isNotEmpty && !_isCalculatingRoute) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              _calculateShortestPath(effectiveStops, targetedStop: _selectedStop);
+              _calculateShortestPath(effectiveStops);
             });
           }
 
@@ -1118,6 +1242,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                             onTap: () {
                               setState(() {
                                 _selectedStop = stop;
+                                _userPickedStop = true;
                                 _showSearch = false;
                                 _searchController.clear();
                                 _searchQuery = '';
@@ -1259,6 +1384,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     final activeStop = _selectedStop ?? pendingStops.first;
 
+    // The road distance is only as fresh as the last Google call, which is
+    // throttled. The straight-line distance moves with every GPS fix, so it is
+    // what the rider sees ticking down between refreshes.
+    final liveKm = _liveDistanceKmTo(activeStop);
+    final shownKm = liveKm ?? route.activeLegDistanceKm;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
@@ -1365,7 +1496,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${route.activeLegDistanceKm.toStringAsFixed(1)} km · ~${route.activeLegDurationMinutes.round()}m',
+                          '${shownKm.toStringAsFixed(1)} km · ~${route.activeLegDurationMinutes.round()}m',
                           style: GoogleFonts.roboto(
                             fontWeight: FontWeight.w900,
                             fontSize: 13,
@@ -1400,7 +1531,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${pendingStops.length} stops · ${route.totalDistanceKm.toStringAsFixed(1)} km',
+                          _isFocusedNavigation
+                              ? '${route.totalDistanceKm.toStringAsFixed(1)} km by road'
+                              : '${pendingStops.length} stops · ${route.totalDistanceKm.toStringAsFixed(1)} km',
                           style: GoogleFonts.roboto(
                             fontWeight: FontWeight.w900,
                             fontSize: 13,
@@ -1408,7 +1541,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           ),
                         ),
                         Text(
-                          'Total Run (~${route.totalDurationMinutes.round()} mins)',
+                          _isFocusedNavigation
+                              ? 'To this stop (~${route.totalDurationMinutes.round()} mins)'
+                              : 'Total Run (~${route.totalDurationMinutes.round()} mins)',
                           style: GoogleFonts.roboto(fontSize: 9.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
                         ),
                       ],
@@ -1511,13 +1646,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     return MapDeliverySheet(
       groupedStops: effectiveStops,
       nextStop: nextStop,
-      onStopSelected: (stop) {
-        setState(() {
-          _selectedStop = stop;
-        });
-        _calculateShortestPath(effectiveStops, targetedStop: stop, force: true);
-        _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
-      },
+      onStopSelected: (stop) => _selectStop(stop, effectiveStops),
       onShowConfirmation: (stop) => _showConfirmation(context, stop),
     );
   }

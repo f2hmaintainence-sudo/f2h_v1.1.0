@@ -318,6 +318,21 @@ class LocationService {
     }
   }
 
+  // ─── Live GPS stream — drives real-time distance and re-routing ─
+  /// Emits a new fix once the rider has moved [distanceFilterMeters].
+  ///
+  /// The filter is what keeps this cheap: without it Android emits a fix per
+  /// second and every one of them would invalidate the route cache, so the map
+  /// would re-bill Google for a rider standing still at a traffic light.
+  Stream<Position> positionStream({int distanceFilterMeters = 15}) {
+    return Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: distanceFilterMeters,
+      ),
+    );
+  }
+
   // ─── Haversine distance (km) — zero API cost ──────────────────
   double haversineDistanceKm(
       double lat1, double lng1, double lat2, double lng2) {
