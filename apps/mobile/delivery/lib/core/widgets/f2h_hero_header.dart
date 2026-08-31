@@ -35,7 +35,7 @@ class F2hHeroHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       constraints: BoxConstraints(
-        minHeight: topInset + 185,
+        minHeight: topInset + 205,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -67,7 +67,7 @@ class F2hHeroHeader extends StatelessWidget {
 
           // 2. Top Header Content (Greeting, Bell, Profile Avatar, Online Pill)
           Padding(
-            padding: EdgeInsets.fromLTRB(16, topInset + 16, 16, 28),
+            padding: EdgeInsets.fromLTRB(16, topInset + 16, 16, 48),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
