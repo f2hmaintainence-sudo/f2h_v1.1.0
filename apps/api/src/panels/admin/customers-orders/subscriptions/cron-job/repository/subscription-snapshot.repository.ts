@@ -123,10 +123,12 @@ export class SubscriptionSnapshotRepository {
           ca.contact_name,
           ca.contact_mobile,
           ca.address_line,
-          SUM(COALESCE(NULLIF(si.final_price, 0), si.unit_price) * ${qtyExpr}) AS subtotal
+          SUM(COALESCE(NULLIF(si.final_price, 0), NULLIF(si.unit_price, 0), pv.price, 0) * ${qtyExpr}) AS subtotal
         FROM subscriptions s
         JOIN subscription_items si
           ON si.subscription_id = s.subscription_id
+        LEFT JOIN product_variants pv
+          ON pv.variant_id = si.product_variant_id
         JOIN subscription_weekly_schedule ws
           ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
         LEFT JOIN customer_addresses ca
@@ -231,12 +233,15 @@ export class SubscriptionSnapshotRepository {
           si.id                  AS subscription_item_id,
           si.product_variant_id  AS variant_id,
           ${qtyExpr}             AS quantity,
-          COALESCE(NULLIF(si.final_price, 0), si.unit_price) AS unit_price,
-          (COALESCE(NULLIF(si.final_price, 0), si.unit_price) * ${qtyExpr}) AS total_price,
+          COALESCE(NULLIF(si.final_price, 0), NULLIF(si.unit_price, 0), pv.price, 0) AS unit_price,
+          (COALESCE(NULLIF(si.final_price, 0), NULLIF(si.unit_price, 0), pv.price, 0) * ${qtyExpr}) AS total_price,
+          COALESCE(NULLIF(si.final_price, 0), NULLIF(si.unit_price, 0), pv.price, 0) AS final_price,
           si.is_free
         FROM orders o
         JOIN subscription_items si
           ON si.subscription_id = o.subscription_id
+        LEFT JOIN product_variants pv
+          ON pv.variant_id = si.product_variant_id
         JOIN subscription_weekly_schedule ws
           ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
         WHERE o.scheduled_date = $1::date

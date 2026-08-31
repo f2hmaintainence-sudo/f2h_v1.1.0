@@ -292,17 +292,17 @@ export default function OrdersTable({
 
       if (result && Array.isArray(result.data)) {
         data = result.data;
-        count = result.total ?? result.count ?? data.length;
+        count = Number(result.recordsFiltered ?? result.recordsTotal ?? result.total ?? result.count ?? data.length);
       } else if (result && Array.isArray(result.rows)) {
         data = result.rows;
-        count = result.total ?? result.count ?? data.length;
+        count = Number(result.recordsFiltered ?? result.recordsTotal ?? result.total ?? result.count ?? data.length);
       } else if (Array.isArray(result)) {
         data = result;
         count = data.length;
       }
 
       setRows(data);
-      setTotalCount(count || data.length);
+      setTotalCount(count);
     } catch (e: any) {
       setError(e.message || 'Failed to load orders');
     } finally {
@@ -432,7 +432,7 @@ export default function OrdersTable({
               const orderId      = stripHtml(order.order_id || order.id || '—');
               const customerName = stripHtml(order.customer_name || order.customer_id || 'Guest');
               const phone        = stripHtml(order.customer_phone || order.phone || order.contact_number || '');
-              const amount       = formatMoney(order.total_amount || order.amount);
+              const amount       = formatMoney(order.total_amount || order.amount || order.subtotal);
               const slot         = stripHtml(order.delivery_slot || order.slot || '');
               const statusRaw    = normalizeStatus(order.order_status || order.status);
 

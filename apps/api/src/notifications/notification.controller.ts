@@ -23,7 +23,7 @@ export class NotificationController {
   constructor(
     private readonly notificationService: NotificationService,
     private readonly developer: DeveloperService,
-  ) {}
+  ) { }
 
   /**
    * Get notifications for the authenticated user
@@ -40,23 +40,12 @@ export class NotificationController {
     @Query('status') status?: 'read' | 'unread',
   ) {
     const user = req.user as any;
-    this.developer.info(
-      '📬 [NotificationController] GET /notifications called',
-      {
-        user_id: user.user_id,
-        status,
-      },
-    );
+
 
     const notifications = await this.notificationService.getUserNotifications(
       user.user_id,
       status,
     );
-
-    this.developer.info('📬 [NotificationController] Returning notifications', {
-      count: notifications.length,
-      status,
-    });
 
     return {
       success: true,

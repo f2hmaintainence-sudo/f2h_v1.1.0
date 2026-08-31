@@ -42,8 +42,6 @@ export class SubscriptionsService {
   ) { }
 
   async checkout(body: CreateSubscriptionDto, req?: any) {
-    this.developer.debug('SubscriptionsService.checkout called', { body });
-
     let customerId = body.customer_id?.trim() || (req?.headers?.['x-user-id'] as string)?.trim() || (req?.user as any)?.user_id;
     if (!customerId && req?.headers?.['authorization']) {
       try {
@@ -125,14 +123,6 @@ export class SubscriptionsService {
       this.developer.error('SubscriptionsService.checkout customer profile not found', { customerId });
       throw new BadRequestException('Customer profile not found');
     }
-
-    this.developer.debug('SubscriptionsService.checkout customer details fetched', {
-      customerId,
-      wallet_balance: customer.wallet_balance,
-      is_postpaid_enabled: customer.is_postpaid_enabled,
-      postpaid_credit_limit: customer.postpaid_credit_limit,
-      estimatedTotal,
-    });
 
     const paymentType = (body.payment_type || 'prepaid').toLowerCase();
     const paymentMethod = (body.payment_method || 'wallet').toLowerCase();
@@ -237,14 +227,6 @@ export class SubscriptionsService {
       const existingCommitted = Number(existingSubsRes?.[0]?.total_committed || 0);
       const newMonthlyEstimate = Number(body.monthly_estimate || estimatedTotal);
 
-      this.developer.debug('SubscriptionsService.checkout postpaid credit check', {
-        existingCommitted,
-        newMonthlyEstimate,
-        combinedTotal: existingCommitted + newMonthlyEstimate,
-        creditLimit,
-        willBlock: creditLimit > 0 && (existingCommitted + newMonthlyEstimate) > creditLimit,
-      });
-
       const combinedTotal = existingCommitted + newMonthlyEstimate;
       if (creditLimit > 0 && combinedTotal > creditLimit) {
         return {
@@ -259,30 +241,17 @@ export class SubscriptionsService {
     }
 
     // 4. Create subscription
-    this.developer.debug('SubscriptionsService.checkout invoking create subscription', { customerId });
     const createResult = await this.create(body);
 
     // 5. Post-creation ledger & billing updates for prepaid payments
     if (paymentType === 'prepaid' && createResult?.subscription_id) {
       if (paymentMethod === 'wallet') {
-        this.developer.debug('SubscriptionsService.checkout updating wallet reference and adding prepaid bill', {
-          subscription_id: createResult.subscription_id,
-          customerId,
-        });
-
         // Deduct from wallet atomically
         const updateRes = await this.db.query(
           `UPDATE customers SET wallet_balance = COALESCE(wallet_balance, 0) - $1, updated_at = NOW() WHERE customer_id = $2 RETURNING wallet_balance`,
           [estimatedTotal, customerId],
         );
         const newBalance = Number(updateRes?.[0]?.wallet_balance ?? (walletBalance - estimatedTotal));
-
-        this.developer.debug('SubscriptionsService.checkout deducting wallet balance', {
-          customerId,
-          walletBalance,
-          estimatedTotal,
-          newBalance,
-        });
 
         // Record wallet transaction ledger entry
         const ts = Math.floor(Date.now() / 1000).toString(36);
@@ -437,13 +406,10 @@ export class SubscriptionsService {
       }
     }
 
-    this.developer.debug('SubscriptionsService.checkout completed successfully', { response });
     return response;
   }
 
   async create(body: CreateSubscriptionDto) {
-    this.developer.debug('SubscriptionsService.create called', { body });
-
     const itemsList = body.items || [];
     const validItems = itemsList
       .map((item) => ({
@@ -515,27 +481,10 @@ export class SubscriptionsService {
           `UPDATE customers SET subscription_number = $1 WHERE customer_id = $2`,
           [subscriptionNumber, customerIdStr],
         );
-        this.developer.debug('SubscriptionsService.create generated new subscription_number for customer', {
-          customerIdStr,
-          subscriptionNumber,
-        });
-      } else {
-        this.developer.debug('SubscriptionsService.create reusing existing subscription_number for customer', {
-          customerIdStr,
-          subscriptionNumber,
-        });
       }
 
       // Always generate a new subscription_id for each subscription record
       const subscriptionId = this.makeId('SUB');
-
-      this.developer.debug('SubscriptionsService.create initiating DB transaction', {
-        subscriptionId,
-        subscriptionNumber,
-        branchId,
-        addressId,
-        validItemsCount: validItems.length,
-      });
 
       // 3. Insert new subscription row using varchar subscription_id
       await client.query(
@@ -590,11 +539,6 @@ export class SubscriptionsService {
 
       for (let index = 0; index < validItems.length; index += 1) {
         const item = validItems[index];
-
-        this.developer.debug('SubscriptionsService.create inserting item', {
-          product_variant_id: item.product_variant_id,
-          unit_price: item.unit_price,
-        });
 
         const subscriptionItemId = this.makeId('SBI');
         const unitPrice = Number(item.unit_price || 0);
@@ -667,12 +611,6 @@ export class SubscriptionsService {
         });
       }
 
-      this.developer.debug('SubscriptionsService.create transaction successful', {
-        subscription_id: subscriptionId,
-        subscription_number: subscriptionNumber,
-        itemsCount: insertedItems.length,
-      });
-
       return {
         status: true,
         subscription_id: subscriptionId,
@@ -690,11 +628,6 @@ export class SubscriptionsService {
     body: CreateSubscriptionDto,
   ) {
     const schedules = item.schedules || [];
-    this.developer.debug('SubscriptionsService.insertWeeklySchedule called', {
-      itemId,
-      subscriptionId,
-      schedulesCount: schedules.length,
-    });
 
     for (const schedule of schedules) {
       const day = schedule.day_of_week ?? schedule.day ?? 0;
@@ -735,12 +668,9 @@ export class SubscriptionsService {
   }
 
   async getVariants() {
-    this.developer.debug('SubscriptionsService.getVariants called');
   }
 
   async getSubscriptions(userId: string, email: string) {
-    this.developer.debug('SubscriptionsService.getSubscriptions called', { userId, email });
-
     const custRows = await this.db.query(
       `SELECT c.customer_id
        FROM customers c
@@ -751,7 +681,6 @@ export class SubscriptionsService {
     );
     const customer = custRows?.[0];
     if (!customer) {
-      this.developer.debug('SubscriptionsService.getSubscriptions customer not found', { userId, email });
       return { status: true, data: [] };
     }
 
@@ -819,7 +748,6 @@ export class SubscriptionsService {
     const items = subsDetails || [];
 
     if (items.length === 0) {
-      this.developer.debug('SubscriptionsService.getSubscriptions no subscriptions found for customer', { customer_id: customer.customer_id });
       return { status: true, data: [] };
     }
 
@@ -865,12 +793,6 @@ export class SubscriptionsService {
       );
     }
 
-    this.developer.debug('SubscriptionsService.getSubscriptions completed', {
-      customer_id: customer.customer_id,
-      subscriptionsCount: subscriptionIds.length,
-      itemsCount: items.length,
-    });
-
     return {
       status: true,
       data: items,
@@ -878,7 +800,6 @@ export class SubscriptionsService {
   }
 
   async makeSubscriptionCalender(subscriptionId: string) {
-    this.developer.debug('SubscriptionsService.makeSubscriptionCalender called', { subscriptionId });
     const isItemId = subscriptionId.startsWith('SBI');
     const result = await this.data.query('subscriptions', {
       select: [
@@ -975,16 +896,10 @@ export class SubscriptionsService {
       });
     }
 
-    this.developer.debug('SubscriptionsService.makeSubscriptionCalender generated calendar', {
-      subscriptionId,
-      daysCount: calendar.length,
-    });
-
     return calendar;
   }
   // Subscription Pause with validation and transaction
   async pauseSubscription(subscriptionId: string, startDate?: string, endDate?: string, reason?: string) {
-    this.developer.debug('SubscriptionsService.pauseSubscription called', { subscriptionId, startDate, endDate });
     try {
       return await this.db.transaction(async (client) => {
         const subRes = await client.query<any>(
@@ -1062,7 +977,6 @@ export class SubscriptionsService {
 
   // Subscription Resume — 3-Scenario Logic with Transaction Safety
   async resumeSubscription(subscriptionId: string, requestedResumeDate?: string) {
-    this.developer.debug('SubscriptionsService.resumeSubscription called', { subscriptionId, requestedResumeDate });
     try {
       return await this.db.transaction(async (client) => {
         // 1. Fetch subscription
@@ -1221,7 +1135,6 @@ export class SubscriptionsService {
           [subscriptionId, JSON.stringify({ resumed_at: todayStr, resume_date: resumeDate })],
         );
 
-        this.developer.debug('SubscriptionsService.resumeSubscription success', { subscriptionId, resumeDate });
         return {
           status: true,
           message: `Subscription resumed successfully! Deliveries will restart on ${resumeDate}.`,
@@ -1237,7 +1150,6 @@ export class SubscriptionsService {
 
   // Pause History (Immutable audit trail)
   async getPauseHistory(subscriptionId: string) {
-    this.developer.debug('SubscriptionsService.getPauseHistory called', { subscriptionId });
     try {
       const rows = await this.db.query(
         `SELECT id, subscription_id, start_date, end_date, status, reason, created_at, updated_at
@@ -1258,7 +1170,6 @@ export class SubscriptionsService {
 
   // Auto Renew Toggle
   async updateAutoRenew(subscriptionId: string, autoRenew: boolean) {
-    this.developer.debug('SubscriptionsService.updateAutoRenew called', { subscriptionId, autoRenew });
     try {
       const rows = await this.db.query(
         `UPDATE subscriptions
@@ -1290,7 +1201,6 @@ export class SubscriptionsService {
   }
 
   async cancelSubscription(subscriptionId: string, cancelReason?: string, endDate?: string) {
-    this.developer.debug('SubscriptionsService.cancelSubscription called', { subscriptionId, cancelReason, endDate });
     try {
       const subResult = await this.data.query('subscriptions', {
         where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
@@ -1328,7 +1238,6 @@ export class SubscriptionsService {
         created_by: 'customer',
       }, { includeDeleted: true });
 
-      this.developer.debug('SubscriptionsService.cancelSubscription success', { subscriptionId });
       return {
         status: true,
         message: 'Subscription cancelled successfully',
@@ -1340,25 +1249,7 @@ export class SubscriptionsService {
     }
   }
 
-  // async getPauseHistory(subscriptionId: string) {
-  //   this.developer.debug('SubscriptionsService.getPauseHistory called', { subscriptionId });
-  //   try {
-  //     const pauseRes = await this.data.query('subscription_pauses', {
-  //       where: [{ column: 'subscription_id', operator: '=', value: subscriptionId }],
-  //       orderBy: [{ column: 'start_date', direction: 'DESC' }],
-  //     }, true);
-  //     return {
-  //       status: true,
-  //       data: pauseRes.data || [],
-  //     };
-  //   } catch (error) {
-  //     this.developer.error('getPauseHistory error', { error, subscriptionId });
-  //     throw new BadRequestException('Failed to get pause history');
-  //   }
-  // }
-
   async cancelSubscriptionItem(subscriptionItemId: string) {
-    this.developer.debug('SubscriptionsService.cancelSubscriptionItem called', { subscriptionItemId });
     try {
       const itemResult = await this.data.query('subscription_items', {
         where: [{ column: 'id', operator: '=', value: subscriptionItemId }],
@@ -1395,7 +1286,6 @@ export class SubscriptionsService {
 
       const activeItems = otherItemsResult?.data || [];
       if (activeItems.length === 0) {
-        this.developer.debug('SubscriptionsService.cancelSubscriptionItem all items cancelled, cancelling subscription container', { subscriptionId });
         await this.data.query('subscriptions', {
           update: {
             status: 'cancelled',
@@ -1407,7 +1297,6 @@ export class SubscriptionsService {
         }, true);
       }
 
-      this.developer.debug('SubscriptionsService.cancelSubscriptionItem success', { subscriptionItemId });
       return {
         status: true,
         message: 'Subscription item cancelled successfully',
@@ -1420,7 +1309,6 @@ export class SubscriptionsService {
   }
 
   async getSubscriptionDetail(subscriptionId: string) {
-    this.developer.debug('SubscriptionsService.getSubscriptionDetail called', { subscriptionId });
     try {
       // 1. Fetch subscription basic info
       const subRes = await this.data.query('subscriptions', {
@@ -1532,7 +1420,6 @@ export class SubscriptionsService {
   }
 
   async getSubscriptionBills(subscriptionId: string) {
-    this.developer.debug('SubscriptionsService.getSubscriptionBills called', { subscriptionId });
     try {
       const billsRes = await this.db.query(
         `SELECT

@@ -76,22 +76,26 @@ function toAmount(value: unknown): number {
 }
 
 function getItemSubtotal(item: OrderItem): number {
-  return toAmount(item.unit_price) * toAmount(item.quantity ?? 1);
+  const price = toAmount(item.final_price) || toAmount(item.total_price) || toAmount(item.unit_price);
+  const qty = Number(item.quantity ?? ((Number(item.default_m_quantity) || 0) + (Number(item.default_e_quantity) || 0))) || 1;
+  if (toAmount(item.final_price) > 0) return toAmount(item.final_price);
+  if (toAmount(item.total_price) > 0) return toAmount(item.total_price);
+  return price * qty;
 }
 
 function getItemDiscount(item: OrderItem): number {
-  return toAmount(item.discount_amount) + toAmount(item.coupon_amount);
+  const promo = toAmount(item.discount_amount);
+  const coupon = toAmount(item.coupon_amount);
+  return promo + coupon;
 }
 
 function getItemTotal(item: OrderItem): number {
-  const totalPrice = toAmount(item.total_price);
-  const calculatedTotal = Math.max(0, getItemSubtotal(item) - getItemDiscount(item));
-  if (totalPrice > 0 || item.is_free || calculatedTotal === 0) return totalPrice;
-
-  const finalPrice = toAmount(item.final_price);
+  const finalPrice = toAmount(item.final_price) || toAmount(item.total_price);
   if (finalPrice > 0 || item.is_free) return finalPrice;
 
-  return calculatedTotal;
+  const subtotal = getItemSubtotal(item);
+  const discount = getItemDiscount(item);
+  return Math.max(0, subtotal - discount);
 }
 
 function getLightStatusBadge(statusRaw: unknown) {
@@ -153,9 +157,12 @@ export default function OrderDetailsDrawer({
   const couponDiscount = items.reduce((sum, item) => sum + toAmount(item.coupon_amount), 0);
   const storedDiscount = toAmount(order.discount_amount);
   const otherDiscount = Math.max(0, storedDiscount - promotionDiscount - couponDiscount);
-  const subtotal = order.subtotal === null || order.subtotal === undefined
+  const subtotal = (order.subtotal === null || order.subtotal === undefined || (toAmount(order.subtotal) === 0 && itemSubtotal > 0))
     ? itemSubtotal
     : toAmount(order.subtotal);
+  const grandTotal = (order.total_amount === null || order.total_amount === undefined || (toAmount(order.total_amount) === 0 && itemSubtotal > 0))
+    ? Math.max(0, subtotal - storedDiscount + toAmount(order.gst_amount))
+    : toAmount(order.total_amount);
 
   const customerName = stripHtml(order.customer_name || order.customer_id || 'Guest Customer');
   const customerPhone = stripHtml(order.customer_phone || order.phone || order.contact_number || '');
@@ -364,12 +371,10 @@ export default function OrderDetailsDrawer({
                 <span>+{formatMoney(order.gst_amount)}</span>
               </div>
             )}
-            {order.total_amount !== null && order.total_amount !== undefined && (
-              <div className="flex justify-between text-sm font-extrabold border-t border-emerald-200/90 pt-2 text-emerald-900">
-                <span>Grand Total:</span>
-                <span className="text-base text-emerald-700">{formatMoney(order.total_amount)}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-sm font-extrabold border-t border-emerald-200/90 pt-2 text-emerald-900">
+              <span>Grand Total:</span>
+              <span className="text-base text-emerald-700">{formatMoney(grandTotal)}</span>
+            </div>
           </div>
 
         </div>

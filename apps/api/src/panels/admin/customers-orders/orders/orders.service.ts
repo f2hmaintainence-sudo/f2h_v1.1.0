@@ -256,13 +256,30 @@ export class OrdersService {
   // ────────────────────────────────────────────────
   async bulkMarkFailed(query: any) {
     try {
-      const date = query.date || todayInIndia();
+      let date = todayInIndia();
+      if (query.date) {
+        const str = String(query.date).trim();
+        if (str.toLowerCase() !== 'today') {
+          if (str.includes('-')) {
+            const parts = str.split('-');
+            if (parts[0].length === 4) {
+              date = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            } else if (parts[2].length === 4) {
+              date = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            } else {
+              date = str;
+            }
+          } else {
+            date = str;
+          }
+        }
+      }
 
       // Find all pending undelivered orders for the specified date
       const candidateOrders = await this.databaseService.query(
         `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status
          FROM orders
-         WHERE scheduled_date = $1
+         WHERE (scheduled_date = $1::date OR scheduled_date::text = $1)
            AND status IN ('pending', 'placed', 'confirmed', 'assigned', 'packed', 'out_for_delivery')
            AND status != 'delivered'
            AND status != 'failed'
@@ -378,6 +395,122 @@ export class OrdersService {
     } catch (error) {
       this.developer.error('bulkMarkFailed error', { error });
       throw new InternalServerErrorException('Failed to bulk-mark orders as failed');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Single Order Status Update (with One-Time Refund)
+  // ────────────────────────────────────────────────
+  async updateOrderStatus(orderId: string, status: string, notes?: string) {
+    try {
+      const normStatus = String(status || '').toLowerCase().replace(/[\s_-]+/g, '_');
+      const validStatuses = ['pending', 'placed', 'confirmed', 'assigned', 'packed', 'out_for_delivery', 'delivered', 'cancelled', 'failed'];
+      if (!validStatuses.includes(normStatus)) {
+        return { status: false, message: `Invalid status. Valid: ${validStatuses.join(', ')}` };
+      }
+
+      const existingOrderRows = await this.databaseService.query(
+        `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status 
+         FROM orders 
+         WHERE order_id = $1 OR id::text = $1 LIMIT 1`,
+        [orderId],
+      );
+      if (!existingOrderRows?.length) {
+        return { status: false, message: `Order not found: ${orderId}` };
+      }
+      const existingOrder = existingOrderRows[0];
+
+      const updateFields: string[] = [
+        `status = $2`,
+        `updated_at = CURRENT_TIMESTAMP`,
+      ];
+      const params: any[] = [existingOrder.order_id, normStatus];
+
+      let isRefunded = false;
+      const isOneTime = String(existingOrder.order_source || '').toLowerCase() === 'one-time' || !existingOrder.subscription_id;
+
+      if (normStatus === 'failed') {
+        const totalAmount = Number(existingOrder.total_amount || 0);
+        const paymentMode = String(existingOrder.payment_mode || '').toLowerCase();
+        const paymentStatus = String(existingOrder.payment_status || '').toLowerCase();
+        const isPrepaid = (paymentStatus === 'paid' || ['wallet', 'prepaid', 'razorpay', 'online'].includes(paymentMode)) && totalAmount > 0 && paymentStatus !== 'refunded';
+
+        // Refund ONLY for one-time orders
+        if (isOneTime && isPrepaid) {
+          try {
+            await this.walletLedger.credit({
+              customerId: existingOrder.customer_id,
+              amount: totalAmount,
+              referenceType: 'order_refund',
+              referenceId: existingOrder.order_id,
+              remarks: `Refund for failed delivery of One-Time Order #${existingOrder.order_id}`,
+              createdBy: 'admin',
+            });
+            updateFields.push(`payment_status = 'refunded'`);
+            isRefunded = true;
+          } catch (refundError) {
+            this.developer.error('Failed to process wallet refund for failed order', {
+              orderId: existingOrder.order_id,
+              customerId: existingOrder.customer_id,
+              totalAmount,
+              refundError,
+            });
+          }
+        }
+      }
+
+      const sql = `
+        UPDATE orders
+        SET ${updateFields.join(', ')}
+        WHERE order_id = $1
+        RETURNING order_id, customer_id, status, payment_status
+      `;
+
+      const rows = await this.databaseService.query(sql, params);
+      const updatedOrder = rows?.[0];
+
+      if (normStatus === 'failed' && existingOrder.customer_id) {
+        const totalAmount = Number(existingOrder.total_amount || 0);
+        if (isRefunded) {
+          this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
+            title: '📦 Order Delivery Failed & Refunded',
+            body: `Your one-time order #${existingOrder.order_id} could not be delivered. ₹${totalAmount.toFixed(2)} has been refunded to your wallet.`,
+            data: {
+              type: 'order_failed_refund',
+              order_id: existingOrder.order_id,
+              refund_amount: String(totalAmount),
+            },
+          }).catch(() => {});
+        } else if (isOneTime) {
+          this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
+            title: '📦 Order Delivery Failed',
+            body: `Your one-time order #${existingOrder.order_id} could not be delivered.`,
+            data: {
+              type: 'order_failed',
+              order_id: existingOrder.order_id,
+            },
+          }).catch(() => {});
+        } else {
+          this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
+            title: '🥛 Subscription Delivery Failed',
+            body: `Your subscription delivery for #${existingOrder.order_id} could not be delivered today.`,
+            data: {
+              type: 'subscription_order_failed',
+              order_id: existingOrder.order_id,
+            },
+          }).catch(() => {});
+        }
+      }
+
+      return {
+        status: true,
+        message: `Order #${existingOrder.order_id} status updated to ${normStatus}`,
+        data: updatedOrder,
+        refunded: isRefunded,
+      };
+    } catch (error) {
+      this.developer.error('updateOrderStatus error', { error, orderId, status });
+      return { status: false, message: 'Failed to update order status' };
     }
   }
 

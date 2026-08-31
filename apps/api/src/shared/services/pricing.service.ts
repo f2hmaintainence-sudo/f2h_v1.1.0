@@ -1,4 +1,5 @@
-import { Injectable, Optional,
+import {
+  Injectable, Optional,
   Logger,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/Database.service';
@@ -39,7 +40,6 @@ export class PricingService {
     // STEP 1a: Validate customerId
     if (!customerId) {
       this.logger.log('[PRICING FLOW] STEP 1a: No customerId provided -> returning empty map (no special prices)');
-      this.developer?.debug('[PricingService] getSpecialPricesMap called without customerId', { customerId: null });
       return specialPricesMap;
     }
 
@@ -48,7 +48,6 @@ export class PricingService {
     try {
       // STEP 1b: Query DB for this customer's special price rules
       this.logger.log(`[PRICING FLOW] STEP 1b: Querying customer_special_prices for customer "${customerId}"...`);
-      this.developer?.debug('[PricingService] Fetching special prices for customer', { customerId });
 
       const res: any = await this.db.query(
         `SELECT csp.product_variant_id, 

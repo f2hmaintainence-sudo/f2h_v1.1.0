@@ -231,7 +231,7 @@ export default function TodayOrdersClient({
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     const cleanId = stripHtml(orderId);
     try {
-      const res = await fetch(`${API_URL}/admin/delivery/orders/${encodeURIComponent(cleanId)}/status`, {
+      const res = await fetch(`${API_URL}/admin/orders/${encodeURIComponent(cleanId)}/status`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -274,8 +274,8 @@ export default function TodayOrdersClient({
       setBulkResult(null);
       try {
         const p = new URLSearchParams();
-        const targetDate = selectedDate || fromDate || '';
-        if (targetDate) p.set('date', targetDate);
+        const targetDate = selectedDate || fromDate || 'today';
+        p.set('date', targetDate);
         const res = await fetch(`${API_URL}/admin/orders/bulk-fail?${p}`, {
           method: 'PATCH',
           credentials: 'include',

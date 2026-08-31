@@ -19,7 +19,7 @@ export class PricingService {
   constructor(
     private readonly db: DatabaseService,
     @Optional() private readonly developer?: DeveloperService,
-  ) {}
+  ) { }
 
   /**
    * Fetches customer special price discounts (as percentage) from DB for a given customer.
@@ -33,7 +33,6 @@ export class PricingService {
     // ── STEP 1a: Validate customerId ──────────────────────────────────────────
     if (!customerId) {
       console.log('[PRICING FLOW] STEP 1a: ❌ No customerId provided → returning empty map (no special prices)');
-      this.developer?.debug('[PricingService] getSpecialPricesMap called without customerId', { customerId: null });
       return specialPricesMap;
     }
 
@@ -42,7 +41,7 @@ export class PricingService {
     try {
       // ── STEP 1b: Query DB ───────────────────────────────────────────────────
       console.log(`[PRICING FLOW] STEP 1b: 🔍 Querying customer_special_prices for customer "${customerId}"...`);
-      this.developer?.debug('[PricingService] Fetching special prices for customer', { customerId });
+
 
       const res: any = await this.db.query(
         `SELECT csp.product_variant_id, 
@@ -79,11 +78,7 @@ export class PricingService {
 
       const mapEntries = Array.from(specialPricesMap.entries()).map(([vId, disc]) => `${vId}:${disc}%`);
       console.log(`[PRICING FLOW] STEP 1c: 🗺️  Special prices map built: [${mapEntries.join(', ') || 'empty'}]`);
-      this.developer?.debug('[PricingService] Special prices loaded', {
-        customerId,
-        count: specialPricesMap.size,
-        entries: mapEntries,
-      });
+
     } catch (e: any) {
       console.error(`[PRICING FLOW] STEP 1 ERROR: ❌ Failed to fetch special prices for customer "${customerId}":`, e?.message || e);
       this.developer?.error('[PricingService] Error fetching customer special prices', { customerId, error: e?.message || e });
@@ -139,10 +134,7 @@ export class PricingService {
         `             has_special_price: true\n` +
         `             → Sending to app: { final_price: ${finalPrice}, final_subscription_price: ${finalSubPrice} }`
       );
-      this.developer?.debug('[PricingService] Special subscription price applied to variant', {
-        variantId, discountPercentage: storedDiscount, discountAmount,
-        price, finalPrice, subscriptionPrice, finalSubPrice,
-      });
+
 
       return result;
     } else {
@@ -184,17 +176,16 @@ export class PricingService {
    */
   async applyPricingToProductList(customerId: string | null, products: any[]): Promise<any[]> {
     if (!products || products.length === 0) return [];
-    
+
     console.log(`\n[PRICING FLOW] ════════════════════════════════════════════`);
     console.log(`[PRICING FLOW] START: applyPricingToProductList`);
     console.log(`[PRICING FLOW]   customerId   : "${customerId}"`);
     console.log(`[PRICING FLOW]   productCount : ${products.length}`);
     console.log(`[PRICING FLOW] ════════════════════════════════════════════`);
-    this.developer?.debug('[PricingService] applyPricingToProductList started', { customerId, productCount: products.length });
-    
+
     // STEP 1: Load special prices map from DB
     const specialPricesMap = await this.getSpecialPricesMap(customerId);
-    
+
     console.log(`[PRICING FLOW] STEP 3: 🔄 Iterating over ${products.length} product variant(s) to apply pricing...`);
     let specialPricesAppliedCount = 0;
     let standardPricingCount = 0;
@@ -231,7 +222,6 @@ export class PricingService {
     console.log(`[PRICING FLOW]   → ${specialPricesAppliedCount} variant(s) got SPECIAL subscription price`);
     console.log(`[PRICING FLOW]   → ${standardPricingCount} variant(s) got standard price`);
     console.log(`[PRICING FLOW] ════════════════════════════════════════════\n`);
-    this.developer?.debug('[PricingService] applyPricingToProductList finished', { customerId, specialPricesAppliedCount });
 
     return result;
   }

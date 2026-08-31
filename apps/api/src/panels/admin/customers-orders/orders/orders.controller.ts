@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Query, Res } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Query, Res, Body } from '@nestjs/common';
 import { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { OrdersTableService } from './services/table.service';
@@ -47,16 +47,14 @@ export class OrdersController {
 
   // ── Bulk Mark Delivered ──
 
-  @Patch('today/bulk-deliver')
-  @Patch('bulk-deliver')
+  @Patch(['today/bulk-deliver', 'bulk-deliver'])
   async bulkMarkDelivered(@Query() query: any) {
     return this.ordersService.bulkMarkDelivered(query);
   }
 
   // ── Bulk Mark Failed ──
 
-  @Patch('today/bulk-fail')
-  @Patch('bulk-fail')
+  @Patch(['today/bulk-fail', 'bulk-fail'])
   async bulkMarkFailed(@Query() query: any) {
     return this.ordersService.bulkMarkFailed(query);
   }
@@ -89,5 +87,13 @@ export class OrdersController {
   @Get(':orderId/items')
   async getOrderItems(@Param('orderId') orderId: string) {
     return this.ordersService.getOrderItems(orderId);
+  }
+
+  @Patch(':orderId/status')
+  async updateOrderStatus(
+    @Param('orderId') orderId: string,
+    @Body() body: { status: string; notes?: string },
+  ) {
+    return this.ordersService.updateOrderStatus(orderId, body.status, body.notes);
   }
 }
