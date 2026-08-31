@@ -222,40 +222,48 @@ class F2hHeroHeader extends StatelessWidget {
     return GestureDetector(
       onTap: () => onToggleOnline(!isOnline),
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: isOnline ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isOnline ? const Color(0xFF86EFAC) : const Color(0xFFCBD5E1),
+            width: 1.2,
           ),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x06000000),
-              blurRadius: 4,
-              offset: Offset(0, 1),
+              color: isOnline ? const Color(0x1A16A34A) : const Color(0x06000000),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(
+              Icons.two_wheeler_rounded,
+              size: 16,
+              color: isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 5),
             Container(
-              width: 8,
-              height: 8,
+              width: 7,
+              height: 7,
               decoration: BoxDecoration(
                 color: isOnline ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text(
-              isOnline ? 'Online' : 'Offline',
+              isOnline ? 'Bike Started' : 'Start Bike',
               style: GoogleFonts.roboto(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: isOnline ? const Color(0xFF15803D) : const Color(0xFF475569),
               ),
             ),
           ],

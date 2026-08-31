@@ -305,7 +305,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Location permission and GPS are required to go online and track deliveries.',
+              'Location permission and GPS are required to start your bike and track deliveries.',
               style: GoogleFonts.roboto(),
             ),
             backgroundColor: kDanger,
@@ -338,7 +338,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         } else {
           AppSnackBar.show(
             context,
-            val ? 'You are now Online.' : 'You are now Offline.',
+            val ? '🏍️ Bike Started! You are on duty.' : '🛑 Bike Stopped! Shift ended.',
             backgroundColor: val ? kSuccess : kDanger,
           );
           if (val) _showPickupSummaryDialog(context);
@@ -514,13 +514,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(20),
                                     decoration: BoxDecoration(
-                                      color: kDanger.withOpacity(0.1),
+                                      color: const Color(0xFFDCFCE7),
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: kDanger.withOpacity(0.3), width: 2),
+                                      border: Border.all(color: const Color(0xFF86EFAC), width: 2),
                                     ),
                                     child: const Icon(
-                                      Icons.power_settings_new_rounded,
-                                      color: kDanger,
+                                      Icons.two_wheeler_rounded,
+                                      color: Color(0xFF059669),
                                       size: 44,
                                     ),
                                   ),
@@ -528,19 +528,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'You are Currently Offline',
+                                'Bike is Stopped',
                                 style: GoogleFonts.roboto(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
                                   color: const Color(0xFF0F172A),
                                 ),
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Tap the Power button above or the switch in the header to go online and receive your assigned delivery batches.',
+                                'Start your bike to begin your delivery shift and receive your assigned delivery batches.',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.roboto(
-                                  fontSize: 12.5,
+                                  fontSize: 13,
                                   color: const Color(0xFF64748B),
                                   height: 1.4,
                                 ),
@@ -548,19 +548,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(height: 18),
                               SizedBox(
                                 width: double.infinity,
-                                height: 46,
+                                height: 48,
                                 child: ElevatedButton.icon(
                                   onPressed: () => _handleOnlineToggle(true),
-                                  icon: const Icon(Icons.power_settings_new_rounded, size: 20),
+                                  icon: const Icon(Icons.two_wheeler_rounded, size: 22),
                                   label: Text(
-                                    'Go Online Now',
+                                    'Start Bike Now',
                                     style: GoogleFonts.roboto(
                                       fontSize: 15,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: kSuccess,
+                                    backgroundColor: const Color(0xFF059669),
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
