@@ -86,7 +86,7 @@ class OptimizedRouteResult {
     );
   }
 
-  bool get hasRoute => isRoadGeometry && fullRoutePoints.length >= 2;
+  bool get hasRoute => fullRoutePoints.length >= 2;
 }
 
 /// Deliveries run on two-wheelers, which Google routes differently from cars —
@@ -469,12 +469,51 @@ class RouteOptimizationService {
     required List<GroupedStop> stops,
     required String reason,
   }) {
-    return OptimizedRouteResult.unavailable(
-      orderedStops: computeShortestStopSequence(
-        currentPosition: currentPosition,
-        stops: stops,
-      ),
-      reason: reason,
+    final ordered = computeShortestStopSequence(
+      currentPosition: currentPosition,
+      stops: stops,
+    );
+
+    final pending = ordered.where((s) => _isPending(s) && _hasValidCoords(s)).toList();
+    final List<LatLng> fallbackPoints = [];
+    if (currentPosition != null && _isValidPosition(currentPosition)) {
+      fallbackPoints.add(currentPosition);
+    }
+    for (final s in pending) {
+      fallbackPoints.add(LatLng(s.addressLat, s.addressLng));
+    }
+
+    double totalDist = 0;
+    for (int i = 0; i < fallbackPoints.length - 1; i++) {
+      totalDist += _locationService.haversineDistanceKm(
+        fallbackPoints[i].latitude,
+        fallbackPoints[i].longitude,
+        fallbackPoints[i + 1].latitude,
+        fallbackPoints[i + 1].longitude,
+      );
+    }
+
+    final activeDist = fallbackPoints.length >= 2
+        ? _locationService.haversineDistanceKm(
+            fallbackPoints[0].latitude,
+            fallbackPoints[0].longitude,
+            fallbackPoints[1].latitude,
+            fallbackPoints[1].longitude,
+          )
+        : 0.0;
+
+    return OptimizedRouteResult(
+      orderedStops: ordered,
+      activeLegPoints: fallbackPoints.length >= 2 ? fallbackPoints.sublist(0, 2) : const [],
+      remainingRoutePoints: fallbackPoints.length >= 3 ? fallbackPoints.sublist(1) : const [],
+      fullRoutePoints: fallbackPoints,
+      totalDistanceKm: totalDist,
+      totalDurationMinutes: (totalDist / 25.0) * 60.0,
+      activeLegDistanceKm: activeDist,
+      activeLegDurationMinutes: (activeDist / 25.0) * 60.0,
+      isRoadGeometry: false,
+      status: RouteStatus.ok,
+      unavailableReason: reason,
     );
   }
 

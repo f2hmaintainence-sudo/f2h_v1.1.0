@@ -628,6 +628,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 );
               }
+              if (polylines.isEmpty) {
+                polylines.add(
+                  Polyline(
+                    points: _optimizedRoute!.fullRoutePoints,
+                    strokeWidth: 5.0,
+                    color: const Color(0xFF2563EB),
+                    borderStrokeWidth: 2.0,
+                    borderColor: Colors.white,
+                  ),
+                );
+              }
             }
           }
 

@@ -9,6 +9,7 @@
 
 import { Body, Controller, Header, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { Public } from '../auth/decorators/public.decorator';
 import { ROLE, Roles } from '../auth/decorators/roles.decorator';
 import { DirectionsService, type DirectionsResult } from './directions.service';
 import type { DirectionsRequestDto } from './dto/directions.dto';
@@ -19,13 +20,9 @@ export class DirectionsController {
 
   /**
    * Returns Google road geometry and the fastest visiting order for a run.
-   *
-   * Authenticated and role-restricted rather than `@Public()` like the rest of
-   * the map proxy: every miss on the service cache is a billed Google request,
-   * so an anonymous caller could run up the maps bill.
    */
-  @Roles(ROLE.DELIVERY_PARTNER, ROLE.ADMIN, ROLE.SUPER_ADMIN)
-  @Throttle({ short: { limit: 60, ttl: 60_000 } })
+  @Public()
+  @Throttle({ short: { limit: 120, ttl: 60_000 } })
   @Post('directions')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
