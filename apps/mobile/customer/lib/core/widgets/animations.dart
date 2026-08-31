@@ -17,9 +17,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/core/services/app_asset_service.dart';
 import 'cow_loading_widget.dart';
-// NOTE: Removed circular self-import that was here previously
 
 
 // ══════════════════════════════════════════════════════════
@@ -1165,12 +1163,16 @@ class InitialLoadingScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  // Cow Drinking Milk Animation (starts immediately)
-                  CowLoadingWidget(size: 260),
+                  // Cow Drinking Milk Animation with Green Loading Bar below
+                  CowLoadingWidget(
+                    size: 240,
+                    showLoadingBar: true,
+                    loadingBarWidth: 180,
+                  ),
 
-                  SizedBox(height: 4),
+                  SizedBox(height: 16),
 
-                  // F2H Fresh Brand Title & Subtitle
+                  // F2H Fresh Brand Title
                   Text(
                     'F2H Fresh',
                     style: TextStyle(
@@ -1178,16 +1180,6 @@ class InitialLoadingScreen extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                       color: kPrimary,
                       letterSpacing: -0.4,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Fresh Daily Essentials',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: kTextSub,
-                      letterSpacing: 0.8,
                     ),
                   ),
                 ],

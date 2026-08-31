@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  COW DRINK MILK LOTTIE LOADING WIDGET
 //
-//  Renders the custom "Cow Drink Milk" Lottie animation for app loading screens,
-//  overlays, pull-to-refresh, catalog loaders, and order processing.
+//  Renders the custom "Cow Drink Milk" Lottie animation with an animated
+//  green progress bar for app loading screens, overlays, pull-to-refresh,
+//  catalog loaders, and order processing.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -22,16 +23,27 @@ class CowLoadingWidget extends StatelessWidget {
   /// Whether to show in a card container with rounded corners & shadow
   final bool showCard;
 
+  /// Whether to show the animated green loading bar below the cow animation
+  final bool showLoadingBar;
+
+  /// Custom width for the green loading bar (defaults to scaled proportion)
+  final double? loadingBarWidth;
+
   const CowLoadingWidget({
     super.key,
     this.size = 120,
     this.message,
     this.backgroundColor,
     this.showCard = false,
+    this.showLoadingBar = true,
+    this.loadingBarWidth,
   });
 
   @override
   Widget build(BuildContext context) {
+    final barWidth = loadingBarWidth ?? (size * 0.75).clamp(64.0, 220.0);
+    final barHeight = (size * 0.05).clamp(4.0, 8.0);
+
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -61,6 +73,13 @@ class CowLoadingWidget extends StatelessWidget {
             },
           ),
         ),
+        if (showLoadingBar) ...[
+          const SizedBox(height: 6),
+          GreenLoadingBar(
+            width: barWidth,
+            height: barHeight,
+          ),
+        ],
         if (message != null && message!.isNotEmpty) ...[
           const SizedBox(height: 10),
           Text(
@@ -96,6 +115,44 @@ class CowLoadingWidget extends StatelessWidget {
           ],
         ),
         child: content,
+      ),
+    );
+  }
+}
+
+/// Standalone Green Loading Bar Lottie Animation Widget
+class GreenLoadingBar extends StatelessWidget {
+  final double width;
+  final double height;
+
+  const GreenLoadingBar({
+    super.key,
+    this.width = 120,
+    this.height = 6,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(height / 2),
+        child: Lottie.asset(
+          'assets/loading/green_loading_bar.json',
+          width: width,
+          height: height,
+          fit: BoxFit.fill,
+          repeat: true,
+          animate: true,
+          errorBuilder: (context, error, stackTrace) {
+            return LinearProgressIndicator(
+              backgroundColor: const Color(0xFFDCFCE7),
+              valueColor: const AlwaysStoppedAnimation<Color>(kPrimary),
+              minHeight: height,
+            );
+          },
+        ),
       ),
     );
   }

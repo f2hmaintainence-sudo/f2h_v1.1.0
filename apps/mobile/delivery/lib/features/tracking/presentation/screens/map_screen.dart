@@ -598,51 +598,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           }
 
           final effectiveStops = _optimizedRoute?.orderedStops ?? state.groupedStops;
-          if (_optimizedRoute == null && effectiveStops.isNotEmpty && !_isCalculatingRoute) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _calculateShortestPath(effectiveStops);
-            });
-          }
-
-          final List<Polyline> polylines = [];
           final pendingStops = effectiveStops.where(
             (s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed',
           ).toList();
 
-          if (pendingStops.isNotEmpty) {
-            if (_optimizedRoute != null && _optimizedRoute!.fullRoutePoints.length >= 2) {
-              if (_optimizedRoute!.remainingRoutePoints.length >= 2) {
-                polylines.add(
-                  Polyline(
-                    points: _optimizedRoute!.remainingRoutePoints,
-                    strokeWidth: 5.5,
-                    color: const Color(0xFF3B82F6),
-                    borderStrokeWidth: 1.8,
-                    borderColor: const Color(0xFF1D4ED8),
-                  ),
-                );
-              }
-              if (_optimizedRoute!.activeLegPoints.length >= 2) {
-                polylines.add(
-                  Polyline(
-                    points: _optimizedRoute!.activeLegPoints,
-                    strokeWidth: 6.5,
-                    color: const Color(0xFF2563EB),
-                    borderStrokeWidth: 2.2,
-                    borderColor: const Color(0xFF1E3A8A),
-                  ),
-                );
-              } else if (_optimizedRoute!.fullRoutePoints.length >= 2) {
-                polylines.add(
-                  Polyline(
-                    points: _optimizedRoute!.fullRoutePoints,
-                    strokeWidth: 6.5,
-                    color: const Color(0xFF2563EB),
-                    borderStrokeWidth: 2.2,
-                    borderColor: const Color(0xFF1E3A8A),
-                  ),
-                );
-              }
+          if (_selectedStop == null && pendingStops.isNotEmpty) {
+            _selectedStop = pendingStops.first;
+          }
+
+          if (_optimizedRoute == null && effectiveStops.isNotEmpty && !_isCalculatingRoute) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _calculateShortestPath(effectiveStops, targetedStop: _selectedStop);
+            });
+          }
+
+          final List<Polyline> polylines = [];
+
+          if (pendingStops.isNotEmpty && _optimizedRoute != null) {
+            final routePts = _optimizedRoute!.fullRoutePoints.length >= 2
+                ? _optimizedRoute!.fullRoutePoints
+                : (_optimizedRoute!.activeLegPoints.length >= 2
+                    ? _optimizedRoute!.activeLegPoints
+                    : const <LatLng>[]);
+
+            if (routePts.length >= 2) {
+              polylines.add(
+                Polyline(
+                  points: routePts,
+                  strokeWidth: 6.5,
+                  color: const Color(0xFF2563EB),
+                  borderStrokeWidth: 2.2,
+                  borderColor: const Color(0xFF1E3A8A),
+                ),
+              );
             }
           }
 

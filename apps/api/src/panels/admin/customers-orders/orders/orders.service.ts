@@ -279,7 +279,7 @@ export class OrdersService {
       const candidateOrders = await this.databaseService.query(
         `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status
          FROM orders
-         WHERE (scheduled_date = $1::date OR scheduled_date::text = $1)
+         WHERE scheduled_date = $1::date
            AND status IN ('pending', 'placed', 'confirmed', 'assigned', 'packed', 'out_for_delivery')
            AND status != 'delivered'
            AND status != 'failed'

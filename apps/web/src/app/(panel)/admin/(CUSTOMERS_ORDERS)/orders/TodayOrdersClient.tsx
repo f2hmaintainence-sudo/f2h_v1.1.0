@@ -11,6 +11,7 @@
 'use client';
 
 import { getApiBaseUrl } from '@/lib/api-config';
+import { getCsrfToken } from '@/lib/csrf';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
@@ -231,10 +232,14 @@ export default function TodayOrdersClient({
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     const cleanId = stripHtml(orderId);
     try {
+      const csrfToken = await getCsrfToken().catch(() => '');
       const res = await fetch(`${API_URL}/admin/orders/${encodeURIComponent(cleanId)}/status`, {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+        },
         body: JSON.stringify({ status: newStatus }),
       });
       const result = await res.json();
@@ -273,13 +278,17 @@ export default function TodayOrdersClient({
       setBulkLoading(true);
       setBulkResult(null);
       try {
+        const csrfToken = await getCsrfToken().catch(() => '');
         const p = new URLSearchParams();
         const targetDate = selectedDate || fromDate || 'today';
         p.set('date', targetDate);
         const res = await fetch(`${API_URL}/admin/orders/bulk-fail?${p}`, {
           method: 'PATCH',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+          },
         });
         const result = await res.json();
         if (result.status) {
@@ -300,10 +309,14 @@ export default function TodayOrdersClient({
       setBulkLoading(true);
       setBulkResult(null);
       try {
+        const csrfToken = await getCsrfToken().catch(() => '');
         const res = await fetch(`${API_URL}/admin/orders/today/bulk-deliver`, {
           method: 'PATCH',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+          },
         });
         const result = await res.json();
         if (result.status) {
