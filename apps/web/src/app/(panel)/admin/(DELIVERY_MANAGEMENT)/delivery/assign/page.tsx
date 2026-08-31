@@ -108,7 +108,7 @@ export default function DeliveryRunsPage() {
   const [result, setResult] = useState<RunResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState<"morning" | "evening">("morning");
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [generateDate, setGenerateDate] = useState<string>(getTodayIST());
@@ -547,18 +547,7 @@ export default function DeliveryRunsPage() {
                       <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
                         Delivery Slot:
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSlot("")}
-                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                            selectedSlot === ""
-                              ? "border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20"
-                              : "border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          All Slots
-                        </button>
+                      <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setSelectedSlot("morning")}
