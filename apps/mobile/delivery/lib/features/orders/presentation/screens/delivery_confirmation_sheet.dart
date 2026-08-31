@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -81,6 +81,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   bool _isUpi = true;
   bool _paymentConfirmed = false;
   String? _imagePath;
+  Uint8List? _imageBytes;
 
   final Map<String, ContainerItemState> _containerStates = {};
 
@@ -135,8 +136,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       final LostDataResponse response = await picker.retrieveLostData();
       if (response.isEmpty) return;
       if (response.file != null) {
+        final bytes = await response.file!.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _imagePath = response.file!.path;
+          _imageBytes = bytes;
           _photoTaken = true;
           if (_currentStep >= 4) {
             _currentStep = 4;
@@ -167,8 +171,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         imageQuality: 70,
       );
       if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _imagePath = photo.path;
+          _imageBytes = bytes;
           _photoTaken = true;
         });
       }
@@ -1403,10 +1410,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                       ],
                     ),
                   ] else ...[
-                    if (_imagePath != null)
-                      Image.file(
-                        File(_imagePath!),
+                    if (_imageBytes != null)
+                      Image.memory(
+                        _imageBytes!,
                         fit: BoxFit.cover,
+                        gaplessPlayback: true,
                       )
                     else
                       Image.network(
@@ -1440,6 +1448,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   onPressed: () => setState(() {
                     _photoTaken = false;
                     _imagePath = null;
+                    _imageBytes = null;
                   }),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
