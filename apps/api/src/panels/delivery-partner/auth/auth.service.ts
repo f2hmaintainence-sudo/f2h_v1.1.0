@@ -10,13 +10,39 @@ export class AuthService {
       throw new BadRequestException('User ID is required');
     }
 
-    const boyRes = await this.db.query(
+    let boyRes = await this.db.query(
       `SELECT is_active, is_online, is_available, delivery_partner_id
        FROM delivery_partners
        WHERE delivery_partner_id = $1
        LIMIT 1`,
       [userId],
     );
+
+    if (!boyRes?.length) {
+      const [userRow] = await this.db.query(
+        `SELECT user_id FROM users WHERE user_id = $1 LIMIT 1`,
+        [userId],
+      );
+      if (userRow) {
+        const [activeBranch] = await this.db.query(
+          `SELECT branch_id FROM branches WHERE is_active = true ORDER BY created_at ASC LIMIT 1`,
+        );
+        const branchId = activeBranch?.branch_id || null;
+        await this.db.query(
+          `INSERT INTO delivery_partners (delivery_partner_id, branch_id, is_active, is_verified, is_available, is_online, vehicle_type, vehicle_number, created_at, updated_at)
+           VALUES ($1, $2, true, true, true, false, 'BIKE', 'N/A', NOW(), NOW())
+           ON CONFLICT (delivery_partner_id) DO NOTHING`,
+          [userId, branchId],
+        );
+        boyRes = await this.db.query(
+          `SELECT is_active, is_online, is_available, delivery_partner_id
+           FROM delivery_partners
+           WHERE delivery_partner_id = $1
+           LIMIT 1`,
+          [userId],
+        );
+      }
+    }
 
     if (!boyRes?.length) {
       throw new NotFoundException('Delivery partner profile not found');

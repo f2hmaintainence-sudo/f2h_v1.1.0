@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -298,22 +299,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _handleOnlineToggle(bool val) async {
     if (val) {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) AppSnackBar.error(context, 'GPS/Location services are disabled. Please enable them to go online.');
-        return;
-      }
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) AppSnackBar.error(context, 'Location permission is required to track live location while online.');
-          return;
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          if (!kIsWeb) {
+            if (mounted) AppSnackBar.error(context, 'GPS/Location services are disabled. Please enable them to go online.');
+            return;
+          }
         }
-      }
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) AppSnackBar.error(context, 'Location permissions are permanently denied. Please enable them in settings.');
-        return;
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) {
+            if (mounted) AppSnackBar.error(context, 'Location permission is required to track live location while online.');
+            return;
+          }
+        }
+        if (permission == LocationPermission.deniedForever) {
+          if (!kIsWeb) {
+            if (mounted) AppSnackBar.error(context, 'Location permissions are permanently denied. Please enable them in settings.');
+            return;
+          }
+        }
+      } catch (e) {
+        print('Location check exception during toggle: $e');
       }
     }
     if (!mounted) return;
@@ -491,16 +500,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: kDanger.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.power_settings_new_rounded,
-                                  color: kDanger,
-                                  size: 36,
+                              Material(
+                                color: Colors.transparent,
+                                shape: const CircleBorder(),
+                                child: InkWell(
+                                  onTap: () => _handleOnlineToggle(true),
+                                  customBorder: const CircleBorder(),
+                                  splashColor: kSuccess.withOpacity(0.2),
+                                  highlightColor: kSuccess.withOpacity(0.1),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: kDanger.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: kDanger.withOpacity(0.3), width: 2),
+                                    ),
+                                    child: const Icon(
+                                      Icons.power_settings_new_rounded,
+                                      color: kDanger,
+                                      size: 44,
+                                    ),
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 16),
@@ -514,12 +534,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Turn on the Online switch in the header to go online and receive your assigned delivery batches.',
+                                'Tap the Power button above or the switch in the header to go online and receive your assigned delivery batches.',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.roboto(
                                   fontSize: 12.5,
                                   color: const Color(0xFF64748B),
                                   height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 46,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _handleOnlineToggle(true),
+                                  icon: const Icon(Icons.power_settings_new_rounded, size: 20),
+                                  label: Text(
+                                    'Go Online Now',
+                                    style: GoogleFonts.roboto(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kSuccess,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    elevation: 0,
+                                  ),
                                 ),
                               ),
                             ],
