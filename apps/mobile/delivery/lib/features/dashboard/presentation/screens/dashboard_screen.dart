@@ -28,6 +28,7 @@ import 'package:f2h_delivery/core/widgets/f2h_hero_header.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_basket_modal.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/containers_tracker_modal.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_result_dialog.dart';
 import 'package:f2h_delivery/features/notifications/services/notification_api_service.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -274,7 +275,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onSuccess: () {
               if (mounted) {
                 Navigator.pop(context); // pop loading dialog
-                AppSnackBar.success(context, 'Stop #${stop.stop} marked as $status!');
+                DeliveryResultDialog.show(
+                  context,
+                  stop: stop,
+                  status: status,
+                  emptyBottlesCollected: emptyBottles,
+                  paymentMode: paymentMode,
+                );
               }
             },
             onError: (errorMsg) {

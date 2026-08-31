@@ -395,15 +395,24 @@ export class CustomerBootstrapController {
           const refCode = customer.referred_by || 'F2HREF';
           const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
           const rnd = Math.floor(Math.random() * 9000 + 1000);
+          // Delivery partner referrers earn a flat ₹75 bonus; customers earn ₹100
+          const dpReferrerRows = await this.db.query(
+            `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+            [customer.referred_by],
+          );
+          const isDpRef = (dpReferrerRows?.length || 0) > 0;
+
           const referralData = await this.filterValidFields('referrals', {
             refer_id: `REF${ts}${rnd}`,
             referrer_customer_id: customer.referred_by,
             referred_customer_id: customer.customer_id,
             referral_code: refCode,
-            referrer_reward_amount: 100.00,
+            referrer_reward_amount: isDpRef ? 75.00 : 100.00,
             referred_reward_amount: 0.00,
             status: 'pending',
-            remarks: 'Referral registered - pending first delivered order',
+            remarks: isDpRef
+              ? 'DP referral registered - ₹75 for DP on 1st delivered order'
+              : 'Referral registered - pending first delivered order',
             created_at: new Date(),
             updated_at: new Date(),
           });

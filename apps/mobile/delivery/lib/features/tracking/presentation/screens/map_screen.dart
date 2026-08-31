@@ -12,6 +12,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/tracking/presentation/widgets/map_delivery_sheet.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_result_dialog.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
 
 enum MapLayerType {
@@ -503,13 +504,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             onSuccess: () {
               if (mounted) {
                 Navigator.pop(context); // pop loading dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Stop #${stop.stop} marked as $status!'),
-                    backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+                DeliveryResultDialog.show(
+                  context,
+                  stop: stop,
+                  status: status,
+                  emptyBottlesCollected: emptyBottles,
+                  paymentMode: paymentMode,
                 );
               }
             },

@@ -20,7 +20,7 @@ export class ReferralRewardEngineService {
    * Executes inside a PostgreSQL transaction with SELECT ... FOR UPDATE row-level locking
    * to guarantee strict single-execution idempotency (no double-crediting).
    *
-   * Customer referrer  → ₹50 to referrer wallet, ₹50 to referee wallet
+   * Customer referrer  → ₹100 to referrer wallet, ₹0 to referee wallet
    * DP referrer        → ₹75 to DP bonus table (for salary), ₹0 to referee
    */
   async processReferralReward(refereeCustomerId: string, orderId?: string): Promise<any> {

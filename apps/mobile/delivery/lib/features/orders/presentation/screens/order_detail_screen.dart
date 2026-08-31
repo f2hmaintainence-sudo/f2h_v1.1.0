@@ -16,6 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_result_dialog.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final GroupedStop stop;
@@ -175,17 +176,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Navigator.pop(context); // Pop order detail screen if still open
           }
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Stop #${_currentStop.stop} marked as $status!'),
-              backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+          DeliveryResultDialog.show(
+            context,
+            stop: _currentStop,
+            status: status,
+            emptyBottlesCollected: emptyBottles,
+            paymentMode: paymentMode,
+            onNext: () {
+              if (status == 'delivered') {
+                MockDataService().tabNavigationNotifier.value = 2; // Switch to Map tab
+              }
+            },
           );
-          if (status == 'delivered') {
-            MockDataService().tabNavigationNotifier.value = 2; // Switch to Map tab
-          }
         },
       ),
     );

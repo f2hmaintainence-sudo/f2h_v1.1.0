@@ -15,6 +15,7 @@ import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
+import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_result_dialog.dart';
 import 'package:f2h_delivery/features/profile/presentation/screens/profile_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -156,17 +157,18 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             onSuccess: () {
               if (mounted) {
                 Navigator.pop(context); // pop loading dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Stop #${stop.stop} marked as $status!'),
-                    backgroundColor: status == 'delivered' ? kSuccess : kDanger,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+                DeliveryResultDialog.show(
+                  context,
+                  stop: stop,
+                  status: status,
+                  emptyBottlesCollected: emptyBottles,
+                  paymentMode: paymentMode,
+                  onNext: () {
+                    if (status == 'delivered') {
+                      MockDataService().tabNavigationNotifier.value = 2;
+                    }
+                  },
                 );
-                if (status == 'delivered') {
-                  MockDataService().tabNavigationNotifier.value = 2;
-                }
               }
             },
             onError: (errorMsg) {
