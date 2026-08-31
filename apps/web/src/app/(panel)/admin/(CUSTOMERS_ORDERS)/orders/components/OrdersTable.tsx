@@ -21,6 +21,7 @@ import {
   Clock,
   CheckCircle2,
   Truck,
+  Bike,
   XCircle,
   AlertCircle,
 } from 'lucide-react';
@@ -352,7 +353,7 @@ export default function OrdersTable({
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Order ID', 'Customer', 'Amount', 'Slot', 'Status Timeline', 'Action'].map((h) => (
+                {['Order ID', 'Customer', 'Delivery Partner', 'Amount', 'Slot', 'Status Timeline', 'Action'].map((h) => (
                   <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500">{h}</th>
                 ))}
               </tr>
@@ -360,10 +361,10 @@ export default function OrdersTable({
             <tbody>
               {Array.from({ length: 10 }).map((_, i) => (
                 <tr key={i} className="border-b border-gray-100">
-                  {[80, 120, 60, 80, 180, 60].map((w, j) => (
+                  {[80, 110, 110, 60, 70, 160, 60].map((w, j) => (
                     <td key={j} className="px-4 py-3.5">
                       <div className="h-3.5 bg-gray-100 rounded animate-pulse" style={{ width: w }} />
-                      {j === 4 && <div className="mt-1.5 h-2 bg-gray-100 rounded animate-pulse" style={{ width: 100 }} />}
+                      {j === 5 && <div className="mt-1.5 h-2 bg-gray-100 rounded animate-pulse" style={{ width: 100 }} />}
                     </td>
                   ))}
                 </tr>
@@ -421,6 +422,7 @@ export default function OrdersTable({
             <tr>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Order ID</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Customer</th>
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Delivery Partner</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Amount</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Slot</th>
               <th className="px-3 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500" style={{ width: 160 }}>Status Timeline</th>
@@ -432,6 +434,13 @@ export default function OrdersTable({
               const orderId      = stripHtml(order.order_id || order.id || '—');
               const customerName = stripHtml(order.customer_name || order.customer_id || 'Guest');
               const phone        = stripHtml(order.customer_phone || order.phone || order.contact_number || '');
+              const partnerFirstName = stripHtml(order.partner_first_name || '');
+              const partnerLastName  = stripHtml(order.partner_last_name || '');
+              const combinedName     = `${partnerFirstName} ${partnerLastName}`.trim();
+              const rawPartnerName   = stripHtml(order.partner_name || order.delivery_partner_name || combinedName || '');
+              const partnerId        = stripHtml(order.delivery_partner_id || '');
+              const partnerPhone     = stripHtml(order.partner_phone || order.delivery_partner_phone || '');
+              const partnerDisplayName = rawPartnerName || (partnerId ? `Partner (${partnerId})` : '');
               const amount       = formatMoney(order.total_amount || order.amount || order.subtotal);
               const slot         = stripHtml(order.delivery_slot || order.slot || '');
               const statusRaw    = normalizeStatus(order.order_status || order.status);
@@ -453,11 +462,36 @@ export default function OrdersTable({
                   </td>
 
                   {/* Customer */}
-                  <td className="px-4 py-3 whitespace-nowrap max-w-[150px]">
+                  <td className="px-4 py-3 whitespace-nowrap max-w-[140px]">
                     <div className="flex flex-col gap-0.5">
                       <span className="font-semibold text-slate-800 truncate block" title={customerName}>{customerName}</span>
                       {phone && <span className="text-[10px] text-gray-400 font-medium">{phone}</span>}
                     </div>
+                  </td>
+
+                  {/* Delivery Partner */}
+                  <td className="px-4 py-3 whitespace-nowrap max-w-[140px]">
+                    {partnerDisplayName ? (
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                            <Bike size={11} />
+                          </div>
+                          <span className="font-bold text-slate-800 text-xs truncate max-w-[120px]" title={partnerDisplayName}>
+                            {partnerDisplayName}
+                          </span>
+                        </div>
+                        {partnerPhone && (
+                          <span className="text-[10px] text-gray-500 font-mono pl-6">
+                            {partnerPhone}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                        Unassigned
+                      </span>
+                    )}
                   </td>
 
                   {/* Amount */}

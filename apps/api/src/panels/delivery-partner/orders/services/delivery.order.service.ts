@@ -1280,9 +1280,10 @@ export class DeliveryOrderService {
 
         if (order.customer_id && order.order_id) {
           try {
-            await this.firstOrderDetector.detectAndMarkFirstOrder(order.customer_id, order.order_id);
-            await this.firstOrderDetector.unlockReferralCode(order.customer_id);
-            await this.referralRewardEngine.processReferralReward(order.customer_id, order.order_id);
+            const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(order.customer_id, order.order_id);
+            if (isFirstOrder) {
+              await this.referralRewardEngine.processReferralReward(order.customer_id, order.order_id);
+            }
           } catch (refErr) {
             this.developer.error('DeliveryOrderService: Failed to process referral reward for stop', {
               orderId: order.order_id,
@@ -1678,9 +1679,10 @@ export class DeliveryOrderService {
 
     if (status === 'delivered' && order.customer_id && order.order_id) {
       try {
-        await this.firstOrderDetector.detectAndMarkFirstOrder(order.customer_id, order.order_id);
-        await this.firstOrderDetector.unlockReferralCode(order.customer_id);
-        await this.referralRewardEngine.processReferralReward(order.customer_id, order.order_id);
+        const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(order.customer_id, order.order_id);
+        if (isFirstOrder) {
+          await this.referralRewardEngine.processReferralReward(order.customer_id, order.order_id);
+        }
       } catch (refErr) {
         this.developer.error('DeliveryOrderService: Failed to process referral reward for order', {
           orderId: order.order_id,

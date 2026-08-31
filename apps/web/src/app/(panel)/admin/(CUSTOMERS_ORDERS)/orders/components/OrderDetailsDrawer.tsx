@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Truck,
+  Bike,
   Repeat,
   ShoppingCart,
   Calendar,
@@ -222,7 +223,7 @@ export default function OrderDetailsDrawer({
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
 
           {/* Customer & Delivery Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Customer Box */}
             <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -236,6 +237,40 @@ export default function OrderDetailsDrawer({
                   <Phone size={12} className="text-slate-400" />
                   {customerPhone}
                 </p>
+              )}
+            </div>
+
+            {/* Delivery Partner Box */}
+            <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Bike size={13} className="text-indigo-600" /> Delivery Partner
+              </span>
+              {order.delivery_partner_id || order.partner_name ? (
+                <div>
+                  <p className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                    {order.partner_name || order.delivery_partner_name || order.delivery_partner_id}
+                  </p>
+                  {(order.partner_phone || order.delivery_partner_phone) && (
+                    <p className="text-xs text-slate-600 flex items-center gap-1.5 font-medium mt-1">
+                      <Phone size={12} className="text-slate-400" />
+                      <a href={`tel:${order.partner_phone || order.delivery_partner_phone}`} className="hover:text-indigo-600 underline">
+                        {order.partner_phone || order.delivery_partner_phone}
+                      </a>
+                    </p>
+                  )}
+                  {(order.vehicle_type || order.vehicle_number) && (
+                    <p className="text-[11px] text-slate-500 font-medium mt-1">
+                      Vehicle: <span className="font-bold text-slate-700">{order.vehicle_type || ''} {order.vehicle_number ? `(${order.vehicle_number})` : ''}</span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-slate-500 py-1">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                    Unassigned
+                  </span>
+                  <span className="text-[11px] text-slate-400">No partner assigned yet</span>
+                </div>
               )}
             </div>
 

@@ -120,12 +120,12 @@ export class DirectionsService {
     const intermediates = request.intermediates ?? [];
     const optimize = Boolean(request.optimizeWaypointOrder) && intermediates.length > 0;
 
-    const body = {
+    const travelMode = request.travelMode ?? 'TWO_WHEELER';
+    const body: Record<string, unknown> = {
       origin: this.routesWaypoint(request.origin, false),
       destination: this.routesWaypoint(request.destination, true),
       intermediates: intermediates.map((p) => this.routesWaypoint(p, true)),
-      travelMode: request.travelMode ?? 'TWO_WHEELER',
-      routingPreference: 'TRAFFIC_AWARE',
+      travelMode,
       optimizeWaypointOrder: optimize,
       computeAlternativeRoutes: false,
       polylineQuality: 'HIGH_QUALITY',
@@ -133,6 +133,11 @@ export class DirectionsService {
       regionCode: 'IN',
       units: 'METRIC',
     };
+
+    // Google Routes API v2 only supports routingPreference on DRIVE
+    if (travelMode === 'DRIVE') {
+      body.routingPreference = 'TRAFFIC_AWARE';
+    }
 
     const fieldMask = [
       'routes.duration',
@@ -157,7 +162,8 @@ export class DirectionsService {
       });
 
       if (!response.ok) {
-        this.logger.warn(`Routes API responded ${response.status}`);
+        const errorText = await response.text().catch(() => '');
+        this.logger.warn(`Routes API responded ${response.status}: ${errorText}`);
         return { ...UNAVAILABLE, message: 'Routing provider error' };
       }
 

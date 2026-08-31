@@ -43,6 +43,31 @@ interface OrderActionModalProps {
   onConfirm: () => void;
 }
 
+function getTodayDateString(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${pick('year')}-${pick('month')}-${pick('day')}`;
+}
+
+function checkIsPastDate(dateStr?: string): boolean {
+  if (!dateStr || dateStr.toLowerCase() === 'today') return false;
+  let normalized = dateStr.trim();
+  if (normalized.includes('-')) {
+    const parts = normalized.split('-');
+    if (parts[2]?.length === 4) {
+      normalized = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  const today = getTodayDateString();
+  return normalized < today;
+}
+
 export default function OrderActionModal({
   isOpen,
   type,
@@ -57,6 +82,8 @@ export default function OrderActionModal({
   const isBulkDeliver = type === 'bulk-deliver';
   const isSingleFail = type === 'single-fail';
   const isSingleDeliver = type === 'single-deliver';
+
+  const isPast = isBulkFail ? checkIsPastDate(data?.date) : true;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-in fade-in duration-200">
@@ -169,9 +196,21 @@ export default function OrderActionModal({
                 </div>
               </div>
 
-              <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                ⚠️ All pending undelivered orders on this date will transition to Failed.
-              </div>
+              {!isPast ? (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2.5 text-xs text-rose-800">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-rose-900">Bulk failure can only be processed for past dates.</p>
+                    <p className="text-[11px] text-rose-700 mt-1 leading-relaxed">
+                      Orders for today (<strong>{data?.date || 'Today'}</strong>) are still active and scheduled for delivery runs. Please filter by a past date to bulk fail undelivered orders.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  ⚠️ All pending undelivered orders on this date will transition to Failed.
+                </div>
+              )}
             </div>
           )}
 
@@ -265,8 +304,8 @@ export default function OrderActionModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={loading}
-            className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer ${
+            disabled={loading || (isBulkFail && !isPast)}
+            className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
               isBulkFail || isSingleFail
                 ? 'bg-gradient-to-r from-amber-600 via-rose-600 to-amber-700 hover:from-amber-700 hover:to-rose-700 shadow-amber-600/20'
                 : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-600/20'
@@ -279,7 +318,7 @@ export default function OrderActionModal({
               </>
             ) : (
               <>
-                {isBulkFail && 'Confirm & Process Bulk Failure'}
+                {isBulkFail && (isPast ? 'Confirm & Process Bulk Failure' : 'Past Dates Only')}
                 {isBulkDeliver && 'Confirm All Delivered'}
                 {isSingleFail && 'Confirm Mark as Failed'}
                 {isSingleDeliver && 'Confirm Delivered'}

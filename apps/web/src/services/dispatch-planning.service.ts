@@ -38,6 +38,8 @@ export interface DeliveryPartnerPlan {
   delivery_slot: string;
   status: string;
   hasActualDispatch?: boolean;
+  isDraft?: boolean;
+  isPendingPartner?: boolean;
   isDispatched?: boolean;
   /** Actual delivery_dispatch.status from DB: 'loaded', 'collected', 'short', 'returned', etc. */
   dispatchStatus?: string | null;
@@ -199,7 +201,15 @@ export class DispatchPlanningService {
         });
       });
 
-      const isDispatched = hasActualDispatch || (isHistorical && ['dispatched', 'completed'].includes(run.status));
+      const isPartnerDispatched = Boolean(
+        ['collected', 'in_progress', 'completed', 'handed_over', 'return_pending', 'returned'].includes(String(dispatchStatus).toLowerCase()) ||
+        ['completed', 'handed_over'].includes(String(run.status).toLowerCase()) ||
+        (hasActualDispatch && dispatchStatus !== 'loaded') ||
+        (isHistorical && ['dispatched', 'completed', 'in_progress', 'handed_over'].includes(String(run.status).toLowerCase()))
+      );
+      const isPendingPartner = Boolean(hasActualDispatch && String(dispatchStatus).toLowerCase() === 'loaded' && !isPartnerDispatched);
+      const isDraft = !isPartnerDispatched && !isPendingPartner;
+      const isDispatched = Boolean(isPartnerDispatched);
 
       if (hasActualDispatch && dispatchItems.length > 0) {
         // Populate totals directly from table data (delivery_dispatch_items)
@@ -330,6 +340,8 @@ export class DispatchPlanningService {
         delivery_slot: run.delivery_slot,
         status: run.status,
         hasActualDispatch,
+        isDraft,
+        isPendingPartner,
         isDispatched,
         dispatchStatus,
         orders,

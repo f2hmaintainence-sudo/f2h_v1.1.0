@@ -43,16 +43,25 @@ export class OrdersService {
 
   async getOrderView(orderId: string) {
     try {
-      const result = await this.dataService.query('orders', {
-        select: ['orders.*'],
-        where: [{ column: 'orders.order_id', operator: '=', value: orderId }],
-        limit: 1,
-      });
+      const rows = await this.databaseService.query(
+        `SELECT
+           orders.*,
+           TRIM(CONCAT(dpu.first_name, ' ', COALESCE(dpu.last_name, ''))) AS partner_name,
+           dpu.phone AS partner_phone,
+           dp.vehicle_type,
+           dp.vehicle_number
+         FROM orders
+         LEFT JOIN users dpu ON dpu.user_id = orders.delivery_partner_id
+         LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = orders.delivery_partner_id
+         WHERE orders.order_id = $1 OR orders.id::text = $1
+         LIMIT 1`,
+        [orderId],
+      );
 
       return {
         status: true,
-        data: result?.data?.[0] ?? null,
-        message: result?.data?.[0] ? 'Order fetched' : 'Order not found',
+        data: rows?.[0] ?? null,
+        message: rows?.[0] ? 'Order fetched' : 'Order not found',
       };
     } catch (error) {
       this.developer.error('getOrderView error', { error, orderId });
@@ -223,9 +232,10 @@ export class OrdersService {
         for (const ord of rows) {
           if (ord.customer_id && ord.order_id) {
             try {
-              await this.firstOrderDetector.detectAndMarkFirstOrder(ord.customer_id, ord.order_id);
-              await this.firstOrderDetector.unlockReferralCode(ord.customer_id);
-              await this.referralRewardEngine.processReferralReward(ord.customer_id, ord.order_id);
+              const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(ord.customer_id, ord.order_id);
+              if (isFirstOrder) {
+                await this.referralRewardEngine.processReferralReward(ord.customer_id, ord.order_id);
+              }
             } catch (error) {
               // One customer's referral failing must not stop the batch, but a
               // reward that never lands is a money problem — record which order.
@@ -275,11 +285,23 @@ export class OrdersService {
         }
       }
 
-      // Find all pending undelivered orders for the specified date
+      const today = todayInIndia();
+      if (date >= today) {
+        return {
+          status: false,
+          updated: 0,
+          refundedCount: 0,
+          totalRefunded: 0,
+          message: `Bulk failure can only be processed for past dates. Active orders for today (${date}) are currently in progress.`,
+        };
+      }
+
+      // Find all pending undelivered orders for the specified past date
       const candidateOrders = await this.databaseService.query(
         `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status
          FROM orders
          WHERE scheduled_date = $1::date
+           AND scheduled_date < CURRENT_DATE
            AND status IN ('pending', 'placed', 'confirmed', 'assigned', 'packed', 'out_for_delivery')
            AND status != 'delivered'
            AND status != 'failed'

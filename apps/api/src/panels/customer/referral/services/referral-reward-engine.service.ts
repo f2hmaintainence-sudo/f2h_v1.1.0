@@ -136,9 +136,8 @@ export class ReferralRewardEngineService {
       const referrerRewardAmount = referrerIsDP
         ? 75.00
         : Number(referralRecord.referrer_reward_amount ?? referralRecord.reward_amount ?? 100.00) || 100.00;
-      const referredRewardAmount = referrerIsDP
-        ? 0.00
-        : Number(referralRecord.referred_reward_amount ?? 0.00) || 0.00;
+      // Referees (new customers) NEVER receive wallet rewards (0.00). First-order discounts are coupon/promotion only.
+      const referredRewardAmount = 0.00;
       const now = new Date();
 
       // ── A. Credit Referrer (₹100 to wallet upon referee's 1st completed order) ──
@@ -190,48 +189,15 @@ export class ReferralRewardEngineService {
         );
       }
 
-      // ── B. Update Referee (Unlock referral code as user_id) ──────────────────
-      let refereeNewBalance = Number(referee.wallet_balance || 0);
-
-      if (referredRewardAmount > 0) {
-        const refereeUpdateRes = await client.query(
-          `UPDATE customers
-           SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
-               first_order_completed = true,
-               updated_at = NOW()
-           WHERE customer_id = $2 OR customer_id = $3
-           RETURNING wallet_balance`,
-          [referredRewardAmount, realRefereeId, refereeCustomerId],
-        );
-        refereeNewBalance = Number(refereeUpdateRes.rows?.[0]?.wallet_balance ?? referredRewardAmount);
-
-        const feeTxId = `WT${Math.floor(Date.now() / 1000).toString(36)}${Math.floor(Math.random() * 9000 + 1000)}`;
-        await client.query(
-          `INSERT INTO customer_wallet_transactions
-             (transaction_id, customer_id, transaction_type, amount, balance_after, reference_type, reference_id, remarks, created_by, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            feeTxId,
-            realRefereeId,
-            'credit',
-            referredRewardAmount,
-            refereeNewBalance,
-            'referral_bonus',
-            orderId || referralRecord.refer_id || String(referralRecord.id),
-            'Welcome Reward: First order completed using referral code',
-            targetReferrerId,
-            now,
-          ],
-        );
-      } else {
-        await client.query(
-          `UPDATE customers
-           SET first_order_completed = true,
-               updated_at = NOW()
-           WHERE customer_id = $1 OR customer_id = $2`,
-          [realRefereeId, refereeCustomerId],
-        );
-      }
+      // ── B. Update Referee (Mark first order completed in DB, ₹0 wallet credit) ──
+      const refereeNewBalance = Number(referee.wallet_balance || 0);
+      await client.query(
+        `UPDATE customers
+         SET first_order_completed = true,
+             updated_at = NOW()
+         WHERE customer_id = $1 OR customer_id = $2`,
+        [realRefereeId, refereeCustomerId],
+      );
 
       // ── C. Mark Referral = 'rewarded' ──────────────────────────────────────────
       await client.query(
@@ -258,12 +224,6 @@ export class ReferralRewardEngineService {
           `₹${referrerRewardAmount} credited to your wallet! Your friend ${referee.first_name || 'a customer'} completed their 1st delivered order.`,
         ).catch(() => {});
       }
-
-      this.sendNotificationSafe(
-        realRefereeId,
-        '🎉 Referral Code Unlocked!',
-        `Your 1st order has been delivered! Your personal referral code (${realRefereeId}) is now unlocked 🔓. Share with friends to earn ₹100 on their first order!`,
-      ).catch(() => {});
 
       this.logger.log(
         `REFERRAL_REWARDED - referralId: ${referralRecord.refer_id || referralRecord.id}, referrerId: ${targetReferrerId}, refereeId: ${realRefereeId}, referrerAmount: ${referrerRewardAmount}, refereeAmount: ${referredRewardAmount}`,

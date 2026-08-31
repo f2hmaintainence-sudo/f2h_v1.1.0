@@ -15,7 +15,7 @@ import {
   X, Trash2, Plus, Sparkles, MapPin, Phone, Clock,
   BarChart3, ArrowRight, Filter, SlidersHorizontal,
   AlertCircle, Boxes, RotateCcw, History, AlertTriangle,
-  ArrowUpFromLine, TrendingDown
+  ArrowUpFromLine, TrendingDown, FileText
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
@@ -43,21 +43,18 @@ function getPastWeekDates() {
   for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const parts = formatter.formatToParts(d);
-    const pick = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-    const dateStr = `${pick("year")}-${pick("month")}-${pick("day")}`;
-    let label = labelFormatter.format(d);
-    if (i === 0) label = `Today (${label})`;
-    else if (i === 1) label = `Yesterday (${label})`;
-    dates.push({ value: dateStr, label });
+    dates.push({
+      value: formatter.format(d),
+      label: i === 0 ? `Today (${labelFormatter.format(d)})` : labelFormatter.format(d),
+    });
   }
   return dates;
 }
 
 const SLOT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  morning: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-400" },
-  evening: { bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-400" },
-  default: { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" },
+  morning: { bg: "bg-amber-50 border-amber-200 text-amber-800", text: "text-amber-800", dot: "bg-amber-500" },
+  evening: { bg: "bg-indigo-50 border-indigo-200 text-indigo-800", text: "text-indigo-800", dot: "bg-indigo-500" },
+  default: { bg: "bg-slate-50 border-slate-200 text-slate-700", text: "text-slate-700", dot: "bg-slate-400" },
 };
 
 function SlotBadge({ slot }: { slot: string }) {
@@ -70,29 +67,42 @@ function SlotBadge({ slot }: { slot: string }) {
   );
 }
 
-function StatusBadge({ dispatched, dispatchStatus }: { dispatched: boolean; dispatchStatus?: string | null }) {
-  // Show the actual delivery_dispatch.status when available
-  const statusMap: Record<string, { cls: string; label: string; icon: React.ReactNode }> = {
-    loaded:    { cls: "bg-emerald-50 text-emerald-700 border-emerald-200/60", label: "Loaded",    icon: <CheckCircle2 size={10} /> },
-    collected: { cls: "bg-sky-50 text-sky-700 border-sky-200/60",             label: "Collected", icon: <CheckCircle2 size={10} /> },
-    short:     { cls: "bg-orange-50 text-orange-700 border-orange-200/60",   label: "Short",     icon: <AlertTriangle size={10} /> },
-    returned:  { cls: "bg-violet-50 text-violet-700 border-violet-200/60",   label: "Returned",  icon: <RotateCcw size={10} /> },
-  };
-  if (dispatchStatus && statusMap[dispatchStatus]) {
-    const s = statusMap[dispatchStatus];
+function StatusBadge({
+  dispatched,
+  dispatchStatus,
+  isPendingPartner,
+  isDraft,
+}: {
+  dispatched?: boolean;
+  dispatchStatus?: string | null;
+  isPendingPartner?: boolean;
+  isDraft?: boolean;
+}) {
+  const ds = String(dispatchStatus || "").toLowerCase();
+  if (ds === "completed") {
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${s.cls}`}>
-        {s.icon} {s.label}
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+        <CheckCircle2 size={10} /> Completed
       </span>
     );
   }
-  return dispatched ? (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-      <CheckCircle2 size={10} /> Dispatched
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200/60">
-      <Clock size={10} /> Pending
+  if (ds === "collected" || ds === "in_progress" || dispatched) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+        <CheckCircle2 size={10} /> Dispatched
+      </span>
+    );
+  }
+  if (ds === "loaded" || isPendingPartner) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+        <Clock size={10} /> Pending
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200">
+      <FileText size={10} /> Draft
     </span>
   );
 }
@@ -342,7 +352,14 @@ function DispatchRequirementsTab({ warehouses }: { warehouses: any[] }) {
                   <Boxes size={18} className="text-emerald-700" />
                 </div>
                 <div className="text-left">
-                  <p className="font-black text-slate-900 text-sm">{warehouse.warehouse_name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-black text-slate-900 text-sm">{warehouse.warehouse_name || "Main Warehouse"}</p>
+                    {warehouse.branch_name && (
+                      <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                        Branch: {warehouse.branch_name}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-0.5">
                     <span>{(warehouse.slots ?? []).length} slot{(warehouse.slots ?? []).length !== 1 ? "s" : ""}</span>
                     <span>·</span>
@@ -1097,6 +1114,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
   const [showOrderBreakdowns, setShowOrderBreakdowns] = useState<Record<string, boolean>>({});
   const [approvingRuns, setApprovingRuns] = useState<Record<string, boolean>>({});
+  const [draftAccordionOpen, setDraftAccordionOpen] = useState(true);
   const [pendingAccordionOpen, setPendingAccordionOpen] = useState(true);
   const [dispatchedAccordionOpen, setDispatchedAccordionOpen] = useState(false);
   const [ordersPage, setOrdersPage] = useState<Record<string, number>>({});
@@ -1205,9 +1223,19 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
       if (p.delivery_partner_id) totalRiders++;
       totalQty += p.totalQuantity;
     });
-    const dispatched = plans.filter((p) => Boolean(p.isDispatched ?? p.hasActualDispatch)).length;
-    const pending = plans.length - dispatched;
-    return { totalOrders, totalCustomers: uniqueCustomers.size, totalRiders, totalProducts: Object.keys(warehouseTotals).length, totalQty, dispatched, pending };
+    const draft = plans.filter((p) => p.isDraft).length;
+    const pending = plans.filter((p) => p.isPendingPartner).length;
+    const dispatched = plans.filter((p) => p.isDispatched).length;
+    return {
+      totalOrders,
+      totalCustomers: uniqueCustomers.size,
+      totalRiders,
+      totalProducts: Object.keys(warehouseTotals).length,
+      totalQty,
+      draft,
+      pending,
+      dispatched,
+    };
   }, [plans, warehouseTotals]);
 
   const filteredPlans = useMemo(() =>
@@ -1338,7 +1366,12 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
       setPlans((prev) => prev.map((p) => p.run_id === activePlanForModal.run_id
         ? {
             ...p,
-            status: "dispatched",
+            status: "in_progress",
+            isDraft: false,
+            isPendingPartner: true,
+            isDispatched: false,
+            dispatchStatus: "loaded",
+            hasActualDispatch: true,
             totals: updatedTotals,
             totalQuantity: modalItems.reduce((s, i) => s + Number(i.loaded_qty || 0), 0),
             totalPlannedQty: modalItems.reduce((s, i) => s + Number(i.planned_qty || 0), 0),
@@ -1462,14 +1495,15 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
       {isGenerated && !loading && (
         <div className="space-y-5 print-full">
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 no-print">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 no-print">
             {[
               { label: "Total Orders", value: statistics.totalOrders, icon: ShoppingBag, colors: "bg-sky-50 text-sky-700 border-sky-100" },
               { label: "Customers", value: statistics.totalCustomers, icon: Users, colors: "bg-violet-50 text-violet-700 border-violet-100" },
               { label: "Delivery Partners", value: statistics.totalRiders, icon: Truck, colors: "bg-emerald-50 text-emerald-700 border-emerald-100" },
               { label: "Unique Products", value: statistics.totalProducts, icon: Package, colors: "bg-amber-50 text-amber-700 border-amber-100" },
+              { label: "Draft Runs", value: statistics.draft, icon: FileText, colors: "bg-slate-50 text-slate-700 border-slate-200" },
+              { label: "Pending Runs", value: statistics.pending, icon: Clock, colors: "bg-amber-50 text-amber-700 border-amber-200" },
               { label: "Dispatched Runs", value: statistics.dispatched, icon: CheckCircle2, colors: "bg-green-50 text-green-700 border-green-100" },
-              { label: "Pending Runs", value: statistics.pending, icon: Clock, colors: "bg-rose-50 text-rose-700 border-rose-100" },
             ].map((stat, i) => {
               const Icon = stat.icon;
               return (
@@ -1539,22 +1573,37 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                       <p className="text-sm font-bold text-slate-400">No delivery runs match your filters</p>
                     </div>
                   ) : (() => {
-                    const pendingPlans = filteredPlans.filter((p) => !Boolean(p.isDispatched ?? p.hasActualDispatch));
-                    const dispatchedPlans = filteredPlans.filter((p) => Boolean(p.isDispatched ?? p.hasActualDispatch));
+                    const draftPlans = filteredPlans.filter((p) => p.isDraft);
+                    const pendingPlans = filteredPlans.filter((p) => p.isPendingPartner);
+                    const dispatchedPlans = filteredPlans.filter((p) => p.isDispatched);
 
                     const renderCard = (plan: DeliveryPartnerPlan) => {
                       const isExpanded = !!expandedCards[plan.run_id];
                       const showBreakdown = !!showOrderBreakdowns[plan.run_id];
-                      const isDispatched = Boolean(plan.isDispatched ?? plan.hasActualDispatch);
+                      const isDispatched = Boolean(plan.isDispatched);
+                      const isPendingPartner = Boolean(plan.isPendingPartner);
+                      const isDraft = Boolean(plan.isDraft);
                       const isApproving = !!approvingRuns[plan.run_id];
 
                       return (
                         <div key={plan.run_id} id={`rider-card-${plan.run_id}`}
-                          className={`bg-white rounded-2xl border shadow-xs overflow-hidden print-card-break transition-all duration-300 hover:shadow-md ${isDispatched ? "border-emerald-200/70" : "border-amber-200/60"}`}>
+                          className={`bg-white rounded-2xl border shadow-xs overflow-hidden print-card-break transition-all duration-300 hover:shadow-md ${
+                            isDispatched
+                              ? "border-emerald-200/70"
+                              : isPendingPartner
+                              ? "border-amber-200/60"
+                              : "border-slate-200/80"
+                          }`}>
                           <div onClick={() => setExpandedCards((prev) => ({ ...prev, [plan.run_id]: !prev[plan.run_id] }))}
                             className="p-4 md:p-5 flex flex-col lg:flex-row lg:items-center gap-4 cursor-pointer hover:bg-slate-50/50 select-none transition-colors">
                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 font-black text-sm border ${isDispatched ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                              <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 font-black text-sm border ${
+                                isDispatched
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : isPendingPartner
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}>
                                 {plan.delivery_partner_name?.charAt(0)?.toUpperCase() || "?"}
                               </div>
                               <div className="min-w-0">
@@ -1589,11 +1638,16 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                                   </div>
                                 ))}
                               </div>
-                              <StatusBadge dispatched={isDispatched} dispatchStatus={plan.dispatchStatus} />
+                              <StatusBadge dispatched={isDispatched} dispatchStatus={plan.dispatchStatus} isPendingPartner={isPendingPartner} isDraft={isDraft} />
                               {isDispatched ? (
                                 <button onClick={(e) => { e.stopPropagation(); if (!isApproving) handleApproveDispatch(plan); }} disabled={isApproving}
                                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all no-print bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 hover:border-emerald-300 shadow-2xs hover:scale-[1.02] active:scale-[0.98]">
                                   <RotateCcw size={12} className="text-emerald-700" /> Re-dispatch / Add Items
+                                </button>
+                              ) : isPendingPartner ? (
+                                <button onClick={(e) => { e.stopPropagation(); if (!isApproving) handleApproveDispatch(plan); }} disabled={isApproving}
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all no-print bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs hover:scale-[1.02] active:scale-[0.98]">
+                                  <RotateCcw size={12} className="text-amber-700" /> Edit Handover Items
                                 </button>
                               ) : (
                                 <button onClick={(e) => { e.stopPropagation(); if (!isApproving) handleApproveDispatch(plan); }} disabled={isApproving}
@@ -1750,7 +1804,36 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
 
                     return (
                       <>
-                        {/* Pending */}
+                        {/* Draft Handover - Awaiting Admin Approval */}
+                        {draftPlans.length > 0 && (
+                          <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
+                            <button onClick={() => setDraftAccordionOpen((o) => !o)}
+                              className="w-full flex items-center justify-between px-5 py-4 bg-slate-100/70 hover:bg-slate-100 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-xl bg-slate-200 border border-slate-300 flex items-center justify-center">
+                                  <FileText size={15} className="text-slate-700" />
+                                </div>
+                                <div className="text-left">
+                                  <p className="text-sm font-black text-slate-900">Draft Handover</p>
+                                  <p className="text-[11px] text-slate-500 font-medium">{draftPlans.length} run{draftPlans.length !== 1 ? "s" : ""} awaiting admin approval</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center justify-center h-6 px-3 bg-white text-slate-700 rounded-full text-[10px] font-black tracking-wider border border-slate-300 transition-all select-none">
+                                  {draftPlans.length} DRAFT
+                                </span>
+                                {draftAccordionOpen ? <ChevronUp size={16} className="text-slate-600" /> : <ChevronDown size={16} className="text-slate-600" />}
+                              </div>
+                            </button>
+                            {draftAccordionOpen && (
+                              <div className="p-4 bg-slate-50/40 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                {draftPlans.map(renderCard)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Pending Handover - Approved by Admin, Waiting for Delivery Partner Confirmation */}
                         {pendingPlans.length > 0 && (
                           <div className="rounded-2xl border border-amber-200/80 overflow-hidden shadow-xs">
                             <button onClick={() => setPendingAccordionOpen((o) => !o)}
@@ -1761,7 +1844,7 @@ function HandoverTab({ warehouses }: { warehouses: any[] }) {
                                 </div>
                                 <div className="text-left">
                                   <p className="text-sm font-black text-amber-900">Pending Handover</p>
-                                  <p className="text-[11px] text-amber-600 font-medium">{pendingPlans.length} run{pendingPlans.length !== 1 ? "s" : ""} awaiting approval</p>
+                                  <p className="text-[11px] text-amber-600 font-medium">{pendingPlans.length} run{pendingPlans.length !== 1 ? "s" : ""} approved · awaiting delivery partner confirmation</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">

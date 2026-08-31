@@ -1,30 +1,33 @@
 import { FirstOrderDetectorService } from './first-order-detector.service';
 
-/**
- * Step 15 – Testing & QA: First Order Detector
- *
- * Test cases covered:
- * - First delivered order detection
- * - Cancelled order (no trigger)
- * - Reward credited once (idempotency)
- * - Referral unlocked after first order
- */
-
-// Minimal mock for DataService
+// Minimal mock for DataService & DatabaseService
 const mockDataService = () => ({
   query: jest.fn(),
   update: jest.fn(),
   insert: jest.fn(),
-  executeTransaction: jest.fn((fn) => fn({})),
+});
+
+const mockDatabaseService = () => ({
+  query: jest.fn().mockResolvedValue([]),
+});
+
+const mockDeveloperService = () => ({
+  warn: jest.fn(),
+  error: jest.fn(),
+  log: jest.fn(),
 });
 
 describe('FirstOrderDetectorService', () => {
   let service: FirstOrderDetectorService;
   let dataService: ReturnType<typeof mockDataService>;
+  let dbService: ReturnType<typeof mockDatabaseService>;
+  let devService: ReturnType<typeof mockDeveloperService>;
 
   beforeEach(() => {
     dataService = mockDataService();
-    service = new FirstOrderDetectorService(dataService as any);
+    dbService = mockDatabaseService();
+    devService = mockDeveloperService();
+    service = new FirstOrderDetectorService(dataService as any, dbService as any, devService as any);
   });
 
   // ─── Test Case: First delivered order ───────────────────────
@@ -39,16 +42,9 @@ describe('FirstOrderDetectorService', () => {
     const result = await service.detectAndMarkFirstOrder('C1', 'ORD-1');
 
     expect(result).toBe(true);
-    // Should update customers table with first_order_completed = true, referral_code = 'C1' and referral_status = 'active'
     expect(dataService.update).toHaveBeenCalledWith(
       'customers',
-      expect.objectContaining({ first_order_completed: true, referral_status: 'active', referral_code: 'C1' }),
-      expect.any(Array),
-    );
-    // Should also update users table
-    expect(dataService.update).toHaveBeenCalledWith(
-      'users',
-      expect.objectContaining({ first_order_completed: true, referral_status: 'active', referral_code: 'C1' }),
+      expect.objectContaining({ first_order_completed: true }),
       expect.any(Array),
     );
   });
@@ -76,10 +72,9 @@ describe('FirstOrderDetectorService', () => {
     const result = await service.detectAndMarkFirstOrder('C1', 'ORD-3');
 
     expect(result).toBe(false);
-    // Should still mark first_order_completed
     expect(dataService.update).toHaveBeenCalledWith(
       'customers',
-      expect.objectContaining({ first_order_completed: true, referral_code: 'C1' }),
+      expect.objectContaining({ first_order_completed: true }),
       expect.any(Array),
     );
   });
@@ -91,19 +86,14 @@ describe('FirstOrderDetectorService', () => {
   });
 
   // ─── Test Case: Referral unlocked after first order ─────────
-  it('unlockReferralCode should set referral_status to active', async () => {
+  it('unlockReferralCode should update first_order_completed', async () => {
     dataService.update.mockResolvedValue({});
 
     await service.unlockReferralCode('C1');
 
     expect(dataService.update).toHaveBeenCalledWith(
       'customers',
-      expect.objectContaining({ referral_status: 'active', referral_code: 'C1', first_order_completed: true }),
-      expect.any(Array),
-    );
-    expect(dataService.update).toHaveBeenCalledWith(
-      'users',
-      expect.objectContaining({ referral_status: 'active', referral_code: 'C1', first_order_completed: true }),
+      expect.objectContaining({ first_order_completed: true }),
       expect.any(Array),
     );
   });

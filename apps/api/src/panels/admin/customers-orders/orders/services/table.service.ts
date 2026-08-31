@@ -189,6 +189,12 @@ export class OrdersTableService {
           customer_id: ['orders.customer_id', true],
           customer_phone: ['orders.contact_number', true],
           contact_number: ['orders.contact_number', true],
+          delivery_partner_id: ['orders.delivery_partner_id', true],
+          partner_first_name: ['dpu.first_name AS partner_first_name', true],
+          partner_last_name: ['dpu.last_name AS partner_last_name', true],
+          partner_phone: ['dpu.phone AS partner_phone', true],
+          partner_vehicle: ['dp.vehicle_type AS partner_vehicle', true],
+          partner_name: ["TRIM(CONCAT(dpu.first_name, ' ', COALESCE(dpu.last_name, ''))) AS partner_name", true],
           order_source: ['orders.order_source', true],
           subscription_id: ['orders.subscription_id', true],
           scheduled_date: ['orders.scheduled_date', true],
@@ -202,7 +208,18 @@ export class OrdersTableService {
           total_amount: ['orders.total_amount', true],
           created_at: ['orders.created_at', true],
         },
-        joins: [],
+        joins: [
+          {
+            type: 'left',
+            table: 'users dpu',
+            on: [['orders.delivery_partner_id', 'dpu.user_id']],
+          },
+          {
+            type: 'left',
+            table: 'delivery_partners dp',
+            on: [['orders.delivery_partner_id', 'dp.delivery_partner_id']],
+          },
+        ],
         conditions,
         custom: [
           {
@@ -259,6 +276,16 @@ export class OrdersTableService {
             renderHtml: true,
           },
 
+          {
+            type: 'compute',
+            column: 'partner_name',
+            callback: (row) => {
+              const fName = String(row.partner_first_name || '').trim();
+              const lName = String(row.partner_last_name || '').trim();
+              const full = `${fName} ${lName}`.trim();
+              return full || (row.delivery_partner_id ? row.delivery_partner_id : '');
+            },
+          },
           {
             type: 'compute',
             column: 'payment_status',

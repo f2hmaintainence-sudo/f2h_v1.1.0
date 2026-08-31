@@ -11,7 +11,6 @@
 import 'package:dio/dio.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
-import 'package:f2h_delivery/core/utils/dev_log.dart';
 import 'package:f2h_delivery/core/utils/google_polyline.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
@@ -100,10 +99,6 @@ const Duration _kResultCacheTtl = Duration(seconds: 45);
 /// ~11 m. Below this the rider has not moved enough to change the road route.
 const int _kOriginKeyPrecision = 4;
 
-/// Tolerance on the geometry-versus-distance check, absorbing rounding and the
-/// simplification Google applies to an overview polyline.
-const double _kGeometrySlackKm = 1.0;
-
 class RouteOptimizationService {
   final LocationService _locationService;
   final Dio _dio;
@@ -191,39 +186,59 @@ class RouteOptimizationService {
       return OptimizedRouteResult.unavailable(orderedStops: List.from(stops));
     }
 
-    final LatLng? origin = _isValidPosition(currentPosition)
-        ? currentPosition
+    final bool originIsRider = _isValidPosition(currentPosition);
+    final LatLng origin = originIsRider
+        ? currentPosition!
         : LatLng(pending.first.addressLat, pending.first.addressLng);
 
-    final initialOrdered = computeShortestStopSequence(
-      currentPosition: origin,
-      stops: pending,
-    );
-
-    // If a specific stop is targeted (e.g. user selected Stop #1 or navigated to it)
-    final GroupedStop destination;
-    final List<GroupedStop> intermediates;
-    final bool originIsRider = _isValidPosition(currentPosition);
-
-    if (targetedStop != null && _hasValidCoords(targetedStop)) {
-      destination = targetedStop;
-      intermediates = const [];
+    // Compute the sequence of pending stops to visit
+    List<GroupedStop> orderedPending;
+    if (targetedStop != null && _hasValidCoords(targetedStop) && _isPending(targetedStop)) {
+      // User selected a target stop: place target stop first, then order remaining stops
+      final others = pending.where((s) => s.stop != targetedStop.stop).toList();
+      final orderedOthers = computeShortestStopSequence(
+        currentPosition: LatLng(targetedStop.addressLat, targetedStop.addressLng),
+        stops: others,
+      );
+      orderedPending = [targetedStop, ...orderedOthers.where(_isPending)];
     } else {
-      final List<GroupedStop> routable =
-          originIsRider ? initialOrdered : initialOrdered.sublist(1);
-
-      if (routable.isEmpty) {
-        return OptimizedRouteResult.unavailable(
-          orderedStops: [...initialOrdered, ...completed],
-          reason: 'Waiting for your location to draw the route',
-        );
-      }
-
-      destination = routable.last;
-      intermediates = routable.sublist(0, routable.length - 1);
+      orderedPending = computeShortestStopSequence(
+        currentPosition: origin,
+        stops: pending,
+      );
     }
 
-    final cacheKey = '${_buildCacheKey(origin!, [destination, ...intermediates])}#tgt:${targetedStop?.stop}';
+    final GroupedStop destination;
+    final List<GroupedStop> intermediates;
+
+    if (originIsRider) {
+      if (orderedPending.length == 1) {
+        destination = orderedPending.first;
+        intermediates = const [];
+      } else {
+        destination = orderedPending.last;
+        intermediates = orderedPending.sublist(0, orderedPending.length - 1);
+      }
+    } else {
+      // GPS not available: first pending stop acts as origin
+      if (orderedPending.length <= 1) {
+        return _buildStraightLineFallback(
+          currentPosition: origin,
+          orderedPending: orderedPending,
+          completed: completed,
+          reason: 'Waiting for GPS location fix',
+        );
+      } else if (orderedPending.length == 2) {
+        destination = orderedPending[1];
+        intermediates = const [];
+      } else {
+        destination = orderedPending.last;
+        intermediates = orderedPending.sublist(1, orderedPending.length - 1);
+      }
+    }
+
+    final cacheKey =
+        '${_buildCacheKey(origin, [destination, ...intermediates])}#tgt:${targetedStop?.stop}';
     if (!forceRefresh && _isCacheFresh(cacheKey)) return _cachedResult!;
 
     Map<String, dynamic>? data;
@@ -239,7 +254,7 @@ class RouteOptimizationService {
           'intermediates': intermediates
               .map((s) => {'lat': s.addressLat, 'lng': s.addressLng})
               .toList(),
-          'optimizeWaypointOrder': intermediates.isNotEmpty,
+          'optimizeWaypointOrder': targetedStop == null && intermediates.isNotEmpty,
           'travelMode': _kTravelMode,
         },
       );
@@ -247,37 +262,40 @@ class RouteOptimizationService {
       final body = response.data;
       if (body is Map) data = Map<String, dynamic>.from(body);
     } on DioException catch (e) {
-      return _unavailable(
-        currentPosition: currentPosition,
-        stops: stops,
+      return _buildStraightLineFallback(
+        currentPosition: origin,
+        orderedPending: orderedPending,
+        completed: completed,
         reason: e.type == DioExceptionType.connectionError
-            ? 'No connection — route will load when you are back online'
-            : 'Could not reach the routing service',
+            ? 'Offline — showing straight line path'
+            : 'Routing service temporarily unavailable',
       );
     } catch (_) {
-      return _unavailable(
-        currentPosition: currentPosition,
-        stops: stops,
-        reason: 'Could not reach the routing service',
+      return _buildStraightLineFallback(
+        currentPosition: origin,
+        orderedPending: orderedPending,
+        completed: completed,
+        reason: 'Routing service temporarily unavailable',
       );
     }
 
     if (data == null || data['status'] != 'OK') {
-      return _unavailable(
-        currentPosition: currentPosition,
-        stops: stops,
-        reason: (data?['message'] as String?) ?? 'Route is unavailable right now',
+      return _buildStraightLineFallback(
+        currentPosition: origin,
+        orderedPending: orderedPending,
+        completed: completed,
+        reason: (data?['message'] as String?) ?? 'Routing service unavailable',
       );
     }
 
     final result = _buildResult(
       data: data,
-      leadingStop: originIsRider ? null : initialOrdered.first,
+      origin: origin,
+      leadingStop: originIsRider ? null : orderedPending.first,
       intermediates: intermediates,
       destination: destination,
       completed: completed,
     );
-
 
     if (result.hasRoute) {
       _cacheKey = cacheKey;
@@ -293,8 +311,7 @@ class RouteOptimizationService {
 
   OptimizedRouteResult _buildResult({
     required Map<String, dynamic> data,
-    // The stop standing in as the origin when the rider has no GPS fix: it
-    // heads the list but is not itself a destination in the request.
+    required LatLng origin,
     required GroupedStop? leadingStop,
     required List<GroupedStop> intermediates,
     required GroupedStop destination,
@@ -312,42 +329,25 @@ class RouteOptimizationService {
 
     final fullPoints =
         decodeGooglePolylineSegments((data['polyline'] as String?) ?? '');
-    if (fullPoints.length < 2) {
-      return OptimizedRouteResult.unavailable(
-        orderedStops: orderedStops,
+    final legs = _parseLegs(data['legs']);
+
+    final List<LatLng> allRoutePoints = fullPoints.isNotEmpty
+        ? fullPoints
+        : legs.expand((l) => l.points).toList();
+
+    if (allRoutePoints.length < 2) {
+      final pendingStops = orderedStops.where(_isPending).toList();
+      return _buildStraightLineFallback(
+        currentPosition: origin,
+        orderedPending: pendingStops,
+        completed: completed,
         reason: 'Routing service returned no road geometry',
       );
     }
 
-    final legs = _parseLegs(data['legs']);
-
-    final totalDistanceKmRaw =
-        ((data['distanceMeters'] as num?)?.toDouble() ?? 0) / 1000.0;
-    final geometrySpanKm =
-        _geometrySpanKm([fullPoints, for (final leg in legs) leg.points]);
-    final ceilingKm = totalDistanceKmRaw > 0
-        ? (totalDistanceKmRaw * 3.0).clamp(50.0, double.infinity)
-        : 50.0;
-
-    if (geometrySpanKm > ceilingKm) {
-      // Rider-facing text stays generic; the numbers that identify the bad
-      // payload go to the debug log.
-      devLog('[route] rejected geometry: spans '
-          '${geometrySpanKm.toStringAsFixed(1)} km (ceiling ${ceilingKm.toStringAsFixed(1)} km) but provider '
-          '${data['provider']} reported '
-          '${totalDistanceKmRaw.toStringAsFixed(3)} km '
-          '(${fullPoints.length} route points, ${legs.length} legs)');
-      return OptimizedRouteResult.unavailable(
-        orderedStops: orderedStops,
-        reason: 'Routing service returned inconsistent road geometry',
-      );
-    }
-
-
-    // Leg 0 is origin → next stop; the rest is what the rider still has to do
-    // after that. Both come from Google, so the split lands on a real junction.
+    // Leg 0 is origin → first stop; subsequent legs connect remaining stops
     List<LatLng> activeLeg = [];
-    if (legs.isNotEmpty && legs.first.points.isNotEmpty) {
+    if (legs.isNotEmpty && legs.first.points.length >= 2) {
       activeLeg = List<LatLng>.from(legs.first.points);
     }
 
@@ -367,23 +367,20 @@ class RouteOptimizationService {
     }
 
     if (activeLeg.length < 2) {
-      // Some responses carry route geometry without per-leg geometry; split the
-      // route itself at the point closest to the first stop rather than
-      // inventing a line to it.
       final nextStop = orderedStops.firstWhere(
         (s) => _isPending(s) && _hasValidCoords(s),
         orElse: () => destination,
       );
       final splitIndex = _closestPointIndex(
-        fullPoints,
+        allRoutePoints,
         LatLng(nextStop.addressLat, nextStop.addressLng),
       );
-      activeLeg = fullPoints.sublist(0, splitIndex + 1);
-      remaining = fullPoints.sublist(splitIndex);
+      activeLeg = allRoutePoints.sublist(0, (splitIndex + 1).clamp(1, allRoutePoints.length));
+      remaining = allRoutePoints.sublist(splitIndex.clamp(0, allRoutePoints.length - 1));
     }
 
-
-    final totalDistanceKm = totalDistanceKmRaw;
+    final totalDistanceKm =
+        ((data['distanceMeters'] as num?)?.toDouble() ?? 0) / 1000.0;
     final totalDurationMin =
         ((data['durationSeconds'] as num?)?.toDouble() ?? 0) / 60.0;
 
@@ -396,9 +393,9 @@ class RouteOptimizationService {
       orderedStops: orderedStops,
       activeLegPoints: activeLeg,
       remainingRoutePoints: remaining,
-      fullRoutePoints: fullPoints,
-      totalDistanceKm: totalDistanceKm,
-      totalDurationMinutes: totalDurationMin,
+      fullRoutePoints: allRoutePoints,
+      totalDistanceKm: totalDistanceKm > 0 ? totalDistanceKm : activeDistanceKm,
+      totalDurationMinutes: totalDurationMin > 0 ? totalDurationMin : activeDurationMin,
       activeLegDistanceKm: activeDistanceKm,
       activeLegDurationMinutes: activeDurationMin,
       isRoadGeometry: true,
@@ -407,10 +404,74 @@ class RouteOptimizationService {
     );
   }
 
+  /// Builds a straight-line connected fallback path between stops when online routing is unavailable.
+  OptimizedRouteResult _buildStraightLineFallback({
+    required LatLng currentPosition,
+    required List<GroupedStop> orderedPending,
+    required List<GroupedStop> completed,
+    String? reason,
+  }) {
+    final orderedStops = [...orderedPending, ...completed];
+    if (orderedPending.isEmpty) {
+      return OptimizedRouteResult.unavailable(
+        orderedStops: orderedStops,
+        reason: reason,
+      );
+    }
+
+    final List<LatLng> activeLeg = [
+      currentPosition,
+      LatLng(orderedPending.first.addressLat, orderedPending.first.addressLng),
+    ];
+
+    final List<LatLng> remaining = [];
+    for (int i = 0; i < orderedPending.length; i++) {
+      remaining.add(LatLng(orderedPending[i].addressLat, orderedPending[i].addressLng));
+    }
+
+    final List<LatLng> fullPoints = [
+      currentPosition,
+      ...remaining,
+    ];
+
+    double totalDistKm = 0.0;
+    for (int i = 0; i < fullPoints.length - 1; i++) {
+      totalDistKm += _locationService.haversineDistanceKm(
+        fullPoints[i].latitude,
+        fullPoints[i].longitude,
+        fullPoints[i + 1].latitude,
+        fullPoints[i + 1].longitude,
+      );
+    }
+
+    final activeDistKm = _locationService.haversineDistanceKm(
+      activeLeg[0].latitude,
+      activeLeg[0].longitude,
+      activeLeg[1].latitude,
+      activeLeg[1].longitude,
+    );
+
+    // Approximate two-wheeler speed ~ 25 km/h
+    final totalDurationMin = (totalDistKm / 25.0) * 60.0;
+    final activeDurationMin = (activeDistKm / 25.0) * 60.0;
+
+    return OptimizedRouteResult(
+      orderedStops: orderedStops,
+      activeLegPoints: activeLeg,
+      remainingRoutePoints: remaining,
+      fullRoutePoints: fullPoints,
+      totalDistanceKm: totalDistKm,
+      totalDurationMinutes: totalDurationMin,
+      activeLegDistanceKm: activeDistKm,
+      activeLegDurationMinutes: activeDurationMin,
+      isRoadGeometry: false,
+      status: RouteStatus.ok,
+      unavailableReason: reason,
+      provider: 'fallback-straight-line',
+    );
+  }
+
   /// Reorders stops to Google's optimised sequence.
-  ///
-  /// The API returns original indices in visiting order, already validated as a
-  /// complete permutation server-side; an empty list means "keep as sent".
   List<GroupedStop> _applyOptimizedOrder(
     List<GroupedStop> intermediates,
     dynamic rawOrder,
@@ -438,35 +499,6 @@ class RouteOptimizationService {
     }).toList();
   }
 
-  /// The diagonal of the decoded geometry's bounding box.
-  ///
-  /// The straight line across a path is never longer than the path itself, so
-  /// this can never exceed the road distance Google reported. When it does the
-  /// payload is corrupt — and drawing it would paint a road across a continent
-  /// on the rider's map, which is worse than drawing nothing.
-  double _geometrySpanKm(List<List<LatLng>> pointSets) {
-    double minLat = double.infinity;
-    double maxLat = double.negativeInfinity;
-    double minLng = double.infinity;
-    double maxLng = double.negativeInfinity;
-    var seen = 0;
-
-    for (final points in pointSets) {
-      for (final p in points) {
-        if (!p.latitude.isFinite || !p.longitude.isFinite) continue;
-        if (p.latitude.abs() < 0.001 && p.longitude.abs() < 0.001) continue;
-        seen++;
-        if (p.latitude < minLat) minLat = p.latitude;
-        if (p.latitude > maxLat) maxLat = p.latitude;
-        if (p.longitude < minLng) minLng = p.longitude;
-        if (p.longitude > maxLng) maxLng = p.longitude;
-      }
-    }
-    if (seen == 0) return 0.0;
-
-    return _locationService.haversineDistanceKm(minLat, minLng, maxLat, maxLng);
-  }
-
   int _closestPointIndex(List<LatLng> points, LatLng target) {
     int bestIndex = 0;
     double best = double.infinity;
@@ -489,26 +521,9 @@ class RouteOptimizationService {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  OptimizedRouteResult _unavailable({
-    required LatLng? currentPosition,
-    required List<GroupedStop> stops,
-    required String reason,
-  }) {
-    return OptimizedRouteResult.unavailable(
-      orderedStops: computeShortestStopSequence(
-        currentPosition: currentPosition,
-        stops: stops,
-      ),
-      reason: reason,
-    );
-  }
-
   bool _isPending(GroupedStop s) =>
       s.status != 'delivered' && s.status != 'completed' && s.status != 'failed';
 
-  /// The orders query COALESCEs a missing address latitude to `0.0`, so an
-  /// un-geocoded stop arrives as Null Island rather than as null. Sending it to
-  /// Google poisons the whole run's route, so it is excluded here.
   bool _hasValidCoords(GroupedStop s) =>
       s.addressLat.isFinite &&
       !s.addressLat.isNaN &&

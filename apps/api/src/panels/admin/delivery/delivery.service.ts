@@ -1129,9 +1129,10 @@ export class DeliveryManagementService {
 
       if (normStatus === 'delivered' && updatedOrder?.customer_id) {
         try {
-          await this.firstOrderDetector.detectAndMarkFirstOrder(updatedOrder.customer_id, updatedOrder.order_id);
-          await this.firstOrderDetector.unlockReferralCode(updatedOrder.customer_id);
-          await this.referralRewardEngine.processReferralReward(updatedOrder.customer_id, updatedOrder.order_id);
+          const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(updatedOrder.customer_id, updatedOrder.order_id);
+          if (isFirstOrder) {
+            await this.referralRewardEngine.processReferralReward(updatedOrder.customer_id, updatedOrder.order_id);
+          }
         } catch (refErr) {
           this.developer.error('DeliveryManagementService: Failed to process referral reward', refErr);
         }

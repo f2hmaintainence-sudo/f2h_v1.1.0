@@ -583,8 +583,10 @@ WHERE ${where.join(' AND ')}
       // warehouse comes from the branch's assigned warehouse
       const sql = `
         SELECT
-          COALESCE(w.warehouse_id, b.branch_id) AS warehouse_id,
-          COALESCE(w.name, b.branch_name, 'Unknown Warehouse') AS warehouse_name,
+          COALESCE(w.warehouse_id, b.branch_id, 'main_wh') AS warehouse_id,
+          COALESCE(w.name, 'Main Warehouse') AS warehouse_name,
+          COALESCE(b.branch_name, 'Main Branch') AS branch_name,
+          b.branch_id,
           o.delivery_slot,
           oi.variant_id AS product_variant_id,
           p.name AS product_name,
@@ -619,6 +621,7 @@ WHERE ${where.join(' AND ')}
           pv.name
         ORDER BY
           warehouse_name,
+          branch_name,
           o.delivery_slot,
           p.name,
           pv.name
@@ -630,6 +633,8 @@ WHERE ${where.join(' AND ')}
       const grouped: Record<string, {
         warehouse_id: string;
         warehouse_name: string;
+        branch_name: string;
+        branch_id: string | null;
         slots: Record<string, {
           delivery_slot: string;
           items: any[];
@@ -644,7 +649,9 @@ WHERE ${where.join(' AND ')}
         if (!grouped[wid]) {
           grouped[wid] = {
             warehouse_id: wid,
-            warehouse_name: row.name,
+            warehouse_name: row.warehouse_name || 'Main Warehouse',
+            branch_name: row.branch_name || 'Main Branch',
+            branch_id: row.branch_id || null,
             slots: {},
           };
         }

@@ -379,7 +379,30 @@ export class DeliveryRunService {
 
       for (const [groupKey, orders] of orderGroups.entries()) {
         const [branchKey, slotName] = groupKey.split('::');
-        const availablePartners = branchPartners.get(branchKey) || partners;
+        const branchPartnersList = branchPartners.get(branchKey) || partners;
+
+        // Query existing runs for all partners on this date + slot
+        const existingSlotRuns = await this.db.query(
+          `SELECT run_id, delivery_partner_id, branch_id, status
+           FROM delivery_runs
+           WHERE run_date = $1 AND delivery_slot = $2 AND deleted_at IS NULL`,
+          [targetDate, slotName],
+        );
+        const partnerClosedRunSet = new Set<string>();
+        for (const r of (existingSlotRuns || [])) {
+          if (['completed', 'cancelled'].includes(r.status)) {
+            partnerClosedRunSet.add(r.delivery_partner_id);
+          }
+        }
+
+        // Filter eligible partners: prefer partners who have no run or an active/open run
+        let availablePartners = branchPartnersList.filter((p) => !partnerClosedRunSet.has(p.id));
+        if (availablePartners.length === 0) {
+          availablePartners = partners.filter((p) => !partnerClosedRunSet.has(p.id));
+        }
+        if (availablePartners.length === 0) {
+          availablePartners = branchPartnersList.length > 0 ? branchPartnersList : partners;
+        }
 
         // Cluster orders by proximity (simple greedy clustering)
         const clusters = this.clusterOrders(orders, availablePartners.length);
@@ -419,13 +442,14 @@ export class DeliveryRunService {
 
           // ── Check for existing run for same partner + branch + date + slot ──
           const existingRunRows = await this.db.query(
-            `SELECT run_id, total_addresses
+            `SELECT run_id, status, total_addresses
              FROM delivery_runs
              WHERE delivery_partner_id = $1
                AND run_date = $2
                AND delivery_slot = $3
                AND ($4::varchar IS NULL OR branch_id = $4)
-               AND status NOT IN ('completed', 'cancelled')
+               AND deleted_at IS NULL
+             ORDER BY CASE WHEN status NOT IN ('completed', 'cancelled') THEN 1 ELSE 2 END, created_at DESC
              LIMIT 1`,
             [partnerId, targetDate, slotName, branchIdVal],
           );
@@ -449,6 +473,14 @@ export class DeliveryRunService {
             runId = existingRunRows[0].run_id;
             runNumber = runId;
             isExistingRun = true;
+
+            // Reactivate run if it was marked completed/cancelled previously
+            if (['completed', 'cancelled'].includes(existingRunRows[0].status)) {
+              await this.db.query(
+                `UPDATE delivery_runs SET status = 'assigned', updated_at = NOW() WHERE run_id = $1`,
+                [runId],
+              );
+            }
 
             // Get current max sequence_no for this run
             const seqRows = await this.db.query(
@@ -480,6 +512,10 @@ export class DeliveryRunService {
                 (run_id, delivery_partner_id, branch_id, run_date, delivery_slot,
                  status, assignment_method, total_addresses, assigned_by)
               VALUES ($1, $2, $3, $4, $5, 'assigned', $6, $7, 'system')
+              ON CONFLICT (delivery_partner_id, run_date, delivery_slot, branch_id)
+              DO UPDATE SET
+                status = CASE WHEN delivery_runs.status IN ('completed', 'cancelled') THEN 'assigned' ELSE delivery_runs.status END,
+                updated_at = NOW()
               RETURNING id, run_id
             `;
             const runRows = await this.db.query(runSql, [
@@ -1020,9 +1056,10 @@ export class DeliveryRunService {
               const ordRows = await this.db.query(`SELECT customer_id FROM orders WHERE order_id = $1 LIMIT 1`, [orderId]);
               const custId = ordRows?.[0]?.customer_id;
               if (custId) {
-                await this.firstOrderDetector.detectAndMarkFirstOrder(custId, orderId);
-                await this.firstOrderDetector.unlockReferralCode(custId);
-                await this.referralRewardEngine.processReferralReward(custId, orderId);
+                const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(custId, orderId);
+                if (isFirstOrder) {
+                  await this.referralRewardEngine.processReferralReward(custId, orderId);
+                }
               }
             } catch (refErr) {
               this.developer.error('DeliveryRunService: Failed to process referral reward on order delivery', refErr);
@@ -1702,7 +1739,11 @@ export class DeliveryRunService {
                 `INSERT INTO delivery_runs
                    (run_id, delivery_partner_id, branch_id, run_date, delivery_slot,
                     status, assignment_method, total_addresses, assigned_by)
-                 VALUES ($1, $2, $3, $4, $5, 'assigned', 'manual', 0, $6)`,
+                 VALUES ($1, $2, $3, $4, $5, 'assigned', 'manual', 0, $6)
+                 ON CONFLICT (delivery_partner_id, run_date, delivery_slot, branch_id)
+                 DO UPDATE SET
+                   status = CASE WHEN delivery_runs.status IN ('completed', 'cancelled') THEN 'assigned' ELSE delivery_runs.status END,
+                   updated_at = NOW()`,
                 [targetRunId, to_partner_id, branchId, runDate, deliverySlot, admin_id || 'system'],
               );
             }
@@ -2113,6 +2154,10 @@ export class DeliveryRunService {
                  (run_id, delivery_partner_id, branch_id, run_date, delivery_slot,
                   status, assignment_method, total_addresses, assigned_by, created_at, updated_at)
                VALUES ($1, $2, $3, $4, $5, 'assigned', 'manual', 0, $6, NOW(), NOW())
+               ON CONFLICT (delivery_partner_id, run_date, delivery_slot, branch_id)
+               DO UPDATE SET
+                 status = CASE WHEN delivery_runs.status IN ('completed', 'cancelled') THEN 'assigned' ELSE delivery_runs.status END,
+                 updated_at = NOW()
                RETURNING *`,
               [newRunId, resolvedTargetPartnerId, sourceRun.branch_id, srcDateStr, sourceRun.delivery_slot, admin_id || 'system'],
             );

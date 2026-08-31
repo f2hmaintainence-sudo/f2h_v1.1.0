@@ -22,17 +22,18 @@ export class OrderDeliveredListener {
       });
 
       // Detect and mark first order delivery & unlock referral code
-      await this.firstOrderDetector.detectAndMarkFirstOrder(
+      const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(
         event.customerId,
         event.orderId,
       );
-      await this.firstOrderDetector.unlockReferralCode(event.customerId);
 
-      // Process referral reward engine (idempotent, checks referrals status != 'rewarded')
-      await this.referralRewardEngine.processReferralReward(
-        event.customerId,
-        event.orderId,
-      );
+      // Process referral reward engine only on genuine 1st delivered order
+      if (isFirstOrder) {
+        await this.referralRewardEngine.processReferralReward(
+          event.customerId,
+          event.orderId,
+        );
+      }
     } catch (error) {
       this.developer.error('Error in OrderDeliveredListener', { error, event });
     }

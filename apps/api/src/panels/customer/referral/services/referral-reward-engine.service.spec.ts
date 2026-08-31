@@ -75,13 +75,8 @@ describe('ReferralRewardEngineService', () => {
       .mockResolvedValueOnce({ rows: [] }) // SELECT delivery_partners (not DP)
       .mockResolvedValueOnce({ rows: [{ wallet_balance: 200 }] }) // UPDATE referrer wallet balance (+100)
       .mockResolvedValueOnce({}) // INSERT referrer wallet transaction
-      .mockResolvedValueOnce({}) // INSERT referrer notification
-      .mockResolvedValueOnce({}) // INSERT referrer notification recipient
-      .mockResolvedValueOnce({}) // UPDATE customers (first_order_completed = true, referral_code = 'C2')
-      .mockResolvedValueOnce({}) // UPDATE users (first_order_completed = true, referral_code = 'C2')
+      .mockResolvedValueOnce({}) // UPDATE customers (first_order_completed = true)
       .mockResolvedValueOnce({}) // UPDATE referrals status = 'rewarded'
-      .mockResolvedValueOnce({}) // INSERT referee notification
-      .mockResolvedValueOnce({}) // INSERT referee notification recipient
       .mockResolvedValueOnce({}); // COMMIT
 
     const result = await service.processReferralReward('C2', 'ORD-1');
