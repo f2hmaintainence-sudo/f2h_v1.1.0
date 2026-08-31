@@ -15,6 +15,29 @@ function todayIST(): string {
   return `${pick('year')}-${pick('month')}-${pick('day')}`;
 }
 
+// A stop stays reassignable until the partner has acted on it at the door.
+// `in_transit` only means the run was started — starting a run bulk-flips every
+// still-waiting stop from 'pending' to 'in_transit' — so an in-transit stop is still
+// freely movable. Only 'arrived' (partner is at the door) and the terminal outcomes lock it.
+const REASSIGNABLE_STOP_STATUSES = ['pending', 'in_transit'];
+
+function assertStopIsReassignable(stop: any, label: string, verb: string): void {
+  const status = stop.delivery_status || 'pending';
+  if (!REASSIGNABLE_STOP_STATUSES.includes(status)) {
+    throw new BadRequestException(
+      `${label} has status '${status}' and can no longer be ${verb}.`,
+    );
+  }
+}
+
+// A stop carries its old run's progress with it, so realign it with the run it lands in:
+// a stop dropped into a started run is in transit, one dropped into a run that has not
+// started yet is pending again. Without this the board shows a 'pending' card inside an
+// in-transit column (and vice versa) and the partner's remaining-stop count reads wrong.
+function stopStatusForRun(run: any): string {
+  return run?.status === 'in_progress' ? 'in_transit' : 'pending';
+}
+
 function toISTDateString(d: any): string {
   if (!d) return '';
   if (typeof d === 'string') {
@@ -2026,10 +2049,7 @@ export class DeliveryRunService {
         }
 
         const resolvedAddressId = sourceStop.address_id;
-        const sourceStopStatus = sourceStop.delivery_status || 'pending';
-        if (sourceStopStatus !== 'pending') {
-          throw new BadRequestException(`Address stop has status '${sourceStopStatus}' and cannot be moved. Only pending stops can be reassigned.`);
-        }
+        assertStopIsReassignable(sourceStop, 'Address stop', 'moved');
 
         // 2. Lock and fetch source run
         const srcRunRes = await client.query<any>(
@@ -2163,9 +2183,10 @@ export class DeliveryRunService {
           `UPDATE delivery_run_addresses
            SET run_id = $1,
                sequence_no = $2,
+               delivery_status = $3,
                updated_at = NOW()
-           WHERE id = $3`,
-          [targetRun.run_id, nextTargetSeq, sourceStop.id],
+           WHERE id = $4`,
+          [targetRun.run_id, nextTargetSeq, stopStatusForRun(targetRun), sourceStop.id],
         );
 
         // Re-sequence remaining stops for source run
@@ -2417,14 +2438,8 @@ export class DeliveryRunService {
           throw new BadRequestException('Cannot swap an address stop with itself');
         }
 
-        const stopAStatus = stopA.delivery_status || 'pending';
-        const stopBStatus = stopB.delivery_status || 'pending';
-        if (stopAStatus !== 'pending') {
-          throw new BadRequestException(`Stop A has status '${stopAStatus}' and cannot be swapped. Only pending stops can be swapped.`);
-        }
-        if (stopBStatus !== 'pending') {
-          throw new BadRequestException(`Stop B has status '${stopBStatus}' and cannot be swapped. Only pending stops can be swapped.`);
-        }
+        assertStopIsReassignable(stopA, 'Stop A', 'swapped');
+        assertStopIsReassignable(stopB, 'Stop B', 'swapped');
 
         const runAId = stopA.run_id;
         const runBId = stopB.run_id;
@@ -2483,25 +2498,21 @@ export class DeliveryRunService {
           }
         }
 
-        // 6. Dispatch check
-        const dCheck = await client.query<any>(
-          `SELECT delivery_run_id, status FROM delivery_dispatch WHERE delivery_run_id IN ($1, $2, $3, $4)`,
-          [runA.run_id, String(runA.id), runB.run_id, String(runB.id)],
-        );
-        for (const d of dCheck.rows) {
-          if (['collected', 'dispatched', 'in_progress'].includes(d.status)) {
-            throw new BadRequestException(`Run ${d.delivery_run_id} has already been collected from warehouse and cannot be modified`);
-          }
-        }
+        // 6. Warehouse collection is deliberately NOT a blocker here.
+        //    Admins reassign stops mid-route (traffic, breakdown, a partner running late),
+        //    so a swap is allowed at any run stage — matching moveOrderBetweenRuns, which
+        //    has never gated on dispatch. Per-stop status is the real guard: a stop that has
+        //    been delivered/failed/skipped/returned or is 'arrived' is already rejected above.
+        //    Operationally the parcel must still be handed over between the two partners.
 
         // 7. Swap run_id between Stop A and Stop B in delivery_run_addresses
         await client.query(
-          `UPDATE delivery_run_addresses SET run_id = $1, updated_at = NOW() WHERE id = $2`,
-          [runB.run_id, stopA.id],
+          `UPDATE delivery_run_addresses SET run_id = $1, delivery_status = $2, updated_at = NOW() WHERE id = $3`,
+          [runB.run_id, stopStatusForRun(runB), stopA.id],
         );
         await client.query(
-          `UPDATE delivery_run_addresses SET run_id = $1, updated_at = NOW() WHERE id = $2`,
-          [runA.run_id, stopB.id],
+          `UPDATE delivery_run_addresses SET run_id = $1, delivery_status = $2, updated_at = NOW() WHERE id = $3`,
+          [runA.run_id, stopStatusForRun(runA), stopB.id],
         );
 
         // Re-sequence stops for Run A

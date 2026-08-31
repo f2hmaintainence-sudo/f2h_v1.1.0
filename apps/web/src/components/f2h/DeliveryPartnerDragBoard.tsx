@@ -25,6 +25,14 @@ import {
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
+// A stop stays reassignable until the partner has actually acted on it at the door.
+// `in_transit` only means the partner tapped "Start Run" — every still-waiting stop is
+// bulk-flipped to in_transit at that moment — so those stops can still be moved or
+// swapped to any other partner. Only door-level outcomes lock a stop.
+const REASSIGNABLE_STOP_STATUSES = ["pending", "in_transit"];
+const canReassign = (stop: { delivery_status?: string }) =>
+  REASSIGNABLE_STOP_STATUSES.includes(stop.delivery_status || "pending");
+
 interface AddressOrder {
   order_id: string;
   customer_id?: string;
@@ -244,10 +252,11 @@ export default function DeliveryPartnerDragBoard({
 
   // Handle Drag Start
   const handleDragStart = (e: React.DragEvent, stop: AddressStop, sourcePartner: PartnerWithStops) => {
-    const isPending = (stop.delivery_status || "pending") === "pending";
-    if (!isPending) {
+    if (!canReassign(stop)) {
       e.preventDefault();
-      showErrorToast("Only pending address stops can be moved or swapped.");
+      showErrorToast(
+        `This stop is already '${stop.delivery_status}' and can no longer be moved or swapped.`
+      );
       return;
     }
 
@@ -332,11 +341,11 @@ export default function DeliveryPartnerDragBoard({
       return;
     }
 
-    const sourceStatus = sourceStop.delivery_status || "pending";
-    const targetStatus = targetStop.delivery_status || "pending";
-
-    if (sourceStatus !== "pending" || targetStatus !== "pending") {
-      showErrorToast("Both address stops must be in 'pending' status to be swapped.");
+    if (!canReassign(sourceStop) || !canReassign(targetStop)) {
+      const blocked = !canReassign(sourceStop) ? sourceStop : targetStop;
+      showErrorToast(
+        `Address stop is already '${blocked.delivery_status}' and can no longer be swapped.`
+      );
       handleDragEnd();
       return;
     }
@@ -408,7 +417,7 @@ export default function DeliveryPartnerDragBoard({
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 max-w-2xl leading-relaxed">
-              Select either <strong className="text-slate-800 font-bold">Partner A</strong> or <strong className="text-emerald-800 font-bold">Partner B</strong> first. The other partner dropdown will automatically filter to delivery partners from the <strong className="text-indigo-700 font-bold">same branch</strong>. Drag any <strong className="text-amber-700 font-bold">pending</strong> address card across to move or swap stops.
+              Select either <strong className="text-slate-800 font-bold">Partner A</strong> or <strong className="text-emerald-800 font-bold">Partner B</strong> first. The other partner dropdown will automatically filter to delivery partners from the <strong className="text-indigo-700 font-bold">same branch</strong>. Drag any <strong className="text-amber-700 font-bold">pending</strong> or <strong className="text-sky-700 font-bold">in-transit</strong> address card across to move or swap stops — the target partner can already be out on their run.
             </p>
           </div>
         </div>
@@ -582,14 +591,14 @@ export default function DeliveryPartnerDragBoard({
               </div>
             ) : (
               stopsA.map((stop, idx) => {
-                const isPending = (stop.delivery_status || "pending") === "pending";
+                const isMovable = canReassign(stop);
                 const isDragOverThis = dragOverStopId === stop.address_id;
                 const isBeingDragged = draggedStop?.stop.address_id === stop.address_id;
 
                 return (
                   <div
                     key={stop.address_id || idx}
-                    draggable={isPending && !processing}
+                    draggable={isMovable && !processing}
                     onDragStart={(e) => handleDragStart(e, stop, partnerA)}
                     onDragEnd={handleDragEnd}
                     onDragOver={(e) => {
@@ -605,19 +614,19 @@ export default function DeliveryPartnerDragBoard({
                         ? "opacity-40 border-indigo-400 bg-indigo-50/50"
                         : isDragOverThis
                         ? "border-indigo-600 bg-indigo-50 ring-2 ring-indigo-500/30 scale-[1.01]"
-                        : isPending
+                        : isMovable
                         ? "border-slate-200 bg-white hover:border-indigo-300 hover:shadow-xs cursor-grab active:cursor-grabbing"
                         : "border-slate-200 bg-slate-50 opacity-75 cursor-not-allowed"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="flex items-center gap-2">
-                        {isPending ? (
+                        {isMovable ? (
                           <div className="text-slate-400 hover:text-indigo-600 cursor-grab">
                             <GripVertical size={16} />
                           </div>
                         ) : (
-                          <div className="text-slate-400" title="Locked - Already completed or failed">
+                          <div className="text-slate-400" title={`Locked - stop is already ${stop.delivery_status}`}>
                             <Lock size={14} />
                           </div>
                         )}
@@ -633,6 +642,8 @@ export default function DeliveryPartnerDragBoard({
                             ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                             : stop.delivery_status === "failed"
                             ? "bg-rose-100 text-rose-800 border border-rose-200"
+                            : stop.delivery_status === "in_transit"
+                            ? "bg-sky-50 text-sky-800 border border-sky-200"
                             : "bg-amber-50 text-amber-800 border border-amber-200"
                         }`}
                       >
@@ -813,14 +824,14 @@ export default function DeliveryPartnerDragBoard({
               </div>
             ) : (
               stopsB.map((stop, idx) => {
-                const isPending = (stop.delivery_status || "pending") === "pending";
+                const isMovable = canReassign(stop);
                 const isDragOverThis = dragOverStopId === stop.address_id;
                 const isBeingDragged = draggedStop?.stop.address_id === stop.address_id;
 
                 return (
                   <div
                     key={stop.address_id || idx}
-                    draggable={isPending && !processing}
+                    draggable={isMovable && !processing}
                     onDragStart={(e) => handleDragStart(e, stop, partnerB)}
                     onDragEnd={handleDragEnd}
                     onDragOver={(e) => {
@@ -836,19 +847,19 @@ export default function DeliveryPartnerDragBoard({
                         ? "opacity-40 border-indigo-400 bg-indigo-50/50"
                         : isDragOverThis
                         ? "border-indigo-600 bg-indigo-50 ring-2 ring-indigo-500/30 scale-[1.01]"
-                        : isPending
+                        : isMovable
                         ? "border-slate-200 bg-white hover:border-indigo-300 hover:shadow-xs cursor-grab active:cursor-grabbing"
                         : "border-slate-200 bg-slate-50 opacity-75 cursor-not-allowed"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="flex items-center gap-2">
-                        {isPending ? (
+                        {isMovable ? (
                           <div className="text-slate-400 hover:text-indigo-600 cursor-grab">
                             <GripVertical size={16} />
                           </div>
                         ) : (
-                          <div className="text-slate-400" title="Locked - Already completed or failed">
+                          <div className="text-slate-400" title={`Locked - stop is already ${stop.delivery_status}`}>
                             <Lock size={14} />
                           </div>
                         )}
@@ -864,6 +875,8 @@ export default function DeliveryPartnerDragBoard({
                             ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                             : stop.delivery_status === "failed"
                             ? "bg-rose-100 text-rose-800 border border-rose-200"
+                            : stop.delivery_status === "in_transit"
+                            ? "bg-sky-50 text-sky-800 border border-sky-200"
                             : "bg-amber-50 text-amber-800 border border-amber-200"
                         }`}
                       >

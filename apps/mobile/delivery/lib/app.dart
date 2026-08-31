@@ -76,76 +76,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   static const _tabs = [
     (Icons.explore_rounded, 'Home'),
     (Icons.map_rounded, 'Map'),
-    (Icons.card_giftcard_rounded, ''),
+    (Icons.card_giftcard_rounded, 'Referral'),
   ];
-
-  static List<TextSpan> _buildMultiColorReferralSpans(bool on, bool isEnabled) {
-    if (!isEnabled) {
-      return [
-        TextSpan(
-          text: 'REFERRAL',
-          style: GoogleFonts.roboto(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.4,
-            color: kMuted,
-          ),
-        ),
-      ];
-    }
-
-    const letters = ['R', 'E', 'F', 'E', 'R', 'R', 'A', 'L'];
-    // When active on Gold: rich jewel & royal tones contrasting with gold
-    // When unselected on Flag: deep vibrant tones that pop over the tricolor flag
-    final colors = on
-        ? const [
-            Color(0xFF451A03), // R - Deep Bronze
-            Color(0xFF7C2D12), // E - Deep Russet
-            Color(0xFF14532D), // F - Deep Emerald
-            Color(0xFF0F766E), // E - Deep Teal
-            Color(0xFF1E3A8A), // R - Deep Royal Navy
-            Color(0xFF581C87), // R - Deep Royal Purple
-            Color(0xFF831843), // A - Deep Ruby Pink
-            Color(0xFF713F12), // L - Deep Amber
-          ]
-        : const [
-            Color(0xFFB91C1C), // R - Vivid Crimson
-            Color(0xFFC2410C), // E - Saffron Orange
-            Color(0xFF15803D), // F - Forest Green
-            Color(0xFF0369A1), // E - Ocean Blue
-            Color(0xFF4338CA), // R - Indigo
-            Color(0xFF7E22CE), // R - Purple
-            Color(0xFFBE185D), // A - Ruby Pink
-            Color(0xFF15803D), // L - Dark Green
-          ];
-
-    return List.generate(letters.length, (idx) {
-      return TextSpan(
-        text: letters[idx],
-        style: GoogleFonts.roboto(
-          fontSize: 14,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.4,
-          color: colors[idx],
-          shadows: on
-              ? [
-                  Shadow(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    offset: const Offset(0, 1),
-                    blurRadius: 1,
-                  ),
-                ]
-              : [
-                  Shadow(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    offset: const Offset(0, 1),
-                    blurRadius: 2,
-                  ),
-                ],
-        ),
-      );
-    });
-  }
 
   Future<bool> _handlePop() async {
     final now = DateTime.now();
@@ -228,7 +160,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   child: Row(
                     children: List.generate(_tabs.length, (i) {
                       final on = i == _i;
-                      final isReferral = i == 2;
                       final isTabEnabled =
                           (i == 0 || i == 2) || (isVerified && isAccountActive);
                       const activeColor = kPrimary;
@@ -268,178 +199,43 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (isReferral)
-                                Container(
-                                  height: 42,
-                                  alignment: Alignment.center,
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                        decoration: BoxDecoration(
-                                          gradient: on
-                                              ? const LinearGradient(
-                                                  colors: [
-                                                    Color(0xFFFFFBEB), // Pale bright gold highlight
-                                                    Color(0xFFFDE68A), // Radiant yellow gold
-                                                    Color(0xFFF59E0B), // Vibrant amber gold
-                                                    Color(0xFFD97706), // Rich deep gold
-                                                  ],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                )
-                                              : const LinearGradient(
-                                                  colors: [
-                                                    Color(0xFFFF9933), // Saffron (India Flag Top)
-                                                    Color(0xFFFFFFFF), // White (India Flag Middle)
-                                                    Color(0xFFFFFFFF), // White
-                                                    Color(0xFF138808), // Green (India Flag Bottom)
-                                                  ],
-                                                  stops: [0.0, 0.38, 0.62, 1.0],
-                                                  begin: Alignment.topCenter,
-                                                  end: Alignment.bottomCenter,
-                                                ),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: on
-                                                ? const Color(0xFFB45309)
-                                                : const Color(0xFFCBD5E1),
-                                            width: on ? 2.0 : 1.4,
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: on ? activeColor : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                  boxShadow: on
+                                      ? [
+                                          BoxShadow(
+                                            color: activeColor.withValues(alpha: 0.35),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
                                           ),
-                                          boxShadow: on
-                                              ? [
-                                                  BoxShadow(
-                                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
-                                                    blurRadius: 12,
-                                                    offset: const Offset(0, 3),
-                                                  ),
-                                                  BoxShadow(
-                                                    color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-                                                    blurRadius: 6,
-                                                    offset: const Offset(0, 1),
-                                                  ),
-                                                ]
-                                              : [
-                                                  BoxShadow(
-                                                    color: const Color(0xFFFF9933).withValues(alpha: 0.25),
-                                                    blurRadius: 6,
-                                                    offset: const Offset(0, -1),
-                                                  ),
-                                                  BoxShadow(
-                                                    color: const Color(0xFF138808).withValues(alpha: 0.25),
-                                                    blurRadius: 6,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ],
-                                        ),
-                                        child: RichText(
-                                          text: TextSpan(
-                                            children: _buildMultiColorReferralSpans(on, isTabEnabled),
-                                          ),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: -9,
-                                        right: -8,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 7.5, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            gradient: on
-                                                ? const LinearGradient(
-                                                    colors: [
-                                                      Color(0xFF78350F),
-                                                      Color(0xFF451A03),
-                                                      Color(0xFF291102),
-                                                    ],
-                                                    begin: Alignment.topLeft,
-                                                    end: Alignment.bottomRight,
-                                                  )
-                                                : const LinearGradient(
-                                                    colors: [
-                                                      Color(0xFF0F172A),
-                                                      Color(0xFF064E3B),
-                                                      Color(0xFF052E16),
-                                                    ],
-                                                    begin: Alignment.topLeft,
-                                                    end: Alignment.bottomRight,
-                                                  ),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(
-                                              color: on
-                                                  ? const Color(0xFFFFD700)
-                                                  : const Color(0xFF4ADE80),
-                                              width: 1.3,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: on
-                                                    ? const Color(0xFFD97706).withValues(alpha: 0.5)
-                                                    : const Color(0xFF064E3B).withValues(alpha: 0.4),
-                                                blurRadius: 6,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Text(
-                                            '₹75',
-                                            style: GoogleFonts.roboto(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w900,
-                                              color: on
-                                                  ? const Color(0xFFFFD700)
-                                                  : const Color(0xFF4ADE80),
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: on ? activeColor : Colors.transparent,
-                                    shape: BoxShape.circle,
-                                    boxShadow: on
-                                        ? [
-                                            BoxShadow(
-                                              color: activeColor.withValues(alpha: 0.35),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ]
-                                        : [],
-                                  ),
-                                  child: Icon(
-                                    _tabs[i].$1,
-                                    color: on
-                                        ? Colors.white
-                                        : (isTabEnabled
-                                            ? kMuted
-                                            : kMuted.withValues(alpha: 0.3)),
-                                    size: 20,
-                                  ),
+                                        ]
+                                      : [],
                                 ),
+                                child: Icon(
+                                  _tabs[i].$1,
+                                  color: on
+                                      ? Colors.white
+                                      : (isTabEnabled
+                                          ? kMuted
+                                          : kMuted.withValues(alpha: 0.3)),
+                                  size: 20,
+                                ),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 _tabs[i].$2,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: on
-                                      ? FontWeight.w800
-                                      : (isReferral ? FontWeight.w700 : FontWeight.w500),
+                                  fontWeight: on ? FontWeight.w800 : FontWeight.w500,
                                   color: on
                                       ? activeColor
-                                      : (isReferral
-                                          ? kPrimary.withValues(alpha: 0.85)
-                                          : (isTabEnabled
-                                              ? kMuted
-                                              : kMuted.withValues(alpha: 0.3))),
+                                      : (isTabEnabled
+                                          ? kMuted
+                                          : kMuted.withValues(alpha: 0.3)),
                                 ),
                               ),
                             ],
