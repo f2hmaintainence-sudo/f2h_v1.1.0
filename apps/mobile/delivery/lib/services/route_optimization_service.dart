@@ -337,10 +337,25 @@ class RouteOptimizationService {
 
     // Leg 0 is origin → next stop; the rest is what the rider still has to do
     // after that. Both come from Google, so the split lands on a real junction.
-    List<LatLng> activeLeg = legs.isNotEmpty ? legs.first.points : const [];
-    List<LatLng> remaining = legs.length > 1
-        ? [for (final leg in legs.skip(1)) ...leg.points]
-        : const [];
+    List<LatLng> activeLeg = [];
+    if (legs.isNotEmpty && legs.first.points.isNotEmpty) {
+      activeLeg = List<LatLng>.from(legs.first.points);
+    }
+
+    List<LatLng> remaining = [];
+    if (legs.length > 1) {
+      for (int i = 1; i < legs.length; i++) {
+        final legPts = legs[i].points;
+        if (legPts.isEmpty) continue;
+        if (remaining.isNotEmpty &&
+            (remaining.last.latitude - legPts.first.latitude).abs() < 1e-5 &&
+            (remaining.last.longitude - legPts.first.longitude).abs() < 1e-5) {
+          remaining.addAll(legPts.skip(1));
+        } else {
+          remaining.addAll(legPts);
+        }
+      }
+    }
 
     if (activeLeg.length < 2) {
       // Some responses carry route geometry without per-leg geometry; split the
@@ -357,6 +372,7 @@ class RouteOptimizationService {
       activeLeg = fullPoints.sublist(0, splitIndex + 1);
       remaining = fullPoints.sublist(splitIndex);
     }
+
 
     final totalDistanceKm = totalDistanceKmRaw;
     final totalDurationMin =

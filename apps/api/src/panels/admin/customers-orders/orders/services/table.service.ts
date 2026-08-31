@@ -142,8 +142,8 @@ export class OrdersTableService {
       if (orderType === 'undelivered' || scope === 'undelivered') {
         conditions.push({
           column: 'orders.status',
-          operator: '=',
-          value: 'failed',
+          operator: '!=',
+          value: 'delivered',
         });
       } else if (orderType) {
         conditions.push({
