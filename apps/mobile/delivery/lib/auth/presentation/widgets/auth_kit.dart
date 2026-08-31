@@ -63,6 +63,7 @@ class DeliveryAuthScaffold extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Stack(
+          fit: StackFit.expand,
           children: [
             const Positioned.fill(child: DeliveryAuthBackdrop()),
             SafeArea(
@@ -81,6 +82,9 @@ class DeliveryAuthScaffold extends StatelessWidget {
                       ),
                     ),
                   SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
                     padding: EdgeInsets.fromLTRB(
                       28,
                       36,
