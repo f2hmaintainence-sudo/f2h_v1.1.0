@@ -1122,27 +1122,55 @@ class _ReferralScreenState extends State<ReferralScreen> with SingleTickerProvid
 
         // Segmented Tabs
         Container(
+          height: 44,
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: const Color(0xFFE2E8F0),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
           ),
-          padding: const EdgeInsets.all(4),
           child: TabBar(
             controller: _tabController,
+            indicatorSize: TabBarIndicatorSize.tab,
+            dividerColor: Colors.transparent,
+            splashFactory: NoSplash.splashFactory,
+            overlayColor: WidgetStateProperty.resolveWith<Color?>((states) => Colors.transparent),
             indicator: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               boxShadow: const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2)),
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
             labelColor: const Color(0xFF0F172A),
             unselectedLabelColor: const Color(0xFF64748B),
             labelStyle: GoogleFonts.roboto(fontSize: 12.5, fontWeight: FontWeight.w800),
             unselectedLabelStyle: GoogleFonts.roboto(fontSize: 12.5, fontWeight: FontWeight.w600),
+            labelPadding: EdgeInsets.zero,
             tabs: [
-              Tab(text: 'Referred Customers (${rawReferrals.length})'),
-              Tab(text: 'Payouts (${payments.length})'),
+              Tab(
+                height: 36,
+                child: Center(
+                  child: Text(
+                    'Referred Customers (${rawReferrals.length})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              Tab(
+                height: 36,
+                child: Center(
+                  child: Text(
+                    'Payouts (${payments.length})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
