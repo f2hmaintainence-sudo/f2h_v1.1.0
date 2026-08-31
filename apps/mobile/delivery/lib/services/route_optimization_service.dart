@@ -302,7 +302,7 @@ class RouteOptimizationService {
     ];
 
     final fullPoints =
-        decodeGooglePolyline((data['polyline'] as String?) ?? '');
+        decodeGooglePolylineSegments((data['polyline'] as String?) ?? '');
     if (fullPoints.length < 2) {
       return OptimizedRouteResult.unavailable(
         orderedStops: orderedStops,
@@ -317,8 +317,8 @@ class RouteOptimizationService {
     final geometrySpanKm =
         _geometrySpanKm([fullPoints, for (final leg in legs) leg.points]);
     final ceilingKm = totalDistanceKmRaw > 0
-        ? (totalDistanceKmRaw * 1.5).clamp(5.0, double.infinity)
-        : 5.0;
+        ? (totalDistanceKmRaw * 3.0).clamp(50.0, double.infinity)
+        : 50.0;
 
     if (geometrySpanKm > ceilingKm) {
       // Rider-facing text stays generic; the numbers that identify the bad
@@ -444,6 +444,8 @@ class RouteOptimizationService {
 
     for (final points in pointSets) {
       for (final p in points) {
+        if (!p.latitude.isFinite || !p.longitude.isFinite) continue;
+        if (p.latitude.abs() < 0.001 && p.longitude.abs() < 0.001) continue;
         seen++;
         if (p.latitude < minLat) minLat = p.latitude;
         if (p.latitude > maxLat) maxLat = p.latitude;
@@ -451,7 +453,7 @@ class RouteOptimizationService {
         if (p.longitude > maxLng) maxLng = p.longitude;
       }
     }
-    if (seen == 0) return double.infinity;
+    if (seen == 0) return 0.0;
 
     return _locationService.haversineDistanceKm(minLat, minLng, maxLat, maxLng);
   }

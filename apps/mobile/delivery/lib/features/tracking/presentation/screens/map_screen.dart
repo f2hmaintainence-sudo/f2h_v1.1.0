@@ -610,10 +610,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 polylines.add(
                   Polyline(
                     points: _optimizedRoute!.remainingRoutePoints,
-                    strokeWidth: 4.0,
-                    color: const Color(0xFF2563EB),
-                    borderStrokeWidth: 1.5,
-                    borderColor: Colors.white.withOpacity(0.8),
+                    strokeWidth: 5.5,
+                    color: const Color(0xFF3B82F6),
+                    borderStrokeWidth: 1.8,
+                    borderColor: const Color(0xFF1D4ED8),
                   ),
                 );
               }
@@ -621,10 +621,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 polylines.add(
                   Polyline(
                     points: _optimizedRoute!.activeLegPoints,
-                    strokeWidth: 5.5,
-                    color: const Color(0xFF10B981),
-                    borderStrokeWidth: 2.5,
-                    borderColor: Colors.white,
+                    strokeWidth: 6.5,
+                    color: const Color(0xFF2563EB),
+                    borderStrokeWidth: 2.2,
+                    borderColor: const Color(0xFF1E3A8A),
+                  ),
+                );
+              } else if (_optimizedRoute!.fullRoutePoints.length >= 2) {
+                polylines.add(
+                  Polyline(
+                    points: _optimizedRoute!.fullRoutePoints,
+                    strokeWidth: 6.5,
+                    color: const Color(0xFF2563EB),
+                    borderStrokeWidth: 2.2,
+                    borderColor: const Color(0xFF1E3A8A),
                   ),
                 );
               }

@@ -9,14 +9,23 @@ import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { OrdersTableService } from './services/table.service';
 import { ReferralModule } from '../../../customer/referral/referral.module';
+import { PaymentGatewayModule } from '../../../../shared/payments/payment-gateway.module';
+import { PushNotificationService } from '../../../../shared/pushNotifications/pushNotification.service';
 
 @Module({
-  imports: [HelpersModule, FieldEncryptionModule, PdfModule, ReferralModule],
+  imports: [
+    HelpersModule,
+    FieldEncryptionModule,
+    PdfModule,
+    ReferralModule,
+    PaymentGatewayModule,
+  ],
   controllers: [OrdersController],
   providers: [
     OrdersService,
     OrdersTableService,
     DeveloperService,
+    PushNotificationService,
   ],
   exports: [OrdersService],
 })

@@ -25,6 +25,8 @@ function formatMoney(value: unknown): string {
 
 import { FirstOrderDetectorService } from '../../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../../customer/referral/services/referral-reward-engine.service';
+import { WalletLedgerService } from '../../../../shared/payments/wallet-ledger.service';
+import { PushNotificationService } from '../../../../shared/pushNotifications/pushNotification.service';
 
 @Injectable()
 export class OrdersService {
@@ -35,6 +37,8 @@ export class OrdersService {
     private readonly pdfService: PdfService,
     private readonly firstOrderDetector: FirstOrderDetectorService,
     private readonly referralRewardEngine: ReferralRewardEngineService,
+    private readonly walletLedger: WalletLedgerService,
+    private readonly pushNotificationService: PushNotificationService,
   ) {}
 
   async getOrderView(orderId: string) {
@@ -244,6 +248,136 @@ export class OrdersService {
     } catch (error) {
       this.developer.error('bulkMarkDelivered error', { error });
       throw new InternalServerErrorException('Failed to bulk-mark orders');
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Bulk Mark Failed (Refund One-Time Orders Only)
+  // ────────────────────────────────────────────────
+  async bulkMarkFailed(query: any) {
+    try {
+      const date = query.date || todayInIndia();
+
+      // Find all pending undelivered orders for the specified date
+      const candidateOrders = await this.databaseService.query(
+        `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status
+         FROM orders
+         WHERE scheduled_date = $1
+           AND status IN ('pending', 'placed', 'confirmed', 'assigned', 'packed', 'out_for_delivery')
+           AND status != 'delivered'
+           AND status != 'failed'
+           AND status != 'cancelled'`,
+        [date],
+      );
+
+      if (!candidateOrders || candidateOrders.length === 0) {
+        return {
+          status: true,
+          updated: 0,
+          refundedCount: 0,
+          totalRefunded: 0,
+          message: 'No pending undelivered orders found for this date',
+        };
+      }
+
+      let refundedCount = 0;
+      let totalRefunded = 0;
+      let oneTimeCount = 0;
+      let subscriptionCount = 0;
+
+      for (const ord of candidateOrders) {
+        const isOneTime = String(ord.order_source || '').toLowerCase() === 'one-time' || !ord.subscription_id;
+        const totalAmount = Number(ord.total_amount || 0);
+        const paymentMode = String(ord.payment_mode || '').toLowerCase();
+        const paymentStatus = String(ord.payment_status || '').toLowerCase();
+        const isPrepaid = (paymentStatus === 'paid' || ['wallet', 'prepaid', 'razorpay', 'online'].includes(paymentMode)) && totalAmount > 0 && paymentStatus !== 'refunded';
+
+        let isRefunded = false;
+
+        // Refund ONLY for one-time prepaid orders
+        if (isOneTime) {
+          oneTimeCount++;
+          if (isPrepaid) {
+            try {
+              await this.walletLedger.credit({
+                customerId: ord.customer_id,
+                amount: totalAmount,
+                referenceType: 'order_refund',
+                referenceId: ord.order_id,
+                remarks: `Refund for failed delivery of One-Time Order #${ord.order_id}`,
+                createdBy: 'admin',
+              });
+              isRefunded = true;
+              refundedCount++;
+              totalRefunded += totalAmount;
+            } catch (refundError) {
+              this.developer.error('BulkMarkFailed: Failed to refund wallet for one-time order', {
+                orderId: ord.order_id,
+                customerId: ord.customer_id,
+                refundError,
+              });
+            }
+          }
+        } else {
+          subscriptionCount++;
+        }
+
+        // Update order status and payment status if refunded
+        await this.databaseService.query(
+          `UPDATE orders
+           SET status = 'failed',
+               payment_status = CASE WHEN $2 = true THEN 'refunded' ELSE payment_status END,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE order_id = $1`,
+          [ord.order_id, isRefunded],
+        );
+
+        // Send notifications
+        if (ord.customer_id) {
+          if (isRefunded) {
+            this.pushNotificationService.sendNotificationToUsers([ord.customer_id], {
+              title: '📦 Order Delivery Failed & Refunded',
+              body: `Your one-time order #${ord.order_id} could not be delivered. ₹${totalAmount.toFixed(2)} has been refunded to your wallet.`,
+              data: {
+                type: 'order_failed_refund',
+                order_id: ord.order_id,
+                refund_amount: String(totalAmount),
+              },
+            }).catch(() => {});
+          } else if (isOneTime) {
+            this.pushNotificationService.sendNotificationToUsers([ord.customer_id], {
+              title: '📦 Order Delivery Failed',
+              body: `Your one-time order #${ord.order_id} could not be delivered.`,
+              data: {
+                type: 'order_failed',
+                order_id: ord.order_id,
+              },
+            }).catch(() => {});
+          } else {
+            this.pushNotificationService.sendNotificationToUsers([ord.customer_id], {
+              title: '🥛 Subscription Delivery Failed',
+              body: `Your subscription delivery for #${ord.order_id} could not be delivered today.`,
+              data: {
+                type: 'subscription_order_failed',
+                order_id: ord.order_id,
+              },
+            }).catch(() => {});
+          }
+        }
+      }
+
+      return {
+        status: true,
+        updated: candidateOrders.length,
+        oneTimeCount,
+        subscriptionCount,
+        refundedCount,
+        totalRefunded: parseFloat(totalRefunded.toFixed(2)),
+        message: `${candidateOrders.length} undelivered order(s) marked as failed (${refundedCount} one-time orders refunded ₹${totalRefunded.toFixed(2)}).`,
+      };
+    } catch (error) {
+      this.developer.error('bulkMarkFailed error', { error });
+      throw new InternalServerErrorException('Failed to bulk-mark orders as failed');
     }
   }
 

@@ -48,8 +48,17 @@ export class OrdersController {
   // ── Bulk Mark Delivered ──
 
   @Patch('today/bulk-deliver')
+  @Patch('bulk-deliver')
   async bulkMarkDelivered(@Query() query: any) {
     return this.ordersService.bulkMarkDelivered(query);
+  }
+
+  // ── Bulk Mark Failed ──
+
+  @Patch('today/bulk-fail')
+  @Patch('bulk-fail')
+  async bulkMarkFailed(@Query() query: any) {
+    return this.ordersService.bulkMarkFailed(query);
   }
 
   // ── PDF Export ──

@@ -356,8 +356,10 @@ export default function OrderDetailsDrawer({
                 type="button"
                 onClick={() => {
                   const isPrepaid = (String(order.payment_status || '').toLowerCase() === 'paid' || ['wallet', 'prepaid', 'razorpay', 'online'].includes(String(order.payment_mode || '').toLowerCase())) && Number(order.total_amount || 0) > 0;
-                  const confirmMsg = isPrepaid
-                    ? `Mark Order #${orderId} as Failed / Undelivered?\n\n💰 Automated Refund: ₹${Number(order.total_amount || 0).toFixed(2)} will be immediately credited to the customer's wallet balance.`
+                  const confirmMsg = isSubscription
+                    ? `Mark Subscription Order #${orderId} as Failed / Undelivered?\n\n(Subscription delivery will be marked as Failed without wallet deduction.)`
+                    : isPrepaid
+                    ? `Mark One-Time Order #${orderId} as Failed / Undelivered?\n\n💰 Automated Refund: Prepaid amount of ₹${Number(order.total_amount || 0).toFixed(2)} will be immediately credited to the customer's wallet balance.`
                     : `Mark Order #${orderId} as Failed / Undelivered?`;
                   if (window.confirm(confirmMsg)) {
                     onUpdateStatus(orderId, 'failed');

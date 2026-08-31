@@ -54,6 +54,7 @@ List<LatLng> decodeGooglePolyline(String encoded) {
 
     if (latitude.isFinite &&
         longitude.isFinite &&
+        (latitude.abs() > 0.001 || longitude.abs() > 0.001) &&
         latitude >= -90.0 &&
         latitude <= 90.0 &&
         longitude >= -180.0 &&

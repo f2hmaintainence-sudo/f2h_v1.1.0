@@ -1068,7 +1068,7 @@ export class DeliveryManagementService {
       }
 
       const existingOrderRows = await this.db.query(
-        `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, status 
+        `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status 
          FROM orders 
          WHERE order_id = $1 OR id::text = $1 LIMIT 1`,
         [orderId],
@@ -1085,20 +1085,23 @@ export class DeliveryManagementService {
       const params: any[] = [existingOrder.order_id, normStatus];
 
       let isRefunded = false;
+      const isOneTime = String(existingOrder.order_source || '').toLowerCase() === 'one-time' || !existingOrder.subscription_id;
+
       if (normStatus === 'failed') {
         const totalAmount = Number(existingOrder.total_amount || 0);
         const paymentMode = String(existingOrder.payment_mode || '').toLowerCase();
         const paymentStatus = String(existingOrder.payment_status || '').toLowerCase();
         const isPrepaid = (paymentStatus === 'paid' || ['wallet', 'prepaid', 'razorpay', 'online'].includes(paymentMode)) && totalAmount > 0 && paymentStatus !== 'refunded';
 
-        if (isPrepaid) {
+        // Refund ONLY for one-time orders
+        if (isOneTime && isPrepaid) {
           try {
             await this.walletLedger.credit({
               customerId: existingOrder.customer_id,
               amount: totalAmount,
               referenceType: 'order_refund',
               referenceId: existingOrder.order_id,
-              remarks: `Refund for failed delivery of Order #${existingOrder.order_id}`,
+              remarks: `Refund for failed delivery of One-Time Order #${existingOrder.order_id}`,
               createdBy: 'admin',
             });
             updateFields.push(`payment_status = 'refunded'`);
@@ -1139,22 +1142,31 @@ export class DeliveryManagementService {
         if (isRefunded) {
           this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
             title: '📦 Order Delivery Failed & Refunded',
-            body: `Your order #${existingOrder.order_id} could not be delivered. ₹${totalAmount.toFixed(2)} has been refunded to your wallet.`,
+            body: `Your one-time order #${existingOrder.order_id} could not be delivered. ₹${totalAmount.toFixed(2)} has been refunded to your wallet.`,
             data: {
               type: 'order_failed_refund',
               order_id: existingOrder.order_id,
               refund_amount: String(totalAmount),
             },
           }).catch((err) => this.developer.warn('Failed to send order failed refund notification', err));
-        } else {
+        } else if (isOneTime) {
           this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
             title: '📦 Order Delivery Failed',
-            body: `Your order #${existingOrder.order_id} could not be delivered.`,
+            body: `Your one-time order #${existingOrder.order_id} could not be delivered.`,
             data: {
               type: 'order_failed',
               order_id: existingOrder.order_id,
             },
           }).catch((err) => this.developer.warn('Failed to send order failed notification', err));
+        } else {
+          this.pushNotificationService.sendNotificationToUsers([existingOrder.customer_id], {
+            title: '🥛 Subscription Delivery Failed',
+            body: `Your subscription delivery for #${existingOrder.order_id} could not be delivered today.`,
+            data: {
+              type: 'subscription_order_failed',
+              order_id: existingOrder.order_id,
+            },
+          }).catch((err) => this.developer.warn('Failed to send subscription failed notification', err));
         }
       }
 

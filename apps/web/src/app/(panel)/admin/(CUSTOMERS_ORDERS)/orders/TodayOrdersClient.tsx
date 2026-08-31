@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   Home,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -263,6 +264,39 @@ export default function TodayOrdersClient({
     }
   };
 
+  // ── Bulk Mark Failed ────────────────────────────────────────────────────────
+  const handleBulkFail = async () => {
+    const targetDate = selectedDate || fromDate || '';
+    const dateLabel = targetDate ? `for ${targetDate}` : 'for today';
+    const confirmText = `Are you sure you want to mark ALL pending undelivered orders ${dateLabel} as Failed?\n\n💰 Automated Refund Policy:\n• Prepaid ONE-TIME orders: Paid amount will be refunded directly to customer's wallet.\n• Subscription orders: Status will be marked as Failed without wallet refund.`;
+    
+    if (!confirm(confirmText)) return;
+    setBulkLoading(true);
+    setBulkResult(null);
+    try {
+      const p = new URLSearchParams();
+      if (targetDate) p.set('date', targetDate);
+      const res = await fetch(`${API_URL}/admin/orders/bulk-fail?${p}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const result = await res.json();
+      if (result.status) {
+        setBulkResult(`✅ ${result.message || `${result.updated} orders marked as failed`}`);
+        setTableKey((k) => k + 1);
+        fetchSummary();
+      } else {
+        setBulkResult(`❌ ${result.message || 'Failed'}`);
+      }
+    } catch {
+      setBulkResult('❌ Network error');
+    } finally {
+      setBulkLoading(false);
+      setTimeout(() => setBulkResult(null), 8000);
+    }
+  };
+
   // ── PDF Export ────────────────────────────────────────────────────────────
   const handlePdfExport = async () => {
     setPdfLoading(true);
@@ -396,16 +430,31 @@ export default function TodayOrdersClient({
                 <Download size={15} className={pdfLoading ? 'animate-bounce' : ''} />
                 {pdfLoading ? 'Generating...' : 'Export PDF'}
               </button>
-              <button
-                type="button"
-                onClick={handleBulkDeliver}
-                disabled={bulkLoading}
-                className="inline-flex items-center gap-2 h-9 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-2xs hover:shadow-xs transition-all disabled:opacity-50"
-              >
-                <CheckCircle2 size={15} className={bulkLoading ? 'animate-spin' : ''} />
-                {bulkLoading ? 'Processing...' : 'Mark All Delivered'}
-              </button>
+              {activeTab !== 'undelivered' && (
+                <button
+                  type="button"
+                  onClick={handleBulkDeliver}
+                  disabled={bulkLoading}
+                  className="inline-flex items-center gap-2 h-9 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-2xs hover:shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle2 size={15} className={bulkLoading ? 'animate-spin' : ''} />
+                  {bulkLoading ? 'Processing...' : 'Mark All Delivered'}
+                </button>
+              )}
             </>
+          )}
+
+          {activeTab === 'undelivered' && (
+            <button
+              type="button"
+              onClick={handleBulkFail}
+              disabled={bulkLoading}
+              className="inline-flex items-center gap-2 h-9 px-4 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-xs font-bold rounded-xl shadow-2xs hover:shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+              title="Mark all pending undelivered orders as Failed (auto-refunds prepaid one-time orders to wallet)"
+            >
+              <AlertTriangle size={15} className={bulkLoading ? 'animate-spin' : ''} />
+              {bulkLoading ? 'Processing...' : 'Bulk Mark Failed'}
+            </button>
           )}
           <button
             type="button"

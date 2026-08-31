@@ -278,12 +278,18 @@ export class DirectionsService {
         polyline: this.joinStepPolylines(leg?.steps),
       }));
 
+      // Combine all step polylines for high-fidelity road curves instead of simplified overview
+      const detailedPolyline = legs
+        .map((l) => l.polyline)
+        .filter(Boolean)
+        .join(POLYLINE_SEGMENT_SEPARATOR);
+
       return {
         status: 'OK',
         provider: 'google-directions',
         distanceMeters: legs.reduce((sum, leg) => sum + leg.distanceMeters, 0),
         durationSeconds: legs.reduce((sum, leg) => sum + leg.durationSeconds, 0),
-        polyline,
+        polyline: detailedPolyline || (typeof route.overview_polyline?.points === 'string' ? route.overview_polyline.points : ''),
         optimizedOrder: this.sanitizeOrder(
           route.waypoint_order,
           intermediates.length,
