@@ -181,6 +181,7 @@ class RouteOptimizationService {
   Future<OptimizedRouteResult> fetchShortestPathRoute({
     required LatLng? currentPosition,
     required List<GroupedStop> stops,
+    GroupedStop? targetedStop,
     bool forceRefresh = false,
   }) async {
     final pending = stops.where((s) => _isPending(s) && _hasValidCoords(s)).toList();
@@ -199,24 +200,31 @@ class RouteOptimizationService {
       stops: pending,
     );
 
-    // Without a fix the rider's own position cannot start the route, so the
-    // first stop stands in as the origin and is not itself routed to.
+    // If a specific stop is targeted (e.g. user selected Stop #1 or navigated to it)
+    final GroupedStop destination;
+    final List<GroupedStop> intermediates;
     final bool originIsRider = _isValidPosition(currentPosition);
-    final List<GroupedStop> routable =
-        originIsRider ? initialOrdered : initialOrdered.sublist(1);
 
-    if (routable.isEmpty) {
-      return OptimizedRouteResult.unavailable(
-        orderedStops: [...initialOrdered, ...completed],
-        reason: 'Waiting for your location to draw the route',
-      );
+    if (targetedStop != null && _hasValidCoords(targetedStop)) {
+      destination = targetedStop;
+      intermediates = const [];
+    } else {
+      final List<GroupedStop> routable =
+          originIsRider ? initialOrdered : initialOrdered.sublist(1);
+
+      if (routable.isEmpty) {
+        return OptimizedRouteResult.unavailable(
+          orderedStops: [...initialOrdered, ...completed],
+          reason: 'Waiting for your location to draw the route',
+        );
+      }
+
+      destination = routable.last;
+      intermediates = routable.sublist(0, routable.length - 1);
     }
 
-    final cacheKey = _buildCacheKey(origin!, routable);
+    final cacheKey = '${_buildCacheKey(origin!, [destination, ...intermediates])}#tgt:${targetedStop?.stop}';
     if (!forceRefresh && _isCacheFresh(cacheKey)) return _cachedResult!;
-
-    final destination = routable.last;
-    final intermediates = routable.sublist(0, routable.length - 1);
 
     Map<String, dynamic>? data;
     try {
@@ -235,6 +243,7 @@ class RouteOptimizationService {
           'travelMode': _kTravelMode,
         },
       );
+
       final body = response.data;
       if (body is Map) data = Map<String, dynamic>.from(body);
     } on DioException catch (e) {

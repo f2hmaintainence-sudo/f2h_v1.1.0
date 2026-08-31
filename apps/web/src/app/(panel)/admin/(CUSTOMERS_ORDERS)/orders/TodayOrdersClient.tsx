@@ -29,6 +29,7 @@ import OrderFilterBar, { OrderTypeTab, DeliverySlotFilter } from './components/O
 import OrderDetailsDrawer from './components/OrderDetailsDrawer';
 import { stripHtml } from './components/OrderDetailsDrawer';
 import OrdersTable from './components/OrdersTable';
+import OrderActionModal, { ModalType, ModalData } from './components/OrderActionModal';
 import { downloadCSV, downloadExcel, ExportColumn } from '@/lib/exportUtils';
 
 interface TodayOrdersClientProps {
@@ -103,6 +104,16 @@ export default function TodayOrdersClient({
   const [bulkResult, setBulkResult]     = useState<string | null>(null);
   const [pdfLoading, setPdfLoading]     = useState(false);
   const [exportLoading, setExportLoading] = useState<'excel' | 'csv' | null>(null);
+
+  // Action Confirmation Modal
+  const [actionModal, setActionModal] = useState<{
+    isOpen: boolean;
+    type: ModalType;
+    data?: ModalData;
+  }>({
+    isOpen: false,
+    type: null,
+  });
 
   // Drawer
   const [selectedOrder, setSelectedOrder] = useState<Record<string, any> | null>(null);
@@ -238,62 +249,77 @@ export default function TodayOrdersClient({
   };
 
   // ── Bulk deliver ──────────────────────────────────────────────────────────
-  const handleBulkDeliver = async () => {
-    if (!confirm('Mark ALL "Out for Delivery" orders as Delivered for today?')) return;
-    setBulkLoading(true);
-    setBulkResult(null);
-    try {
-      const res = await fetch(`${API_URL}/admin/orders/today/bulk-deliver`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const result = await res.json();
-      if (result.status) {
-        setBulkResult(`✅ ${result.updated} order(s) marked as delivered`);
-        setTableKey((k) => k + 1);
-        fetchSummary();
-      } else {
-        setBulkResult(`❌ ${result.message || 'Failed'}`);
-      }
-    } catch {
-      setBulkResult('❌ Network error');
-    } finally {
-      setBulkLoading(false);
-      setTimeout(() => setBulkResult(null), 5000);
-    }
+  const handleBulkDeliver = () => {
+    setActionModal({
+      isOpen: true,
+      type: 'bulk-deliver',
+      data: { date: 'Today' },
+    });
   };
 
   // ── Bulk Mark Failed ────────────────────────────────────────────────────────
-  const handleBulkFail = async () => {
-    const targetDate = selectedDate || fromDate || '';
-    const dateLabel = targetDate ? `for ${targetDate}` : 'for today';
-    const confirmText = `Are you sure you want to mark ALL pending undelivered orders ${dateLabel} as Failed?\n\n💰 Automated Refund Policy:\n• Prepaid ONE-TIME orders: Paid amount will be refunded directly to customer's wallet.\n• Subscription orders: Status will be marked as Failed without wallet refund.`;
-    
-    if (!confirm(confirmText)) return;
-    setBulkLoading(true);
-    setBulkResult(null);
-    try {
-      const p = new URLSearchParams();
-      if (targetDate) p.set('date', targetDate);
-      const res = await fetch(`${API_URL}/admin/orders/bulk-fail?${p}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const result = await res.json();
-      if (result.status) {
-        setBulkResult(`✅ ${result.message || `${result.updated} orders marked as failed`}`);
-        setTableKey((k) => k + 1);
-        fetchSummary();
-      } else {
-        setBulkResult(`❌ ${result.message || 'Failed'}`);
+  const handleBulkFail = () => {
+    const targetDate = selectedDate || fromDate || 'Today';
+    setActionModal({
+      isOpen: true,
+      type: 'bulk-fail',
+      data: { date: targetDate },
+    });
+  };
+
+  // ── Confirm Modal Action Execution ─────────────────────────────────────────
+  const handleConfirmModalAction = async () => {
+    if (actionModal.type === 'bulk-fail') {
+      setBulkLoading(true);
+      setBulkResult(null);
+      try {
+        const p = new URLSearchParams();
+        const targetDate = selectedDate || fromDate || '';
+        if (targetDate) p.set('date', targetDate);
+        const res = await fetch(`${API_URL}/admin/orders/bulk-fail?${p}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const result = await res.json();
+        if (result.status) {
+          setBulkResult(`✅ ${result.message || `${result.updated} orders marked as failed`}`);
+          setTableKey((k) => k + 1);
+          fetchSummary();
+        } else {
+          setBulkResult(`❌ ${result.message || 'Failed'}`);
+        }
+      } catch {
+        setBulkResult('❌ Network error');
+      } finally {
+        setBulkLoading(false);
+        setActionModal({ isOpen: false, type: null });
+        setTimeout(() => setBulkResult(null), 8000);
       }
-    } catch {
-      setBulkResult('❌ Network error');
-    } finally {
-      setBulkLoading(false);
-      setTimeout(() => setBulkResult(null), 8000);
+    } else if (actionModal.type === 'bulk-deliver') {
+      setBulkLoading(true);
+      setBulkResult(null);
+      try {
+        const res = await fetch(`${API_URL}/admin/orders/today/bulk-deliver`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const result = await res.json();
+        if (result.status) {
+          setBulkResult(`✅ ${result.updated} order(s) marked as delivered`);
+          setTableKey((k) => k + 1);
+          fetchSummary();
+        } else {
+          setBulkResult(`❌ ${result.message || 'Failed'}`);
+        }
+      } catch {
+        setBulkResult('❌ Network error');
+      } finally {
+        setBulkLoading(false);
+        setActionModal({ isOpen: false, type: null });
+        setTimeout(() => setBulkResult(null), 5000);
+      }
     }
   };
 
@@ -523,6 +549,16 @@ export default function TodayOrdersClient({
         itemsError={itemsError}
         onClose={handleCloseDrawer}
         onUpdateStatus={handleUpdateStatus}
+      />
+
+      {/* ── Action Confirmation Modal ── */}
+      <OrderActionModal
+        isOpen={actionModal.isOpen}
+        type={actionModal.type}
+        data={actionModal.data}
+        loading={bulkLoading}
+        onClose={() => setActionModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmModalAction}
       />
     </div>
   );

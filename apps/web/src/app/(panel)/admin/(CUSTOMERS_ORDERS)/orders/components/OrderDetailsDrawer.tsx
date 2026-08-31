@@ -10,7 +10,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   PackageOpen,
@@ -26,6 +26,7 @@ import {
   ShoppingCart,
   Calendar,
 } from 'lucide-react';
+import OrderActionModal, { ModalType, ModalData } from './OrderActionModal';
 
 export interface OrderItem {
   id: number | string;
@@ -125,6 +126,16 @@ export default function OrderDetailsDrawer({
   onClose,
   onUpdateStatus,
 }: OrderDetailsDrawerProps) {
+  const [actionModal, setActionModal] = useState<{
+    isOpen: boolean;
+    type: ModalType;
+    data?: ModalData;
+  }>({
+    isOpen: false,
+    type: null,
+  });
+  const [actionLoading, setActionLoading] = useState(false);
+
   if (!order) return null;
 
   const orderId = stripHtml(order.order_id || order.id || 'N/A');
@@ -150,6 +161,21 @@ export default function OrderDetailsDrawer({
   const customerPhone = stripHtml(order.customer_phone || order.phone || order.contact_number || '');
   const addressStr = stripHtml(order.delivery_address || order.address_line || order.address || order.area || order.pincode || 'Address not specified');
   const deliverySlot = stripHtml(order.delivery_slot || order.slot || 'Standard Slot');
+
+  const handleConfirmAction = async () => {
+    if (!onUpdateStatus) return;
+    setActionLoading(true);
+    try {
+      if (actionModal.type === 'single-fail') {
+        await onUpdateStatus(orderId, 'failed');
+      } else if (actionModal.type === 'single-deliver') {
+        await onUpdateStatus(orderId, 'delivered');
+      }
+    } finally {
+      setActionLoading(false);
+      setActionModal({ isOpen: false, type: null });
+    }
+  };
 
   return (
     <div className="fixed top-16 right-0 bottom-0 left-0 z-40 bg-slate-900/30 backdrop-blur-2xs flex justify-end">
@@ -356,14 +382,17 @@ export default function OrderDetailsDrawer({
                 type="button"
                 onClick={() => {
                   const isPrepaid = (String(order.payment_status || '').toLowerCase() === 'paid' || ['wallet', 'prepaid', 'razorpay', 'online'].includes(String(order.payment_mode || '').toLowerCase())) && Number(order.total_amount || 0) > 0;
-                  const confirmMsg = isSubscription
-                    ? `Mark Subscription Order #${orderId} as Failed / Undelivered?\n\n(Subscription delivery will be marked as Failed without wallet deduction.)`
-                    : isPrepaid
-                    ? `Mark One-Time Order #${orderId} as Failed / Undelivered?\n\n💰 Automated Refund: Prepaid amount of ₹${Number(order.total_amount || 0).toFixed(2)} will be immediately credited to the customer's wallet balance.`
-                    : `Mark Order #${orderId} as Failed / Undelivered?`;
-                  if (window.confirm(confirmMsg)) {
-                    onUpdateStatus(orderId, 'failed');
-                  }
+                  setActionModal({
+                    isOpen: true,
+                    type: 'single-fail',
+                    data: {
+                      orderId,
+                      customerName,
+                      isSubscription,
+                      isPrepaid,
+                      totalAmount: Number(order.total_amount || 0),
+                    },
+                  });
                 }}
                 className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
               >
@@ -376,9 +405,14 @@ export default function OrderDetailsDrawer({
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm(`Mark Order #${orderId} as Delivered?`)) {
-                    onUpdateStatus(orderId, 'delivered');
-                  }
+                  setActionModal({
+                    isOpen: true,
+                    type: 'single-deliver',
+                    data: {
+                      orderId,
+                      customerName,
+                    },
+                  });
                 }}
                 className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
               >
@@ -398,6 +432,16 @@ export default function OrderDetailsDrawer({
         </div>
 
       </div>
+
+      {/* Action Confirmation Modal */}
+      <OrderActionModal
+        isOpen={actionModal.isOpen}
+        type={actionModal.type}
+        data={actionModal.data}
+        loading={actionLoading}
+        onClose={() => setActionModal({ isOpen: false, type: null })}
+        onConfirm={handleConfirmAction}
+      />
     </div>
   );
 }

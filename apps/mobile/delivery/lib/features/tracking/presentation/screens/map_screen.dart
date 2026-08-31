@@ -75,14 +75,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _calculateShortestPath(List<GroupedStop> stops) async {
-    if (stops.isEmpty || _isCalculatingRoute) return;
+  Future<void> _calculateShortestPath(List<GroupedStop> stops, {GroupedStop? targetedStop, bool force = false}) async {
+    if (stops.isEmpty) return;
+    if (_isCalculatingRoute && !force) return;
     _isCalculatingRoute = true;
     try {
       final routeService = sl<RouteOptimizationService>();
+      final target = targetedStop ?? _selectedStop;
       final result = await routeService.fetchShortestPathRoute(
         currentPosition: _currentPosition,
         stops: stops,
+        targetedStop: target,
+        forceRefresh: force,
       );
 
       if (mounted) {
@@ -222,6 +226,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               setState(() {
                 _selectedStop = stop;
               });
+              _calculateShortestPath(groupedStops, targetedStop: stop, force: true);
               _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
             },
             child: Stack(
@@ -1351,6 +1356,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         setState(() {
           _selectedStop = stop;
         });
+        _calculateShortestPath(effectiveStops, targetedStop: stop, force: true);
         _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
       },
       onShowConfirmation: (stop) => _showConfirmation(context, stop),
