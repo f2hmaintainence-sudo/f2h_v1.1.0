@@ -18,9 +18,12 @@ import {
   Loader2,
   FileText,
   Sparkles,
+  Sun,
+  Moon,
   PlusCircle
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
+import { getShiftInfo } from "@/components/f2h/DeliveryPartnerDragBoard";
 
 interface DeliveryOrderSwapModalProps {
   orderId: string | null;
@@ -165,6 +168,8 @@ export default function DeliveryOrderSwapModal({
         delivery_slot: sourceOrder?.delivery_slot,
       }];
 
+  const sourceShift = sourceOrder ? getShiftInfo(sourceOrder.delivery_slot, sourceOrder.current_run_id) : null;
+
   const handleExecute = async () => {
     if (!sourceOrder || !selectedPartner) return;
     setSubmitting(true);
@@ -224,20 +229,20 @@ export default function DeliveryOrderSwapModal({
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200 my-8">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-6 py-4 text-white flex items-center justify-between">
+        {/* Header - Enterprise Slate/Emerald Theme */}
+        <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 px-6 py-4 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
               <ArrowRightLeft size={20} />
             </div>
             <div>
               <h3 className="text-base font-black tracking-tight">Address Stop Reassignment & Swap</h3>
-              <p className="text-xs text-indigo-200/80">Reassign or swap address stop with all associated orders in branch</p>
+              <p className="text-xs text-emerald-200/80">Reassign or swap address stop with all associated orders in branch</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white"
+            className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -247,8 +252,8 @@ export default function DeliveryOrderSwapModal({
         <div className="p-6 max-h-[75vh] overflow-y-auto space-y-5">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-              <p className="text-xs font-semibold">Checking available partners in branch and locking stop...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+              <p className="text-xs font-semibold">Checking available partners in branch...</p>
             </div>
           ) : fetchError ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-5 text-rose-800 space-y-2">
@@ -260,7 +265,7 @@ export default function DeliveryOrderSwapModal({
               <div className="pt-3">
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Close
                 </button>
@@ -269,13 +274,19 @@ export default function DeliveryOrderSwapModal({
           ) : sourceOrder ? (
             <>
               {/* Source Address Stop Card */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3 shadow-2xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Current Stop</span>
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
                       {sourceOrdersList.length} {sourceOrdersList.length === 1 ? "Order" : "Orders"} at this address
                     </span>
+                    {sourceShift && (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 ${sourceShift.badgeClass}`}>
+                        {sourceShift.shift === "morning" ? <Sun size={10} className="text-amber-600" /> : <Moon size={10} className="text-teal-700" />}
+                        <span>{sourceShift.code}</span>
+                      </span>
+                    )}
                   </div>
                   <span className="text-xs font-black text-slate-700 font-mono">
                     #{sourceOrder.order_id}
@@ -286,7 +297,7 @@ export default function DeliveryOrderSwapModal({
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Customer & Address</p>
                     <p className="font-bold text-slate-900 flex items-center gap-1.5 truncate">
-                      <User size={13} className="text-indigo-600 shrink-0" />
+                      <User size={13} className="text-emerald-600 shrink-0" />
                       {sourceOrder.customer_name || "Customer"}
                     </p>
                     <p className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-relaxed">
@@ -302,7 +313,7 @@ export default function DeliveryOrderSwapModal({
                       {sourceOrder.current_partner_name || "Partner"}
                     </p>
                     <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                      <span className="font-mono font-semibold text-indigo-600">{sourceOrder.current_run_id}</span>
+                      <span className="font-mono font-semibold text-emerald-700">{sourceOrder.current_run_id}</span>
                       <span className="capitalize px-1.5 py-0.5 rounded bg-slate-200 text-[10px] font-bold text-slate-700">
                         {sourceOrder.delivery_slot}
                       </span>
@@ -322,7 +333,7 @@ export default function DeliveryOrderSwapModal({
                           key={ord.order_id}
                           className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 shadow-2xs"
                         >
-                          <Package size={11} className="text-indigo-600" />
+                          <Package size={11} className="text-emerald-600" />
                           <span className="font-mono">{ord.order_id}</span>
                         </div>
                       ))}
@@ -342,9 +353,9 @@ export default function DeliveryOrderSwapModal({
                         setSelectedAddressId("");
                         setSelectedTargetOrderId("");
                       }}
-                      className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                      className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         mode === "move"
-                          ? "bg-white text-indigo-700 shadow-sm"
+                          ? "bg-white text-emerald-800 shadow-sm"
                           : "text-slate-500 hover:text-slate-800"
                       }`}
                     >
@@ -357,9 +368,9 @@ export default function DeliveryOrderSwapModal({
                         setSelectedAddressId("");
                         setSelectedTargetOrderId("");
                       }}
-                      className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                      className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         mode === "swap"
-                          ? "bg-white text-indigo-700 shadow-sm"
+                          ? "bg-white text-emerald-800 shadow-sm"
                           : "text-slate-500 hover:text-slate-800"
                       }`}
                     >
@@ -395,6 +406,7 @@ export default function DeliveryOrderSwapModal({
                         {eligiblePartners.map((partner) => {
                           const isSelected = selectedPartnerId === partner.delivery_partner_id;
                           const isSwapDisabled = mode === "swap" && (!partner.has_existing_run || partner.address_stops.length === 0);
+                          const pShift = getShiftInfo(partner.delivery_slot, partner.run_id ?? undefined);
 
                           return (
                             <div
@@ -409,14 +421,14 @@ export default function DeliveryOrderSwapModal({
                                 isSwapDisabled
                                   ? "border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed"
                                   : isSelected
-                                  ? "border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20 cursor-pointer"
-                                  : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer"
+                                  ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 cursor-pointer"
+                                  : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-slate-50/50 cursor-pointer"
                               }`}
                             >
                               <div className="flex items-center gap-3">
                                 <div
                                   className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                    isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
+                                    isSelected ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"
                                   }`}
                                 >
                                   <Truck size={18} />
@@ -425,10 +437,15 @@ export default function DeliveryOrderSwapModal({
                                   <div className="flex items-center gap-2">
                                     <span className="font-bold text-xs text-slate-900">{partner.partner_name || "Partner"}</span>
                                     {partner.run_id ? (
-                                      <span className="text-[10px] font-mono font-bold text-slate-400">{partner.run_id}</span>
+                                      <span className="text-[10px] font-mono font-bold text-slate-500">{partner.run_id}</span>
                                     ) : (
-                                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/60 px-1.5 py-0.2 rounded">
+                                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/60 px-1.5 py-0.2 rounded">
                                         No Run Yet
+                                      </span>
+                                    )}
+                                    {partner.run_id && (
+                                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${pShift.badgeClass}`}>
+                                        {pShift.code}
                                       </span>
                                     )}
                                   </div>
@@ -442,11 +459,11 @@ export default function DeliveryOrderSwapModal({
 
                               <div className="text-right">
                                 {partner.has_existing_run ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-700">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800">
                                     Active Run
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-100 text-blue-700 flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-teal-100 text-teal-800 flex items-center gap-1">
                                     <Sparkles size={10} /> New Run
                                   </span>
                                 )}
@@ -460,12 +477,12 @@ export default function DeliveryOrderSwapModal({
 
                   {/* Move info or Swap Target Selection */}
                   {mode === "move" && selectedPartner && (
-                    <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200/70 text-xs text-indigo-900 space-y-1 animate-in fade-in duration-200">
+                    <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-900 space-y-1 animate-in fade-in duration-200">
                       <div className="flex items-center gap-1.5 font-bold">
-                        <CheckCircle2 size={14} className="text-indigo-600" />
+                        <CheckCircle2 size={14} className="text-emerald-600" />
                         <span>Ready to move address stop to {selectedPartner.partner_name}</span>
                       </div>
-                      <p className="text-[11px] text-indigo-700 leading-relaxed">
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
                         {selectedPartner.has_existing_run
                           ? `Will append address stop and ${sourceOrdersList.length} order(s) to existing run ${selectedPartner.run_id}.`
                           : `Will auto-create a new delivery run for ${selectedPartner.partner_name} on ${sourceOrder.scheduled_date} (${sourceOrder.delivery_slot}) with this address stop.`}
@@ -487,36 +504,36 @@ export default function DeliveryOrderSwapModal({
 
                       {selectedPartner.address_stops.length === 0 ? (
                         <div className="p-4 rounded-xl bg-slate-50 border text-xs text-slate-500 text-center">
-                          No active address stops found in this run to swap with.
+                          No transferable address stops found in this run to swap with.
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
                           {selectedPartner.address_stops.map((stop) => {
                             const isSelected = selectedAddressId === stop.address_id;
                             const stopOrders = stop.orders || [];
-                            const stopStatus = stop.delivery_status || "pending";
-                            const isPending = stopStatus === "pending";
+                            const stopStatus = (stop.delivery_status || "pending").toLowerCase();
+                            const isTransferable = ["pending", "in_transit", "in-transit"].includes(stopStatus);
 
                             return (
                               <div
                                 key={stop.address_id}
                                 onClick={() => {
-                                  if (!isPending) return;
+                                  if (!isTransferable) return;
                                   setSelectedAddressId(stop.address_id);
                                   setSelectedTargetOrderId(stopOrders[0]?.order_id || "");
                                 }}
                                 className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
-                                  !isPending
+                                  !isTransferable
                                     ? "border-slate-100 bg-slate-50/60 opacity-60 cursor-not-allowed"
                                     : isSelected
-                                    ? "border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20 cursor-pointer"
-                                    : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer"
+                                    ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 cursor-pointer"
+                                    : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-slate-50/50 cursor-pointer"
                                 }`}
                               >
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
                                     <span className="font-bold text-xs text-slate-900">{stop.customer_name}</span>
-                                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
+                                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60">
                                       Stop #{stop.sequence_no || 1}
                                     </span>
                                   </div>
@@ -537,10 +554,12 @@ export default function DeliveryOrderSwapModal({
                                         ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                                         : stopStatus === "failed"
                                         ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                        : stopStatus === "in_transit" || stopStatus === "in-transit"
+                                        ? "bg-sky-50 text-sky-800 border border-sky-200"
                                         : "bg-amber-50 text-amber-800 border border-amber-200"
                                     }`}
                                   >
-                                    {stopStatus}
+                                    {stopStatus === "in_transit" || stopStatus === "in-transit" ? "In Transit" : stopStatus}
                                   </span>
                                 </div>
                               </div>
@@ -561,7 +580,7 @@ export default function DeliveryOrderSwapModal({
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       placeholder="e.g., Partner vehicle capacity adjustment or route optimization"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 bg-slate-50/50"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 bg-slate-50/50"
                     />
                   </div>
                 </div>
@@ -570,9 +589,9 @@ export default function DeliveryOrderSwapModal({
               {/* Confirmation Preview Step */}
               {confirmStep && (
                 <div className="space-y-4 animate-in fade-in duration-200">
-                  <div className="p-5 rounded-2xl bg-indigo-50/60 border border-indigo-200 space-y-4">
-                    <div className="flex items-center gap-2 text-indigo-900 font-black text-sm">
-                      <CheckCircle2 size={18} className="text-indigo-600" />
+                  <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-4">
+                    <div className="flex items-center gap-2 text-emerald-950 font-black text-sm">
+                      <CheckCircle2 size={18} className="text-emerald-600" />
                       <span>Confirm Reassignment Breakdown</span>
                     </div>
 
@@ -581,16 +600,16 @@ export default function DeliveryOrderSwapModal({
                         <p className="text-slate-600 leading-relaxed">
                           You are moving Customer Stop <span className="font-bold text-slate-900">{sourceOrder.customer_name}</span> ({sourceOrdersList.length} orders) from{" "}
                           <span className="font-bold text-slate-900">{sourceOrder.current_partner_name}</span> ({sourceOrder.current_run_id}) to{" "}
-                          <span className="font-bold text-indigo-700">{selectedPartner?.partner_name}</span>.
+                          <span className="font-bold text-emerald-800">{selectedPartner?.partner_name}</span>.
                         </p>
-                        <div className="bg-white rounded-xl p-3 border border-indigo-100 space-y-1.5 text-[11px]">
+                        <div className="bg-white rounded-xl p-3 border border-emerald-100 space-y-1.5 text-[11px]">
                           <div className="flex justify-between">
                             <span className="text-slate-400">Target Delivery Partner:</span>
                             <span className="font-bold text-slate-800">{selectedPartner?.partner_name}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">Target Delivery Run:</span>
-                            <span className="font-mono font-bold text-indigo-600">
+                            <span className="font-mono font-bold text-emerald-700">
                               {selectedPartner?.run_id ? selectedPartner.run_id : "Auto-created New Run"}
                             </span>
                           </div>
@@ -615,27 +634,27 @@ export default function DeliveryOrderSwapModal({
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                          <div className="p-3 bg-white rounded-xl border border-indigo-100 space-y-1">
+                          <div className="p-3 bg-white rounded-xl border border-emerald-100 space-y-1">
                             <span className="text-[10px] font-bold uppercase text-slate-400">Stop A ({sourceOrder.current_partner_name})</span>
                             <p className="text-slate-900 font-bold">{sourceOrder.customer_name}</p>
                             <p className="text-[10px] text-slate-500 font-mono">
                               {sourceOrdersList.map((o) => o.order_id).join(", ")}
                             </p>
-                            <p className="text-indigo-600 text-[10px] font-bold">&rarr; Moving to {selectedPartner?.partner_name}</p>
+                            <p className="text-emerald-700 text-[10px] font-bold">&rarr; Moving to {selectedPartner?.partner_name}</p>
                           </div>
 
-                          <div className="p-3 bg-white rounded-xl border border-indigo-100 space-y-1">
+                          <div className="p-3 bg-white rounded-xl border border-emerald-100 space-y-1">
                             <span className="text-[10px] font-bold uppercase text-slate-400">Stop B ({selectedPartner?.partner_name})</span>
                             <p className="text-slate-900 font-bold">{selectedStop?.customer_name}</p>
                             <p className="text-[10px] text-slate-500 font-mono">
                               {selectedStop?.orders?.map((o) => o.order_id).join(", ")}
                             </p>
-                            <p className="text-indigo-600 text-[10px] font-bold">&rarr; Moving to {sourceOrder.current_partner_name}</p>
+                            <p className="text-emerald-700 text-[10px] font-bold">&rarr; Moving to {sourceOrder.current_partner_name}</p>
                           </div>
                         </div>
 
                         {reason && (
-                          <div className="bg-white rounded-xl p-2.5 border border-indigo-100 text-[11px] flex justify-between text-slate-600">
+                          <div className="bg-white rounded-xl p-2.5 border border-emerald-100 text-[11px] flex justify-between text-slate-600">
                             <span className="text-slate-400">Reason:</span>
                             <span className="italic">{reason}</span>
                           </div>
@@ -655,7 +674,7 @@ export default function DeliveryOrderSwapModal({
             type="button"
             onClick={confirmStep ? () => setConfirmStep(false) : onClose}
             disabled={submitting}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
           >
             {confirmStep ? "Back" : "Cancel"}
           </button>
@@ -671,7 +690,7 @@ export default function DeliveryOrderSwapModal({
                     (mode === "swap" && !selectedAddressId)
                   }
                   onClick={() => setConfirmStep(true)}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-500/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Review {mode === "move" ? "Move" : "Swap"}</span>
                   <ArrowRight size={14} />
@@ -681,7 +700,7 @@ export default function DeliveryOrderSwapModal({
                   type="button"
                   disabled={submitting}
                   onClick={handleExecute}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
                   {submitting ? (
                     <>

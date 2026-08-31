@@ -100,18 +100,9 @@ const Duration _kResultCacheTtl = Duration(seconds: 45);
 /// ~11 m. Below this the rider has not moved enough to change the road route.
 const int _kOriginKeyPrecision = 4;
 
-/// Minimum floor for the geometry-vs-distance ceiling.  Even a very short run
-/// can have a diagonal that exceeds a tight road distance, because the overview
-/// polyline simplifies curves.
-const double _kGeometryFloorKm = 5.0;
-
-/// Proportional factor: the bounding-box diagonal may be up to this fraction
-/// of the road distance.  A diagonal can never exceed the path it encloses, but
-/// Google's overview polyline is simplified — so in practice the straight-line
-/// span sometimes sits around 60-80 % of the driving distance.  1.5× gives
-/// ample room while still catching obviously corrupt payloads (e.g. a point on
-/// another continent).
-const double _kGeometryRatioMax = 1.5;
+/// Tolerance on the geometry-versus-distance check, absorbing rounding and the
+/// simplification Google applies to an overview polyline.
+const double _kGeometrySlackKm = 1.0;
 
 class RouteOptimizationService {
   final LocationService _locationService;
@@ -319,34 +310,19 @@ class RouteOptimizationService {
         ((data['distanceMeters'] as num?)?.toDouble() ?? 0) / 1000.0;
     final geometrySpanKm =
         _geometrySpanKm([fullPoints, for (final leg in legs) leg.points]);
-
-    // Proportional ceiling: allow the diagonal to be up to _kGeometryRatioMax
-    // of the road distance, with an absolute floor so very short routes are
-    // never rejected.
-    final ceilingKm = totalDistanceKmRaw > 0
-        ? (totalDistanceKmRaw * _kGeometryRatioMax)
-            .clamp(_kGeometryFloorKm, double.infinity)
-        : _kGeometryFloorKm;
-
-    if (geometrySpanKm > ceilingKm) {
-      devLog('[route] REJECTED geometry: diagonal '
-          '${geometrySpanKm.toStringAsFixed(2)} km exceeds ceiling '
-          '${ceilingKm.toStringAsFixed(2)} km '
-          '(provider ${data['provider']}, reported '
-          '${totalDistanceKmRaw.toStringAsFixed(3)} km, '
-          '${fullPoints.length} points, ${legs.length} legs)');
+    if (geometrySpanKm > totalDistanceKmRaw + _kGeometrySlackKm) {
+      // Rider-facing text stays generic; the numbers that identify the bad
+      // payload go to the debug log.
+      devLog('[route] rejected geometry: spans '
+          '${geometrySpanKm.toStringAsFixed(1)} km but provider '
+          '${data['provider']} reported '
+          '${totalDistanceKmRaw.toStringAsFixed(3)} km '
+          '(${fullPoints.length} route points, ${legs.length} legs)');
       return OptimizedRouteResult.unavailable(
         orderedStops: orderedStops,
         reason: 'Routing service returned inconsistent road geometry',
       );
     }
-
-    devLog('[route] ACCEPTED geometry: diagonal '
-        '${geometrySpanKm.toStringAsFixed(2)} km, ceiling '
-        '${ceilingKm.toStringAsFixed(2)} km '
-        '(provider ${data['provider']}, '
-        '${totalDistanceKmRaw.toStringAsFixed(1)} km, '
-        '${fullPoints.length} pts, ${legs.length} legs)');
 
     // Leg 0 is origin → next stop; the rest is what the rider still has to do
     // after that. Both come from Google, so the split lands on a real junction.

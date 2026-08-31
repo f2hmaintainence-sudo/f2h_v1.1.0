@@ -75,10 +75,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _calculateShortestPath(
-    List<GroupedStop> stops, {
-    bool forceRefresh = false,
-  }) async {
+  Future<void> _calculateShortestPath(List<GroupedStop> stops) async {
     if (stops.isEmpty || _isCalculatingRoute) return;
     _isCalculatingRoute = true;
     try {
@@ -86,7 +83,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       final result = await routeService.fetchShortestPathRoute(
         currentPosition: _currentPosition,
         stops: stops,
-        forceRefresh: forceRefresh,
       );
 
       if (mounted) {
@@ -168,7 +164,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
         final sessionState = context.read<DeliverySessionBloc>().state;
         if (sessionState is DeliverySessionLoaded) {
-          _calculateShortestPath(sessionState.groupedStops, forceRefresh: true);
+          _calculateShortestPath(sessionState.groupedStops);
         }
       } else {
         if (!mounted) return;
@@ -1119,91 +1115,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       );
     }
 
-    if (!route.hasRoute) {
-      // No road route came back. The map deliberately shows no line at all —
-      // a straight hop between stops is not a road the rider can take.
-      if (route.status != RouteStatus.unavailable) {
-        return const SizedBox.shrink();
-      }
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.96),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFFDE68A), width: 1.5),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1F000000),
-              blurRadius: 14,
-              offset: Offset(0, 4),
-            )
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFEF3C7),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.alt_route_rounded, color: Color(0xFFD97706), size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Road route unavailable',
-                    style: GoogleFonts.roboto(
-                      color: const Color(0xFF0F172A),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    route.unavailableReason ?? 'Stops are listed in nearest-first order.',
-                    style: GoogleFonts.roboto(
-                      color: const Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => _calculateShortestPath(route.orderedStops, forceRefresh: true),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.refresh_rounded, size: 13, color: Color(0xFF475569)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Retry',
-                      style: GoogleFonts.roboto(
-                        color: const Color(0xFF475569),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 10.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+    if (route.fullRoutePoints.length < 2) {
+      return const SizedBox.shrink();
     }
 
     final nextPending = pendingStops.first;
@@ -1240,7 +1153,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     const Icon(Icons.bolt_rounded, color: Colors.white, size: 13),
                     const SizedBox(width: 4),
                     Text(
-                      'FASTEST ROUTE',
+                      'SHORTEST ROUTE',
                       style: GoogleFonts.roboto(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,

@@ -32,13 +32,29 @@ class SubscriptionButton extends StatelessWidget {
 
   void _openSetup(BuildContext context) {
     HapticFeedback.lightImpact();
+    final vars = product.variants.isNotEmpty ? product.variants : product.allVariants;
+    final initialVar = selectedVariant ??
+        vars.firstWhere(
+          (v) => v.id == product.id,
+          orElse: () => vars.firstWhere(
+            (v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0 && !v.isOutOfStock,
+            orElse: () => vars.firstOrNull ?? ProductVariant(
+              id: product.id,
+              label: product.unit,
+              price: product.price,
+              originalPrice: product.originalPrice,
+              subscriptionPrice: product.subscriptionPrice,
+            ),
+          ),
+        );
+
     context.runWithAuth(() {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => SubscriptionSetupScreen(
             product: product,
-            initialVariant: selectedVariant ?? product.allVariants.firstOrNull,
+            initialVariant: initialVar,
           ),
         ),
       );

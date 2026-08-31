@@ -267,9 +267,9 @@ export default function DeliveryRunsPage() {
   };
 
   const methodLabels: Record<string, { label: string; color: string; desc: string }> = {
-    auto_history: { label: "History", color: "bg-purple-100 text-purple-700", desc: "Based on previous delivery history" },
-    auto_cluster: { label: "Cluster", color: "bg-blue-100 text-blue-700", desc: "Proximity-based address clustering" },
-    auto_balanced: { label: "Balanced", color: "bg-teal-100 text-teal-700", desc: "Load-balanced across partners" },
+    auto_history: { label: "History", color: "bg-emerald-100 text-emerald-800", desc: "Based on previous delivery history" },
+    auto_cluster: { label: "Cluster", color: "bg-blue-100 text-blue-800", desc: "Proximity-based address clustering" },
+    auto_balanced: { label: "Balanced", color: "bg-teal-100 text-teal-800", desc: "Load-balanced across partners" },
     manual: { label: "Manual", color: "bg-slate-100 text-slate-700", desc: "Manually assigned" },
   };
 
@@ -307,9 +307,9 @@ export default function DeliveryRunsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <Route size={24} className="text-emerald-500" /> Delivery Runs & Order Swap
+            <Route size={24} className="text-emerald-600" /> Delivery Runs & Order Swap
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Manage delivery runs, inspect address stops, and perform controlled order moves or swaps between partners
           </p>
         </div>
@@ -319,7 +319,7 @@ export default function DeliveryRunsPage() {
               fetchSummary();
               fetchRunsWithOrders();
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
           >
             <RefreshCw size={14} /> Refresh
           </button>
@@ -339,7 +339,7 @@ export default function DeliveryRunsPage() {
             { label: "In Progress", value: summary.in_progress, color: "bg-blue-50 border-blue-200", icon: Truck },
             { label: "Completed", value: summary.completed, color: "bg-emerald-50 border-emerald-200", icon: CheckCircle2 },
             { label: "Unassigned Orders", value: summary.unassigned, color: "bg-amber-50 border-amber-200", icon: AlertTriangle },
-            { label: "Active Partners", value: summary.active_partners, color: "bg-indigo-50 border-indigo-200", icon: Users },
+            { label: "Active Partners", value: summary.active_partners, color: "bg-teal-50 border-teal-200", icon: Users },
           ].map((c) => {
             const Icon = c.icon;
             return (
@@ -373,14 +373,14 @@ export default function DeliveryRunsPage() {
           onClick={() => setActiveTab("drag_board")}
           className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === "drag_board"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
           }`}
         >
-          <ArrowRightLeft size={14} className={activeTab === "drag_board" ? "text-white" : "text-indigo-600"} />
+          <ArrowRightLeft size={14} className={activeTab === "drag_board" ? "text-white" : "text-emerald-600"} />
           <span>2-Partner Drag & Drop Board</span>
           <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-400 text-slate-950 uppercase">
-            New
+            Live
           </span>
         </button>
 
@@ -392,7 +392,7 @@ export default function DeliveryRunsPage() {
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
           }`}
         >
-          <Route size={14} className={activeTab === "manage" ? "text-indigo-400" : ""} />
+          <Route size={14} className={activeTab === "manage" ? "text-emerald-400" : ""} />
           <span>Address Stops by Run</span>
           <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === "manage" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"}`}>
             {runsList.length}
@@ -423,9 +423,9 @@ export default function DeliveryRunsPage() {
                 </div>
 
                 <div className="grid sm:grid-cols-3 gap-3">
-                  <div className="rounded-2xl border border-purple-100 bg-white/90 p-4 shadow-xs">
+                  <div className="rounded-2xl border border-emerald-200/80 bg-white/90 p-4 shadow-xs">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="h-8 w-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
                         <Target size={16} />
                       </div>
                       <h4 className="text-xs font-bold text-slate-900">1. History Based</h4>
@@ -447,9 +447,9 @@ export default function DeliveryRunsPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-emerald-100 bg-white/90 p-4 shadow-xs">
+                  <div className="rounded-2xl border border-teal-100 bg-white/90 p-4 shadow-xs">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                      <div className="h-8 w-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center">
                         <BarChart3 size={16} />
                       </div>
                       <h4 className="text-xs font-bold text-slate-900">3. Load Balanced</h4>
@@ -699,7 +699,7 @@ export default function DeliveryRunsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setActiveTab("drag_board")}
-                      className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <ArrowRightLeft size={13} />
                       <span>Fine-Tune in Drag & Drop Board</span>
@@ -727,8 +727,8 @@ export default function DeliveryRunsPage() {
                     <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Remaining Unassigned</p>
                     <p className="text-2xl font-black text-amber-800 mt-0.5">{result.remaining}</p>
                   </div>
-                  <div className="bg-purple-50 rounded-xl p-3.5 border border-purple-100">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-purple-600">Methods Used</p>
+                  <div className="bg-teal-50 rounded-xl p-3.5 border border-teal-100">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Methods Used</p>
                     <div className="flex gap-1 mt-1.5 flex-wrap">
                       {Object.entries(result.methods).filter(([, v]) => v > 0).map(([k, v]) => {
                         const ml = methodLabels[k];
@@ -767,7 +767,7 @@ export default function DeliveryRunsPage() {
                               <td className="px-4 py-3 font-bold text-slate-800">{run.partner_name || "—"}</td>
                               <td className="px-4 py-3 text-center capitalize text-slate-600">{run.slot}</td>
                               <td className="px-4 py-3 text-center">
-                                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-800 rounded-full font-bold">
+                                <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 rounded-full font-bold">
                                   {run.addresses} Stops
                                 </span>
                               </td>
@@ -803,7 +803,7 @@ export default function DeliveryRunsPage() {
                   type="date"
                   value={manageDate}
                   onChange={(e) => setManageDate(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 />
               </div>
 
@@ -814,7 +814,7 @@ export default function DeliveryRunsPage() {
                 <select
                   value={manageBranch}
                   onChange={(e) => setManageBranch(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 >
                   <option value="">All Branches</option>
                   {branches.map((b: any) => (
@@ -832,7 +832,7 @@ export default function DeliveryRunsPage() {
                 <select
                   value={manageSlot}
                   onChange={(e) => setManageSlot(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 >
                   <option value="">All Slots</option>
                   <option value="morning">Morning</option>
@@ -876,7 +876,7 @@ export default function DeliveryRunsPage() {
                   type="date"
                   value={manageDate}
                   onChange={(e) => setManageDate(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 />
               </div>
 
@@ -888,7 +888,7 @@ export default function DeliveryRunsPage() {
                 <select
                   value={manageBranch}
                   onChange={(e) => setManageBranch(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 >
                   <option value="">All Branches</option>
                   {branches.map((b: any) => (
@@ -907,7 +907,7 @@ export default function DeliveryRunsPage() {
                 <select
                   value={manageSlot}
                   onChange={(e) => setManageSlot(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 >
                   <option value="">All Slots</option>
                   <option value="morning">Morning</option>
@@ -923,7 +923,7 @@ export default function DeliveryRunsPage() {
                 <select
                   value={manageStatus}
                   onChange={(e) => setManageStatus(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 >
                   <option value="">All Statuses</option>
                   <option value="assigned">Assigned</option>
@@ -944,14 +944,14 @@ export default function DeliveryRunsPage() {
                   placeholder="Search partner, customer, run ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-600 focus:outline-none"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-none"
                 />
               </div>
 
               <button
                 onClick={() => fetchRunsWithOrders()}
                 disabled={runsLoading}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <RefreshCw size={13} className={runsLoading ? "animate-spin" : ""} />
                 <span className="hidden sm:inline">Refresh</span>
@@ -962,7 +962,7 @@ export default function DeliveryRunsPage() {
           {/* Runs & Address Stops List */}
           {runsLoading ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600" />
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" />
               <p className="text-xs text-slate-500 font-semibold mt-3">Loading delivery runs and address stops...</p>
             </div>
           ) : filteredRuns.length === 0 ? (
@@ -974,7 +974,7 @@ export default function DeliveryRunsPage() {
               </p>
               <button
                 onClick={() => setActiveTab("generate")}
-                className="mt-4 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-all inline-flex items-center gap-1.5"
+                className="mt-4 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-all inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <Zap size={14} />
                 <span>Go to Auto-Generate Runs</span>
@@ -1021,7 +1021,7 @@ export default function DeliveryRunsPage() {
                                   ? "bg-amber-100 text-amber-800"
                                   : run.status === "cancelled"
                                   ? "bg-rose-100 text-rose-800"
-                                  : "bg-indigo-100 text-indigo-800"
+                                  : "bg-slate-100 text-slate-800 border border-slate-200"
                               }`}
                             >
                               {run.status}
@@ -1064,9 +1064,9 @@ export default function DeliveryRunsPage() {
                           <tbody className="divide-y divide-slate-100">
                             {addressStops.map((stop: any, idx: number) => {
                               const canSwap = !["completed", "cancelled"].includes(run.status);
-                              const isPending = stop.delivery_status === "pending";
+                              const stopStatus = (stop.delivery_status || "pending").toLowerCase();
+                              const isTransferable = ["pending", "in_transit", "in-transit"].includes(stopStatus);
                               const firstOrderId = stop.orders?.[0]?.order_id;
-                              const stopStatus = stop.delivery_status || "pending";
                               return (
                                 <tr key={idx} className="hover:bg-white transition-colors">
                                   <td className="px-2 py-2.5 font-mono font-bold text-slate-600">#{stop.sequence_no || idx + 1}</td>
@@ -1076,36 +1076,38 @@ export default function DeliveryRunsPage() {
                                     <span
                                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
                                         stopStatus === "delivered"
-                                          ? "bg-emerald-100 text-emerald-800"
+                                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                                           : stopStatus === "failed"
-                                          ? "bg-rose-100 text-rose-800"
-                                          : "bg-amber-50 text-amber-800"
+                                          ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                          : stopStatus === "in_transit" || stopStatus === "in-transit"
+                                          ? "bg-sky-50 text-sky-800 border border-sky-200"
+                                          : "bg-amber-50 text-amber-800 border border-amber-200"
                                       }`}
                                     >
-                                      {stopStatus}
+                                      {stopStatus === "in_transit" || stopStatus === "in-transit" ? "In Transit" : stopStatus}
                                     </span>
                                   </td>
                                   <td className="py-2.5 pr-2 text-right">
-                                        <button
-                                          onClick={() => {
-                                            if (firstOrderId) setSwapModalOrderId(firstOrderId);
-                                          }}
-                                          disabled={!canSwap || !firstOrderId}
-                                          title={
-                                            !isPending
-                                              ? "Only pending stops can be swapped or moved"
-                                              : ["completed", "cancelled"].includes(run.status)
-                                              ? `Cannot modify ${run.status} run`
-                                              : "Swap or Move this address stop"
-                                          }
-                                          className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition-colors border border-indigo-200/60 inline-flex items-center gap-1 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                                        >
-                                          <ArrowRightLeft size={11} />
-                                          <span>Swap / Move</span>
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
+                                    <button
+                                      onClick={() => {
+                                        if (firstOrderId) setSwapModalOrderId(firstOrderId);
+                                      }}
+                                      disabled={!canSwap || !firstOrderId || !isTransferable}
+                                      title={
+                                        !isTransferable
+                                          ? "Only pending or in-transit stops can be swapped or moved"
+                                          : ["completed", "cancelled"].includes(run.status)
+                                          ? `Cannot modify ${run.status} run`
+                                          : "Swap or Move this address stop"
+                                      }
+                                      className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] transition-colors border border-emerald-200/60 inline-flex items-center gap-1 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                    >
+                                      <ArrowRightLeft size={11} />
+                                      <span>Swap / Move</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
                             })}
                           </tbody>
                         </table>
@@ -1139,7 +1141,7 @@ export default function DeliveryRunsPage() {
               <div className="rounded-xl bg-slate-50 border p-4 mb-6 text-left space-y-2.5">
                 <div className="flex justify-between text-xs">
                   <span className="font-semibold text-slate-400 uppercase tracking-wider">Run Date:</span>
-                  <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                  <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
                     {generateDate}
                   </span>
                 </div>
@@ -1169,7 +1171,7 @@ export default function DeliveryRunsPage() {
                 <button
                   type="button"
                   onClick={() => setConfirmOpen(false)}
-                  className="h-12 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="h-12 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1177,7 +1179,7 @@ export default function DeliveryRunsPage() {
                 <button
                   type="button"
                   onClick={executeCreateRuns}
-                  className="h-12 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
+                  className="h-12 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-600/20 cursor-pointer"
                 >
                   Confirm & Generate
                 </button>

@@ -90,33 +90,55 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       _variant.isOutOfStock ||
       (_variant.id == widget.product.id && widget.product.isOutOfStock);
 
+  String get _currentDisplayName {
+    if (_variant.label.trim().isNotEmpty && _variant.label.trim() != 'Standard') {
+      if (_variant.label.toLowerCase().contains(widget.product.name.toLowerCase()) ||
+          widget.product.name.toLowerCase().contains(_variant.label.toLowerCase())) {
+        return _variant.label;
+      }
+      final cleanBaseName = widget.product.name.split(' - ').first.trim();
+      final packUnit = _variant.formattedUnit.isNotEmpty ? _variant.formattedUnit : _variant.label;
+      return '$cleanBaseName - $packUnit';
+    }
+    return widget.product.name;
+  }
+
   @override
   void initState() {
     super.initState();
-    final vars = widget.product.allVariants;
-    _variant =
-        widget.initialVariant ??
-        vars.firstWhere(
-          (v) =>
-              v.subscriptionPrice != null &&
-              v.subscriptionPrice! > 0 &&
-              !v.isOutOfStock,
-          // Fall back to a subscribable pack even if sold out, so the screen
-          // still explains itself rather than silently showing another pack.
+    final vars = widget.product.variants.isNotEmpty
+        ? widget.product.variants
+        : widget.product.allVariants;
+
+    if (widget.initialVariant != null) {
+      _variant = vars.firstWhere(
+        (v) => v.id == widget.initialVariant!.id,
+        orElse: () => widget.initialVariant!,
+      );
+    } else {
+      _variant = vars.firstWhere(
+        (v) => v.id == widget.product.id && v.subscriptionPrice != null && v.subscriptionPrice! > 0,
+        orElse: () => vars.firstWhere(
+          (v) => v.id == widget.product.id,
           orElse: () => vars.firstWhere(
-            (v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0,
-            orElse: () => vars.isNotEmpty
-              ? vars.first
-                : ProductVariant(
-                    id: widget.product.id,
-                    label: widget.product.unit,
-                    price: widget.product.price,
-                    originalPrice: widget.product.originalPrice,
-                    subscriptionPrice: widget.product.subscriptionPrice,
-                    isOutOfStock: widget.product.isOutOfStock,
-                  ),
+            (v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0 && !v.isOutOfStock,
+            orElse: () => vars.firstWhere(
+              (v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0,
+              orElse: () => vars.isNotEmpty
+                  ? vars.first
+                  : ProductVariant(
+                      id: widget.product.id,
+                      label: widget.product.unit,
+                      price: widget.product.price,
+                      originalPrice: widget.product.originalPrice,
+                      subscriptionPrice: widget.product.subscriptionPrice,
+                      isOutOfStock: widget.product.isOutOfStock,
+                    ),
+            ),
           ),
-        );
+        ),
+      );
+    }
 
     _startDate = DateTime.now().add(const Duration(days: 1));
 
@@ -609,7 +631,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     : 'Default Address',
                 startDate: _startDate.toString().split(' ')[0],
                 estimatedMonthlyAmount: estimate.total,
-                productName: p.name,
+                productName: _currentDisplayName,
                 variantLabel: _variant.label,
               ),
             ),
@@ -729,10 +751,17 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Product Card ─────────────────────────────────────
 
   Widget _buildProductCard(Product p) {
-    final vars = p.allVariants
-        .where((v) => v.subscriptionPrice != null && v.subscriptionPrice! > 0)
+    final rawVars = p.variants.isNotEmpty ? p.variants : p.allVariants;
+    final vars = rawVars
+        .where((v) => (v.subscriptionPrice != null && v.subscriptionPrice! > 0) || v.price > 0)
         .toList();
-    if (vars.isEmpty) vars.addAll(p.allVariants);
+    if (vars.isEmpty) vars.addAll(rawVars);
+
+    final currentVariantImage = (_variant.imagePath != null && _variant.imagePath!.trim().isNotEmpty)
+        ? _variant.imagePath
+        : (_variant.images.isNotEmpty
+            ? _variant.images.first
+            : p.imageAsset);
 
     return _SectionCard(
       child: Column(
@@ -743,8 +772,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: buildProductImage(
-                  p.name,
-                  imageAsset: p.imageAsset,
+                  _currentDisplayName,
+                  imageAsset: currentVariantImage,
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
@@ -756,7 +785,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      p.name,
+                      _currentDisplayName,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w900,

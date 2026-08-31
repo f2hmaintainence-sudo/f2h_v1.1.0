@@ -207,7 +207,7 @@ class Product {
     if (variants.isNotEmpty) {
       final unique = <ProductVariant>[];
       for (final v in variants) {
-        if (!unique.any((u) => u.id == v.id || (u.formattedUnit.isNotEmpty && u.formattedUnit.toLowerCase() == v.formattedUnit.toLowerCase()))) {
+        if (!unique.any((u) => u.id == v.id)) {
           unique.add(v);
         }
       }

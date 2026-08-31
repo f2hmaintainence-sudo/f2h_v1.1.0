@@ -1908,10 +1908,15 @@ export class CustomersService {
   async getProductsList() {
     try {
       const rows = await this.databaseService.query(
-        `SELECT product_id, name, unit_type, is_active
-         FROM products
-         WHERE deleted_at IS NULL AND is_active = true
-         ORDER BY name ASC`,
+        `SELECT DISTINCT p.product_id, p.name, p.unit_type, p.is_active
+         FROM products p
+         JOIN product_variants pv ON pv.product_id = p.product_id
+         WHERE p.deleted_at IS NULL 
+           AND p.is_active = true 
+           AND (p.is_subscribable = true OR (pv.subscription_price IS NOT NULL AND pv.subscription_price > 0))
+           AND pv.deleted_at IS NULL 
+           AND pv.status = 'active'
+         ORDER BY p.name ASC`,
         [],
       );
       return { status: true, data: rows };
@@ -1924,11 +1929,17 @@ export class CustomersService {
   async getProductVariants(productId: string) {
     try {
       const rows = await this.databaseService.query(
-        `SELECT variant_id, product_id, name, price, subscription_price,
-                original_price, discount, unit_value, unit_type, status
-         FROM product_variants
-         WHERE product_id = $1 AND deleted_at IS NULL AND status = 'active'
-         ORDER BY sort_order ASC, name ASC`,
+        `SELECT pv.variant_id, pv.product_id, pv.name, pv.price, 
+                COALESCE(pv.subscription_price, pv.price) AS subscription_price,
+                COALESCE(pv.original_price, pv.price) AS original_price, 
+                pv.discount, pv.unit_value, pv.unit_type, pv.status
+         FROM product_variants pv
+         JOIN products p ON p.product_id = pv.product_id
+         WHERE pv.product_id = $1 
+           AND pv.deleted_at IS NULL 
+           AND pv.status = 'active'
+           AND (p.is_subscribable = true OR (pv.subscription_price IS NOT NULL AND pv.subscription_price > 0))
+         ORDER BY pv.sort_order ASC, pv.name ASC`,
         [productId],
       );
       return { status: true, data: rows };
@@ -2206,6 +2217,8 @@ export class CustomersService {
         FROM product_variants pv
         JOIN products p ON p.product_id = pv.product_id
         WHERE pv.deleted_at IS NULL AND p.deleted_at IS NULL
+          AND p.is_active = true AND pv.status = 'active'
+          AND (p.is_subscribable = true OR (pv.subscription_price IS NOT NULL AND pv.subscription_price > 0))
         ORDER BY p.name ASC, pv.name ASC
       `);
 

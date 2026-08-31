@@ -1823,7 +1823,7 @@ export class DeliveryRunService {
         throw new BadRequestException(`Order ${orderId} is not currently assigned to any delivery run`);
       }
 
-      // Check that this address stop is currently 'pending'
+      // Check that this address stop is currently 'pending' or 'in_transit'
       const sourceStopRes = await this.db.query(
         `SELECT delivery_status FROM delivery_run_addresses
          WHERE (run_id = $1 OR run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $1))
@@ -1831,8 +1831,8 @@ export class DeliveryRunService {
         [order.delivery_run_id, order.address_id],
       );
       const sourceStopStatus = sourceStopRes[0]?.delivery_status || 'pending';
-      if (sourceStopStatus !== 'pending') {
-        throw new BadRequestException(`Address stop has status '${sourceStopStatus}' and cannot be moved or swapped. Only pending stops can be reassigned.`);
+      if (!REASSIGNABLE_STOP_STATUSES.includes(sourceStopStatus)) {
+        throw new BadRequestException(`Address stop has status '${sourceStopStatus}' and cannot be moved or swapped. Only pending or in-transit stops can be reassigned.`);
       }
 
       const scheduledDateStr = toISTDateString(order.scheduled_date);
@@ -1881,7 +1881,7 @@ export class DeliveryRunService {
            AND dr.run_date = $1
            AND dr.delivery_slot = $2
            AND ($3::varchar IS NULL OR dr.branch_id = $3)
-           AND dr.status IN ('planned', 'assigned')
+           AND dr.status IN ('planned', 'assigned', 'in_progress')
            AND dr.deleted_at IS NULL
          )
          WHERE ($3::varchar IS NULL OR dp.branch_id = $3)
@@ -1901,7 +1901,7 @@ export class DeliveryRunService {
         [scheduledDateStr, order.delivery_slot, order.branch_id, order.delivery_partner_id],
       );
 
-      // For each partner, if they have a run, fetch pending address stops and orders
+      // For each partner, if they have a run, fetch pending and in_transit address stops and orders
       const eligiblePartners = await Promise.all(
         partnersRes.map(async (p: any) => {
           const hasExistingRun = Boolean(p.run_id);
@@ -1938,7 +1938,7 @@ export class DeliveryRunService {
                LEFT JOIN customers c ON c.customer_id = dra.customer_id
                LEFT JOIN users u ON u.user_id = dra.customer_id
                WHERE (dra.run_id = $1 OR dra.run_id = $2)
-                 AND COALESCE(dra.delivery_status, 'pending') = 'pending'
+                 AND COALESCE(dra.delivery_status, 'pending') IN ('pending', 'in_transit')
                  AND dra.deleted_at IS NULL
                ORDER BY dra.sequence_no ASC`,
               [p.run_id, String(p.run_db_id || '')],
@@ -2159,16 +2159,10 @@ export class DeliveryRunService {
           throw new BadRequestException(`Target delivery partner is currently inactive or unavailable`);
         }
 
-        // 6. Warehouse dispatch / handover check
-        const dispatchCheck = await client.query<any>(
-          `SELECT status FROM delivery_dispatch WHERE delivery_run_id = $1 OR delivery_run_id = $2 LIMIT 1`,
-          [sourceRun.run_id, String(sourceRun.id)],
-        );
-        if (dispatchCheck.rows[0] && ['collected', 'dispatched', 'in_progress'].includes(dispatchCheck.rows[0].status)) {
-          throw new BadRequestException(
-            `Run ${sourceRun.run_id} has already been collected/dispatched from the warehouse and cannot be reassigned.`
-          );
-        }
+        // 6. Warehouse collection is deliberately NOT a blocker here.
+        //    Admins reassign stops mid-route (traffic, breakdown, a partner running late),
+        //    so moving a stop is allowed at any run stage — matching swapOrdersBetweenRuns.
+        //    Per-stop status is the real guard: only pending or in_transit stops are allowed (checked above).
 
         // 7. Calculate next sequence number for Target Run
         const maxSeqRes = await client.query<any>(
@@ -2914,11 +2908,15 @@ export class DeliveryRunService {
         FROM delivery_partners dp
         LEFT JOIN users u ON u.user_id = dp.delivery_partner_id
         LEFT JOIN branches b ON b.branch_id = dp.branch_id
-        LEFT JOIN warehouses w ON w.branch_id = dp.branch_id AND w.is_active = true AND w.deleted_at IS NULL
+        LEFT JOIN LATERAL (
+          SELECT warehouse_id, name FROM warehouses
+          WHERE branch_id = dp.branch_id AND is_active = true AND deleted_at IS NULL
+          ORDER BY warehouse_id ASC LIMIT 1
+        ) w ON true
         LEFT JOIN delivery_runs dr ON (
           dr.delivery_partner_id = dp.delivery_partner_id
           AND dr.run_date = $1
-          AND ($2::varchar IS NULL OR dr.delivery_slot = $2)
+          AND ($2::varchar IS NULL OR LOWER(dr.delivery_slot) = LOWER($2))
           AND dr.status NOT IN ('cancelled')
           AND dr.deleted_at IS NULL
         )
@@ -2933,7 +2931,7 @@ export class DeliveryRunService {
               AND dlr.leave_date <= $1::date
               AND (dlr.end_date IS NULL OR dlr.end_date >= $1::date)
           )
-        ORDER BY b.branch_name ASC, (dr.run_id IS NOT NULL) DESC, partner_name ASC
+        ORDER BY b.branch_name ASC, (dr.run_id IS NOT NULL) DESC, partner_name ASC, dr.run_id ASC
       `;
 
       const rows = await this.db.query(sql, [targetDate, slot, branchId]);
