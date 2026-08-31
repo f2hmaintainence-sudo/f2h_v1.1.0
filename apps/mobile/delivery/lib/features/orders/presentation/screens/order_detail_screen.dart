@@ -792,14 +792,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: const Icon(Icons.inventory_2_rounded, color: kPrimary, size: 18),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'CONTAINER & PACKAGING STATUS',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 0.8),
+              const Expanded(
+                child: Text(
+                  'CONTAINER & PACKAGING',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: kTextSub,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               if (!isDone)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                   decoration: BoxDecoration(
                     color: const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(12),
@@ -808,7 +817,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Text(
                     'Step 3 Collection',
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w900,
                       color: Colors.teal,
                     ),
@@ -1044,19 +1053,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _currentStop.orders.length > 1
-                      ? 'ORDER #$orderIndex DETAILS'
-                      : 'ORDER DETAILS',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: kTextSub,
-                    letterSpacing: 0.8,
+                Expanded(
+                  child: Text(
+                    _currentStop.orders.length > 1
+                        ? 'ORDER #$orderIndex DETAILS'
+                        : 'ORDER DETAILS',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: kTextSub,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
