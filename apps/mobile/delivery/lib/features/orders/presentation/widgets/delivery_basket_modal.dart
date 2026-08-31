@@ -839,53 +839,6 @@ class _DeliveryBasketModalState extends State<DeliveryBasketModal> {
               ],
             ),
           ),
-
-          // Bottom Action Button: Return Items to Warehouse (Available whenever dispatch is active / not completed)
-          if (_dispatchStatus != 'completed')
-            Container(
-              padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.of(context).padding.bottom + 10),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(color: Color(0x0F0F172A), blurRadius: 12, offset: Offset(0, -3)),
-                ],
-              ),
-              child: _dispatchStatus == 'return_pending'
-                  ? Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCCFBF1),
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: const Color(0xFF5EEAD4), width: 1.2),
-                      ),
-                      child: const Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.assignment_return_rounded, size: 20, color: Color(0xFF0D9488)),
-                            SizedBox(width: 8),
-                            Text(
-                              'Return Pending at Warehouse',
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F766E),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : SwipeToActionButton(
-                      label: 'Swipe to Return to Warehouse',
-                      loadingLabel: 'Submitting Return…',
-                      icon: Icons.assignment_return_rounded,
-                      height: 52,
-                      isLoading: _isReturningProducts,
-                      isEnabled: !_isReturningProducts,
-                      onSwipeConfirmed: () => _returnProductsToHub(showConfirmationDialog: false),
-                    ),
-            ),
         ],
       ),
     );
