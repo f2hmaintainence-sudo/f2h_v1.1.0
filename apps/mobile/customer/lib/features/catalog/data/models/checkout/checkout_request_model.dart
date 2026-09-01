@@ -46,7 +46,9 @@ class CheckoutRequestModel extends CheckoutRequestEntity {
           'onetime_details': {
             'quantity': item.quantity ?? 1,
             'delivery_date': item.deliveryDate ?? DateTime.now().add(const Duration(days: 1)).toString().split(' ')[0],
-            'delivery_slot': item.deliverySlot ?? 'Morning',
+            'delivery_slot': (item.deliverySlot != null && item.deliverySlot!.trim().isNotEmpty)
+                ? (item.deliverySlot!.trim().toLowerCase() == 'evening' ? 'Evening' : 'Morning')
+                : 'Morning',
           },
         });
       }

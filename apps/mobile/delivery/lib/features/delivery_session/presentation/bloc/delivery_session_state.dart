@@ -19,6 +19,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
   final bool isVerified;
   final String accountStatus;
   final bool isSosActive;
+  final String vehicleType;
 
   // ── Run / Orders ─────────────────────────────────────────────────────────────
   final DeliveryRun? currentRun;
@@ -30,6 +31,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
     required this.isVerified,
     required this.accountStatus,
     required this.isSosActive,
+    this.vehicleType = 'bike',
     required this.currentRun,
     required this.orders,
   });
@@ -163,6 +165,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
     bool? isVerified,
     String? accountStatus,
     bool? isSosActive,
+    String? vehicleType,
     DeliveryRun? currentRun,
     List<DeliveryOrderModel>? orders,
     bool clearRun = false,
@@ -173,6 +176,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
       isVerified: isVerified ?? this.isVerified,
       accountStatus: accountStatus ?? this.accountStatus,
       isSosActive: isSosActive ?? this.isSosActive,
+      vehicleType: vehicleType ?? this.vehicleType,
       currentRun: clearRun ? null : (currentRun ?? this.currentRun),
       orders: orders ?? this.orders,
     );

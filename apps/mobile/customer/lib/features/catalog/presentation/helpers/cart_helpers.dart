@@ -195,25 +195,30 @@ DateTime getFirstAllowedDate(DateTime now, [Map<String, dynamic>? slotTimings]) 
 ///
 /// RULES:
 ///   - If [selectedDate] == Today:
-///       • Include 'Morning' ONLY if within configured Morning window
-///       • Include 'Evening' ONLY if within configured Evening window
+///       • 'Evening' available if before evening cutoff (default 16:00 / 4:00 PM) and enabled
 ///   - If [selectedDate] == Tomorrow:
-///       • 'Morning' available if before morning cutoff (23:00)
-///       • 'Evening' always available
+///       • 'Morning' available if before morning cutoff (default 23:00 / 11:00 PM) and enabled
+///       • 'Evening' available if enabled
 ///   - If [selectedDate] >= Day+2:
-///       • Both ['Morning', 'Evening'] available
+///       • Both ['Morning', 'Evening'] available if enabled
 List<String> getAvailableSlots(DateTime selectedDate, DateTime now, [Map<String, dynamic>? slotTimings]) {
   final today = DateTime(now.year, now.month, now.day);
   final tomorrow = today.add(const Duration(days: 1));
   final selected = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
   final nowMinutes = now.hour * 60 + now.minute;
 
+  final isMorningEnabled = slotTimings?['morning_slot']?['is_enabled'] != false;
+  final isEveningEnabled = slotTimings?['evening_slot']?['is_enabled'] != false;
+
   if (selected.isAtSameMomentAs(today)) {
-    final morningWin = getMorningSlotWindow(now, slotTimings);
-    final eveningWin = getEveningSlotWindow(now, slotTimings);
+    final eveningCutoffMinutes = _parseCutoffMinutes(
+      slotTimings?['evening_slot']?['customer_cutoff_time'],
+      16 * 60, // 16:00 (4:00 PM)
+    );
     final slots = <String>[];
-    if (morningWin.isOpen) slots.add('Morning');
-    if (eveningWin.isOpen) slots.add('Evening');
+    if (isEveningEnabled && nowMinutes < eveningCutoffMinutes) {
+      slots.add('Evening');
+    }
     return slots;
   }
 
@@ -223,14 +228,21 @@ List<String> getAvailableSlots(DateTime selectedDate, DateTime now, [Map<String,
   );
 
   if (selected.isAtSameMomentAs(tomorrow)) {
-    if (nowMinutes < morningCutoffMinutes) {
-      return ['Morning', 'Evening'];
+    final slots = <String>[];
+    if (isMorningEnabled && nowMinutes < morningCutoffMinutes) {
+      slots.add('Morning');
     }
-    return ['Evening'];
+    if (isEveningEnabled) {
+      slots.add('Evening');
+    }
+    return slots.isNotEmpty ? slots : (isMorningEnabled ? ['Morning'] : ['Evening']);
   }
 
-  // Future days: both slots available
-  return ['Morning', 'Evening'];
+  // Future days: both slots available if enabled
+  final slots = <String>[];
+  if (isMorningEnabled) slots.add('Morning');
+  if (isEveningEnabled) slots.add('Evening');
+  return slots.isNotEmpty ? slots : ['Morning'];
 }
 
 /// Returns the default slot for a given date.
@@ -240,14 +252,14 @@ String getDefaultSlot(DateTime selectedDate, DateTime now, [Map<String, dynamic>
   final available = getAvailableSlots(selectedDate, now, slotTimings);
 
   if (selected.isAtSameMomentAs(today)) {
-    if (available.contains('Morning')) return 'Morning';
     if (available.contains('Evening')) return 'Evening';
-    return '';
+    if (available.contains('Morning')) return 'Morning';
   }
 
   if (available.contains('Morning')) return 'Morning';
   if (available.contains('Evening')) return 'Evening';
-  return available.isNotEmpty ? available.first : '';
+  if (available.isNotEmpty) return available.first;
+  return 'Morning';
 }
 
 // ===== Quantity Helpers =====

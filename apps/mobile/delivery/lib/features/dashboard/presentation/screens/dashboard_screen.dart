@@ -297,6 +297,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  IconData _getVehicleIcon(String? type) {
+    final t = (type ?? '').toLowerCase().trim();
+    if (t.contains('scoot') || t.contains('moped') || t == 'scooty') {
+      return Icons.moped_rounded;
+    } else if (t.contains('electric') || t.contains('ev')) {
+      return Icons.electric_moped_rounded;
+    } else if (t.contains('cycle') || t.contains('bicycle')) {
+      return Icons.directions_bike_rounded;
+    } else if (t.contains('car') || t.contains('van') || t.contains('auto')) {
+      return Icons.directions_car_rounded;
+    }
+    return Icons.two_wheeler_rounded;
+  }
+
   Future<void> _handleOnlineToggle(bool val) async {
     if (val) {
       final isLocationReady = await _locationService.ensureLocationPermission(context);
@@ -305,7 +319,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Location permission and GPS are required to start your bike and track deliveries.',
+              'Location permission and GPS are required to start your engine and track deliveries.',
               style: GoogleFonts.roboto(),
             ),
             backgroundColor: kDanger,
@@ -338,7 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         } else {
           AppSnackBar.show(
             context,
-            val ? '🏍️ Bike Started! You are on duty.' : '🛑 Bike Stopped! Shift ended.',
+            val ? '🏍️ Engine Started! You are on duty.' : '🛑 Engine Stopped! Shift ended.',
             backgroundColor: val ? kSuccess : kDanger,
           );
           if (val) _showPickupSummaryDialog(context);
@@ -453,6 +467,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               F2hHeroHeader(
                 driverName: session.driverName,
                 isOnline: session.isOnline,
+                vehicleType: session.vehicleType,
                 unreadCount: _unreadNotificationsCount,
                 address: nextStop != null
                     ? nextStop.address
@@ -518,9 +533,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       shape: BoxShape.circle,
                                       border: Border.all(color: const Color(0xFF86EFAC), width: 2),
                                     ),
-                                    child: const Icon(
-                                      Icons.two_wheeler_rounded,
-                                      color: Color(0xFF059669),
+                                    child: Icon(
+                                      _getVehicleIcon(session.vehicleType),
+                                      color: const Color(0xFF059669),
                                       size: 44,
                                     ),
                                   ),
@@ -528,7 +543,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Bike is Stopped',
+                                'Engine is Stopped',
                                 style: GoogleFonts.roboto(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
@@ -537,7 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Start your bike to begin your delivery shift and receive your assigned delivery batches.',
+                                'Start your engine to begin your delivery shift and receive your assigned delivery batches.',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.roboto(
                                   fontSize: 13,
@@ -551,9 +566,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 height: 48,
                                 child: ElevatedButton.icon(
                                   onPressed: () => _handleOnlineToggle(true),
-                                  icon: const Icon(Icons.two_wheeler_rounded, size: 22),
+                                  icon: Icon(_getVehicleIcon(session.vehicleType), size: 22),
                                   label: Text(
-                                    'Start Bike Now',
+                                    'Start Engine Now',
                                     style: GoogleFonts.roboto(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w800,

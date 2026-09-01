@@ -321,7 +321,21 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  List<Marker> _buildMarkers(List<GroupedStop> groupedStops) {
+  IconData _getVehicleIcon(String? type) {
+    final t = (type ?? '').toLowerCase().trim();
+    if (t.contains('scoot') || t.contains('moped') || t == 'scooty') {
+      return Icons.moped_rounded;
+    } else if (t.contains('electric') || t.contains('ev')) {
+      return Icons.electric_moped_rounded;
+    } else if (t.contains('cycle') || t.contains('bicycle')) {
+      return Icons.directions_bike_rounded;
+    } else if (t.contains('car') || t.contains('van') || t.contains('auto')) {
+      return Icons.directions_car_rounded;
+    }
+    return Icons.two_wheeler_rounded;
+  }
+
+  List<Marker> _buildMarkers(List<GroupedStop> groupedStops, {String? vehicleType}) {
     final List<Marker> markers = [];
 
     // 1. Add client stop markers
@@ -444,13 +458,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       );
     }
 
-    // 2. Add current position Google Maps GPS Blue Puck
+    // 2. Add current position Partner Vehicle Marker (replaces blue dot)
     if (_currentPosition != null) {
+      final vehicleIcon = _getVehicleIcon(vehicleType);
       markers.add(
         Marker(
           point: _currentPosition!,
-          width: 44,
-          height: 44,
+          width: 52,
+          height: 52,
           alignment: Alignment.center,
           child: Stack(
             alignment: Alignment.center,
@@ -460,47 +475,45 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 animation: _pulsateAnimation,
                 builder: (context, child) {
                   return Container(
-                    width: 24 + 18 * _pulsateAnimation.value,
-                    height: 24 + 18 * _pulsateAnimation.value,
+                    width: 28 + 22 * _pulsateAnimation.value,
+                    height: 28 + 22 * _pulsateAnimation.value,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A73E8).withValues(alpha: 0.28 * (1 - _pulsateAnimation.value)),
+                      color: const Color(0xFF059669).withValues(alpha: 0.32 * (1 - _pulsateAnimation.value)),
                       shape: BoxShape.circle,
                     ),
                   );
                 },
               ),
-              // White Outer Ring
+              // Outer White Ring with drop shadow
               Container(
-                width: 22,
-                height: 22,
+                width: 38,
+                height: 38,
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x331A73E8),
+                      color: Color(0x33059669),
                       blurRadius: 8,
                       spreadRadius: 2,
                     )
                   ],
                 ),
               ),
-              // Solid Google Blue Puck Core
+              // Solid Emerald Vehicle Core
               Container(
-                width: 15,
-                height: 15,
+                width: 30,
+                height: 30,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF1A73E8),
+                  color: Color(0xFF059669),
                   shape: BoxShape.circle,
                 ),
-              ),
-              // Inner White Dot
-              Container(
-                width: 5,
-                height: 5,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+                child: Center(
+                  child: Icon(
+                    vehicleIcon,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
@@ -561,12 +574,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  /// The stops this screen is responsible for drawing.
-  ///
-  /// Focused navigation narrows the whole screen — map pins, bottom sheet and
-  /// search — to the one stop being navigated to. The map tab keeps the run's
-  /// own order rather than the router's, so stop numbering stays stable while
-  /// the rider moves and the nearest stop changes.
+  
   List<GroupedStop> _visibleStops(List<GroupedStop> sessionStops) {
     if (!_isFocusedNavigation) return sessionStops;
     final focused = widget.focusedStop!;
@@ -933,7 +941,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           polylines: polylines,
                         ),
                       MarkerLayer(
-                        markers: _buildMarkers(effectiveStops),
+                        markers: _buildMarkers(effectiveStops, vehicleType: state.vehicleType),
                       ),
                     ],
                   ),
@@ -1017,7 +1025,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     top: MediaQuery.of(context).padding.top + 70,
                     left: 16,
                     right: 72,
-                    child: _buildShortestRouteCard(),
+                    child: _buildShortestRouteCard(vehicleType: state.vehicleType),
                   ),
 
                 // 5. Floating Side Map Options
@@ -1319,7 +1327,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildShortestRouteCard() {
+  Widget _buildShortestRouteCard({String? vehicleType}) {
     final route = _optimizedRoute;
     if (route == null) return const SizedBox.shrink();
 
@@ -1489,7 +1497,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.directions_bike_rounded, color: Color(0xFF1A73E8), size: 16),
+                      child: Icon(_getVehicleIcon(vehicleType), color: const Color(0xFF1A73E8), size: 16),
                     ),
                     const SizedBox(width: 8),
                     Column(

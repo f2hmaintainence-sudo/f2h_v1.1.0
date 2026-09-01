@@ -51,38 +51,31 @@ class CowLoadingWidget extends StatelessWidget {
       children: [
         SizedBox(
           width: size,
-          height: size * 0.36,
-          child: OverflowBox(
-            maxHeight: size * 0.58,
-            minHeight: size * 0.58,
-            maxWidth: size,
-            minWidth: size,
-            alignment: Alignment.topCenter,
-            child: Lottie.asset(
-              'assets/loading/cow_drink_milk.json',
-              width: size,
-              height: size * 0.58,
-              fit: BoxFit.contain,
-              repeat: true,
-              animate: true,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (context, error, stackTrace) {
-                return Center(
-                  child: SizedBox(
-                    width: size * 0.30,
-                    height: size * 0.30,
-                    child: const CircularProgressIndicator(
-                      color: kPrimary,
-                      strokeWidth: 2.5,
-                    ),
+          height: size * 0.65,
+          child: Lottie.asset(
+            'assets/loading/cow_drink_milk.json',
+            width: size,
+            height: size * 0.65,
+            fit: BoxFit.contain,
+            repeat: true,
+            animate: true,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (context, error, stackTrace) {
+              return Center(
+                child: SizedBox(
+                  width: size * 0.35,
+                  height: size * 0.35,
+                  child: const CircularProgressIndicator(
+                    color: kPrimary,
+                    strokeWidth: 2.5,
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
         if (showLoadingBar) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           GreenLoadingBar(
             width: barWidth,
             height: barHeight,

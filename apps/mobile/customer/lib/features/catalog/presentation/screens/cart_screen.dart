@@ -228,8 +228,10 @@ class _CartScreenState extends State<CartScreen> {
                     );
                   }
                   if (firstOnetime != null &&
-                      firstOnetime.deliverySlot != null) {
-                    _globalOnetimeSlot = firstOnetime.deliverySlot!;
+                      firstOnetime.deliverySlot != null &&
+                      firstOnetime.deliverySlot!.trim().isNotEmpty) {
+                    final raw = firstOnetime.deliverySlot!.trim();
+                    _globalOnetimeSlot = raw.toLowerCase() == 'evening' ? 'Evening' : 'Morning';
                   }
                 }
 
@@ -244,12 +246,15 @@ class _CartScreenState extends State<CartScreen> {
                   now,
                   sessionState.slotTimings,
                 );
-                if (!availableSlots.contains(_globalOnetimeSlot)) {
+                if (!availableSlots.contains(_globalOnetimeSlot) || _globalOnetimeSlot.isEmpty) {
                   _globalOnetimeSlot = getDefaultSlot(
                     _globalOnetimeDate!,
                     now,
                     sessionState.slotTimings,
                   );
+                }
+                if (_globalOnetimeSlot.isEmpty) {
+                  _globalOnetimeSlot = availableSlots.isNotEmpty ? availableSlots.first : 'Morning';
                 }
 
                 // ===== Sync One-Time Items to Global Settings =====

@@ -31,7 +31,12 @@ class CartItemModel extends CartItemEntity {
       if (onetime != null) {
         qty = onetime['quantity'] as int?;
         deliveryDate = onetime['delivery_date'] as String?;
-        deliverySlot = onetime['delivery_slot'] as String?;
+        final rawSlot = onetime['delivery_slot']?.toString().trim();
+        if (rawSlot != null && rawSlot.isNotEmpty) {
+          deliverySlot = rawSlot.toLowerCase() == 'evening' ? 'Evening' : 'Morning';
+        } else {
+          deliverySlot = 'Morning';
+        }
       }
     } else if (purchaseType == 'subscription') {
       final sub = json['subscription_details'] as Map<String, dynamic>?;
@@ -81,6 +86,10 @@ class CartItemModel extends CartItemEntity {
 
   // Converts our Flutter cart item to the exact JSON format the backend expects
   Map<String, dynamic> toJson() {
+    final cleanSlot = (deliverySlot != null && deliverySlot!.trim().isNotEmpty)
+        ? (deliverySlot!.trim().toLowerCase() == 'evening' ? 'Evening' : 'Morning')
+        : 'Morning';
+
     return {
       'product_id': productId,
       'product_variant_id': variantId,
@@ -88,9 +97,9 @@ class CartItemModel extends CartItemEntity {
       
       if (purchaseType == 'onetime') 
         'onetime_details': {
-          'quantity': quantity,
+          'quantity': quantity ?? 1,
           'delivery_date': deliveryDate,
-          'delivery_slot': deliverySlot,
+          'delivery_slot': cleanSlot,
         },
       
       if (purchaseType == 'subscription' && schedules != null) 

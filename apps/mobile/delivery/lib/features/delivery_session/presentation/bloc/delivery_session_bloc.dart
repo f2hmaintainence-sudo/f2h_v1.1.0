@@ -66,6 +66,7 @@ class DeliverySessionBloc
     bool isOnline = current.isOnline;
     bool isVerified = current.isVerified;
     String accountStatus = current.accountStatus;
+    String vehicleType = current.vehicleType;
     DeliveryRun? currentRun;
     List<DeliveryOrderModel> orders = [];
 
@@ -93,6 +94,9 @@ class DeliverySessionBloc
       isOnline = profileRes.isOnline;
       isVerified = profileRes.isVerified;
       accountStatus = profileRes.accountStatus ?? (profileRes.isActive ? 'active' : 'inactive');
+      if (profileRes.vehicleType.isNotEmpty) {
+        vehicleType = profileRes.vehicleType;
+      }
 
       // Sync location tracking
       try {
@@ -147,6 +151,7 @@ class DeliverySessionBloc
       isOnline: isOnline,
       isVerified: isVerified,
       accountStatus: accountStatus,
+      vehicleType: vehicleType,
       currentRun: currentRun,
       orders: orders,
     );

@@ -8,7 +8,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -24,8 +24,16 @@ export class OnetimeDetailsDto {
   delivery_date?: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value !== 'string' || value.trim() === '') return 'Morning';
+    const lower = value.trim().toLowerCase();
+    if (lower === 'evening') return 'Evening';
+    if (lower === 'morning') return 'Morning';
+    return value.trim();
+  })
   @IsString()
-  @IsIn(['Morning', 'Evening'])
+  @IsIn(['Morning', 'Evening', 'morning', 'evening'])
   delivery_slot?: string;
 }
 

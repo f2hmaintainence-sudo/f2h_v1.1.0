@@ -742,26 +742,22 @@ export class CartService {
       return isNaN(h) || isNaN(m) ? defaultMin : h * 60 + m;
     };
 
-    const morningStartMinutes = parseCutoff(slotTimingsConfig?.morning_slot?.delivery_window_start, 6 * 60);
-    const morningEndMinutes = parseCutoff(slotTimingsConfig?.morning_slot?.delivery_window_end, 8 * 60 + 30);
-    const eveningStartMinutes = parseCutoff(slotTimingsConfig?.evening_slot?.delivery_window_start, 17 * 60);
-    const eveningEndMinutes = parseCutoff(slotTimingsConfig?.evening_slot?.delivery_window_end, 20 * 60);
+    const morningCutoffMinutes = parseCutoff(slotTimingsConfig?.morning_slot?.customer_cutoff_time, 20 * 60);
+    const eveningCutoffMinutes = parseCutoff(slotTimingsConfig?.evening_slot?.customer_cutoff_time, 16 * 60);
 
     for (const group of groups) {
       const slotLower = group.deliverySlot.toLowerCase();
       // If delivery is for today
       if (group.deliveryDate === kolkataDateStr) {
         if (slotLower === 'morning') {
-          if (currentMinutes < morningStartMinutes || currentMinutes > morningEndMinutes) {
-            throw new BadRequestException(
-              `Morning delivery slot for today (${kolkataDateStr}) is closed. Operating window: ${slotTimingsConfig?.morning_slot?.delivery_window_start || '06:00'} - ${slotTimingsConfig?.morning_slot?.delivery_window_end || '08:30'}.`,
-            );
-          }
+          throw new BadRequestException(
+            `Morning delivery slot for today (${kolkataDateStr}) is closed. Orders for morning delivery must be placed by ${slotTimingsConfig?.morning_slot?.customer_cutoff_time || '20:00'} the previous evening.`,
+          );
         }
         if (slotLower === 'evening') {
-          if (currentMinutes < eveningStartMinutes || currentMinutes > eveningEndMinutes) {
+          if (currentMinutes > eveningCutoffMinutes) {
             throw new BadRequestException(
-              `Evening delivery slot for today (${kolkataDateStr}) is closed. Operating window: ${slotTimingsConfig?.evening_slot?.delivery_window_start || '17:00'} - ${slotTimingsConfig?.evening_slot?.delivery_window_end || '20:00'}.`,
+              `Evening delivery cutoff (${slotTimingsConfig?.evening_slot?.customer_cutoff_time || '16:00'}) for today (${kolkataDateStr}) has passed.`,
             );
           }
         }
