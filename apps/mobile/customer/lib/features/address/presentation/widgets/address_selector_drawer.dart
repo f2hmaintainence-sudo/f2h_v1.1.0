@@ -181,8 +181,14 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
           );
         }
 
-        // Find primary address
-        final primaryAddress = list.firstWhere((a) => a.isDefault, orElse: () => list.first);
+        // Find primary address: prefer default that is serviceable, or first serviceable address
+        final serviceableList = list.where((a) => a.isServiceable && a.branchIsActive).toList();
+        final primaryAddress = serviceableList.firstWhere(
+          (a) => a.isDefault,
+          orElse: () => serviceableList.isNotEmpty
+              ? serviceableList.first
+              : list.firstWhere((a) => a.isDefault, orElse: () => list.first),
+        );
         _selectedAddressId ??= primaryAddress.uniqueId;
         if (!list.any((a) => a.uniqueId == _selectedAddressId)) {
           _selectedAddressId = primaryAddress.uniqueId;
@@ -223,10 +229,9 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                 separatorBuilder: (_, _) => const Divider(color: kBorderLt, height: 1),
                 itemBuilder: (context, index) {
                   final addr = list[index];
-                  final isSelected = addr.uniqueId == _selectedAddressId;
-                  final isExpanded = addr.uniqueId == _expandedAddressId;
-
                   final bool isServiceable = addr.isServiceable && addr.branchIsActive;
+                  final isSelected = addr.uniqueId == _selectedAddressId && isServiceable;
+                  final isExpanded = addr.uniqueId == _expandedAddressId;
 
                   return Container(
                     color: !isServiceable

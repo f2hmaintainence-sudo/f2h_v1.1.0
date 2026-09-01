@@ -853,19 +853,24 @@ class _CartScreenState extends State<CartScreen> {
                     context.runWithAuth(() async {
                       final sessionCubit = context.read<CustomerSessionCubit>();
                       final session = sessionCubit.state;
-                      if (session.addresses.isEmpty) {
-                        final chosen =
-                            await AddressSelectorDrawer.show(context);
-                        if (context.mounted) {
-                          await sessionCubit.refreshSilently();
-                          final updatedSession = sessionCubit.state;
-                          if (updatedSession.addresses.isEmpty) {
-                            F2HToast.error(
-                              context,
-                              'Please select or add a delivery address to proceed.',
-                            );
-                            return;
+                      if (session.addresses.isNotEmpty) {
+                        final activeAddr = session.addresses.firstWhere(
+                          (a) => a.isDefault,
+                          orElse: () => session.addresses.first,
+                        );
+                        if (!activeAddr.isServiceable || !activeAddr.branchIsActive) {
+                          final reason = activeAddr.unserviceableReason ??
+                              'Delivery is currently unavailable at this address because the local branch is inactive.';
+                          F2HToast.error(
+                            context,
+                            '$reason Please select another delivery address.',
+                            title: 'Delivery Unavailable',
+                          );
+                          await AddressSelectorDrawer.show(context);
+                          if (context.mounted) {
+                            await sessionCubit.refreshSilently();
                           }
+                          return;
                         }
                       }
 
@@ -1006,14 +1011,18 @@ class _CartScreenState extends State<CartScreen> {
       (a) => a.isDefault,
       orElse: () => list.first,
     );
+    final bool isServiceable = primaryAddress.isServiceable && primaryAddress.branchIsActive;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kSurface,
+        color: !isServiceable ? const Color(0xFFFEF2F2) : kSurface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kBorder),
+        border: Border.all(
+          color: !isServiceable ? const Color(0xFFFCA5A5) : kBorder,
+          width: !isServiceable ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -1022,102 +1031,162 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: kPrimaryPl,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.location_on_rounded,
-              size: 20,
-              color: kPrimary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: !isServiceable ? const Color(0xFFFEE2E2) : kPrimaryPl,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  !isServiceable ? Icons.location_off_rounded : Icons.location_on_rounded,
+                  size: 20,
+                  color: !isServiceable ? const Color(0xFFDC2626) : kPrimary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Delivery to ${primaryAddress.addressType.toUpperCase()}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: !isServiceable ? const Color(0xFF991B1B) : kTextSub,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        if (primaryAddress.isDefault) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: !isServiceable ? const Color(0xFFFEE2E2) : kPrimaryPl,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'DEFAULT',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: !isServiceable ? const Color(0xFFDC2626) : kPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (!isServiceable) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFFECACA), width: 0.8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.error_outline_rounded, size: 9, color: Color(0xFFDC2626)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'HUB INACTIVE',
+                                  style: TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFDC2626),
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
                     Text(
-                      'Delivery to ${primaryAddress.addressType.toUpperCase()}',
+                      primaryAddress.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: !isServiceable ? const Color(0xFF991B1B) : kText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      primaryAddress.detail,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () async {
+                  final chosen = await AddressSelectorDrawer.show(context);
+                  if (chosen != null && context.mounted) {
+                    await context.read<CustomerSessionCubit>().refreshSilently();
+                  }
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: !isServiceable ? const Color(0xFFDC2626) : kPrimary,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: Text(
+                  !isServiceable ? 'Change' : 'Change',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!isServiceable) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      primaryAddress.unserviceableReason ??
+                          'Delivery is currently unavailable at this address because the local hub is inactive.',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: kTextSub,
-                        letterSpacing: 0.3,
+                        color: Color(0xFFDC2626),
                       ),
                     ),
-                    if (primaryAddress.isDefault) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: kPrimaryPl,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'DEFAULT',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            color: kPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  primaryAddress.name,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: kText,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  primaryAddress.detail,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: kTextSub,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: () async {
-              final chosen = await AddressSelectorDrawer.show(context);
-              if (chosen != null && context.mounted) {
-                await context.read<CustomerSessionCubit>().refreshSilently();
-              }
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: kPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              visualDensity: VisualDensity.compact,
-            ),
-            child: const Text(
-              'Change',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+                ],
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

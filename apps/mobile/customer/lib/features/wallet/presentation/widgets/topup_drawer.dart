@@ -20,18 +20,26 @@ class TopupDrawer extends StatefulWidget {
 
 class _TopupDrawerState extends State<TopupDrawer> {
   static const List<double> _presets = [200, 500, 1000];
-  static const double _maxAmount = 5000;
+  static const double _walletCap = 5000;
 
   final _amountController = TextEditingController(text: '500');
   bool _isSubmitting = false;
 
+  /// How much the customer can still add before hitting the ₹5,000 cap.
+  double _maxAllowed(BuildContext context) {
+    final balance =
+        context.read<CustomerSessionCubit>().state.profile?.walletBalance ?? 0;
+    return (_walletCap - balance).clamp(0, _walletCap);
+  }
+
   double get _enteredAmount =>
       double.tryParse(_amountController.text) ?? 0;
 
-  String? get _validationError {
+  String? _validationError(double maxAllowed) {
     final amt = _enteredAmount;
     if (amt <= 0) return 'Enter an amount';
-    if (amt > _maxAmount) return 'Maximum ₹${_maxAmount.toStringAsFixed(0)}';
+    if (maxAllowed <= 0) return 'Wallet is full (₹${_walletCap.toStringAsFixed(0)} limit reached)';
+    if (amt > maxAllowed) return 'Max you can add: ₹${maxAllowed.toStringAsFixed(0)}';
     return null;
   }
 
@@ -41,8 +49,8 @@ class _TopupDrawerState extends State<TopupDrawer> {
     super.dispose();
   }
 
-  Future<void> _submitTopup() async {
-    final error = _validationError;
+  Future<void> _submitTopup(double maxAllowed) async {
+    final error = _validationError(maxAllowed);
     if (error != null || _isSubmitting) {
       if (error != null) F2HToast.error(context, error);
       return;
@@ -106,6 +114,9 @@ class _TopupDrawerState extends State<TopupDrawer> {
 
   @override
   Widget build(BuildContext context) {
+    final maxAllowed = _maxAllowed(context);
+    final validationErr =
+        _amountController.text.isNotEmpty ? _validationError(maxAllowed) : null;
     return SafeArea(
       top: false,
       child: Padding(
@@ -156,14 +167,14 @@ class _TopupDrawerState extends State<TopupDrawer> {
                     fontWeight: FontWeight.w900,
                     color: kPrimary.withValues(alpha: 0.25),
                   ),
-                  helperText: 'Max ₹${_maxAmount.toStringAsFixed(0)}',
-                  helperStyle: const TextStyle(
+                  helperText: maxAllowed <= 0
+                      ? 'Wallet full (₹${_walletCap.toStringAsFixed(0)} limit)'
+                      : 'Max you can add: ₹${maxAllowed.toStringAsFixed(0)}',
+                  helperStyle: TextStyle(
                     fontSize: 11,
-                    color: kTextSub,
+                    color: maxAllowed <= 0 ? Colors.red : kTextSub,
                   ),
-                  errorText: _amountController.text.isNotEmpty
-                      ? _validationError
-                      : null,
+                  errorText: validationErr,
                   filled: true,
                   fillColor: const Color(0xFFF5F5F5),
                   contentPadding: const EdgeInsets.symmetric(
@@ -275,7 +286,7 @@ class _TopupDrawerState extends State<TopupDrawer> {
               const SizedBox(height: 20),
 
               ElevatedButton(
-                onPressed: (_isSubmitting || _validationError != null)
+                onPressed: (_isSubmitting || _validationError(maxAllowed) != null)
                     ? null
                     : () {
                         final authState = context.read<AuthBloc>().state;
@@ -301,7 +312,7 @@ class _TopupDrawerState extends State<TopupDrawer> {
                           return;
                         }
 
-                        _submitTopup();
+                        _submitTopup(maxAllowed);
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimary,

@@ -865,9 +865,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             (s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed',
           ).toList();
 
-          if (_optimizedRoute == null && effectiveStops.isNotEmpty && !_isCalculatingRoute) {
+          final bool needsRouteFetch = _optimizedRoute == null ||
+              !_optimizedRoute!.isRoadGeometry ||
+              _optimizedRoute!.activeLegPoints.length < 2;
+
+          if (needsRouteFetch && effectiveStops.isNotEmpty && !_isCalculatingRoute) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              _calculateShortestPath(effectiveStops);
+              _calculateShortestPath(effectiveStops, force: true);
             });
           }
 

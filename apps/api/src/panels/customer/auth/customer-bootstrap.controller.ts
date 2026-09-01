@@ -739,10 +739,12 @@ export class CustomerBootstrapController {
       return { branch_id: null, h3_index: null };
     }
 
-    const branchesResult = await this.Data.query('branches', {
-      where: [{ column: 'is_active', operator: '=', value: true }],
-    });
-    const branches = branchesResult?.data || [];
+    // Query all branches to identify the true local hub (even if currently inactive)
+    const branchesResult = await this.db.query(
+      `SELECT branch_id, branch_name, is_active, lat, lng, delivery_radius_km, buffer_zone, allow_buffer_order
+       FROM branches`,
+    );
+    const branches: any[] = branchesResult || [];
 
     let nearestBranch: any = null;
     let minDistance = Infinity;
@@ -776,18 +778,30 @@ export class CustomerBootstrapController {
       }
     }
 
+    // If outside standard radius, find closest geographical branch within 30km
     if (!nearestBranch && branches.length > 0) {
-      nearestBranch = branches[0];
-    }
-
-    if (!nearestBranch) {
-      throw new BadRequestException(
-        'Currently this location is outside our delivery area.',
-      );
+      let closestBranch: any = null;
+      let closestDist = Infinity;
+      for (const branch of branches) {
+        if (!branch.lat || !branch.lng) continue;
+        const dist = this.getDistanceKm(
+          Number(branch.lat),
+          Number(branch.lng),
+          latitude,
+          longitude,
+        );
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestBranch = branch;
+        }
+      }
+      if (closestBranch && closestDist <= 30) {
+        nearestBranch = closestBranch;
+      }
     }
 
     return {
-      branch_id: nearestBranch.branch_id,
+      branch_id: nearestBranch?.branch_id || null,
       h3_index: null,
     };
   }

@@ -194,6 +194,19 @@ export class CustomerPaymentService {
           `Maximum top-up amount is ₹${MAX_TOPUP_AMOUNT}`,
         );
       }
+      // Enforce wallet cap: current balance + top-up must not exceed ₹5,000.
+      const currentBalance = Number(customer.wallet_balance || 0);
+      const remaining = Math.max(0, MAX_TOPUP_AMOUNT - currentBalance);
+      if (remaining <= 0) {
+        throw new BadRequestException(
+          `Your wallet is already at the ₹${MAX_TOPUP_AMOUNT} limit. Please spend some balance before topping up.`,
+        );
+      }
+      if (amount > remaining) {
+        throw new BadRequestException(
+          `You can only add ₹${remaining.toFixed(0)} more (wallet limit is ₹${MAX_TOPUP_AMOUNT}, current balance ₹${currentBalance.toFixed(0)}).`,
+        );
+      }
     }
 
     if (amount < MIN_ONLINE_AMOUNT) {
