@@ -24,7 +24,6 @@ import 'package:f2h_customer/features/profile/presentation/screens/contact_us_sc
 import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
-import 'package:f2h_customer/features/profile/presentation/widgets/profile_updated_dialog.dart';
 
 // ----------------------------------------------------------
 //  PROFILE SCREEN - Premium farm-market design
@@ -455,7 +454,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                                 if (ctx.mounted) {
                                   Navigator.pop(ctx);
-                                  ProfileUpdatedDialog.show(context);
+                                  _showToast(
+                                    context,
+                                    'Profile updated successfully',
+                                  );
                                 }
                               } catch (e) {
                                 if (ctx.mounted) {
