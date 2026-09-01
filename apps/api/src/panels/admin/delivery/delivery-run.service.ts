@@ -15,17 +15,14 @@ function todayIST(): string {
   return `${pick('year')}-${pick('month')}-${pick('day')}`;
 }
 
-// A stop stays reassignable until the partner has acted on it at the door.
-// `in_transit` only means the run was started — starting a run bulk-flips every
-// still-waiting stop from 'pending' to 'in_transit' — so an in-transit stop is still
-// freely movable. Only 'arrived' (partner is at the door) and the terminal outcomes lock it.
-const REASSIGNABLE_STOP_STATUSES = ['pending', 'in_transit', 'in-transit'];
+// All stops can be moved or swapped between runs EXCEPT when already delivered.
+const NON_REASSIGNABLE_STOP_STATUSES = ['delivered', 'completed'];
 
 function assertStopIsReassignable(stop: any, label: string, verb: string): void {
-  const status = (stop?.delivery_status || 'pending').toLowerCase();
-  if (!REASSIGNABLE_STOP_STATUSES.includes(status)) {
+  const status = (stop?.delivery_status || 'pending').toLowerCase().trim();
+  if (NON_REASSIGNABLE_STOP_STATUSES.includes(status)) {
     throw new BadRequestException(
-      `${label} has status '${stop?.delivery_status || status}' and can no longer be ${verb}.`,
+      `${label} has status '${stop?.delivery_status || status}' and cannot be ${verb} (already delivered).`,
     );
   }
 }
@@ -1856,7 +1853,7 @@ export class DeliveryRunService {
         throw new BadRequestException('Order not found');
       }
 
-      if (['delivered', 'cancelled', 'failed'].includes(order.status)) {
+      if (['delivered', 'cancelled'].includes(order.status)) {
         throw new BadRequestException(`Order ${orderId} has status '${order.status}' and cannot be moved or swapped`);
       }
 
@@ -1864,16 +1861,16 @@ export class DeliveryRunService {
         throw new BadRequestException(`Order ${orderId} is not currently assigned to any delivery run`);
       }
 
-      // Check that this address stop is currently 'pending' or 'in_transit'
+      // Check that this address stop is not already delivered
       const sourceStopRes = await this.db.query(
         `SELECT delivery_status FROM delivery_run_addresses
          WHERE (run_id = $1 OR run_id = (SELECT id::varchar FROM delivery_runs WHERE run_id = $1))
            AND address_id = $2 AND deleted_at IS NULL LIMIT 1`,
         [order.delivery_run_id, order.address_id],
       );
-      const sourceStopStatus = sourceStopRes[0]?.delivery_status || 'pending';
-      if (!REASSIGNABLE_STOP_STATUSES.includes(sourceStopStatus)) {
-        throw new BadRequestException(`Address stop has status '${sourceStopStatus}' and cannot be moved or swapped. Only pending or in-transit stops can be reassigned.`);
+      const sourceStopStatus = (sourceStopRes[0]?.delivery_status || 'pending').toLowerCase().trim();
+      if (NON_REASSIGNABLE_STOP_STATUSES.includes(sourceStopStatus)) {
+        throw new BadRequestException(`Address stop has status '${sourceStopStatus}' and cannot be moved or swapped. Delivered stops cannot be reassigned.`);
       }
 
       const scheduledDateStr = toISTDateString(order.scheduled_date);
@@ -2210,23 +2207,74 @@ export class DeliveryRunService {
         //    Per-stop status is the real guard: only pending or in_transit stops are allowed (checked above).
 
         // 7. Calculate next sequence number for Target Run
-        const maxSeqRes = await client.query<any>(
-          `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses
-           WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL`,
-          [targetRun.run_id, String(targetRun.id)],
+        // 7. Check if Target Run ALREADY contains an active stop for this address
+        const existingTargetStopRes = await client.query<any>(
+          `SELECT * FROM delivery_run_addresses
+           WHERE (run_id = $1 OR run_id = $2)
+             AND address_id = $3
+             AND deleted_at IS NULL
+           ORDER BY sequence_no ASC, id ASC LIMIT 1 FOR UPDATE`,
+          [targetRun.run_id, String(targetRun.id), resolvedAddressId],
         );
-        const nextTargetSeq = Number(maxSeqRes.rows[0]?.next_seq || 1);
+        const existingTargetStop = existingTargetStopRes.rows[0];
 
-        // 8. Move address stop record to Target Run in delivery_run_addresses
-        await client.query(
-          `UPDATE delivery_run_addresses
-           SET run_id = $1,
-               sequence_no = $2,
-               delivery_status = $3,
-               updated_at = NOW()
-           WHERE id = $4`,
-          [targetRun.run_id, nextTargetSeq, stopStatusForRun(targetRun), sourceStop.id],
-        );
+        let targetSeq = 1;
+        if (existingTargetStop) {
+          // Merge stopOrderIds into existing target stop
+          let existingTargetOrderIds: string[] = [];
+          try {
+            const raw = existingTargetStop.order_ids;
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            existingTargetOrderIds = Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+          } catch {
+            existingTargetOrderIds = [];
+          }
+
+          let srcOrderIds: string[] = [];
+          try {
+            const raw = sourceStop.order_ids;
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            srcOrderIds = Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+          } catch {
+            srcOrderIds = [];
+          }
+
+          const mergedOrderIds = Array.from(new Set([...existingTargetOrderIds, ...srcOrderIds]));
+          targetSeq = existingTargetStop.sequence_no;
+
+          await client.query(
+            `UPDATE delivery_run_addresses
+             SET order_ids = $1::jsonb,
+                 updated_at = NOW()
+             WHERE id = $2`,
+            [JSON.stringify(mergedOrderIds), existingTargetStop.id],
+          );
+
+          // Remove the source stop row since it has been merged into the target stop
+          await client.query(
+            `DELETE FROM delivery_run_addresses WHERE id = $1`,
+            [sourceStop.id],
+          );
+        } else {
+          // Calculate next sequence number for Target Run
+          const maxSeqRes = await client.query<any>(
+            `SELECT COALESCE(MAX(sequence_no), 0) + 1 AS next_seq FROM delivery_run_addresses
+             WHERE (run_id = $1 OR run_id = $2) AND deleted_at IS NULL`,
+            [targetRun.run_id, String(targetRun.id)],
+          );
+          targetSeq = Number(maxSeqRes.rows[0]?.next_seq || 1);
+
+          // Move address stop record to Target Run in delivery_run_addresses
+          await client.query(
+            `UPDATE delivery_run_addresses
+             SET run_id = $1,
+                 sequence_no = $2,
+                 delivery_status = $3,
+                 updated_at = NOW()
+             WHERE id = $4`,
+            [targetRun.run_id, targetSeq, stopStatusForRun(targetRun), sourceStop.id],
+          );
+        }
 
         // Re-sequence remaining stops for source run
         const remainingSrcStops = await client.query<any>(
@@ -2243,8 +2291,6 @@ export class DeliveryRunService {
         }
 
         // 9. Update only the specific orders listed in delivery_run_addresses.order_ids.
-        //    Do NOT use address_id as a filter — it would hit orders from other days/runs
-        //    that happen to share the same delivery address.
         let stopOrderIds: string[] = [];
         try {
           const raw = sourceStop.order_ids;
@@ -2266,9 +2312,9 @@ export class DeliveryRunService {
                  updated_at = NOW()
              WHERE order_id = ANY($4)
                AND (delivery_run_id = $5 OR delivery_run_id = $6)
-               AND status NOT IN ('cancelled', 'failed')
+               AND status NOT IN ('delivered', 'cancelled')
              RETURNING order_id`,
-            [targetRun.run_id, targetRun.delivery_partner_id, nextTargetSeq, stopOrderIds, sourceRun.run_id, String(sourceRun.id)],
+            [targetRun.run_id, targetRun.delivery_partner_id, targetSeq, stopOrderIds, sourceRun.run_id, String(sourceRun.id)],
           );
           movedOrderIds = orderUpdateRes.rows.map((r: any) => r.order_id);
         }
@@ -2623,7 +2669,7 @@ export class DeliveryRunService {
                  updated_at = NOW()
              WHERE order_id = ANY($3)
                AND (delivery_run_id = $4 OR delivery_run_id = $5)
-               AND status NOT IN ('cancelled', 'failed')
+               AND status NOT IN ('delivered', 'cancelled')
              RETURNING order_id`,
             [runB.run_id, runB.delivery_partner_id, stopAOrderIds, runA.run_id, String(runA.id)],
           );
@@ -2641,7 +2687,7 @@ export class DeliveryRunService {
                  updated_at = NOW()
              WHERE order_id = ANY($3)
                AND (delivery_run_id = $4 OR delivery_run_id = $5)
-               AND status NOT IN ('cancelled', 'failed')
+               AND status NOT IN ('delivered', 'cancelled')
              RETURNING order_id`,
             [runA.run_id, runA.delivery_partner_id, stopBOrderIds, runB.run_id, String(runB.id)],
           );

@@ -25,14 +25,12 @@ import {
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
-// A stop stays reassignable until the partner has actually acted on it at the door.
-// Both `pending` and `in_transit` stops are transferable/swappable mid-route.
-// Terminal outcomes ('delivered', 'failed', 'cancelled') lock a stop.
-const REASSIGNABLE_STOP_STATUSES = ["pending", "in_transit", "in-transit"];
+// All stops can be moved or swapped between partners EXCEPT when already delivered.
+const NON_REASSIGNABLE_STOP_STATUSES = ["delivered", "completed"];
 
 const canReassign = (stop: { delivery_status?: string }) => {
-  const status = (stop.delivery_status || "pending").toLowerCase();
-  return REASSIGNABLE_STOP_STATUSES.includes(status);
+  const status = (stop.delivery_status || "pending").toLowerCase().trim();
+  return !NON_REASSIGNABLE_STOP_STATUSES.includes(status);
 };
 
 export function getShiftInfo(slot?: string, runId?: string): {

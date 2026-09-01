@@ -142,6 +142,11 @@ class ApiEndpoints {
   /// Force-update check. The route lives at the versioned root (`@Get('app-version')`),
   /// not under `/device` — the old value 404'd, so version checking never ran.
   static const String appVersion = '/app-version';
+
+  /// Mandatory-update gate. Reads `app_configs` for the caller's platform and
+  /// answers whether the installed build is below the minimum supported one.
+  /// Sent with the `x-app-platform` and `x-app-version` headers.
+  static const String appCheckVersion = '/app/check-version';
   static const String deviceInformation = '/device/deviceInformation';
 
   // ---------------------------------------------------------------------------

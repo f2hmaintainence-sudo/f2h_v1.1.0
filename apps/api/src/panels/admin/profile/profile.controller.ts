@@ -7,7 +7,11 @@ import {
   Query,
   Req,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ProfileService } from './profile.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
@@ -18,6 +22,19 @@ import { UpdateCompanyProfileDto } from './company-profile.dto';
 @UseGuards(JwtAuthGuard)
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
+
+  @Post(['photo', 'image', 'avatar'])
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  async uploadProfilePhoto(@Req() req: any, @UploadedFile() file: any) {
+    const userId = req.user?.user_id || req.user?.sub || req.user?.email;
+    if (!userId) return { status: false, message: 'Unauthorized' };
+    return this.profileService.uploadProfilePhoto(userId, file);
+  }
 
   // ── My Profile (logged-in admin) ──
   @Get('me')

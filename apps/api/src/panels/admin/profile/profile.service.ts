@@ -8,6 +8,8 @@ import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { RedisService } from '../../../shared/redis/redis.service';
 import * as bcrypt from 'bcrypt';
+import * as fs from 'fs';
+import * as path from 'path';
 import { UpdateCompanyProfileDto } from './company-profile.dto';
 import {
   buildEditableCompanyProfile,
@@ -247,6 +249,7 @@ export class ProfileService {
             COALESCE(u.first_name, u.user_name) AS first_name,
             COALESCE(u.last_name, '') AS last_name,
             COALESCE(u.phone, '') AS phone,
+            COALESCE(u.profile_image_url, '') AS profile,
             u.role_id,
             u.account_status,
             u.created_at AS user_created_at
@@ -264,6 +267,40 @@ export class ProfileService {
     } catch (error) {
       this.developer.error('getMyProfile error', { error });
       throw new InternalServerErrorException('Failed to retrieve profile');
+    }
+  }
+
+  async uploadProfilePhoto(userId: string, file: any) {
+    try {
+      if (!file) throw new BadRequestException('No file provided');
+
+      const docDir = path.join(process.cwd(), 'uploads', 'profile-photos');
+      if (!fs.existsSync(docDir)) {
+        fs.mkdirSync(docDir, { recursive: true });
+      }
+
+      const ext = path.extname(file.originalname || 'photo.jpg') || '.jpg';
+      const filename = `admin_${userId}_${Date.now()}${ext}`;
+      const filePath = path.join(docDir, filename);
+      fs.writeFileSync(filePath, file.buffer);
+
+      const fileUrl = `uploads/profile-photos/${filename}`;
+
+      await this.db.query(
+        `UPDATE users SET profile_image_url = $2, updated_at = NOW() WHERE user_id = $1 OR email = $1`,
+        [userId, fileUrl],
+      );
+
+      return {
+        status: true,
+        success: true,
+        message: 'Profile picture updated successfully',
+        url: fileUrl,
+      };
+    } catch (error) {
+      this.developer.error('uploadProfilePhoto error', { error });
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException('Failed to upload profile photo');
     }
   }
 
