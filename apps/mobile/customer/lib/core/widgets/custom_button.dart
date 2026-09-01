@@ -46,11 +46,11 @@ class NotifBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Stack(children: [
     Container(width: 36, height: 36,
-      decoration: BoxDecoration(color: kSurface, shape: BoxShape.circle, border: Border.all(color: kBorder)),
+      decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(10), border: Border.all(color: kBorder)),
       child: const Center(child: Icon(Icons.notifications_none, size: 20, color: kText))),
     Positioned(top: 2, right: 2, child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+        decoration: const BoxDecoration(color: Colors.red, borderRadius: BorderRadius.all(Radius.circular(10))),
         child: const Text('2', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)))),
   ]);
 }
@@ -88,7 +88,7 @@ class CartBtn extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: kSurface,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: kBorder),
                 ),
                 child: const Center(
