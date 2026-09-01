@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
 class DynamicSplashScreen extends StatefulWidget {
   final Widget child;
@@ -142,26 +141,26 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                 // ── Main Content ───────────────────────────────────────
                 Column(
                   children: [
-                    SizedBox(height: topPadding > 0 ? 32 : 48),
+                    const Spacer(flex: 2),
 
-                    // 1. Logo Circle
+                    // 1. Center Brand Logo from Assets
                     Container(
-                      width: 88,
-                      height: 88,
-                      padding: const EdgeInsets.all(12),
+                      width: 120,
+                      height: 120,
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: const Color(0xFFDCFCE7),
-                          width: 2,
+                          width: 2.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF16A34A).withValues(alpha: 0.12),
-                            blurRadius: 24,
-                            spreadRadius: 2,
-                            offset: const Offset(0, 8),
+                            color: const Color(0xFF16A34A).withValues(alpha: 0.16),
+                            blurRadius: 32,
+                            spreadRadius: 4,
+                            offset: const Offset(0, 10),
                           ),
                         ],
                       ),
@@ -173,11 +172,11 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
 
                     // 2. Headline
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 28.0),
                       child: RichText(
                         textAlign: TextAlign.center,
                         text: const TextSpan(
@@ -203,7 +202,7 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                             TextSpan(
                               text: 'Delivered, Every Day!',
                               style: TextStyle(
-                                fontSize: 26,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w900,
                                 color: Color(0xFF0F172A),
                                 letterSpacing: -0.5,
@@ -214,15 +213,15 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
                     // 3. Heart Line Divider
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 28,
-                          height: 1.8,
+                          width: 32,
+                          height: 2,
                           decoration: BoxDecoration(
                             color: const Color(0xFF22C55E),
                             borderRadius: BorderRadius.circular(2),
@@ -236,8 +235,8 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          width: 28,
-                          height: 1.8,
+                          width: 32,
+                          height: 2,
                           decoration: BoxDecoration(
                             color: const Color(0xFF22C55E),
                             borderRadius: BorderRadius.circular(2),
@@ -246,32 +245,24 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                       ],
                     ),
 
-                    const Spacer(),
+                    const SizedBox(height: 10),
 
-                    // 4. Center Cow Drinking Milk Animation with Soft Mint Glow
-                    Container(
-                      width: 170,
-                      height: 170,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFFDDF5E8).withValues(alpha: 0.7),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF16A34A).withValues(alpha: 0.08),
-                            blurRadius: 36,
-                            spreadRadius: 10,
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: CowLoadingWidget(
-                          size: 135,
-                          loadingBarWidth: 85,
+                    // 4. Subtitle tagline
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 36.0),
+                      child: Text(
+                        'Pure farm fresh milk & dairy delivered directly to your doorstep.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                          height: 1.4,
                         ),
                       ),
                     ),
 
-                    const Spacer(),
+                    const Spacer(flex: 3),
 
                     // 5. Bottom Feature Card
                     Container(

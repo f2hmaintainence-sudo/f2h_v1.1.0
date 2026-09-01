@@ -47,6 +47,14 @@ class ApiEndpoints {
   static String get baseUrl => apiBaseUrl;
 
   // ---------------------------------------------------------------------------
+  // App version
+  // ---------------------------------------------------------------------------
+  /// Mandatory-update gate. Reads `app_configs` for the caller's platform and
+  /// answers whether the installed build is below the minimum supported one.
+  /// Sent with the `x-app-platform` and `x-app-version` headers.
+  static const String appCheckVersion = '/app/check-version';
+
+  // ---------------------------------------------------------------------------
   // Auth & Session
   // ---------------------------------------------------------------------------
   static const String _auth            = '/auth';

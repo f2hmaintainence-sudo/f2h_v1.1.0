@@ -7,7 +7,9 @@ import 'package:f2h_delivery/app.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_delivery/core/utils/app_update_service.dart';
 import 'package:f2h_delivery/core/utils/version_checker.dart';
+import 'package:f2h_delivery/core/widgets/force_update_gate.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -84,8 +86,23 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       if (!mounted) return;
 
       // ── PRIORITY 0: App Version Check ──────────────────────────────────────
-      final isBlocked = await VersionChecker.checkUpdates(context);
-      if (isBlocked) return; // Keep showing splash screen under dialog if blocked
+      // A build below the supported minimum never reaches the dashboard or the
+      // login form. Replacing the route rather than stacking a dialog leaves
+      // nothing behind the update screen to pop back to.
+      final update = await AppUpdateService.check();
+      if (!mounted) return;
+      if (update.mustUpdate) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => MandatoryUpdateScreen(status: update)),
+        );
+        return;
+      }
+      // Still supported, but a newer build exists — the existing optional
+      // prompt handles that and does not block navigation.
+      if (update.updateAvailable) {
+        VersionChecker.checkUpdates(context);
+      }
 
       // ── PRIORITY 1: Valid session → go straight to Dashboard ──────────────
       // This ensures a logged-in user NEVER gets sent back to onboarding,

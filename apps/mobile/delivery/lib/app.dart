@@ -18,6 +18,7 @@ import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
+import 'package:f2h_delivery/core/widgets/force_update_gate.dart';
 import 'package:f2h_delivery/services/location_tracking_service.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
 
@@ -52,7 +53,9 @@ class F2HApp extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
         ),
       ),
-      home: const SplashScreen(),
+      // Catches a build retired while a partner was mid-session; the splash
+      // covers the cold-start case.
+      home: const ForceUpdateGate(child: SplashScreen()),
     ),
   );
 }
