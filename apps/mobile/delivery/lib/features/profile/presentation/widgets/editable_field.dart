@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 
 class EditableField extends StatelessWidget {
@@ -10,6 +11,10 @@ class EditableField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final Widget? suffixIcon;
+  final List<TextInputFormatter>? inputFormatters;
+  final int? maxLength;
+  final AutovalidateMode autovalidateMode;
+  final TextCapitalization textCapitalization;
 
   const EditableField({
     super.key,
@@ -21,6 +26,10 @@ class EditableField extends StatelessWidget {
     this.readOnly = false,
     this.onTap,
     this.suffixIcon,
+    this.inputFormatters,
+    this.maxLength,
+    this.autovalidateMode = AutovalidateMode.onUserInteraction,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   @override
@@ -43,12 +52,17 @@ class EditableField extends StatelessWidget {
           keyboardType: keyboardType,
           readOnly: readOnly,
           onTap: onTap,
+          inputFormatters: inputFormatters,
+          maxLength: maxLength,
+          autovalidateMode: autovalidateMode,
+          textCapitalization: textCapitalization,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: const TextStyle(color: kMuted, fontWeight: FontWeight.normal),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             suffixIcon: suffixIcon,
+            counterText: '',
             fillColor: readOnly ? kBgDeep : kSurface,
             filled: true,
             border: OutlineInputBorder(

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
@@ -11,6 +12,16 @@ import 'package:f2h_delivery/features/profile/presentation/widgets/editable_fiel
 import 'package:f2h_delivery/features/profile/presentation/widgets/image_upload_field.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
 
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
+}
+
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
 
@@ -19,6 +30,146 @@ class DocumentsScreen extends StatefulWidget {
 }
 
 class _DocumentsScreenState extends State<DocumentsScreen> {
+  ({String label, String idLabel, IconData icon, String placeholder, int maxLength}) _getDocumentMeta(String type) {
+    switch (type) {
+      case 'aadhaar':
+        return (
+          label: 'Aadhaar Card',
+          idLabel: 'Aadhaar Number (12 Digits)',
+          icon: Icons.badge_rounded,
+          placeholder: '12-digit Aadhaar Number',
+          maxLength: 12,
+        );
+      case 'pan':
+        return (
+          label: 'PAN Card',
+          idLabel: 'PAN Number (10 Characters)',
+          icon: Icons.credit_card_rounded,
+          placeholder: 'e.g. ABCDE1234F',
+          maxLength: 10,
+        );
+      case 'driving_license':
+        return (
+          label: 'Driving License',
+          idLabel: 'Driving License Number',
+          icon: Icons.drive_eta_rounded,
+          placeholder: 'e.g. KA0120150001234',
+          maxLength: 16,
+        );
+      case 'police_verification':
+        return (
+          label: 'Police Verification',
+          idLabel: 'Verification Certificate Number',
+          icon: Icons.verified_user_rounded,
+          placeholder: 'Reference / Certificate No.',
+          maxLength: 30,
+        );
+      case 'vehicle_rc':
+        return (
+          label: 'Vehicle RC',
+          idLabel: 'Vehicle Registration Number',
+          icon: Icons.two_wheeler_rounded,
+          placeholder: 'e.g. KA01AB1234 / TS09EA1234',
+          maxLength: 12,
+        );
+      default:
+        return (
+          label: 'Other Document',
+          idLabel: 'Document ID Number',
+          icon: Icons.description_rounded,
+          placeholder: 'Document ID / Reference Number',
+          maxLength: 30,
+        );
+    }
+  }
+
+  List<TextInputFormatter> _getInputFormattersForType(String type) {
+    switch (type) {
+      case 'aadhaar':
+        return [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(12),
+        ];
+      case 'pan':
+        return [
+          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+          UpperCaseTextFormatter(),
+          LengthLimitingTextInputFormatter(10),
+        ];
+      case 'driving_license':
+        return [
+          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\-]')),
+          UpperCaseTextFormatter(),
+          LengthLimitingTextInputFormatter(16),
+        ];
+      case 'vehicle_rc':
+        return [
+          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\-]')),
+          UpperCaseTextFormatter(),
+          LengthLimitingTextInputFormatter(12),
+        ];
+      case 'police_verification':
+        return [
+          FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z0-9\/\-_]")),
+          UpperCaseTextFormatter(),
+          LengthLimitingTextInputFormatter(30),
+        ];
+      default:
+        return [
+          LengthLimitingTextInputFormatter(30),
+        ];
+    }
+  }
+
+  String? _validateDocumentNumber(String type, String? val) {
+    if (val == null || val.trim().isEmpty) return 'Enter document number';
+    final clean = val.replaceAll(RegExp(r'\s+'), '');
+
+    if (type == 'aadhaar') {
+      if (!RegExp(r'^\d{12}$').hasMatch(clean)) {
+        return 'Aadhaar number must be exactly 12 digits';
+      }
+      if (clean.startsWith('0') || clean.startsWith('1')) {
+        return 'Aadhaar number cannot start with 0 or 1';
+      }
+      if (RegExp(r'^([0-9])\1{11}$').hasMatch(clean)) {
+        return 'Please enter a valid 12-digit Indian Aadhaar number';
+      }
+    } else if (type == 'pan') {
+      final cleanPan = clean.toUpperCase();
+      if (cleanPan.length != 10) return 'PAN must be exactly 10 characters';
+      if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(cleanPan)) {
+        return 'Enter valid 10-char PAN (e.g. ABCDE1234F)';
+      }
+    } else if (type == 'driving_license') {
+      final cleanDL = val.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase();
+      if (cleanDL.length < 10 || cleanDL.length > 16) {
+        return 'Driving license must be 10-16 characters';
+      }
+      if (!RegExp(r'^[A-Z]{2}').hasMatch(cleanDL)) {
+        return 'DL must start with 2-letter state code (e.g. KA, TS, DL)';
+      }
+      if (!RegExp(r'^[A-Z]{2}[0-9]{2}[0-9A-Z]{6,12}$').hasMatch(cleanDL)) {
+        return 'Enter valid DL format (e.g. KA0120150001234)';
+      }
+    } else if (type == 'vehicle_rc') {
+      final cleanRC = val.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase();
+      if (!RegExp(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$').hasMatch(cleanRC)) {
+        return 'Enter valid RC number (e.g. KA01AB1234 or TS09EA1234)';
+      }
+    } else if (type == 'police_verification') {
+      final cleanPV = val.trim();
+      if (cleanPV.length < 4) return 'Verification number must be at least 4 characters';
+      if (cleanPV.length > 30) return 'Verification number cannot exceed 30 characters';
+      if (!RegExp(r'^[a-zA-Z0-9\/\-_]+$').hasMatch(cleanPV)) {
+        return 'Verification number can only contain letters, numbers, -, /, _';
+      }
+    } else {
+      if (val.trim().length < 3) return 'Document number must be at least 3 characters';
+    }
+    return null;
+  }
+
   void _openDocumentForm(BuildContext context, {DocumentModel? document}) {
     final formKey = GlobalKey<FormState>();
     final numberController = TextEditingController(text: document?.documentNumber ?? '');
@@ -77,9 +228,17 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       initialValue: selectedType,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
                       onChanged: document == null
                           ? (val) {
-                              if (val != null) setModalState(() => selectedType = val);
+                              if (val != null) {
+                                setModalState(() {
+                                  selectedType = val;
+                                  numberController.clear();
+                                });
+                              }
                             }
                           : null,
                       style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
@@ -92,44 +251,37 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5)),
                       ),
                       items: documentTypes
-                          .map((t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(t.toUpperCase().replaceAll('_', ' ')),
-                              ))
+                          .map((t) {
+                            final meta = _getDocumentMeta(t);
+                            return DropdownMenuItem(
+                              value: t,
+                              child: Row(
+                                children: [
+                                  Icon(meta.icon, size: 18, color: const Color(0xFF16A34A)),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    meta.label,
+                                    style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          })
                           .toList(),
                     ),
                     const SizedBox(height: 14),
 
                     EditableField(
-                      label: 'Document ID Number',
+                      label: _getDocumentMeta(selectedType).idLabel,
                       controller: numberController,
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Enter document number';
-                        final clean = val.replaceAll(RegExp(r'\s+'), '');
-                        if (selectedType == 'aadhaar') {
-                          if (!RegExp(r'^\d{12}$').hasMatch(clean)) {
-                            return 'Aadhaar number must be exactly 12 digits';
-                          }
-                        } else if (selectedType == 'pan') {
-                          if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(clean.toUpperCase())) {
-                            return 'Enter valid 10-char PAN (e.g. ABCDE1234F)';
-                          }
-                        } else if (selectedType == 'driving_license') {
-                          if (clean.length < 10) {
-                            return 'Enter a valid driving license number';
-                          }
-                        } else if (selectedType == 'vehicle_rc') {
-                          if (clean.length < 6) {
-                            return 'Enter a valid vehicle RC number';
-                          }
-                        }
-                        return null;
-                      },
-                      placeholder: selectedType == 'aadhaar'
-                          ? '12-digit Aadhaar Number'
-                          : selectedType == 'pan'
-                              ? '10-character PAN (e.g. ABCDE1234F)'
-                              : 'Document ID Number',
+                      placeholder: _getDocumentMeta(selectedType).placeholder,
+                      maxLength: _getDocumentMeta(selectedType).maxLength,
+                      keyboardType: selectedType == 'aadhaar' ? TextInputType.number : TextInputType.text,
+                      textCapitalization: selectedType == 'pan' || selectedType == 'driving_license' || selectedType == 'vehicle_rc'
+                          ? TextCapitalization.characters
+                          : TextCapitalization.none,
+                      inputFormatters: _getInputFormattersForType(selectedType),
+                      validator: (val) => _validateDocumentNumber(selectedType, val),
                     ),
                     const SizedBox(height: 14),
 
@@ -140,12 +292,48 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                             label: 'Issue Date',
                             controller: issueController,
                             placeholder: 'YYYY-MM-DD',
+                            readOnly: true,
+                            validator: (val) {
+                              if (val != null && val.trim().isNotEmpty) {
+                                final d = DateTime.tryParse(val.trim());
+                                if (d != null && d.isAfter(DateTime.now())) {
+                                  return 'Issue date cannot be in future';
+                                }
+                              }
+                              return null;
+                            },
                             onTap: () async {
+                              final initialDate = issueController.text.trim().isNotEmpty
+                                  ? (DateTime.tryParse(issueController.text.trim()) ?? DateTime.now())
+                                  : DateTime.now();
                               final date = await showDatePicker(
                                 context: dialogContext,
-                                initialDate: DateTime.now(),
-                                firstDate: DateTime(2000),
+                                initialDate: initialDate,
+                                firstDate: DateTime(1990),
                                 lastDate: DateTime.now(),
+                                builder: (context, child) {
+                                  return Theme(
+                                    data: Theme.of(context).copyWith(
+                                      colorScheme: const ColorScheme.light(
+                                        primary: Color(0xFF16A34A),
+                                        onPrimary: Colors.white,
+                                        surface: Colors.white,
+                                        onSurface: Color(0xFF0F172A),
+                                      ),
+                                      dialogBackgroundColor: Colors.white,
+                                      datePickerTheme: DatePickerThemeData(
+                                        backgroundColor: Colors.white,
+                                        headerBackgroundColor: const Color(0xFF16A34A),
+                                        headerForegroundColor: Colors.white,
+                                        surfaceTintColor: Colors.transparent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                      ),
+                                    ),
+                                    child: child!,
+                                  );
+                                },
                               );
                               if (date != null) {
                                 setModalState(() {
@@ -158,15 +346,54 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: EditableField(
-                            label: 'Expiry Date',
+                            label: selectedType == 'driving_license' ? 'Expiry Date *' : 'Expiry Date',
                             controller: expiryController,
                             placeholder: 'YYYY-MM-DD',
+                            readOnly: true,
+                            validator: (val) {
+                              if (selectedType == 'driving_license' && (val == null || val.trim().isEmpty)) {
+                                return 'Expiry date required for DL';
+                              }
+                              if (val != null && val.trim().isNotEmpty) {
+                                final d = DateTime.tryParse(val.trim());
+                                if (d != null && d.isBefore(DateTime.now())) {
+                                  return 'Document has already expired';
+                                }
+                              }
+                              return null;
+                            },
                             onTap: () async {
+                              final initialDate = expiryController.text.trim().isNotEmpty
+                                  ? (DateTime.tryParse(expiryController.text.trim()) ?? DateTime.now().add(const Duration(days: 365)))
+                                  : DateTime.now().add(const Duration(days: 365));
                               final date = await showDatePicker(
                                 context: dialogContext,
-                                initialDate: DateTime.now().add(const Duration(days: 365)),
+                                initialDate: initialDate,
                                 firstDate: DateTime.now(),
-                                lastDate: DateTime(2050),
+                                lastDate: DateTime(2055),
+                                builder: (context, child) {
+                                  return Theme(
+                                    data: Theme.of(context).copyWith(
+                                      colorScheme: const ColorScheme.light(
+                                        primary: Color(0xFF16A34A),
+                                        onPrimary: Colors.white,
+                                        surface: Colors.white,
+                                        onSurface: Color(0xFF0F172A),
+                                      ),
+                                      dialogBackgroundColor: Colors.white,
+                                      datePickerTheme: DatePickerThemeData(
+                                        backgroundColor: Colors.white,
+                                        headerBackgroundColor: const Color(0xFF16A34A),
+                                        headerForegroundColor: Colors.white,
+                                        surfaceTintColor: Colors.transparent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                      ),
+                                    ),
+                                    child: child!,
+                                  );
+                                },
                               );
                               if (date != null) {
                                 setModalState(() {
@@ -184,7 +411,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       children: [
                         Expanded(
                           child: ImageUploadField(
-                            label: 'Front Image',
+                            label: 'Front Image *',
                             initialImageUrl: document?.frontImage,
                             selectedFile: frontFile,
                             onImageSelected: (file) {
@@ -219,6 +446,17 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           if (formKey.currentState!.validate()) {
+                            if (document == null && frontFile == null) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please upload front image of document proof'),
+                                  backgroundColor: Color(0xFFDC2626),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              return;
+                            }
+
                             final data = {
                               'document_type': selectedType,
                               'document_number': numberController.text.trim(),

@@ -344,16 +344,35 @@ export class ProfileService {
 
   async createDocument(deliveryPartnerId: string, dto: CreateDocumentDto, files?: { front_image?: any; back_image?: any }) {
     try {
-      if (dto.document_type === 'aadhaar' && dto.document_number) {
-        const cleanAadhaar = dto.document_number.replace(/\s+/g, '');
-        if (!/^\d{12}$/.test(cleanAadhaar)) {
-          throw new BadRequestException('Please provide a valid 12-digit Aadhaar number');
+      if (dto.document_type === 'aadhaar') {
+        const cleanAadhaar = (dto.document_number || '').replace(/\s+/g, '');
+        if (!/^[2-9]\d{11}$/.test(cleanAadhaar) || /^(\d)\1{11}$/.test(cleanAadhaar)) {
+          throw new BadRequestException('Please provide a valid 12-digit Indian Aadhaar number');
         }
-      }
-      if (dto.document_type === 'pan' && dto.document_number) {
-        const cleanPan = dto.document_number.replace(/\s+/g, '').toUpperCase();
+      } else if (dto.document_type === 'pan') {
+        const cleanPan = (dto.document_number || '').replace(/\s+/g, '').toUpperCase();
         if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
           throw new BadRequestException('Please provide a valid 10-character PAN number (e.g. ABCDE1234F)');
+        }
+      } else if (dto.document_type === 'driving_license') {
+        const cleanDL = (dto.document_number || '').replace(/[\s\-]/g, '').toUpperCase();
+        if (!/^[A-Z]{2}[0-9]{2}[0-9A-Z]{6,12}$/.test(cleanDL) || cleanDL.length < 10 || cleanDL.length > 16) {
+          throw new BadRequestException('Please provide a valid Driving License number (e.g. KA0120150001234)');
+        }
+      } else if (dto.document_type === 'vehicle_rc') {
+        const cleanRC = (dto.document_number || '').replace(/[\s\-]/g, '').toUpperCase();
+        if (!/^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$/.test(cleanRC)) {
+          throw new BadRequestException('Please provide a valid Vehicle RC registration number (e.g. KA01AB1234)');
+        }
+      } else if (dto.document_type === 'police_verification') {
+        const cleanPV = (dto.document_number || '').trim();
+        if (cleanPV.length < 4 || cleanPV.length > 30) {
+          throw new BadRequestException('Police verification reference number must be between 4 and 30 characters');
+        }
+      } else if (dto.document_type === 'other') {
+        const cleanOther = (dto.document_number || '').trim();
+        if (cleanOther.length < 3 || cleanOther.length > 50) {
+          throw new BadRequestException('Document number must be between 3 and 50 characters');
         }
       }
 
