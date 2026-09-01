@@ -30,16 +30,20 @@ class DocumentModel {
   static String? _imageUrl(dynamic value) {
     if (value == null) return null;
 
-    final path = value.toString();
-    if (path.isEmpty) return null;
+    var path = value.toString().trim();
+    if (path.isEmpty || path == 'null') return null;
 
     // Already a full URL
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
 
-    // Relative path from backend
-    return '${ApiEndpoints.baseUrl}/$path';
+    if (path.startsWith('/')) {
+      path = path.substring(1);
+    }
+
+    // Relative path from backend root
+    return '${ApiEndpoints.host}/$path';
   }
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
@@ -47,8 +51,8 @@ class DocumentModel {
       id: json['id'] != null ? int.tryParse(json['id'].toString()) : null,
       documentType: json['document_type']?.toString() ?? '',
       documentNumber: json['document_number']?.toString(),
-      frontImage: _imageUrl(json['front_image']),
-      backImage: _imageUrl(json['back_image']),
+      frontImage: _imageUrl(json['front_image'] ?? json['document_url'] ?? json['aadhaar_url']),
+      backImage: _imageUrl(json['back_image'] ?? json['id_proof_url']),
       issueDate: json['issue_date']?.toString(),
       expiryDate: json['expiry_date']?.toString(),
       verificationStatus: json['verification_status']?.toString() ?? 'pending',

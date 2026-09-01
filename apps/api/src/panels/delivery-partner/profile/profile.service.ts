@@ -326,16 +326,55 @@ export class ProfileService {
 
   async getDocuments(deliveryPartnerId: string) {
     try {
-      const res = await this.Data.query('delivery_partners', {
-        where: [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }],
-        limit: 1,
-      });
-      const partner = res?.data?.[0];
-      const docs: any[] = [];
-      if (partner?.aadhaar_url) docs.push({ id: 1, document_type: 'aadhaar', document_url: partner.aadhaar_url, verification_status: partner.is_verified ? 'verified' : 'pending' });
-      if (partner?.id_proof_url) docs.push({ id: 2, document_type: 'id_proof', document_url: partner.id_proof_url, verification_status: partner.is_verified ? 'verified' : 'pending' });
-      if (partner?.profile_photo_url) docs.push({ id: 3, document_type: 'profile_photo', document_url: partner.profile_photo_url, verification_status: partner.is_verified ? 'verified' : 'pending' });
-      return docs;
+      const rows = await this.db.query(
+        `SELECT id, delivery_partner_id, document_type, document_number, front_image, back_image, issue_date, expiry_date, verification_status, rejection_reason, is_primary, created_at, updated_at
+         FROM delivery_partner_documents
+         WHERE delivery_partner_id = $1
+         ORDER BY id ASC`,
+        [deliveryPartnerId],
+      );
+
+      if (rows && rows.length > 0) {
+        return rows.map((r: any) => ({
+          ...r,
+          document_type: r.document_type === 'rc' ? 'vehicle_rc' : r.document_type,
+        }));
+      }
+
+      // Fallback to legacy columns in delivery_partners table if table is empty
+      const partnerRes = await this.db.query(
+        `SELECT aadhaar_url, id_proof_url, is_verified FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+        [deliveryPartnerId],
+      );
+      const partner = partnerRes?.[0];
+      const fallbackDocs: any[] = [];
+      if (partner?.aadhaar_url) {
+        fallbackDocs.push({
+          id: 1,
+          document_type: 'aadhaar',
+          document_number: null,
+          front_image: partner.aadhaar_url,
+          back_image: null,
+          issue_date: null,
+          expiry_date: null,
+          verification_status: partner.is_verified ? 'verified' : 'pending',
+          is_primary: true,
+        });
+      }
+      if (partner?.id_proof_url) {
+        fallbackDocs.push({
+          id: 2,
+          document_type: 'pan',
+          document_number: null,
+          front_image: partner.id_proof_url,
+          back_image: null,
+          issue_date: null,
+          expiry_date: null,
+          verification_status: partner.is_verified ? 'verified' : 'pending',
+          is_primary: false,
+        });
+      }
+      return fallbackDocs;
     } catch (error) {
       this.developerService.error(`[Profile] Error fetching documents for deliveryPartnerId: ${deliveryPartnerId}`, { error });
       throw error;
@@ -344,46 +383,109 @@ export class ProfileService {
 
   async createDocument(deliveryPartnerId: string, dto: CreateDocumentDto, files?: { front_image?: any; back_image?: any }) {
     try {
-      if (dto.document_type === 'aadhaar') {
+      const rawType = (dto.document_type || 'other').toLowerCase().trim();
+      const docType = rawType === 'rc' ? 'vehicle_rc' : rawType;
+
+      if (docType === 'aadhaar') {
         const cleanAadhaar = (dto.document_number || '').replace(/\s+/g, '');
         if (!/^[2-9]\d{11}$/.test(cleanAadhaar) || /^(\d)\1{11}$/.test(cleanAadhaar)) {
           throw new BadRequestException('Please provide a valid 12-digit Indian Aadhaar number');
         }
-      } else if (dto.document_type === 'pan') {
+      } else if (docType === 'pan') {
         const cleanPan = (dto.document_number || '').replace(/\s+/g, '').toUpperCase();
         if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
           throw new BadRequestException('Please provide a valid 10-character PAN number (e.g. ABCDE1234F)');
         }
-      } else if (dto.document_type === 'driving_license') {
+      } else if (docType === 'driving_license') {
         const cleanDL = (dto.document_number || '').replace(/[\s\-]/g, '').toUpperCase();
         if (!/^[A-Z]{2}[0-9]{2}[0-9A-Z]{6,12}$/.test(cleanDL) || cleanDL.length < 10 || cleanDL.length > 16) {
           throw new BadRequestException('Please provide a valid Driving License number (e.g. KA0120150001234)');
         }
-      } else if (dto.document_type === 'vehicle_rc') {
+      } else if (docType === 'vehicle_rc') {
         const cleanRC = (dto.document_number || '').replace(/[\s\-]/g, '').toUpperCase();
         if (!/^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$/.test(cleanRC)) {
           throw new BadRequestException('Please provide a valid Vehicle RC registration number (e.g. KA01AB1234)');
         }
-      } else if (dto.document_type === 'police_verification') {
+      } else if (docType === 'police_verification') {
         const cleanPV = (dto.document_number || '').trim();
         if (cleanPV.length < 4 || cleanPV.length > 30) {
           throw new BadRequestException('Police verification reference number must be between 4 and 30 characters');
         }
-      } else if (dto.document_type === 'other') {
+      } else if (docType === 'other') {
         const cleanOther = (dto.document_number || '').trim();
         if (cleanOther.length < 3 || cleanOther.length > 50) {
           throw new BadRequestException('Document number must be between 3 and 50 characters');
         }
       }
 
-      const updates: Record<string, any> = { updated_at: new Date() };
+      let frontUrl: string | null = null;
+      let backUrl: string | null = null;
+
       if (files?.front_image) {
-        updates.aadhaar_url = await this.saveDocumentFile(deliveryPartnerId, 'front', files.front_image);
+        frontUrl = await this.saveDocumentFile(deliveryPartnerId, `${docType}_front`, files.front_image);
       }
       if (files?.back_image) {
-        updates.id_proof_url = await this.saveDocumentFile(deliveryPartnerId, 'back', files.back_image);
+        backUrl = await this.saveDocumentFile(deliveryPartnerId, `${docType}_back`, files.back_image);
       }
-      await this.Data.update('delivery_partners', updates, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
+
+      // Check if document of this type already exists for this partner
+      const existing = await this.db.query(
+        `SELECT id, front_image, back_image FROM delivery_partner_documents WHERE delivery_partner_id = $1 AND (document_type = $2 OR (document_type = 'rc' AND $2 = 'vehicle_rc')) LIMIT 1`,
+        [deliveryPartnerId, docType],
+      );
+
+      if (existing && existing.length > 0) {
+        const existingId = existing[0].id;
+        const finalFront = frontUrl || existing[0].front_image;
+        const finalBack = backUrl || existing[0].back_image;
+
+        await this.db.query(
+          `UPDATE delivery_partner_documents
+           SET document_type = $1,
+               document_number = $2,
+               front_image = $3,
+               back_image = $4,
+               issue_date = $5,
+               expiry_date = $6,
+               verification_status = 'pending',
+               updated_at = NOW()
+           WHERE id = $7 AND delivery_partner_id = $8`,
+          [
+            docType,
+            dto.document_number?.trim() || null,
+            finalFront,
+            finalBack,
+            dto.issue_date?.trim() || null,
+            dto.expiry_date?.trim() || null,
+            existingId,
+            deliveryPartnerId,
+          ],
+        );
+      } else {
+        await this.db.query(
+          `INSERT INTO delivery_partner_documents (
+            delivery_partner_id, document_type, document_number, front_image, back_image, issue_date, expiry_date, verification_status, is_primary, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', false, NOW(), NOW())`,
+          [
+            deliveryPartnerId,
+            docType,
+            dto.document_number?.trim() || null,
+            frontUrl,
+            backUrl,
+            dto.issue_date?.trim() || null,
+            dto.expiry_date?.trim() || null,
+          ],
+        );
+      }
+
+      // Update legacy columns in delivery_partners table
+      const partnerUpdates: Record<string, any> = { updated_at: new Date() };
+      if (docType === 'aadhaar' && frontUrl) partnerUpdates.aadhaar_url = frontUrl;
+      if (docType === 'pan' && frontUrl) partnerUpdates.id_proof_url = frontUrl;
+      if (Object.keys(partnerUpdates).length > 1) {
+        await this.Data.update('delivery_partners', partnerUpdates, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
+      }
+
       return { success: true, message: 'Document added successfully. Pending admin verification.' };
     } catch (error) {
       this.developerService.error(`[Profile] Error creating document for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto });
@@ -392,11 +494,73 @@ export class ProfileService {
   }
 
   async updateDocument(deliveryPartnerId: string, docId: string, dto: UpdateDocumentDto, files?: { front_image?: any; back_image?: any }) {
-    return this.createDocument(deliveryPartnerId, dto as any, files);
+    try {
+      const rawType = (dto.document_type || 'other').toLowerCase().trim();
+      const docType = rawType === 'rc' ? 'vehicle_rc' : rawType;
+
+      let frontUrl: string | null = null;
+      let backUrl: string | null = null;
+
+      if (files?.front_image) {
+        frontUrl = await this.saveDocumentFile(deliveryPartnerId, `${docType}_front`, files.front_image);
+      }
+      if (files?.back_image) {
+        backUrl = await this.saveDocumentFile(deliveryPartnerId, `${docType}_back`, files.back_image);
+      }
+
+      const existing = await this.db.query(
+        `SELECT id, front_image, back_image, document_type FROM delivery_partner_documents WHERE id = $1 AND delivery_partner_id = $2 LIMIT 1`,
+        [docId, deliveryPartnerId],
+      );
+
+      if (!existing || existing.length === 0) {
+        return this.createDocument(deliveryPartnerId, dto as any, files);
+      }
+
+      const finalFront = frontUrl || existing[0].front_image;
+      const finalBack = backUrl || existing[0].back_image;
+
+      await this.db.query(
+        `UPDATE delivery_partner_documents
+         SET document_type = $1,
+             document_number = $2,
+             front_image = $3,
+             back_image = $4,
+             issue_date = $5,
+             expiry_date = $6,
+             verification_status = 'pending',
+             updated_at = NOW()
+         WHERE id = $7 AND delivery_partner_id = $8`,
+        [
+          docType || existing[0].document_type,
+          dto.document_number?.trim() || null,
+          finalFront,
+          finalBack,
+          dto.issue_date?.trim() || null,
+          dto.expiry_date?.trim() || null,
+          docId,
+          deliveryPartnerId,
+        ],
+      );
+
+      return { success: true, message: 'Document updated successfully. Pending admin verification.' };
+    } catch (error) {
+      this.developerService.error(`[Profile] Error updating document for deliveryPartnerId: ${deliveryPartnerId}`, { error, dto, docId });
+      throw error;
+    }
   }
 
   async deleteDocument(deliveryPartnerId: string, docId: string) {
-    return { success: true, message: 'Document deleted' };
+    try {
+      await this.db.query(
+        `DELETE FROM delivery_partner_documents WHERE id = $1 AND delivery_partner_id = $2`,
+        [docId, deliveryPartnerId],
+      );
+      return { success: true, message: 'Document deleted' };
+    } catch (error) {
+      this.developerService.error(`[Profile] Error deleting document for deliveryPartnerId: ${deliveryPartnerId}`, { error, docId });
+      throw error;
+    }
   }
 
   // ─── Vehicles ───────────────────────────────────────────────────────────────

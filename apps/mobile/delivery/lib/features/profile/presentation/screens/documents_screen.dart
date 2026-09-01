@@ -176,11 +176,16 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     final issueController = TextEditingController(text: document?.issueDate?.split('T')[0] ?? '');
     final expiryController = TextEditingController(text: document?.expiryDate?.split('T')[0] ?? '');
 
-    String selectedType = document?.documentType ?? 'aadhaar';
+    final documentTypes = ['aadhaar', 'pan', 'driving_license', 'police_verification', 'vehicle_rc', 'other'];
+
+    String rawType = (document?.documentType ?? 'aadhaar').toLowerCase().trim();
+    if (rawType == 'rc') rawType = 'vehicle_rc';
+    if (rawType == 'id_proof') rawType = 'pan';
+    if (rawType == 'dl') rawType = 'driving_license';
+    String selectedType = documentTypes.contains(rawType) ? rawType : 'other';
+
     File? frontFile;
     File? backFile;
-
-    final documentTypes = ['aadhaar', 'pan', 'driving_license', 'police_verification', 'vehicle_rc', 'other'];
 
     showModalBottomSheet(
       context: context,

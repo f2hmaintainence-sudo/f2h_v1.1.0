@@ -45,6 +45,9 @@ export class CreateDocumentDto {
 export class UpdateDocumentDto {
   @IsString()
   @IsOptional()
+  document_type?: string;
+  @IsString()
+  @IsOptional()
   document_number?: string;
   @IsString()
   @IsOptional()
