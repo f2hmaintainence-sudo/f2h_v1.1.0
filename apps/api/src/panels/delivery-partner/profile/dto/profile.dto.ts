@@ -10,6 +10,9 @@ export class UpdatePersonalDto {
   email?: string;
   @IsString()
   @IsOptional()
+  phone?: string;
+  @IsString()
+  @IsOptional()
   date_of_birth?: string;
   @IsString()
   @IsOptional()

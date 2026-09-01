@@ -278,7 +278,17 @@ export class RefundEligibilityService {
         p.name AS product_name,
         pv.name AS variant_name,
         oi.item_status::text AS item_status,
-        dra.failed_reason
+        -- Decorative only, and deliberately a subquery rather than a join: an
+        -- order re-attempted in a second run matches two run-address rows, and
+        -- a LEFT JOIN would duplicate the line into a double refund.
+        (
+          SELECT dra.failed_reason
+          FROM delivery_run_addresses dra
+          WHERE dra.order_ids::text LIKE '%' || o.order_id || '%'
+            AND dra.deleted_at IS NULL
+          ORDER BY dra.updated_at DESC NULLS LAST
+          LIMIT 1
+        ) AS failed_reason
       FROM orders o
       LEFT JOIN users u ON u.user_id = o.customer_id
       JOIN order_items oi
@@ -294,25 +304,31 @@ export class RefundEligibilityService {
        AND si.deleted_at IS NULL
       LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
       LEFT JOIN products p ON p.product_id = pv.product_id
-      LEFT JOIN delivery_run_addresses dra
-        ON (dra.order_ids::text LIKE '%' || o.order_id || '%') AND dra.deleted_at IS NULL
       WHERE o.deleted_at IS NULL
         AND o.scheduled_date BETWEEN $1::date AND $2::date
-        AND o.status <> 'cancelled'
-        AND o.status <> 'delivered'
+        -- Delivery is judged by the order's own status, and only by that.
+        --
+        -- When a partner misses a stop or abandons a run, the admin force-fails
+        -- the undelivered orders the next day — and that action writes to the
+        -- orders table alone. The run-address rows keep whatever status they
+        -- had, so requiring delivery_run_addresses.delivery_status = 'failed'
+        -- as corroboration silently rejected almost every genuine failure. The
+        -- other half of that condition was worse: delivery_proof_logs has never
+        -- held a single row, so it could never match anything.
+        --
+        -- 'delivered' and 'completed' mean the customer received the goods.
+        -- Every other status means they did not, which makes the day refundable.
+        AND LOWER(COALESCE(o.status, '')) NOT IN ('delivered', 'completed')
+        -- Cancellation refunds through the order-cancellation path; picking it
+        -- up here as well would pay the customer twice for one order.
+        AND LOWER(COALESCE(o.status, '')) <> 'cancelled'
         AND COALESCE(oi.item_status::text, '') NOT IN ('cancelled', 'returned')
         AND LOWER(COALESCE(oi.item_status::text, '')) <> 'delivered'
+        -- Only a day that is fully past can be judged. An order still 'assigned'
+        -- or 'out_for_delivery' today is in flight, not failed, and refunding it
+        -- would pay for a delivery that is about to happen.
+        AND o.scheduled_date < CURRENT_DATE
         ${scope.join('\n        ')}
-        AND (
-          dra.delivery_status = 'failed'
-          OR EXISTS (
-            SELECT 1 FROM delivery_proof_logs dpl
-            WHERE dpl.subscription_id = o.subscription_id
-              AND dpl.delivery_date = o.scheduled_date
-              AND dpl.shift_type = o.delivery_slot
-              AND dpl.delivery_status IN ('not_home', 'issue')
-          )
-        )
       ORDER BY o.scheduled_date, oi.subscription_item_id
       `,
       params,

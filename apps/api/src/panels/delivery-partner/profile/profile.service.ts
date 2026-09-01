@@ -231,6 +231,25 @@ export class ProfileService {
         }
         userUpdates.email = email;
       }
+      if (dto.phone !== undefined || (dto as any).mobile_number !== undefined) {
+        const rawPhone = (dto.phone || (dto as any).mobile_number || '').trim();
+        if (rawPhone) {
+          const cleanPhone = rawPhone.replace(/[\s\-+()]/g, '').replace(/^(91|0)/, '');
+          if (!/^[6-9]\d{9}$/.test(cleanPhone) || /^([6-9])\1{9}$/.test(cleanPhone)) {
+            throw new BadRequestException(
+              'Please provide a valid 10-digit Indian mobile number (starting with 6, 7, 8, or 9)',
+            );
+          }
+          const existing = await this.db.query(
+            `SELECT user_id FROM users WHERE phone = $1 AND user_id != $2 LIMIT 1`,
+            [cleanPhone, deliveryPartnerId],
+          );
+          if (existing?.length) {
+            throw new BadRequestException('This mobile number is already registered with another account');
+          }
+          userUpdates.phone = cleanPhone;
+        }
+      }
       userUpdates.updated_at = new Date();
 
       // Update both tables

@@ -24,6 +24,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: p.fullName);
     final emailController = TextEditingController(text: p.email);
+
+    String rawPhone = p.phone;
+    String initPhone = rawPhone.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+    if (initPhone.length > 10) initPhone = initPhone.substring(0, 10);
+    final phoneController = TextEditingController(text: initPhone);
+
     final dobController = TextEditingController(text: p.dateOfBirth?.split('T')[0] ?? '');
     String selectedGender = 'Male';
     if (p.gender != null && p.gender!.isNotEmpty) {
@@ -98,6 +104,33 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         if (val == null || val.trim().isEmpty) return 'Enter email address';
                         if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(val.trim())) {
                           return 'Enter a valid email address';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    _buildEditTextField(
+                      label: 'Mobile Number',
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      maxLength: 10,
+                      prefixText: '+91 ',
+                      placeholder: '10-digit Mobile Number',
+                      inputFormatters: [
+                        IndianMobileNumberInputFormatter(),
+                      ],
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Enter mobile number';
+                        final clean = val.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+                        if (clean.length != 10) {
+                          return 'Mobile number must be exactly 10 digits';
+                        }
+                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                          return 'Indian mobile number must start with 6, 7, 8, or 9';
+                        }
+                        if (RegExp(r'^([6-9])\1{9}$').hasMatch(clean)) {
+                          return 'Please enter a valid active Indian mobile number';
                         }
                         return null;
                       },
@@ -274,7 +307,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         if (RegExp(r'^([6-9])\1{9}$').hasMatch(clean)) {
                           return 'Please enter a valid active Indian mobile number';
                         }
-                        if (clean == p.phone.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '')) {
+                        final ownPhone = phoneController.text.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+                        if (clean == ownPhone) {
                           return 'Emergency contact cannot be your own mobile number';
                         }
                         return null;
@@ -293,9 +327,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                                 ? null
                                 : rawEmergencyPhone.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
 
+                            final cleanPhone = phoneController.text.trim().replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+
                             final updates = {
                               'full_name': nameController.text.trim(),
                               'email': emailController.text.trim(),
+                              'phone': cleanPhone,
                               'date_of_birth': dobController.text.trim().isEmpty ? null : dobController.text.trim(),
                               'gender': selectedGender,
                               'residential_address': addressController.text.trim().isEmpty ? null : addressController.text.trim(),
