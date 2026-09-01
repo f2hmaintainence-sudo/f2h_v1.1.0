@@ -328,7 +328,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
     final dueAmount = double.tryParse(bill['due_amount']?.toString() ?? '0') ?? 0;
 
     return GestureDetector(
-      onTap: () => showBillDetailSheet(context, bill),
+      onTap: () => showBillDetailSheet(context, bill, onPaymentSuccess: _fetchBills),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -689,18 +689,33 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
   }
 }
 
-void showBillDetailSheet(BuildContext context, Map<String, dynamic> bill) {
+void showBillDetailSheet(BuildContext context, Map<String, dynamic> bill, {VoidCallback? onPaymentSuccess}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => BillDetailSheet(bill: bill),
+    builder: (ctx) => BillDetailSheet(bill: bill, onPaymentSuccess: onPaymentSuccess),
   );
 }
 
 class BillDetailSheet extends StatelessWidget {
   final Map<String, dynamic> bill;
-  const BillDetailSheet({required this.bill, super.key});
+  final VoidCallback? onPaymentSuccess;
+  const BillDetailSheet({required this.bill, this.onPaymentSuccess, super.key});
+
+  String _getBillMonth(Map<String, dynamic> bill) {
+    final rawDate = bill['created_at'] ?? bill['billing_from'] ?? bill['billing_to'] ?? bill['due_date'];
+    if (rawDate == null) return 'Recent';
+    try {
+      final str = rawDate.toString().trim().replaceAll(' ', '-');
+      final d = DateTime.tryParse(str);
+      if (d == null) return 'Recent';
+      const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[d.month]} ${d.year}';
+    } catch (_) {
+      return 'Recent';
+    }
+  }
 
   String _formatDate(dynamic dateStr) {
     if (dateStr == null) return '—';
@@ -793,6 +808,10 @@ class BillDetailSheet extends StatelessWidget {
     final billId = bill['bill_id']?.toString() ?? 'BILL';
     final billType = bill['bill_type']?.toString() ?? 'subscription';
     final refId = bill['reference_id']?.toString() ?? '';
+    final isSubscription = billType.toLowerCase() == 'subscription' ||
+        refId.startsWith('SUB') ||
+        refId == 'CONSOLIDATED' ||
+        billId.contains('PB');
     final paymentMethod = bill['payment_method']?.toString() ?? 'wallet';
     final paymentType = bill['payment_type']?.toString() ?? 'prepaid';
     final billingFrom = bill['billing_from'];
@@ -1132,7 +1151,7 @@ class BillDetailSheet extends StatelessWidget {
                                       ),
                                     ),
                                     Text(
-                                      'Itemized deliveries for ${_getBillMonthYear(bill)}',
+                                      'Itemized deliveries for ${_getBillMonth(bill)}',
                                       style: const TextStyle(
                                         fontSize: 11,
                                         color: Color(0xFF16653A),
@@ -1455,7 +1474,7 @@ class BillDetailSheet extends StatelessWidget {
                         bill: bill,
                         walletBalance: walletBalance,
                         onPaymentSuccess: () {
-                          _fetchBills();
+                          onPaymentSuccess?.call();
                           context.read<CustomerSessionCubit>().refresh();
                         },
                       );
