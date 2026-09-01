@@ -853,25 +853,18 @@ class _CartScreenState extends State<CartScreen> {
                     context.runWithAuth(() async {
                       final sessionCubit = context.read<CustomerSessionCubit>();
                       final session = sessionCubit.state;
-                      if (session.addresses.isNotEmpty) {
-                        final activeAddr = session.addresses.firstWhere(
-                          (a) => a.isDefault,
-                          orElse: () => session.addresses.first,
+                      final serviceableAddresses = session.addresses.where((a) => a.isServiceable && a.branchIsActive).toList();
+                      if (serviceableAddresses.isEmpty) {
+                        F2HToast.error(
+                          context,
+                          'Please add or select an active delivery address to continue.',
+                          title: 'Delivery Address Required',
                         );
-                        if (!activeAddr.isServiceable || !activeAddr.branchIsActive) {
-                          final reason = activeAddr.unserviceableReason ??
-                              'Delivery is currently unavailable at this address because the local branch is inactive.';
-                          F2HToast.error(
-                            context,
-                            '$reason Please select another delivery address.',
-                            title: 'Delivery Unavailable',
-                          );
-                          await AddressSelectorDrawer.show(context);
-                          if (context.mounted) {
-                            await sessionCubit.refreshSilently();
-                          }
-                          return;
+                        await AddressSelectorDrawer.show(context);
+                        if (context.mounted) {
+                          await sessionCubit.refreshSilently();
                         }
+                        return;
                       }
 
                       if (context.mounted) {
@@ -921,15 +914,17 @@ class _CartScreenState extends State<CartScreen> {
     BuildContext context,
     CustomerSessionState sessionState,
   ) {
-    final list = sessionState.addresses;
-    if (list.isEmpty) {
+    final list = context.watch<CustomerSessionCubit>().state.addresses;
+    final serviceableList = list.where((a) => a.isServiceable && a.branchIsActive).toList();
+
+    if (serviceableList.isEmpty) {
       return Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: kSurface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: kRed.withValues(alpha: 0.35)),
+          border: Border.all(color: kBorder),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -942,15 +937,11 @@ class _CartScreenState extends State<CartScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: kRed.withValues(alpha: 0.1),
+              decoration: const BoxDecoration(
+                color: kPrimaryPl,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.location_off_rounded,
-                size: 20,
-                color: kRed,
-              ),
+              child: const Icon(Icons.add_location_alt_outlined, size: 20, color: kPrimary),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -962,7 +953,7 @@ class _CartScreenState extends State<CartScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: kRed,
+                      color: kText,
                     ),
                   ),
                   SizedBox(height: 2),
@@ -1007,11 +998,11 @@ class _CartScreenState extends State<CartScreen> {
       );
     }
 
-    final primaryAddress = list.firstWhere(
+    final primaryAddress = serviceableList.firstWhere(
       (a) => a.isDefault,
-      orElse: () => list.first,
+      orElse: () => serviceableList.first,
     );
-    final bool isServiceable = primaryAddress.isServiceable && primaryAddress.branchIsActive;
+    final bool isServiceable = true;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

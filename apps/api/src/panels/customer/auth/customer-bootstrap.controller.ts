@@ -160,9 +160,10 @@ export class CustomerBootstrapController {
                 b.branch_name,
                 b.is_active AS branch_is_active
          FROM customer_addresses ca
-         LEFT JOIN branches b ON b.branch_id = ca.branch_id
+         JOIN branches b ON b.branch_id = ca.branch_id
          WHERE (ca.customer_id = $1)
            AND ca.status = true
+           AND b.is_active = true
          ORDER BY ca.is_default DESC, ca.id ASC`,
         [customerId],
       );
@@ -208,29 +209,22 @@ export class CustomerBootstrapController {
     }
 
     let slotTimings: any = {
-      morning_slot: {
-        slot_key: 'morning',
-        slot_name: 'Morning',
-        customer_cutoff_time: '20:00',
-        customer_cutoff_day_offset: -1,
-        delivery_window_start: '06:00',
-        delivery_window_end: '08:30',
-      },
-      evening_slot: {
-        slot_key: 'evening',
-        slot_name: 'Evening',
-        customer_cutoff_time: '14:00',
-        customer_cutoff_day_offset: 0,
-        delivery_window_start: '17:00',
-        delivery_window_end: '20:00',
-      },
+      morning_start: '06:00',
+      morning_end: '09:00',
+      evening_start: '17:00',
+      evening_end: '21:00',
+      morning_cutoff_time: '20:00',
+      evening_cutoff_time: '15:00',
     };
     try {
       const slotTimingsRes = await this.db.query(
         `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' LIMIT 1`,
       );
       if (slotTimingsRes?.[0]?.config_data) {
-        slotTimings = slotTimingsRes[0].config_data;
+        slotTimings = {
+          ...slotTimings,
+          ...slotTimingsRes[0].config_data,
+        };
       }
     } catch (err) {
       this.Developer.error('[CustomerBootstrapController] Failed to load slot_timings', err);
@@ -239,10 +233,13 @@ export class CustomerBootstrapController {
     const todayPartnersData = await this.getTodayDeliveryPartners(customerId);
 
     const addressesList = Array.isArray(addressesResult) ? addressesResult : ((addressesResult as any)?.data || []);
+    const normalizedAddresses = addressesList
+      .map((addr: any) => this.normalizeAddress(addr))
+      .filter((addr: any) => addr.branch_is_active === true && addr.is_serviceable === true);
 
     return {
       profile,
-      addresses: addressesList.map((addr: any) => this.normalizeAddress(addr)),
+      addresses: normalizedAddresses,
       wallet: {
         balance: Number(profile?.wallet_balance || 0),
         referral_code: profile?.referral_code || null,

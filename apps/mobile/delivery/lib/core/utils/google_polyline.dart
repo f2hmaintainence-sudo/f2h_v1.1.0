@@ -10,6 +10,31 @@
 
 import 'package:latlong2/latlong.dart';
 
+int _pow2(int shift) {
+  switch (shift) {
+    case 0:
+      return 1;
+    case 5:
+      return 32;
+    case 10:
+      return 1024;
+    case 15:
+      return 32768;
+    case 20:
+      return 1048576;
+    case 25:
+      return 33554432;
+    case 30:
+      return 1073741824;
+    default:
+      return 1 << (shift % 30);
+  }
+}
+
+int _unZigZag(int result) {
+  return (result % 2 != 0) ? -((result + 1) ~/ 2) : (result ~/ 2);
+}
+
 /// Decodes a standard Google Encoded Polyline string (precision 1e5).
 /// Returns a list of [LatLng] points along the road path.
 List<LatLng> decodeGooglePolyline(String encoded) {
@@ -31,11 +56,11 @@ List<LatLng> decodeGooglePolyline(String encoded) {
     do {
       if (index >= length) break;
       b = codeUnits[index++] - 63;
-      result |= (b & 0x1f) << shift;
+      result += (b & 0x1f) * _pow2(shift);
       shift += 5;
     } while (b >= 0x20);
 
-    final int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+    final int dlat = _unZigZag(result);
     lat += dlat;
 
     shift = 0;
@@ -43,11 +68,11 @@ List<LatLng> decodeGooglePolyline(String encoded) {
     do {
       if (index >= length) break;
       b = codeUnits[index++] - 63;
-      result |= (b & 0x1f) << shift;
+      result += (b & 0x1f) * _pow2(shift);
       shift += 5;
     } while (b >= 0x20);
 
-    final int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+    final int dlng = _unZigZag(result);
     lng += dlng;
 
     final double latitude = lat / 1e5;

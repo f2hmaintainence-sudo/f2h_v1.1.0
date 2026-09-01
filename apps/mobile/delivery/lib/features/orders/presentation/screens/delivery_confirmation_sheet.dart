@@ -40,8 +40,8 @@ class ContainerItemState {
   })  : initialDeliveringToday = initialDeliveringToday ?? deliveringToday,
         initialCustomerBalance = initialCustomerBalance ?? customerBalance;
 
-  /// Maximum empties collectable = what customer already held + what is delivered today
-  int get maxCollectable => (customerBalance + deliveringToday).clamp(0, 999);
+  /// Maximum empties collectable = what customer currently holds with them
+  int get maxCollectable => customerBalance.clamp(0, 999);
 
   /// Net balance remaining with customer after delivery & returns
   int get projectedBalance => customerBalance + deliveringToday - returned - damaged - lost;
@@ -106,8 +106,8 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         name: bal.name.isNotEmpty ? bal.name : 'Glass Bottle',
         deliveringToday: exp,
         customerBalance: withCust,
-        isCollecting: withCust > 0 || exp > 0,
-        returned: (withCust > 0) ? withCust : (exp > 0 ? exp : 0),
+        isCollecting: withCust > 0,
+        returned: withCust > 0 ? withCust : 0,
       );
     }
 
@@ -121,8 +121,8 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           name: 'Glass Bottle',
           deliveringToday: exp > 0 ? exp : 1,
           customerBalance: outstanding,
-          isCollecting: true,
-          returned: outstanding > 0 ? outstanding : (exp > 0 ? exp : 0),
+          isCollecting: outstanding > 0,
+          returned: outstanding > 0 ? outstanding : 0,
         );
       }
     }
@@ -1100,7 +1100,26 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                               value: state.customerBalance,
                               color: Colors.orange.shade800,
                               onDec: state.customerBalance > 0
-                                  ? () => setState(() => state.customerBalance--)
+                                  ? () => setState(() {
+                                        state.customerBalance--;
+                                        final maxAllowed = state.customerBalance;
+                                        final totalCollecting = state.returned + state.damaged + state.lost;
+                                        if (totalCollecting > maxAllowed) {
+                                          final excess = totalCollecting - maxAllowed;
+                                          if (state.returned >= excess) {
+                                            state.returned -= excess;
+                                          } else {
+                                            final remainingExcess = excess - state.returned;
+                                            state.returned = 0;
+                                            if (state.lost >= remainingExcess) {
+                                              state.lost -= remainingExcess;
+                                            } else {
+                                              state.lost = 0;
+                                              state.damaged = (state.damaged - (remainingExcess - state.lost)).clamp(0, maxAllowed);
+                                            }
+                                          }
+                                        }
+                                      })
                                   : null,
                               onInc: () => setState(() => state.customerBalance++),
                             ),

@@ -214,9 +214,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   String? _defaultAddressId() {
     final list = context.read<CustomerSessionCubit>().state.addresses;
-    if (list.isEmpty) return null;
-    return list
-        .firstWhere((a) => a.isDefault, orElse: () => list.first)
+    final serviceableList = list.where((a) => a.isServiceable && a.branchIsActive).toList();
+    if (serviceableList.isEmpty) return null;
+    return serviceableList
+        .firstWhere((a) => a.isDefault, orElse: () => serviceableList.first)
         .id
         ?.toString();
   }
@@ -724,7 +725,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 >(
                                   builder: (context, sessionState) {
                                     final list = sessionState.addresses;
-                                    final isEmpty = list.isEmpty;
+                                    final serviceableList = list.where((a) => a.isServiceable && a.branchIsActive).toList();
+                                    final isEmpty = serviceableList.isEmpty;
 
                                     if (isEmpty) {
                                       return Container(
@@ -735,7 +737,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                             16,
                                           ),
                                           border: Border.all(
-                                            color: kRed.withOpacity(0.4),
+                                            color: kBorder,
                                           ),
                                         ),
                                         child: Row(
@@ -743,7 +745,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                             const Icon(
                                               Icons.location_off_outlined,
                                               size: 24,
-                                              color: kRed,
+                                              color: kPrimary,
                                             ),
                                             const SizedBox(width: 14),
                                             const Expanded(
@@ -757,7 +759,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                       fontSize: 11,
                                                       fontWeight:
                                                           FontWeight.w600,
-                                                      color: kRed,
+                                                      color: kTextSub,
                                                     ),
                                                   ),
                                                   SizedBox(height: 2),
@@ -1361,21 +1363,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         _selectedPayment == 'wallet' &&
                                         payableNow > walletBalance,
                                     onSwipeCompleted: () async {
-                                      final list = sessionState.addresses;
+                                      final list = sessionState.addresses.where((a) => a.isServiceable && a.branchIsActive).toList();
                                       if (list.isEmpty) {
                                         final selectedAddress =
                                             await AddressSelectorDrawer.show(
                                               context,
                                             );
-                                        if (selectedAddress == null &&
-                                            context.mounted) {
+                                        if (context.mounted) {
                                           final currentSession = context
                                               .read<CustomerSessionCubit>()
                                               .state;
-                                          if (currentSession.addresses.isEmpty) {
+                                          final serviceable = currentSession.addresses
+                                              .where((a) => a.isServiceable && a.branchIsActive)
+                                              .toList();
+                                          if (serviceable.isEmpty) {
                                             F2HToast.error(
                                               context,
-                                              'Please add a delivery address to complete your order.',
+                                              'Please add or select an active delivery address to complete your order.',
                                             );
                                             setState(() {
                                               _dragKey++;
@@ -1387,12 +1391,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       final updatedList = context
                                           .read<CustomerSessionCubit>()
                                           .state
-                                          .addresses;
+                                          .addresses
+                                          .where((a) => a.isServiceable && a.branchIsActive)
+                                          .toList();
                                       if (updatedList.isEmpty) {
                                         if (context.mounted) {
                                           F2HToast.error(
                                             context,
-                                            'Please add a delivery address to complete your order.',
+                                            'Please add an active delivery address to complete your order.',
                                           );
                                           setState(() {
                                             _dragKey++;
@@ -1405,22 +1411,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         (a) => a.isDefault,
                                         orElse: () => updatedList.first,
                                       );
-
-                                      if (!selectedAddr.isServiceable || !selectedAddr.branchIsActive) {
-                                        if (context.mounted) {
-                                          final reason = selectedAddr.unserviceableReason ??
-                                              'Delivery is currently unavailable at this address because the local branch is inactive.';
-                                          F2HToast.error(
-                                            context,
-                                            reason,
-                                            title: 'Delivery Unavailable',
-                                          );
-                                          setState(() {
-                                            _dragKey++;
-                                          });
-                                        }
-                                        return;
-                                      }
 
                                       final addressId =
                                           (selectedAddr.id != null &&
