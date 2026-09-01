@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
@@ -27,7 +28,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     final genderController = TextEditingController(text: p.gender ?? '');
     final addressController = TextEditingController(text: p.residentialAddress ?? '');
     final emergencyNameController = TextEditingController(text: p.emergencyContact ?? '');
-    final emergencyPhoneController = TextEditingController(text: p.emergencyContactNumber ?? '');
+
+    String rawEmerg = p.emergencyContactNumber ?? '';
+    String initEmerg = rawEmerg.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+    if (initEmerg.length > 10) initEmerg = initEmerg.substring(0, 10);
+    final emergencyPhoneController = TextEditingController(text: initEmerg);
 
     showModalBottomSheet(
       context: context,
@@ -170,15 +175,24 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       label: 'Emergency Mobile Number',
                       controller: emergencyPhoneController,
                       keyboardType: TextInputType.phone,
-                      placeholder: '10-digit Indian Mobile Number (e.g. 9876543210)',
+                      maxLength: 10,
+                      prefixText: '+91 ',
+                      placeholder: '10-digit Mobile Number',
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
                       validator: (val) {
                         if (emergencyNameController.text.trim().isNotEmpty && (val == null || val.trim().isEmpty)) {
                           return 'Enter emergency mobile number';
                         }
                         if (val == null || val.trim().isEmpty) return null;
                         final clean = val.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+                        if (clean.length != 10) {
+                          return 'Mobile number must be exactly 10 digits';
+                        }
                         if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
-                          return 'Enter a valid 10-digit Indian mobile number (e.g. 9876543210)';
+                          return 'Indian mobile number must start with 6, 7, 8, or 9';
                         }
                         if (clean == p.phone.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '')) {
                           return 'Emergency contact cannot be your own mobile number';
@@ -245,8 +259,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     String? placeholder,
     bool readOnly = false,
     int maxLines = 1,
+    int? maxLength,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? prefixText,
     VoidCallback? onTap,
+    AutovalidateMode autovalidateMode = AutovalidateMode.onUserInteraction,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -265,7 +283,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           controller: controller,
           readOnly: readOnly,
           maxLines: maxLines,
+          maxLength: maxLength,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          autovalidateMode: autovalidateMode,
           onTap: onTap,
           validator: validator,
           style: GoogleFonts.roboto(
@@ -276,6 +297,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: GoogleFonts.roboto(fontSize: 12, color: const Color(0xFF94A3B8)),
+            prefixText: prefixText,
+            prefixStyle: GoogleFonts.roboto(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
+            counterText: '',
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
@@ -290,6 +318,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
             ),
           ),
         ),
