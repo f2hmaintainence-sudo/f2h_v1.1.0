@@ -48,15 +48,17 @@ export class OrdersController {
   // ── Bulk Mark Delivered ──
 
   @Patch(['today/bulk-deliver', 'bulk-deliver'])
-  async bulkMarkDelivered(@Query() query: any) {
-    return this.ordersService.bulkMarkDelivered(query);
+  async bulkMarkDelivered(@Query() query: any, @Body() body: any) {
+    const combined = { ...query, ...body };
+    return this.ordersService.bulkMarkDelivered(combined);
   }
 
   // ── Bulk Mark Failed ──
 
   @Patch(['today/bulk-fail', 'bulk-fail'])
-  async bulkMarkFailed(@Query() query: any) {
-    return this.ordersService.bulkMarkFailed(query);
+  async bulkMarkFailed(@Query() query: any, @Body() body: any) {
+    const combined = { ...query, ...body };
+    return this.ordersService.bulkMarkFailed(combined);
   }
 
   // ── PDF Export ──

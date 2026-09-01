@@ -32,6 +32,18 @@ export interface ModalData {
   isPrepaid?: boolean;
   totalAmount?: number;
   date?: string;
+  fromDate?: string;
+  toDate?: string;
+  slot?: string;
+  isRange?: boolean;
+  scopeLabel?: string;
+}
+
+export interface BulkActionPayload {
+  scope?: string;
+  fromDate?: string;
+  toDate?: string;
+  date?: string;
 }
 
 interface OrderActionModalProps {
@@ -40,7 +52,7 @@ interface OrderActionModalProps {
   data?: ModalData;
   loading: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (payload?: BulkActionPayload) => void;
 }
 
 function getTodayDateString(): string {
@@ -53,6 +65,16 @@ function getTodayDateString(): string {
 
   const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
   return `${pick('year')}-${pick('month')}-${pick('day')}`;
+}
+
+function getLastMonthInfo() {
+  const d = new Date();
+  const firstDay = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth(), 0);
+  const fromStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-01`;
+  const toStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+  const monthName = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(firstDay);
+  return { fromStr, toStr, monthName, days: lastDay.getDate() };
 }
 
 function checkIsPastDate(dateStr?: string): boolean {
@@ -76,6 +98,18 @@ export default function OrderActionModal({
   onClose,
   onConfirm,
 }: OrderActionModalProps) {
+  const lastMonth = getLastMonthInfo();
+  const hasFilterRange = !!(data?.fromDate && data?.toDate);
+  const [scopeMode, setScopeMode] = React.useState<'last_month' | 'filter_range' | 'single_date'>(
+    hasFilterRange ? 'filter_range' : 'last_month'
+  );
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setScopeMode(hasFilterRange ? 'filter_range' : 'last_month');
+    }
+  }, [isOpen, hasFilterRange]);
+
   if (!isOpen || !type) return null;
 
   const isBulkFail = type === 'bulk-fail';
@@ -83,7 +117,27 @@ export default function OrderActionModal({
   const isSingleFail = type === 'single-fail';
   const isSingleDeliver = type === 'single-deliver';
 
-  const isPast = isBulkFail ? checkIsPastDate(data?.date) : true;
+  const isPast = isBulkFail
+    ? scopeMode === 'last_month'
+      ? true
+      : scopeMode === 'filter_range'
+        ? checkIsPastDate(data?.toDate || data?.fromDate)
+        : checkIsPastDate(data?.date)
+    : true;
+
+  const handleConfirm = () => {
+    if (isBulkFail) {
+      if (scopeMode === 'last_month') {
+        onConfirm({ scope: 'last_month', fromDate: lastMonth.fromStr, toDate: lastMonth.toStr });
+      } else if (scopeMode === 'filter_range') {
+        onConfirm({ fromDate: data?.fromDate, toDate: data?.toDate });
+      } else {
+        onConfirm({ date: data?.date });
+      }
+    } else {
+      onConfirm();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-in fade-in duration-200">
@@ -124,7 +178,7 @@ export default function OrderActionModal({
               </h3>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
                 {isBulkFail && 'Batch status update with automated refund routing'}
-                {isBulkDeliver && 'Batch delivery status update for today'}
+                {isBulkDeliver && 'Batch delivery status update for date / range'}
                 {isSingleFail && `Order #${data?.orderId || ''}`}
                 {isSingleDeliver && `Order #${data?.orderId || ''}`}
               </p>
@@ -145,12 +199,85 @@ export default function OrderActionModal({
           {/* BULK FAIL CONTENT */}
           {isBulkFail && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-                <span className="font-semibold text-slate-600">Target Date:</span>
-                <span className="inline-flex items-center gap-1.5 font-bold text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
-                  <Calendar size={13} className="text-emerald-700" />
-                  {data?.date || 'Today'}
-                </span>
+              {/* Target Scope Selection Tabs */}
+              <div className="space-y-2">
+                <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider block">
+                  Select Target Period:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScopeMode('last_month')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                      scopeMode === 'last_month'
+                        ? 'bg-amber-500/10 border-amber-500 text-amber-950 ring-2 ring-amber-500/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Calendar size={13} className={scopeMode === 'last_month' ? 'text-amber-600' : 'text-slate-400'} />
+                      Last Month
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-normal truncate">
+                      {lastMonth.monthName}
+                    </span>
+                  </button>
+
+                  {hasFilterRange && (
+                    <button
+                      type="button"
+                      onClick={() => setScopeMode('filter_range')}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                        scopeMode === 'filter_range'
+                          ? 'bg-amber-500/10 border-amber-500 text-amber-950 ring-2 ring-amber-500/20'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1">
+                        <Calendar size={13} className={scopeMode === 'filter_range' ? 'text-amber-600' : 'text-slate-400'} />
+                        Filter Range
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-normal truncate">
+                        {data?.fromDate} – {data?.toDate}
+                      </span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setScopeMode('single_date')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                      scopeMode === 'single_date'
+                        ? 'bg-amber-500/10 border-amber-500 text-amber-950 ring-2 ring-amber-500/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Calendar size={13} className={scopeMode === 'single_date' ? 'text-amber-600' : 'text-slate-400'} />
+                      Specific Date
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-normal truncate">
+                      {data?.date || data?.fromDate || 'Selected'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Scope Summary Box */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-950">Active Batch Scope:</span>
+                  <span className="font-mono font-bold text-amber-900 bg-white px-2 py-0.5 rounded border border-amber-200">
+                    {scopeMode === 'last_month' && `Full Month: ${lastMonth.fromStr} to ${lastMonth.toStr}`}
+                    {scopeMode === 'filter_range' && `Range: ${data?.fromDate} to ${data?.toDate}`}
+                    {scopeMode === 'single_date' && `Date: ${data?.date || data?.fromDate || 'Today'}`}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  {scopeMode === 'last_month' && `⚡ Will process all undelivered orders across the entire month of ${lastMonth.monthName}.`}
+                  {scopeMode === 'filter_range' && `⚡ Will process all undelivered orders between ${data?.fromDate} and ${data?.toDate}.`}
+                  {scopeMode === 'single_date' && `⚡ Will process all undelivered orders on ${data?.date || data?.fromDate || 'Today'}.`}
+                </p>
               </div>
 
               <div className="space-y-2.5">
@@ -202,13 +329,13 @@ export default function OrderActionModal({
                   <div>
                     <p className="font-bold text-rose-900">Bulk failure can only be processed for past dates.</p>
                     <p className="text-[11px] text-rose-700 mt-1 leading-relaxed">
-                      Orders for today (<strong>{data?.date || 'Today'}</strong>) are still active and scheduled for delivery runs. Please filter by a past date to bulk fail undelivered orders.
+                      Active orders for today are in progress. Please select <strong>Last Month</strong> or a past date range.
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                  ⚠️ All pending undelivered orders on this date will transition to Failed.
+                  ⚠️ All pending undelivered orders in this period will transition to Failed.
                 </div>
               )}
             </div>
@@ -218,7 +345,7 @@ export default function OrderActionModal({
           {isBulkDeliver && (
             <div className="space-y-3">
               <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Are you sure you want to mark all <strong>"Out for Delivery"</strong> orders as <strong>Delivered</strong> for today?
+                Are you sure you want to mark all <strong>"Out for Delivery" / Pending</strong> orders as <strong>Delivered</strong> for {data?.fromDate && data?.toDate ? `${data.fromDate} to ${data.toDate}` : (data?.date || 'today')}?
               </p>
               <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
@@ -303,7 +430,7 @@ export default function OrderActionModal({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={handleConfirm}
             disabled={loading || (isBulkFail && !isPast)}
             className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
               isBulkFail || isSingleFail
@@ -318,7 +445,7 @@ export default function OrderActionModal({
               </>
             ) : (
               <>
-                {isBulkFail && (isPast ? 'Confirm & Process Bulk Failure' : 'Past Dates Only')}
+                {isBulkFail && (isPast ? (scopeMode === 'last_month' ? 'Confirm Full Last Month Failure' : 'Confirm & Process Bulk Failure') : 'Past Dates Only')}
                 {isBulkDeliver && 'Confirm All Delivered'}
                 {isSingleFail && 'Confirm Mark as Failed'}
                 {isSingleDeliver && 'Confirm Delivered'}

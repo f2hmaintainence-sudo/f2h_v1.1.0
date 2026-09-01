@@ -138,6 +138,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _mapController.move(LatLng(stop.addressLat, stop.addressLng), 16.5);
   }
 
+  bool _isStopPending(GroupedStop s) =>
+      s.status != 'delivered' && s.status != 'completed' && s.status != 'failed';
+
   Future<void> _calculateShortestPath(List<GroupedStop> stops, {GroupedStop? targetedStop, bool force = false}) async {
     if (stops.isEmpty) return;
     if (_isCalculatingRoute && !force) return;
@@ -147,17 +150,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     _isCalculatingRoute = true;
     try {
-      final result = await sl<RouteOptimizationService>().fetchDirectRoute(
-        currentPosition: _currentPosition,
-        stops: stops,
-        destinationStop: destination,
-        forceRefresh: force,
-      );
+      final routeService = sl<RouteOptimizationService>();
+      final OptimizedRouteResult result;
+
+      if (_isFocusedNavigation) {
+        // Single-stop focused mode: direct road route to that specific stop
+        result = await routeService.fetchDirectRoute(
+          currentPosition: _currentPosition,
+          stops: stops,
+          destinationStop: destination,
+          forceRefresh: force,
+        );
+      } else {
+        // Full-run overview mode: shortest path route through all pending stops
+        result = await routeService.fetchShortestPathRoute(
+          currentPosition: _currentPosition,
+          stops: stops,
+          targetedStop: targetedStop ?? _selectedStop,
+          forceRefresh: force,
+        );
+      }
 
       if (mounted) {
         setState(() {
           _optimizedRoute = result;
-          _selectedStop = destination;
+          if (_isFocusedNavigation) {
+            _selectedStop = destination;
+          } else {
+            _selectedStop = targetedStop ??
+                _selectedStop ??
+                (result.orderedStops.isNotEmpty
+                    ? result.orderedStops.firstWhere(_isStopPending, orElse: () => destination)
+                    : destination);
+          }
         });
         _lastRouteFetchAt = DateTime.now();
         _lastRoutedFrom = _currentPosition;

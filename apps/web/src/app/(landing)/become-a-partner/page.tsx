@@ -348,16 +348,28 @@ export default function BecomeAPartnerPage() {
                       <label className="mb-1 block text-xs font-semibold text-slate-700">
                         Mobile Phone Number <span className="text-rose-500">*</span>
                       </label>
-                      <input
-                        type="tel"
-                        required
-                        maxLength={10}
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) })}
-                        placeholder="9876543210"
-                        className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                      />
-                      <p className="mt-1 text-[10px] text-slate-400">10-digit mobile number</p>
+                      <div className="relative flex rounded-lg border border-slate-300 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 overflow-hidden bg-white">
+                        <span className="inline-flex items-center bg-slate-50 border-r border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 select-none">
+                          +91
+                        </span>
+                        <input
+                          type="tel"
+                          required
+                          maxLength={10}
+                          value={formData.phone}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/[^0-9]/g, "");
+                            // Strictly allow only valid Indian mobile starting digits (6, 7, 8, 9)
+                            if (val.length === 1 && !/[6-9]/.test(val)) {
+                              return;
+                            }
+                            setFormData({ ...formData, phone: val.slice(0, 10) });
+                          }}
+                          placeholder="98765 43210"
+                          className="w-full px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent"
+                        />
+                      </div>
+                      <p className="mt-1 text-[10px] text-slate-400">10-digit Indian number (starts with 6, 7, 8, or 9)</p>
                     </div>
                   </div>
 

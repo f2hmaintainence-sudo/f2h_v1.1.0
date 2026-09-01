@@ -295,7 +295,11 @@ export class DirectionsService {
         provider: 'google-directions',
         distanceMeters: legs.reduce((sum, leg) => sum + leg.distanceMeters, 0),
         durationSeconds: legs.reduce((sum, leg) => sum + leg.durationSeconds, 0),
-        polyline: detailedPolyline || (typeof route.overview_polyline?.points === 'string' ? route.overview_polyline.points : ''),
+        polyline:
+          typeof route.overview_polyline?.points === 'string' &&
+          route.overview_polyline.points.length > 0
+            ? route.overview_polyline.points
+            : (detailedPolyline || ''),
         optimizedOrder: this.sanitizeOrder(
           route.waypoint_order,
           intermediates.length,

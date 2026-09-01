@@ -216,18 +216,28 @@ export class OrdersService {
   // ────────────────────────────────────────────────
   async bulkMarkDelivered(query: any) {
     try {
-      const date = query.date || todayInIndia();
+      const fromDate = query.fromDate ? (String(query.fromDate).includes('-') ? query.fromDate.split('-').length === 3 && query.fromDate.split('-')[2].length === 4 ? `${query.fromDate.split('-')[2]}-${query.fromDate.split('-')[1].padStart(2, '0')}-${query.fromDate.split('-')[0].padStart(2, '0')}` : query.fromDate : query.fromDate) : (query.date || todayInIndia());
+      const toDate = query.toDate ? (String(query.toDate).includes('-') ? query.toDate.split('-').length === 3 && query.toDate.split('-')[2].length === 4 ? `${query.toDate.split('-')[2]}-${query.toDate.split('-')[1].padStart(2, '0')}-${query.toDate.split('-')[0].padStart(2, '0')}` : query.toDate : query.toDate) : fromDate;
+
+      const params: any[] = [fromDate, toDate];
+      let slotClause = '';
+      if (query.slot && query.slot !== 'all') {
+        params.push(query.slot);
+        slotClause = ` AND delivery_slot = $${params.length}`;
+      }
 
       const sql = `
         UPDATE orders
         SET    status     = 'delivered',
                updated_at = CURRENT_TIMESTAMP
-        WHERE  scheduled_date = $1
-          AND  status = 'out_for_delivery'
+        WHERE  scheduled_date >= $1::date
+          AND  scheduled_date <= $2::date
+          AND  status IN ('out_for_delivery', 'assigned', 'packed', 'confirmed')
+          ${slotClause}
         RETURNING order_id, customer_id
       `;
 
-      const rows = await this.databaseService.query(sql, [date]);
+      const rows = await this.databaseService.query(sql, params);
 
       if (rows && rows.length > 0) {
         for (const ord of rows) {
@@ -238,8 +248,6 @@ export class OrdersService {
                 await this.referralRewardEngine.processReferralReward(ord.customer_id, ord.order_id);
               }
             } catch (error) {
-              // One customer's referral failing must not stop the batch, but a
-              // reward that never lands is a money problem — record which order.
               this.developer.error('Referral reward processing failed for order', {
                 orderId: ord.order_id,
                 customerId: ord.customer_id,
@@ -254,7 +262,7 @@ export class OrdersService {
         status: true,
         updated: rows.length,
         orderIds: rows.map((r: any) => r.order_id),
-        message: `${rows.length} order(s) marked as delivered`,
+        message: `${rows.length} order(s) marked as delivered (${fromDate} to ${toDate})`,
       };
     } catch (error) {
       this.developer.error('bulkMarkDelivered error', { error });
@@ -267,47 +275,69 @@ export class OrdersService {
   // ────────────────────────────────────────────────
   async bulkMarkFailed(query: any) {
     try {
-      let date = todayInIndia();
-      if (query.date) {
-        const str = String(query.date).trim();
-        if (str.toLowerCase() !== 'today') {
+      const today = todayInIndia();
+      let fromDate: string = today;
+      let toDate: string = today;
+
+      if (query.scope === 'last_month' || query.date === 'last_month' || query.lastMonth === true || query.lastMonth === 'true') {
+        const d = new Date();
+        const firstDayPrev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+        const lastDayPrev = new Date(d.getFullYear(), d.getMonth(), 0);
+        fromDate = `${firstDayPrev.getFullYear()}-${String(firstDayPrev.getMonth() + 1).padStart(2, '0')}-01`;
+        toDate = `${lastDayPrev.getFullYear()}-${String(lastDayPrev.getMonth() + 1).padStart(2, '0')}-${String(lastDayPrev.getDate()).padStart(2, '0')}`;
+      } else {
+        const rawFrom = query.fromDate || query.date || today;
+        const rawTo = query.toDate || query.fromDate || query.date || today;
+
+        const normalize = (val: string) => {
+          const str = String(val).trim();
+          if (!str || str.toLowerCase() === 'today') return today;
           if (str.includes('-')) {
             const parts = str.split('-');
             if (parts[0].length === 4) {
-              date = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+              return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
             } else if (parts[2].length === 4) {
-              date = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            } else {
-              date = str;
+              return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
             }
-          } else {
-            date = str;
           }
-        }
+          return str;
+        };
+
+        fromDate = normalize(rawFrom);
+        toDate = normalize(rawTo);
       }
 
-      const today = todayInIndia();
-      if (date >= today) {
+      if (fromDate >= today && toDate >= today) {
         return {
           status: false,
           updated: 0,
           refundedCount: 0,
           totalRefunded: 0,
-          message: `Bulk failure can only be processed for past dates. Active orders for today (${date}) are currently in progress.`,
+          message: `Bulk failure can only be processed for past dates. Active orders for today (${today}) are currently in progress.`,
         };
       }
 
-      // Find all pending undelivered orders for the specified past date
+      const params: any[] = [fromDate, toDate];
+      let slotClause = '';
+      if (query.slot && query.slot !== 'all') {
+        params.push(query.slot);
+        slotClause = ` AND delivery_slot = $${params.length}`;
+      }
+
+      // Find all pending undelivered orders for the specified date range (up to yesterday)
       const candidateOrders = await this.databaseService.query(
-        `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status
+        `SELECT order_id, customer_id, total_amount, payment_mode, payment_status, order_source, subscription_id, status, scheduled_date
          FROM orders
-         WHERE scheduled_date = $1::date
+         WHERE scheduled_date >= $1::date
+           AND scheduled_date <= $2::date
            AND scheduled_date < CURRENT_DATE
            AND status IN ('pending', 'placed', 'confirmed', 'assigned', 'packed', 'out_for_delivery')
            AND status != 'delivered'
            AND status != 'failed'
-           AND status != 'cancelled'`,
-        [date],
+           AND status != 'cancelled'
+           ${slotClause}
+         ORDER BY scheduled_date ASC, created_at ASC`,
+        params,
       );
 
       if (!candidateOrders || candidateOrders.length === 0) {
@@ -316,7 +346,7 @@ export class OrdersService {
           updated: 0,
           refundedCount: 0,
           totalRefunded: 0,
-          message: 'No pending undelivered orders found for this date',
+          message: `No pending undelivered orders found for period ${fromDate} to ${toDate}`,
         };
       }
 

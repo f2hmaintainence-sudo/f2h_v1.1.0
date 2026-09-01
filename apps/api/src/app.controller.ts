@@ -467,8 +467,8 @@ export class AppController {
     if (!cleanedPhone) {
       throw new BadRequestException('Phone number is required');
     }
-    if (cleanedPhone.length !== 10) {
-      throw new BadRequestException('Please enter a valid 10-digit mobile number');
+    if (!/^[6-9]\d{9}$/.test(cleanedPhone)) {
+      throw new BadRequestException('Please enter a valid 10-digit Indian mobile number (starting with 6, 7, 8, or 9)');
     }
 
     if (!area || !String(area).trim()) {
