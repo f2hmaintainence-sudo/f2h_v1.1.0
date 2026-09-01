@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:f2h_customer/theme/app_colors.dart';
 
 enum ToastType { success, error, info }
 
@@ -15,7 +14,7 @@ class F2HToast {
     String? title,
     String? actionText,
     VoidCallback? onAction,
-    Duration duration = const Duration(milliseconds: 3500),
+    Duration duration = const Duration(milliseconds: 3200),
   }) {
     final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
@@ -28,161 +27,28 @@ class F2HToast {
             ? ToastType.error
             : (isInfo ? ToastType.info : ToastType.success));
 
-    _currentEntry = OverlayEntry(
+    late OverlayEntry entry;
+    entry = OverlayEntry(
       builder: (context) {
-        final Color iconBgColor;
-        final Color iconColor;
-        final IconData iconData;
-        final String titleText;
-        final Color titleColor;
-        final Color btnColor;
-        final String btnText;
-
-        switch (resolvedType) {
-          case ToastType.error:
-            iconBgColor = const Color(0xFFFEE2E2);
-            iconColor = const Color(0xFFDC2626);
-            iconData = Icons.close_rounded;
-            titleText = title ?? 'Action Failed';
-            titleColor = const Color(0xFF991B1B);
-            btnColor = const Color(0xFFDC2626);
-            btnText = actionText ?? 'Got it';
-            break;
-          case ToastType.info:
-            iconBgColor = const Color(0xFFDCFCE7);
-            iconColor = kPrimary;
-            iconData = Icons.info_outline_rounded;
-            titleText = title ?? 'Sign In Required';
-            titleColor = const Color(0xFF166534);
-            btnColor = kPrimary;
-            btnText = actionText ?? 'Sign In';
-            break;
-          case ToastType.success:
-          default:
-            iconBgColor = const Color(0xFFDCFCE7);
-            iconColor = const Color(0xFF16A34A);
-            iconData = Icons.check_rounded;
-            titleText = title ?? 'Success!';
-            titleColor = const Color(0xFF166534);
-            btnColor = kPrimary;
-            btnText = actionText ?? 'Awesome';
-            break;
-        }
-
-        return Material(
-          color: Colors.black.withValues(alpha: 0.4),
-          child: Center(
-            child: Container(
-              width: 300,
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 30,
-                    offset: const Offset(0, 12),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Icon container
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: iconBgColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      iconData,
-                      size: 32,
-                      color: iconColor,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Title
-                  Text(
-                    titleText,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: titleColor,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  
-                  // Message
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      color: kTextMid,
-                      fontWeight: FontWeight.w500,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Action Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _currentEntry?.remove();
-                        _currentEntry = null;
-                        onAction?.call();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: btnColor,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 46),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        btnText,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        return _ToastOverlayWidget(
+          message: message,
+          title: title,
+          type: resolvedType,
+          actionText: actionText,
+          onAction: onAction,
+          duration: duration,
+          onDismiss: () {
+            if (_currentEntry == entry) {
+              _currentEntry?.remove();
+              _currentEntry = null;
+            }
+          },
         );
       },
     );
 
-    overlay.insert(_currentEntry!);
-    
-    final entryToVerify = _currentEntry;
-    Future.delayed(duration, () {
-      if (entryToVerify != null && entryToVerify.mounted) {
-        entryToVerify.remove();
-        if (_currentEntry == entryToVerify) {
-          _currentEntry = null;
-        }
-      }
-    });
+    _currentEntry = entry;
+    overlay.insert(entry);
   }
 
   static void success(
@@ -191,7 +57,7 @@ class F2HToast {
     String? title,
     String? actionText,
     VoidCallback? onAction,
-    Duration duration = const Duration(milliseconds: 2500),
+    Duration duration = const Duration(milliseconds: 2800),
   }) {
     show(
       context,
@@ -210,7 +76,7 @@ class F2HToast {
     String? title,
     String? actionText,
     VoidCallback? onAction,
-    Duration duration = const Duration(milliseconds: 2500),
+    Duration duration = const Duration(milliseconds: 3500),
   }) {
     show(
       context,
@@ -239,6 +105,254 @@ class F2HToast {
       actionText: actionText,
       onAction: onAction,
       duration: duration,
+    );
+  }
+}
+
+class _ToastOverlayWidget extends StatefulWidget {
+  final String message;
+  final String? title;
+  final ToastType type;
+  final String? actionText;
+  final VoidCallback? onAction;
+  final VoidCallback onDismiss;
+  final Duration duration;
+
+  const _ToastOverlayWidget({
+    required this.message,
+    this.title,
+    required this.type,
+    this.actionText,
+    this.onAction,
+    required this.onDismiss,
+    required this.duration,
+  });
+
+  @override
+  State<_ToastOverlayWidget> createState() => _ToastOverlayWidgetState();
+}
+
+class _ToastOverlayWidgetState extends State<_ToastOverlayWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  bool _isDismissed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, -0.35),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _controller.forward();
+
+    Future.delayed(widget.duration, () {
+      if (mounted && !_isDismissed) {
+        _dismiss();
+      }
+    });
+  }
+
+  void _dismiss() {
+    if (!mounted || _isDismissed) return;
+    _isDismissed = true;
+    _controller.reverse().then((_) {
+      if (mounted) {
+        widget.onDismiss();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color primaryColor;
+    final IconData iconData;
+    final String defaultTitle;
+
+    switch (widget.type) {
+      case ToastType.error:
+        primaryColor = const Color(0xFFDC2626);
+        iconData = Icons.cancel_rounded;
+        defaultTitle = 'ERROR';
+        break;
+      case ToastType.info:
+        primaryColor = const Color(0xFF16A34A);
+        iconData = Icons.info_rounded;
+        defaultTitle = 'INFO';
+        break;
+      case ToastType.success:
+      default:
+        primaryColor = const Color(0xFF16A34A);
+        iconData = Icons.check_circle_rounded;
+        defaultTitle = 'SUCCESS';
+        break;
+    }
+
+    final titleText = widget.title ?? defaultTitle;
+
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Material(
+                color: Colors.transparent,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFFE2E8F0),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                          spreadRadius: 0,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Left color indicator bar
+                          Container(
+                            width: 5,
+                            color: primaryColor,
+                          ),
+
+                          // Main Content
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Icon
+                                  Icon(
+                                    iconData,
+                                    color: primaryColor,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // Title + Message
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          titleText.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            color: primaryColor,
+                                            letterSpacing: 0.4,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          widget.message,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF1E293B),
+                                            height: 1.35,
+                                          ),
+                                        ),
+                                        if (widget.actionText != null &&
+                                            widget.onAction != null) ...[
+                                          const SizedBox(height: 4),
+                                          GestureDetector(
+                                            onTap: () {
+                                              _dismiss();
+                                              widget.onAction!();
+                                            },
+                                            child: Text(
+                                              widget.actionText!,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: primaryColor,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 6),
+
+                                  // Close button (X)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                    splashRadius: 16,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 26,
+                                      minHeight: 26,
+                                    ),
+                                    onPressed: _dismiss,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
