@@ -469,12 +469,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 isOnline: session.isOnline,
                 vehicleType: session.vehicleType,
                 unreadCount: _unreadNotificationsCount,
-                address: nextStop != null
-                    ? nextStop.address
-                    : (session.currentRun?.runId != null
-                        ? 'Run #${session.currentRun!.runId} (${session.currentRun!.slot})'
-                        : 'Active and online for assigned runs'),
-                addressLabel: nextStop != null ? 'NEXT DELIVERY ADDRESS' : 'CURRENT LOCATION',
                 onToggleOnline: _handleOnlineToggle,
                 onNotifications: () async {
                   await Navigator.push(

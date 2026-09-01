@@ -166,17 +166,20 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       final morningWin = getMorningSlotWindow(now, timings);
       final eveningWin = getEveningSlotWindow(now, timings);
 
-      if (morningWin.isOpen && !eveningWin.isOpen) {
+      // Seed from which slots the admin has enabled, not from the clock —
+      // otherwise opening this screen outside a delivery window zeroed the
+      // quantities and left the Confirm button permanently disabled.
+      if (!eveningWin.isEnabled && morningWin.isEnabled) {
         setState(() {
           _morningQty = 1;
           _eveningQty = 0;
         });
-      } else if (!morningWin.isOpen && eveningWin.isOpen) {
+      } else if (!morningWin.isEnabled && eveningWin.isEnabled) {
         setState(() {
           _morningQty = 0;
           _eveningQty = 1;
         });
-      } else if (!morningWin.isOpen && !eveningWin.isOpen) {
+      } else if (!morningWin.isEnabled && !eveningWin.isEnabled) {
         setState(() {
           _morningQty = 0;
           _eveningQty = 0;
@@ -463,24 +466,26 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     final morningWin = getMorningSlotWindow(now, slotTimings);
     final eveningWin = getEveningSlotWindow(now, slotTimings);
 
-    if (morningQty > 0 && !morningWin.isOpen) {
+    // Deliveries start on a future date, so the time of day a subscription is
+    // created is irrelevant — only a slot disabled in Configurations blocks it.
+    if (morningQty > 0 && !morningWin.isEnabled) {
       F2HToast.error(
         context,
-        'Morning delivery slot is currently closed (${morningWin.timeRangeText})',
+        'Morning delivery is not available right now. Please choose Evening.',
       );
       return;
     }
 
-    if (eveningQty > 0 && !eveningWin.isOpen) {
+    if (eveningQty > 0 && !eveningWin.isEnabled) {
       F2HToast.error(
         context,
-        'Evening delivery slot is currently closed (${eveningWin.timeRangeText})',
+        'Evening delivery is not available right now. Please choose Morning.',
       );
       return;
     }
 
     if (morningQty == 0 && eveningQty == 0) {
-      F2HToast.error(context, 'Set at least 1 unit in an active delivery window');
+      F2HToast.error(context, 'Set at least 1 unit to continue');
       return;
     }
 
@@ -1050,8 +1055,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     final now = DateTime.now();
     final morningWin = getMorningSlotWindow(now, slotTimings);
     final eveningWin = getEveningSlotWindow(now, slotTimings);
-    final isMorningOpen = morningWin.isOpen;
-    final isEveningOpen = eveningWin.isOpen;
+    // A subscription schedules deliveries for FUTURE dates, so the delivery
+    // window (when the driver is actually out) says nothing about whether it
+    // may be created now. Only a slot the admin has switched off in
+    // Configurations is genuinely unavailable. Same-day ordering cutoffs stay
+    // where they belong — the one-time cart flow.
+    final isMorningOpen = morningWin.isEnabled;
+    final isEveningOpen = eveningWin.isEnabled;
     final bothClosed = !isMorningOpen && !isEveningOpen;
 
     return _SectionCard(
@@ -1107,7 +1117,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       Icon(Icons.schedule_rounded, size: 16, color: Color(0xFFDC2626)),
                       SizedBox(width: 6),
                       Text(
-                        'Delivery Windows Currently Closed',
+                        'Delivery Currently Unavailable',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w900,
@@ -1118,7 +1128,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Deliveries can only be scheduled during active configured delivery windows:\n'
+                    'No delivery slots are enabled at the moment. '
+                    'Delivery windows are:\n'
                     '• Morning: ${morningWin.timeRangeText}\n'
                     '• Evening: ${eveningWin.timeRangeText}',
                     textAlign: TextAlign.center,
@@ -1691,7 +1702,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     final now = DateTime.now();
     final morningWin = getMorningSlotWindow(now, slotTimings);
     final eveningWin = getEveningSlotWindow(now, slotTimings);
-    final allSlotsClosed = !morningWin.isOpen && !eveningWin.isOpen;
+    // Only an admin-disabled slot blocks a subscription; see _buildSlotSelector.
+    final allSlotsClosed = !morningWin.isEnabled && !eveningWin.isEnabled;
 
     return Container(
       decoration: const BoxDecoration(
@@ -1761,7 +1773,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     _variantOutOfStock
                         ? 'Out of Stock'
                         : allSlotsClosed
-                        ? 'Delivery Windows Closed'
+                        ? 'Delivery Unavailable'
                         : total <= 0
                         ? 'Set Quantity to Continue'
                         : 'Confirm Subscription',

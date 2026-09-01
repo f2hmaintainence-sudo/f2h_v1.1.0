@@ -171,11 +171,36 @@ export class NotificationController {
   }
 
   /**
+   * Dismiss all notifications for the authenticated user
+   */
+  @Delete('dismiss-all')
+  @Delete('clear-all')
+  @Delete('all')
+  @Delete()
+  @Put('dismiss-all')
+  @Put('clear-all')
+  @Post('dismiss-all')
+  @Post('clear-all')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ short: { limit: 30, ttl: 60000 } })
+  async dismissAllNotifications(@Req() req: Request) {
+    const user = req.user as any;
+    await this.notificationService.dismissAllNotifications(user.user_id);
+
+    return {
+      success: true,
+      message: 'All notifications dismissed',
+    };
+  }
+
+  /**
    * Mark a single notification as read by recipient ID
    */
   @Put(':recipientId/read')
+  @Post(':recipientId/read')
+  @Patch(':recipientId/read')
   @UseGuards(JwtAuthGuard)
-  @Throttle({ short: { limit: 20, ttl: 60000 } })
+  @Throttle({ short: { limit: 60, ttl: 60000 } })
   async markNotificationAsRead(
     @Req() req: Request,
     @Param('recipientId') recipientId: string,
@@ -203,6 +228,7 @@ export class NotificationController {
    */
   @Delete(':recipientId')
   @Put(':recipientId/dismiss')
+  @Post(':recipientId/dismiss')
   @UseGuards(JwtAuthGuard)
   @Throttle({ short: { limit: 60, ttl: 60000 } })
   async dismissNotification(
@@ -215,40 +241,6 @@ export class NotificationController {
     return {
       success: true,
       message: 'Notification dismissed',
-    };
-  }
-
-  /**
-   * Mark all as read (PUT endpoint for new frontend)
-   */
-  @Put('mark-all/read')
-  @UseGuards(JwtAuthGuard)
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
-  async markAllAsReadPut(@Req() req: Request) {
-    const user = req.user as any;
-    await this.notificationService.markAllAsRead(user.user_id);
-
-    return {
-      success: true,
-      message: 'All notifications marked as read',
-    };
-  }
-
-  /**
-   * Dismiss all notifications for the authenticated user
-   */
-  @Delete('dismiss-all')
-  @Put('dismiss-all')
-  @Post('dismiss-all')
-  @UseGuards(JwtAuthGuard)
-  @Throttle({ short: { limit: 20, ttl: 60000 } })
-  async dismissAllNotifications(@Req() req: Request) {
-    const user = req.user as any;
-    await this.notificationService.dismissAllNotifications(user.user_id);
-
-    return {
-      success: true,
-      message: 'All notifications dismissed',
     };
   }
 

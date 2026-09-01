@@ -20,8 +20,11 @@ class PopupBannerWidget {
 
   static Future<void> checkAndShowPopupBanner(BuildContext context) async {
     // Popup banner should ONLY be shown on the home screen
+    if (!context.mounted) return;
     final appShell = AppShell.of(context);
-    if (appShell != null && !appShell.isHomeScreen) return;
+    if (appShell == null || !appShell.isHomeScreen) return;
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isCurrent) return;
 
     if (!_hasLoadedBanners) {
       _hasLoadedBanners = true;
@@ -53,7 +56,7 @@ class PopupBannerWidget {
     }
 
     // The banner fetch above is awaited, so the screen may have been popped
-    // before we get here — showing a dialog on a dead context throws.
+    // or navigated away before we get here.
     if (!context.mounted) return;
 
     _showCurrentBanner(context);
@@ -61,6 +64,14 @@ class PopupBannerWidget {
 
   static void onReturnedToHomeScreen(BuildContext context) {
     if (_bannerList.isEmpty || _isBannerShowing) return;
+    if (!context.mounted) return;
+
+    final appShell = AppShell.of(context);
+    if (appShell == null || !appShell.isHomeScreen) return;
+
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isCurrent) return;
+
     if (_nextDueTime != null && DateTime.now().isBefore(_nextDueTime!)) {
       return;
     }
@@ -71,8 +82,12 @@ class PopupBannerWidget {
     if (_bannerList.isEmpty || _isBannerShowing) return;
     if (!context.mounted) return;
 
+    // Popup banner MUST ONLY be shown on the home screen and when HomeScreen is current
     final appShell = AppShell.of(context);
-    if (appShell != null && !appShell.isHomeScreen) return;
+    if (appShell == null || !appShell.isHomeScreen) return;
+
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isCurrent) return;
 
     final bannerData = _bannerList[_currentBannerIndex % _bannerList.length];
     _isBannerShowing = true;

@@ -11,8 +11,6 @@ class F2hHeroHeader extends StatelessWidget {
   final VoidCallback? onProfile;
   final String? avatarUrl;
   final int unreadCount;
-  final String? address;
-  final String? addressLabel;
   final String? vehicleType;
 
   const F2hHeroHeader({
@@ -24,8 +22,6 @@ class F2hHeroHeader extends StatelessWidget {
     this.onProfile,
     this.avatarUrl,
     this.unreadCount = 0,
-    this.address,
-    this.addressLabel,
     this.vehicleType,
   });
 
@@ -40,13 +36,13 @@ class F2hHeroHeader extends StatelessWidget {
         Positioned.fill(
           child: Image.asset(
             'assets/home_bg.png',
-            fit: BoxFit.fitWidth,
+            fit: BoxFit.cover,
             alignment: Alignment.topCenter,
             errorBuilder: (_, __, ___) => Container(color: const Color(0xFFE8F5E9)),
           ),
         ),
 
-        // Gradient overlay for smooth readability
+        // Gradient overlay for smooth readability on text side
         Positioned.fill(
           child: Container(
             decoration: const BoxDecoration(
@@ -66,7 +62,7 @@ class F2hHeroHeader extends StatelessWidget {
 
         // ── FOREGROUND: greeting, bell, avatar, online pill ──
         Padding(
-          padding: EdgeInsets.fromLTRB(16, topInset + 8, 16, 12),
+          padding: EdgeInsets.fromLTRB(16, topInset + 10, 16, 120),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -85,7 +81,7 @@ class F2hHeroHeader extends StatelessWidget {
                               TextSpan(
                                 text: '${AppGreeting.get()}, $firstName!',
                                 style: GoogleFonts.roboto(
-                                  fontSize: 16,
+                                  fontSize: 17,
                                   fontWeight: FontWeight.w800,
                                   color: const Color(0xFF0F172A),
                                 ),
@@ -99,7 +95,7 @@ class F2hHeroHeader extends StatelessWidget {
                             Text(
                               'Ready to deliver amazing today',
                               style: GoogleFonts.roboto(
-                                fontSize: 11,
+                                fontSize: 11.5,
                                 color: const Color(0xFF64748B),
                                 fontWeight: FontWeight.w500,
                               ),
@@ -131,16 +127,10 @@ class F2hHeroHeader extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
 
-              // ONLINE STATUS PILL
+              // ONLINE / ENGINE STATUS PILL
               _buildOnlineStatusPill(context),
-
-              // RUNNING ADDRESS BAR (Floating translucent pill above background)
-              if (address != null && address!.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                _buildAddressBanner(context),
-              ],
             ],
           ),
         ),
@@ -226,59 +216,6 @@ class F2hHeroHeader extends StatelessWidget {
                 )
               : null,
         ),
-      ),
-    );
-  }
-
-  Widget _buildAddressBanner(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.90),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.location_on, size: 14, color: Color(0xFF059669)),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (addressLabel != null && addressLabel!.isNotEmpty)
-                  Text(
-                    addressLabel!.toUpperCase(),
-                    style: GoogleFonts.roboto(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF059669),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                Text(
-                  address!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.roboto(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1E293B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
