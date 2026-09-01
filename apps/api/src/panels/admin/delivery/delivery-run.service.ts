@@ -1047,19 +1047,91 @@ export class DeliveryRunService {
             [orderIds],
           );
 
-          // Process referral rewards only when order is delivered
+          // Process referral rewards and COD billing settlement when order is delivered
           for (const orderId of orderIds) {
             try {
-              const ordRows = await this.db.query(`SELECT customer_id FROM orders WHERE order_id = $1 LIMIT 1`, [orderId]);
-              const custId = ordRows?.[0]?.customer_id;
+              const ordRows = await this.db.query(
+                `SELECT order_id, customer_id, total_amount, payment_mode, order_source, subscription_id
+                 FROM orders WHERE order_id = $1 LIMIT 1`,
+                [orderId],
+              );
+              const ord = ordRows?.[0];
+              const custId = ord?.customer_id;
               if (custId) {
                 const isFirstOrder = await this.firstOrderDetector.detectAndMarkFirstOrder(custId, orderId);
                 if (isFirstOrder) {
                   await this.referralRewardEngine.processReferralReward(custId, orderId);
                 }
+
+                // If this is a COD order (one-time), settle payment transaction and customer bill
+                const pMode = (ord.payment_mode || '').toLowerCase();
+                const isCod = (pMode === 'cod' || pMode === 'cash');
+                if (isCod) {
+                  const cashAmount = Number(ord.total_amount || 0);
+                  const existingTxn = await this.db.query(
+                    `SELECT 1 FROM payment_transactions WHERE reference_id = $1 AND purpose = 'order_payment' AND status = 'success' LIMIT 1`,
+                    [orderId],
+                  );
+                  if (!existingTxn?.length) {
+                    const txnId = `TXN_COD_${orderId}_${Date.now()}`;
+                    await this.db.query(
+                      `INSERT INTO payment_transactions (
+                        transaction_id, customer_id, purpose, reference_id,
+                        provider, method, amount, currency, status, paid_at, created_at, updated_at
+                      ) VALUES ($1, $2, 'order_payment', $3, 'cash', 'cash', $4, 'INR', 'success', NOW(), NOW(), NOW())`,
+                      [txnId, custId, orderId, cashAmount],
+                    );
+                  }
+
+                  const existingBill = await this.db.query(
+                    `SELECT bill_id FROM customer_bills WHERE reference_id = $1 LIMIT 1`,
+                    [orderId],
+                  );
+                  if (existingBill?.length) {
+                    await this.db.query(
+                      `UPDATE customer_bills
+                       SET status = 'paid',
+                           paid_amount = total_amount,
+                           due_amount = 0,
+                           updated_at = NOW()
+                       WHERE reference_id = $1`,
+                      [orderId],
+                    );
+                  } else {
+                    const newBillId = `BILL-${orderId}`;
+                    await this.db.query(
+                      `INSERT INTO customer_bills (
+                        bill_id, customer_id, bill_type, reference_id, payment_type, payment_method,
+                        billing_from, billing_to, due_date, subtotal, discount_amount, tax_amount,
+                        total_amount, paid_amount, due_amount, status, remarks, created_at, updated_at
+                      ) VALUES (
+                        $1, $2, 'order', $3, 'cod', 'cod',
+                        CURRENT_DATE, CURRENT_DATE, CURRENT_DATE, $4, 0, 0,
+                        $4, $4, 0, 'paid', 'Cash on Delivery - Collected on delivery', NOW(), NOW()
+                      )`,
+                      [newBillId, custId, orderId, cashAmount],
+                    );
+
+                    const orderItemsRes = await this.db.query(
+                      `SELECT variant_id, quantity, unit_price, total_price FROM order_items WHERE order_id = $1 AND deleted_at IS NULL`,
+                      [orderId],
+                    );
+                    const items = orderItemsRes || [];
+                    for (const item of items) {
+                      const itemTotal = Number(item.total_price || (Number(item.unit_price || 0) * Number(item.quantity || 1)));
+                      await this.db.query(
+                        `INSERT INTO customer_bill_items (
+                          bill_id, reference_type, reference_id, product_variant_id,
+                          quantity, unit_price, discount_amount, tax_amount, total_amount, created_at
+                        ) VALUES ($1, 'order', $2, $3, $4, $5, 0, 0, $6, NOW())`,
+                        [newBillId, orderId, item.variant_id, item.quantity, item.unit_price, itemTotal],
+                      );
+                    }
+                  }
+                }
               }
             } catch (refErr) {
-              this.developer.error('DeliveryRunService: Failed to process referral reward on order delivery', refErr);
+              this.developer.error('DeliveryRunService: Failed to process referral/COD settlement on order delivery', refErr);
             }
           }
         } else if (newStatus === 'failed') {

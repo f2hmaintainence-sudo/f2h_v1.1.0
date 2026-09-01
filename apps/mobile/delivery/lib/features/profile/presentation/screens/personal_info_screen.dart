@@ -146,45 +146,41 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                             color: const Color(0xFF475569),
                           ),
                         ),
-                        const SizedBox(height: 5),
-                        DropdownButtonFormField<String>(
-                          initialValue: selectedGender,
-                          onChanged: (val) {
-                            if (val != null) {
-                              setModalState(() {
-                                selectedGender = val;
-                              });
-                            }
-                          },
-                          style: GoogleFonts.roboto(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF0F172A),
-                          ),
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                          dropdownColor: Colors.white,
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            _buildGenderOption(
+                              label: 'Male',
+                              icon: Icons.male_rounded,
+                              isSelected: selectedGender == 'Male',
+                              onTap: () {
+                                setModalState(() {
+                                  selectedGender = 'Male';
+                                });
+                              },
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            const SizedBox(width: 8),
+                            _buildGenderOption(
+                              label: 'Female',
+                              icon: Icons.female_rounded,
+                              isSelected: selectedGender == 'Female',
+                              onTap: () {
+                                setModalState(() {
+                                  selectedGender = 'Female';
+                                });
+                              },
                             ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+                            const SizedBox(width: 8),
+                            _buildGenderOption(
+                              label: 'Other',
+                              icon: Icons.transgender_rounded,
+                              isSelected: selectedGender == 'Other',
+                              onTap: () {
+                                setModalState(() {
+                                  selectedGender = 'Other';
+                                });
+                              },
                             ),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'Male', child: Text('Male')),
-                            DropdownMenuItem(value: 'Female', child: Text('Female')),
-                            DropdownMenuItem(value: 'Other', child: Text('Other')),
-                            DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
                           ],
                         ),
                       ],
@@ -305,6 +301,61 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderOption({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFDCFCE7) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+              width: isSelected ? 1.6 : 1.0,
+            ),
+            boxShadow: isSelected
+                ? const [
+                    BoxShadow(
+                      color: Color(0x1816A34A),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: GoogleFonts.roboto(
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? const Color(0xFF15803D) : const Color(0xFF334155),
+                ),
+              ),
+            ],
           ),
         ),
       ),
