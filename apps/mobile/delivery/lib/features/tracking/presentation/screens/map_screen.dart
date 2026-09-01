@@ -847,7 +847,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
           final List<Polyline> polylines = [];
 
-          if (pendingStops.isNotEmpty && _optimizedRoute != null) {
+          if (pendingStops.isNotEmpty && _optimizedRoute != null && _optimizedRoute!.isRoadGeometry) {
             final activePts = _optimizedRoute!.activeLegPoints;
             final remainingPts = _optimizedRoute!.remainingRoutePoints;
             final fullPts = _optimizedRoute!.fullRoutePoints;
@@ -1619,6 +1619,45 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
+          if (!route.isRoadGeometry && route.unavailableReason != null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 13),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      route.unavailableReason!,
+                      style: GoogleFonts.roboto(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _refreshMap,
+                    child: Text(
+                      'Retry',
+                      style: GoogleFonts.roboto(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF1A73E8),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

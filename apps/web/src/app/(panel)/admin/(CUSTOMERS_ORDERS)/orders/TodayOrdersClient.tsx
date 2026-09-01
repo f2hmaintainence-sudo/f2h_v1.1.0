@@ -203,7 +203,7 @@ export default function TodayOrdersClient({
         if (itemsResult?.status) {
           setItems(Array.isArray(itemsResult.data) ? itemsResult.data : []);
         } else {
-          setItemsError(itemsResult?.message || 'Failed to load order items');
+          setItemsError((itemsResult as any)?.message || 'Failed to load order items');
         }
       })
       .catch(() => setItemsError('Failed to load complete order details'))
@@ -288,11 +288,11 @@ export default function TodayOrdersClient({
 
         const result = await apiClient.patch<any>(`/admin/orders/bulk-fail?${p.toString()}`, {});
         if (result?.status) {
-          setBulkResult(`✅ ${result.message || `${result.updated} orders marked as failed`}`);
+          setBulkResult(`✅ ${(result as any)?.message || `${(result as any)?.updated || 0} orders marked as failed`}`);
           setTableKey((k) => k + 1);
           fetchSummary();
         } else {
-          setBulkResult(`❌ ${result?.message || 'Failed'}`);
+          setBulkResult(`❌ ${(result as any)?.message || 'Failed'}`);
         }
       } catch (err: any) {
         setBulkResult(`❌ ${err?.message || 'Network error'}`);
@@ -305,25 +305,26 @@ export default function TodayOrdersClient({
       setBulkLoading(true);
       setBulkResult(null);
       try {
-        const csrfToken = await getCsrfToken().catch(() => '');
-        const res = await fetch(`${API_URL}/admin/orders/today/bulk-deliver`, {
-          method: 'PATCH',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-          },
-        });
-        const result = await res.json();
-        if (result.status) {
-          setBulkResult(`✅ ${result.updated} order(s) marked as delivered`);
+        const p = new URLSearchParams();
+        if (fromDate && toDate) {
+          p.set('fromDate', fromDate);
+          p.set('toDate', toDate);
+        } else if (selectedDate) {
+          p.set('date', selectedDate);
+        }
+        if (slotFilter && slotFilter !== 'all') {
+          p.set('slot', slotFilter);
+        }
+        const result = await apiClient.patch<any>(`/admin/orders/today/bulk-deliver?${p.toString()}`, {});
+        if (result?.status) {
+          setBulkResult(`✅ ${(result as any)?.message || `${(result as any)?.updated || 0} order(s) marked as delivered`}`);
           setTableKey((k) => k + 1);
           fetchSummary();
         } else {
-          setBulkResult(`❌ ${result.message || 'Failed'}`);
+          setBulkResult(`❌ ${(result as any)?.message || 'Failed'}`);
         }
-      } catch {
-        setBulkResult('❌ Network error');
+      } catch (err: any) {
+        setBulkResult(`❌ ${err?.message || 'Network error'}`);
       } finally {
         setBulkLoading(false);
         setActionModal({ isOpen: false, type: null });

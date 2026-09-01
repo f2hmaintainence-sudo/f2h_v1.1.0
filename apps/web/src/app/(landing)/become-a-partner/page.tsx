@@ -341,7 +341,6 @@ export default function BecomeAPartnerPage() {
                         placeholder="Ashok Gowda"
                         className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
-                      <p className="mt-1 text-[10px] text-slate-400">Letters and spaces only (no numbers)</p>
                     </div>
 
                     <div>
@@ -369,7 +368,6 @@ export default function BecomeAPartnerPage() {
                           className="w-full px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent"
                         />
                       </div>
-                      <p className="mt-1 text-[10px] text-slate-400">10-digit Indian number (starts with 6, 7, 8, or 9)</p>
                     </div>
                   </div>
 
@@ -475,7 +473,6 @@ export default function BecomeAPartnerPage() {
                         placeholder="KA03 20210001234"
                         className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
-                      <p className="mt-1 text-[10px] text-slate-400">Letters and numbers only</p>
                     </div>
                   </div>
 

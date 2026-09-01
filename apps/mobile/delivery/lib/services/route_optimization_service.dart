@@ -318,7 +318,6 @@ class RouteOptimizationService {
     String? reason,
   }) {
     final destination = LatLng(destinationStop.addressLat, destinationStop.addressLng);
-    final points = [origin, destination];
     final distanceKm = _locationService.haversineDistanceKm(
       origin.latitude,
       origin.longitude,
@@ -328,15 +327,15 @@ class RouteOptimizationService {
 
     return OptimizedRouteResult(
       orderedStops: List.from(stops),
-      activeLegPoints: points,
+      activeLegPoints: const [],
       remainingRoutePoints: const [],
-      fullRoutePoints: points,
+      fullRoutePoints: [origin, destination],
       totalDistanceKm: distanceKm,
       totalDurationMinutes: (distanceKm / 25.0) * 60.0,
       activeLegDistanceKm: distanceKm,
       activeLegDurationMinutes: (distanceKm / 25.0) * 60.0,
       isRoadGeometry: false,
-      status: RouteStatus.ok,
+      status: reason != null ? RouteStatus.unavailable : RouteStatus.ok,
       unavailableReason: reason,
       provider: 'fallback-straight-line',
     );
@@ -582,7 +581,7 @@ class RouteOptimizationService {
     );
   }
 
-  /// Builds a straight-line connected fallback path between stops when online routing is unavailable.
+  /// Builds fallback result with proximity stop ordering when online road routing is unavailable.
   OptimizedRouteResult _buildStraightLineFallback({
     required LatLng currentPosition,
     required List<GroupedStop> orderedPending,
@@ -597,37 +596,34 @@ class RouteOptimizationService {
       );
     }
 
-    final List<LatLng> activeLeg = [
-      currentPosition,
-      LatLng(orderedPending.first.addressLat, orderedPending.first.addressLng),
-    ];
-
-    final List<LatLng> remaining = [];
+    final List<LatLng> stopCoords = [];
     for (int i = 0; i < orderedPending.length; i++) {
-      remaining.add(LatLng(orderedPending[i].addressLat, orderedPending[i].addressLng));
+      stopCoords.add(LatLng(orderedPending[i].addressLat, orderedPending[i].addressLng));
     }
 
-    final List<LatLng> fullPoints = [
+    final List<LatLng> boundsPoints = [
       currentPosition,
-      ...remaining,
+      ...stopCoords,
     ];
 
     double totalDistKm = 0.0;
-    for (int i = 0; i < fullPoints.length - 1; i++) {
+    for (int i = 0; i < boundsPoints.length - 1; i++) {
       totalDistKm += _locationService.haversineDistanceKm(
-        fullPoints[i].latitude,
-        fullPoints[i].longitude,
-        fullPoints[i + 1].latitude,
-        fullPoints[i + 1].longitude,
+        boundsPoints[i].latitude,
+        boundsPoints[i].longitude,
+        boundsPoints[i + 1].latitude,
+        boundsPoints[i + 1].longitude,
       );
     }
 
-    final activeDistKm = _locationService.haversineDistanceKm(
-      activeLeg[0].latitude,
-      activeLeg[0].longitude,
-      activeLeg[1].latitude,
-      activeLeg[1].longitude,
-    );
+    final activeDistKm = stopCoords.isNotEmpty
+        ? _locationService.haversineDistanceKm(
+            currentPosition.latitude,
+            currentPosition.longitude,
+            stopCoords.first.latitude,
+            stopCoords.first.longitude,
+          )
+        : 0.0;
 
     // Approximate two-wheeler speed ~ 25 km/h
     final totalDurationMin = (totalDistKm / 25.0) * 60.0;
@@ -635,15 +631,15 @@ class RouteOptimizationService {
 
     return OptimizedRouteResult(
       orderedStops: orderedStops,
-      activeLegPoints: activeLeg,
-      remainingRoutePoints: remaining,
-      fullRoutePoints: fullPoints,
+      activeLegPoints: const [],
+      remainingRoutePoints: const [],
+      fullRoutePoints: boundsPoints,
       totalDistanceKm: totalDistKm,
       totalDurationMinutes: totalDurationMin,
       activeLegDistanceKm: activeDistKm,
       activeLegDurationMinutes: activeDurationMin,
       isRoadGeometry: false,
-      status: RouteStatus.ok,
+      status: reason != null ? RouteStatus.unavailable : RouteStatus.ok,
       unavailableReason: reason,
       provider: 'fallback-straight-line',
     );
