@@ -186,7 +186,7 @@ export default function TodayOrdersClient({
     setItems([]);
     setItemsError('');
 
-    const rawOrderId = stripHtml(row.order_id || row.id);
+    const rawOrderId = stripHtml(row.order_id || row.id).replace(/^[#\s]+|[#\s]+$/g, '');
     if (!rawOrderId || rawOrderId === 'null' || rawOrderId === 'undefined') {
       setItemsError('No valid order ID linked to this record.');
       setLoadingItems(false);
@@ -205,11 +205,8 @@ export default function TodayOrdersClient({
           setSelectedOrder((current) => ({ ...(current || {}), ...detailData }));
         }
 
-        const itemsList = Array.isArray(itemsResult?.data?.data)
-          ? itemsResult.data.data
-          : Array.isArray(itemsResult?.data)
-            ? itemsResult.data
-            : [];
+        const rawItems = itemsResult?.data?.data ?? itemsResult?.data;
+        const itemsList = Array.isArray(rawItems) ? rawItems : [];
         setItems(itemsList);
       })
       .catch(() => setItemsError('Failed to load complete order details'))

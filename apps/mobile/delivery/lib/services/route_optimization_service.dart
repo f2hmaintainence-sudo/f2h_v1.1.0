@@ -536,12 +536,15 @@ class RouteOptimizationService {
 
     // Leg 0 is origin → first stop; subsequent legs connect remaining stops
     List<LatLng> activeLeg = [];
-    if (legs.isNotEmpty && legs.first.points.length >= 2) {
-      activeLeg = List<LatLng>.from(legs.first.points);
-    }
-
     List<LatLng> remaining = [];
-    if (legs.length > 1) {
+
+    if (legs.length <= 1) {
+      activeLeg = List<LatLng>.from(allRoutePoints);
+      remaining = const [];
+    } else {
+      if (legs.first.points.length >= 2) {
+        activeLeg = List<LatLng>.from(legs.first.points);
+      }
       for (int i = 1; i < legs.length; i++) {
         final legPts = legs[i].points;
         if (legPts.isEmpty) continue;
@@ -553,19 +556,19 @@ class RouteOptimizationService {
           remaining.addAll(legPts);
         }
       }
-    }
 
-    if (activeLeg.length < 2) {
-      final nextStop = orderedStops.firstWhere(
-        (s) => _isPending(s) && _hasValidCoords(s),
-        orElse: () => destination,
-      );
-      final splitIndex = _closestPointIndex(
-        allRoutePoints,
-        LatLng(nextStop.addressLat, nextStop.addressLng),
-      );
-      activeLeg = allRoutePoints.sublist(0, (splitIndex + 1).clamp(1, allRoutePoints.length));
-      remaining = allRoutePoints.sublist(splitIndex.clamp(0, allRoutePoints.length - 1));
+      if (activeLeg.length < 2) {
+        final nextStop = orderedStops.firstWhere(
+          (s) => _isPending(s) && _hasValidCoords(s),
+          orElse: () => destination,
+        );
+        final splitIndex = _closestPointIndex(
+          allRoutePoints,
+          LatLng(nextStop.addressLat, nextStop.addressLng),
+        );
+        activeLeg = allRoutePoints.sublist(0, (splitIndex + 1).clamp(1, allRoutePoints.length));
+        remaining = allRoutePoints.sublist(splitIndex.clamp(0, allRoutePoints.length - 1));
+      }
     }
 
     final totalDistanceKm =

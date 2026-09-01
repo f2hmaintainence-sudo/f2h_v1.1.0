@@ -43,6 +43,7 @@ export class OrdersService {
 
   async getOrderView(orderId: string) {
     try {
+      const cleanId = String(orderId || '').replace(/^[#\s]+|[#\s]+$/g, '').trim();
       const rows = await this.databaseService.query(
         `SELECT
            orders.*,
@@ -53,9 +54,11 @@ export class OrdersService {
          FROM orders
          LEFT JOIN users dpu ON dpu.user_id = orders.delivery_partner_id
          LEFT JOIN delivery_partners dp ON dp.delivery_partner_id = orders.delivery_partner_id
-         WHERE orders.order_id = $1 OR orders.id::text = $1
+         WHERE orders.order_id = $1 
+            OR orders.order_id = $2
+            OR orders.id::text = $1
          LIMIT 1`,
-        [orderId],
+        [cleanId, orderId],
       );
 
       return {
@@ -71,6 +74,7 @@ export class OrdersService {
 
   async getOrderItems(orderId: string) {
     try {
+      const cleanId = String(orderId || '').replace(/^[#\s]+|[#\s]+$/g, '').trim();
       const sql = `
         SELECT
           oi.id,
@@ -92,10 +96,41 @@ export class OrdersService {
         FROM order_items oi
         LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
         LEFT JOIN products p ON p.product_id = pv.product_id
-        WHERE oi.order_id = $1
+        WHERE oi.order_id = $1 OR oi.order_id = $2
         ORDER BY oi.id ASC
       `;
-      const rows = await this.databaseService.query(sql, [orderId]);
+      let rows = await this.databaseService.query(sql, [cleanId, orderId]);
+
+      // Fallback for subscription recurring deliveries if items are in subscription_items
+      if (!rows || rows.length === 0) {
+        const subSql = `
+          SELECT
+            si.id,
+            $1 AS order_id,
+            si.variant_id,
+            COALESCE(NULLIF(si.product_name, ''), p.name, pv.name, 'Produce Item') AS product_name,
+            COALESCE(pv.name, '') AS variant_name,
+            pv.quantity_value,
+            pv.quantity_unit,
+            COALESCE(si.quantity, (COALESCE(si.default_m_quantity, 0) + COALESCE(si.default_e_quantity, 0)), 1) AS quantity,
+            si.unit_price,
+            si.original_price,
+            si.discount_amount,
+            si.coupon_amount,
+            si.total_price,
+            si.final_price,
+            si.is_free,
+            si.created_at
+          FROM subscription_items si
+          JOIN orders o ON o.subscription_id = si.subscription_id
+          LEFT JOIN product_variants pv ON pv.variant_id = si.variant_id
+          LEFT JOIN products p ON p.product_id = pv.product_id
+          WHERE o.order_id = $1 OR o.order_id = $2 OR o.id::text = $1
+          ORDER BY si.id ASC
+        `;
+        rows = await this.databaseService.query(subSql, [cleanId, orderId]);
+      }
+
       return {
         status: true,
         data: rows ?? [],

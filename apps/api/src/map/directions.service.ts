@@ -234,10 +234,19 @@ export class DirectionsService {
     const intermediates = request.intermediates ?? [];
     const optimize = Boolean(request.optimizeWaypointOrder) && intermediates.length > 0;
 
+    let googleMode = 'driving';
+    if (request.travelMode === 'TWO_WHEELER') {
+      googleMode = 'two_wheeler';
+    } else if (request.travelMode === 'BICYCLE') {
+      googleMode = 'bicycling';
+    } else if (request.travelMode === 'WALK') {
+      googleMode = 'walking';
+    }
+
     const params = new URLSearchParams({
       origin: this.latLngParam(request.origin),
       destination: this.latLngParam(request.destination),
-      mode: 'driving',
+      mode: googleMode,
       departure_time: 'now',
       region: 'in',
       units: 'metric',
@@ -277,29 +286,42 @@ export class DirectionsService {
       }
 
       const rawLegs = Array.isArray(route.legs) ? route.legs : [];
-      const legs: RouteLeg[] = rawLegs.map((leg: any) => ({
-        distanceMeters: Number(leg?.distance?.value) || 0,
-        durationSeconds:
-          Number(leg?.duration_in_traffic?.value ?? leg?.duration?.value) || 0,
-        polyline: this.joinStepPolylines(leg?.steps),
-      }));
+      const legs: RouteLeg[] = rawLegs.map((leg: any) => {
+        let legPolyline = '';
+        if (rawLegs.length === 1 && typeof route.overview_polyline?.points === 'string') {
+          legPolyline = route.overview_polyline.points;
+        } else if (Array.isArray(leg?.steps) && leg.steps.length > 0) {
+          const legPoints: Array<[number, number]> = [];
+          for (const step of leg.steps) {
+            if (typeof step?.polyline?.points === 'string') {
+              const stepPts = this.decodePolyline(step.polyline.points);
+              if (legPoints.length > 0 && stepPts.length > 0) {
+                legPoints.push(...stepPts.slice(1));
+              } else {
+                legPoints.push(...stepPts);
+              }
+            }
+          }
+          legPolyline =
+            legPoints.length > 0
+              ? this.encodePolyline(legPoints)
+              : (route.overview_polyline?.points || '');
+        }
 
-      // Combine all step polylines for high-fidelity road curves instead of simplified overview
-      const detailedPolyline = legs
-        .map((l) => l.polyline)
-        .filter(Boolean)
-        .join(POLYLINE_SEGMENT_SEPARATOR);
+        return {
+          distanceMeters: Number(leg?.distance?.value) || 0,
+          durationSeconds:
+            Number(leg?.duration_in_traffic?.value ?? leg?.duration?.value) || 0,
+          polyline: legPolyline,
+        };
+      });
 
       return {
         status: 'OK',
         provider: 'google-directions',
         distanceMeters: legs.reduce((sum, leg) => sum + leg.distanceMeters, 0),
         durationSeconds: legs.reduce((sum, leg) => sum + leg.durationSeconds, 0),
-        polyline:
-          typeof route.overview_polyline?.points === 'string' &&
-          route.overview_polyline.points.length > 0
-            ? route.overview_polyline.points
-            : (detailedPolyline || ''),
+        polyline: route.overview_polyline.points,
         optimizedOrder: this.sanitizeOrder(
           route.waypoint_order,
           intermediates.length,
@@ -368,6 +390,73 @@ export class DirectionsService {
       this.logger.warn(`OSRM request failed: ${String(error)}`);
       return { ...UNAVAILABLE, message: 'OSRM router unreachable' };
     }
+  }
+
+  private decodePolyline(encoded: string): Array<[number, number]> {
+    if (!encoded) return [];
+    const points: Array<[number, number]> = [];
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+    const len = encoded.length;
+
+    while (index < len) {
+      let b: number;
+      let shift = 0;
+      let result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlat = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlng = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+      lng += dlng;
+
+      points.push([lat / 1e5, lng / 1e5]);
+    }
+    return points;
+  }
+
+  private encodePolyline(points: Array<[number, number]>): string {
+    let result = '';
+    let prevLat = 0;
+    let prevLng = 0;
+
+    for (const [lat, lng] of points) {
+      const latE5 = Math.round(lat * 1e5);
+      const lngE5 = Math.round(lng * 1e5);
+
+      const dLat = latE5 - prevLat;
+      const dLng = lngE5 - prevLng;
+
+      prevLat = latE5;
+      prevLng = lngE5;
+
+      result += this.encodeNumber(dLat) + this.encodeNumber(dLng);
+    }
+
+    return result;
+  }
+
+  private encodeNumber(num: number): string {
+    let sgnNum = num < 0 ? ~(num << 1) : num << 1;
+    let str = '';
+    while (sgnNum >= 0x20) {
+      str += String.fromCharCode((0x20 | (sgnNum & 0x1f)) + 63);
+      sgnNum >>= 5;
+    }
+    str += String.fromCharCode(sgnNum + 63);
+    return str;
   }
 
   private joinStepPolylines(steps: unknown): string {
