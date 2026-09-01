@@ -187,9 +187,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
       if (!mounted) return;
 
-      // A 2-point straight-line fallback has exactly 2 points and isRoadGeometry == false.
-      // We require real road geometry AND at least 5 points to consider the route drawable.
-      final bool drawable = result.isRoadGeometry && result.fullRoutePoints.length >= 5;
+      // A straight-line fallback has isRoadGeometry == false, so that flag alone
+      // distinguishes it from a real route. No minimum point count needed beyond 2.
+      final bool drawable = result.isRoadGeometry && result.fullRoutePoints.length >= 2;
 
       debugPrint('[MapRoute] status=${result.status} isRoad=${result.isRoadGeometry} '
           'fullPts=${result.fullRoutePoints.length} activePts=${result.activeLegPoints.length} '
@@ -1733,45 +1733,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
-          if (!route.isRoadGeometry && route.unavailableReason != null) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 13),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      route.unavailableReason!,
-                      style: GoogleFonts.roboto(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF92400E),
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _refreshMap,
-                    child: Text(
-                      'Retry',
-                      style: GoogleFonts.roboto(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1A73E8),
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );

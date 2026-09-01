@@ -275,7 +275,9 @@ class RouteOptimizationService {
 
     final legs = _parseLegs(data['legs']);
     final fullPoints = decodeGooglePolylineSegments((data['polyline'] as String?) ?? '');
-    final points = fullPoints.isNotEmpty ? fullPoints : legs.expand((l) => l.points).toList();
+    // Use leg geometry as fallback only when fullPoints has fewer than 2 real road points.
+    // One degenerate origin==destination response returns exactly 1 point and must fall through.
+    final points = fullPoints.length >= 2 ? fullPoints : legs.expand((l) => l.points).toList();
 
     debugPrint('[fetchDirectRoute] status=${data["status"]} '
         'polylineLen=${(data["polyline"] as String?)?.length ?? 0} '
@@ -536,7 +538,7 @@ class RouteOptimizationService {
 
     debugPrint('[_buildResult] fullPoints=${fullPoints.length} legCount=${legs.length}');
 
-    final List<LatLng> allRoutePoints = fullPoints.isNotEmpty
+    final List<LatLng> allRoutePoints = fullPoints.length >= 2
         ? fullPoints
         : legs.expand((l) => l.points).toList();
 

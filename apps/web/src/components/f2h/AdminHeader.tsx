@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth, getHomeForRole } from "@/context/AuthContext";
-import { ChevronDown, LogOut, User, Settings, ShieldCheck } from "lucide-react";
+import { ChevronDown, LogOut, User, ShieldCheck } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { NotificationPanel } from "./NotificationPanel";
@@ -109,15 +109,6 @@ export function AdminHeader() {
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
               >
                 <User size={16} /> Profile
-              </button>
-              <button
-                onClick={() => {
-                  setProfileOpen(false);
-                  router.push("/admin/settings");
-                }}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <Settings size={16} /> Settings
               </button>
               <div className="border-t border-gray-100 mt-1 pt-1">
                 <button

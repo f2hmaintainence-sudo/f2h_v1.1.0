@@ -81,6 +81,9 @@ export class DirectionsService {
 
   /**
    * Resolves a drivable road route through Google Directions API or OSRM fallback.
+   *
+   * Routes API v2 (routes.googleapis.com) is disabled on this GCP project (API_KEY_SERVICE_BLOCKED).
+   * Skip it entirely and go straight to the Legacy Directions API, then OSRM.
    */
   async computeRoute(request: DirectionsRequestDto): Promise<DirectionsResult> {
     const cacheKey = this.cacheKey(request);
@@ -91,16 +94,12 @@ export class DirectionsService {
 
     let result: DirectionsResult = { ...UNAVAILABLE };
 
-    // 1. Try Google Routes API v2 if apiKey is available
+    // 1. Google Directions API (Legacy) — Routes API v2 is blocked on this project
     if (apiKey) {
-      result = await this.viaRoutesApi(request, apiKey);
-      // 2. Try Google Directions API (Legacy) if Routes API returned UNAVAILABLE
-      if (result.status === 'UNAVAILABLE') {
-        result = await this.viaDirectionsApi(request, apiKey);
-      }
+      result = await this.viaDirectionsApi(request, apiKey);
     }
 
-    // 3. Fallback to OSRM Driving Router if Google APIs are unavailable
+    // 2. Fallback to OSRM Driving Router if Google is unavailable
     if (result.status === 'UNAVAILABLE') {
       result = await this.viaOsrmApi(request);
     }
