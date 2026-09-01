@@ -1047,78 +1047,45 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 ),
 
                 // 3. Floating Search Bar & Back Button
-                // 3. Floating Search Bar, Back Button & Top Map Layer Pill Bar
+                // 3. Floating Search Bar & Back Button
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 12,
                   left: 16,
-                  right: 16,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                  right: 72,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          if (widget.isStandalonePage || Navigator.canPop(context)) ...[
-                            GestureDetector(
-                              onTap: () => Navigator.maybePop(context),
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                margin: const EdgeInsets.only(right: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x14000000),
-                                      blurRadius: 8,
-                                      offset: Offset(0, 3),
-                                    )
-                                  ],
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.arrow_back_rounded,
-                                    color: Color(0xFF0F172A),
-                                    size: 20,
-                                  ),
-                                ),
+                      if (widget.isStandalonePage || Navigator.canPop(context)) ...[
+                        GestureDetector(
+                          onTap: () => Navigator.maybePop(context),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x14000000),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                )
+                              ],
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.arrow_back_rounded,
+                                color: Color(0xFF0F172A),
+                                size: 22,
                               ),
                             ),
-                          ],
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: _buildMapLayerPillBar(),
-                            ),
                           ),
-                          const SizedBox(width: 8),
-                          _buildMapOptionCircle(
-                            icon: _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
-                            color: _showSearch ? const Color(0xFF16A34A) : const Color(0xFF475569),
-                            onTap: () {
-                              setState(() {
-                                _showSearch = !_showSearch;
-                                if (!_showSearch) {
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                  _searchResults = [];
-                                  _searchFocusNode.unfocus();
-                                } else {
-                                  Future.delayed(const Duration(milliseconds: 100), () {
-                                    _searchFocusNode.requestFocus();
-                                  });
-                                }
-                              });
-                            },
-                            tooltip: _showSearch ? 'Close Search' : 'Search Stops',
-                          ),
-                        ],
-                      ),
-                      if (_showSearch) ...[
-                        const SizedBox(height: 8),
-                        _buildSearchBar(effectiveStops),
+                        ),
                       ],
+                      Expanded(
+                        child: _buildSearchBar(effectiveStops),
+                      ),
                     ],
                   ),
                 ),
@@ -1126,9 +1093,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 // 4. Floating Shortest Route Summary Card & Route Notice Banner
                 if (!_showSearch)
                   Positioned(
-                    top: MediaQuery.of(context).padding.top + 62,
+                    top: MediaQuery.of(context).padding.top + 70,
                     left: 16,
-                    right: 16,
+                    right: 72,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1829,85 +1796,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       nextStop: nextStop,
       onStopSelected: (stop) => _selectStop(stop, effectiveStops),
       onShowConfirmation: (stop) => _showConfirmation(context, stop),
-    );
-  }
-
-  Widget _buildMapLayerPillBar() {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildMapPillOption(
-            type: MapLayerType.googleRoadmap,
-            label: 'Google Roadmap',
-            icon: Icons.map_rounded,
-          ),
-          const SizedBox(width: 3),
-          _buildMapPillOption(
-            type: MapLayerType.googleSatellite,
-            label: 'Satellite',
-            icon: Icons.satellite_alt_rounded,
-          ),
-          const SizedBox(width: 3),
-          _buildMapPillOption(
-            type: MapLayerType.googleTerrain,
-            label: 'Light',
-            icon: Icons.wb_sunny_rounded,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapPillOption({
-    required MapLayerType type,
-    required String label,
-    required IconData icon,
-  }) {
-    final bool isSelected = _currentLayer == type;
-    return GestureDetector(
-      onTap: () => setState(() => _currentLayer = type),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF059669) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 13,
-              color: isSelected ? Colors.white : const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: GoogleFonts.roboto(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? Colors.white : const Color(0xFF475569),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

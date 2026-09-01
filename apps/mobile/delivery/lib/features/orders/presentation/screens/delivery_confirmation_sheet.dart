@@ -1102,26 +1102,15 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                               onDec: state.customerBalance > 0
                                   ? () => setState(() {
                                         state.customerBalance--;
-                                        final maxAllowed = state.customerBalance;
-                                        final totalCollecting = state.returned + state.damaged + state.lost;
-                                        if (totalCollecting > maxAllowed) {
-                                          final excess = totalCollecting - maxAllowed;
-                                          if (state.returned >= excess) {
-                                            state.returned -= excess;
-                                          } else {
-                                            final remainingExcess = excess - state.returned;
-                                            state.returned = 0;
-                                            if (state.lost >= remainingExcess) {
-                                              state.lost -= remainingExcess;
-                                            } else {
-                                              state.lost = 0;
-                                              state.damaged = (state.damaged - (remainingExcess - state.lost)).clamp(0, maxAllowed);
-                                            }
-                                          }
+                                        if (state.returned > (state.customerBalance - state.damaged - state.lost)) {
+                                          state.returned = (state.customerBalance - state.damaged - state.lost).clamp(0, 999);
                                         }
                                       })
                                   : null,
-                              onInc: () => setState(() => state.customerBalance++),
+                              onInc: () => setState(() {
+                                    state.customerBalance++;
+                                    state.returned = (state.customerBalance - state.damaged - state.lost).clamp(0, 999);
+                                  }),
                             ),
                           ],
                         ),
@@ -1157,7 +1146,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       GestureDetector(
                                         onTap: () {
                                           setState(() {
-                                            state.returned = state.maxCollectable;
+                                            state.returned = state.customerBalance;
                                             state.damaged = 0;
                                             state.lost = 0;
                                           });
@@ -1215,9 +1204,12 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       onDec: state.returned > 0
                                           ? () => setState(() => state.returned--)
                                           : null,
-                                      onInc: (state.returned + state.damaged + state.lost) < state.maxCollectable
-                                          ? () => setState(() => state.returned++)
-                                          : null,
+                                      onInc: () => setState(() {
+                                            state.returned++;
+                                            if (state.returned + state.damaged + state.lost > state.customerBalance) {
+                                              state.customerBalance = state.returned + state.damaged + state.lost;
+                                            }
+                                          }),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -1236,9 +1228,12 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                                 }
                                               })
                                           : null,
-                                      onInc: (state.returned + state.damaged + state.lost) < state.maxCollectable
-                                          ? () => setState(() => state.lost++)
-                                          : null,
+                                      onInc: () => setState(() {
+                                            state.lost++;
+                                            if (state.returned + state.damaged + state.lost > state.customerBalance) {
+                                              state.customerBalance = state.returned + state.damaged + state.lost;
+                                            }
+                                          }),
                                     ),
                                   ),
                                 ],
