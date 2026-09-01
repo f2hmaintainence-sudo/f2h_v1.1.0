@@ -110,8 +110,34 @@ export class CustomerBillingRepository {
   ): Promise<any> {
     return await this.databaseService.transaction(async (client) => {
       const billId = `BILL-${generateId('PB', 10)}`;
-      const referenceId = orders && orders.length > 0 ? orders[0].order_id : 'CONSOLIDATED';
       const dueAmount = Math.max(0, totalAmount - paidAmount);
+
+      // This engine only ever consolidates subscription deliveries —
+      // `findDeliveredOrdersForPeriod` requires `subscription_id IS NOT NULL`. The
+      // type was hardcoded to 'order', so a month of subscription deliveries was
+      // presented in the admin as a "One-Time Order".
+      const subscriptionIds = Array.from(
+        new Set(
+          (orders ?? [])
+            .map((o) => o.subscription_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+      const isSubscriptionBill =
+        (orders?.length ?? 0) > 0 && orders.every((o) => Boolean(o.subscription_id));
+      const billType = isSubscriptionBill ? 'subscription' : 'order';
+
+      // A subscription bill points at the subscription, not at one arbitrary order
+      // out of the month. `reference_id` is varchar(30) so it holds a single id;
+      // when the month spans several subscriptions the complete set stays
+      // recoverable from `customer_bill_items`.
+      const referenceId = isSubscriptionBill
+        ? subscriptionIds.length === 1
+          ? subscriptionIds[0]
+          : 'CONSOLIDATED'
+        : orders && orders.length > 0
+          ? orders[0].order_id
+          : 'CONSOLIDATED';
 
       // `customer_bills.payment_method` is NOT NULL with no default, but a monthly
       // postpaid bill is raised before anyone pays it — there is no method to record
@@ -133,7 +159,7 @@ export class CustomerBillingRepository {
       const billRes = await client.query(insertBillSql, [
         billId,
         customerId,
-        'order',
+        billType,
         referenceId,
         paymentType,
         paymentMethod,
@@ -381,9 +407,12 @@ export class CustomerBillingRepository {
     if (!rows || rows.length === 0) return null;
     const bill = rows[0];
 
-    // Query actual orders if they exist
+    // The orders recorded on the bill are the authoritative list, whatever the
+    // bill_type says. A consolidated month can span several subscriptions, so
+    // resolving by the bill's single `reference_id` would silently drop every
+    // order belonging to the others.
     let orders: any[] = [];
-    if (bill.bill_type === 'order') {
+    {
       const ordersSql = `
         SELECT 
           o.order_id,
@@ -409,7 +438,11 @@ export class CustomerBillingRepository {
         )
       `;
       orders = await this.databaseService.query(ordersSql, [bill.id]);
-    } else if (bill.bill_type === 'subscription') {
+    }
+
+    // Legacy subscription bills predate `customer_bill_items` and carry only a
+    // subscription id, so they still have to be resolved by period.
+    if (orders.length === 0 && bill.bill_type === 'subscription') {
       const ordersSql = `
         SELECT 
           o.order_id,
