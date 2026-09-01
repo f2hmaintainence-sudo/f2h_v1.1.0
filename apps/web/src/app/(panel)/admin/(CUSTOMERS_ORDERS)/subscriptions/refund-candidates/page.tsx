@@ -181,7 +181,11 @@ export default function RefundCandidatesPage() {
   const [expandedPreviewCustomers, setExpandedPreviewCustomers] = useState<Set<string>>(new Set());
   const [expandedPreviewSubs, setExpandedPreviewSubs] = useState<Set<string>>(new Set());
 
-  // Single Action Confirm / Reject Modals
+  // Single Action Confirm / Reject Modals & Alert State
+  const [bulkApproveModalOpen, setBulkApproveModalOpen] = useState(false);
+  const [bulkRejectModalOpen, setBulkRejectModalOpen] = useState(false);
+  const [bulkRejectReason, setBulkRejectReason] = useState('');
+  const [singleApproveTarget, setSingleApproveTarget] = useState<{ id: string; amount: number } | null>(null);
   const [singleRejectTarget, setSingleRejectTarget] = useState<string | null>(null);
   const [singleRejectReason, setSingleRejectReason] = useState('');
 
@@ -518,11 +522,13 @@ export default function RefundCandidatesPage() {
     }
   };
 
-  const handleBulkApprove = async () => {
+  const handleBulkApproveClick = () => {
     if (!selectedIds.size) return showToast('error', 'Please select at least one delivery');
-    if (!confirm(`Approve and credit wallet with ${fmtAmount(selectedTotalAmount)} for ${selectedIds.size} selected deliveries?`)) {
-      return;
-    }
+    setBulkApproveModalOpen(true);
+  };
+
+  const handleBulkApproveConfirm = async () => {
+    if (!selectedIds.size) return;
     setProcessing(true);
     try {
       const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-approve`, {
@@ -535,6 +541,7 @@ export default function RefundCandidatesPage() {
       if (json.status) {
         showToast('success', json.message ?? 'Refunds approved and credited to customer wallets!');
         setSelectedIds(new Set());
+        setBulkApproveModalOpen(false);
         fetchSummary();
         fetchGroups();
       } else {
@@ -547,22 +554,28 @@ export default function RefundCandidatesPage() {
     }
   };
 
-  const handleBulkReject = async () => {
+  const handleBulkRejectClick = () => {
     if (!selectedIds.size) return showToast('error', 'Please select at least one delivery');
-    const notes = prompt(`Reason for rejecting ${selectedIds.size} selected deliveries (optional):`);
-    if (notes === null) return;
+    setBulkRejectReason('');
+    setBulkRejectModalOpen(true);
+  };
+
+  const handleBulkRejectConfirm = async () => {
+    if (!selectedIds.size) return;
     setProcessing(true);
     try {
       const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-reject`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_ids: Array.from(selectedIds), notes }),
+        body: JSON.stringify({ candidate_ids: Array.from(selectedIds), notes: bulkRejectReason }),
       });
       const json = await res.json();
       if (json.status) {
         showToast('success', json.message ?? 'Refunds marked as rejected');
         setSelectedIds(new Set());
+        setBulkRejectModalOpen(false);
+        setBulkRejectReason('');
         fetchSummary();
         fetchGroups();
       } else {
@@ -575,24 +588,30 @@ export default function RefundCandidatesPage() {
     }
   };
 
-  const handleSingleApprove = async (candidateId: string, amount: number) => {
-    if (!confirm(`Approve and refund ${fmtAmount(amount)} to customer wallet?`)) return;
+  const handleSingleApprove = (candidateId: string, amount: number) => {
+    setSingleApproveTarget({ id: candidateId, amount });
+  };
+
+  const handleSingleApproveConfirm = async () => {
+    if (!singleApproveTarget) return;
     setProcessing(true);
     try {
       const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-approve`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_ids: [candidateId] }),
+        body: JSON.stringify({ candidate_ids: [singleApproveTarget.id] }),
       });
       const json = await res.json();
       if (json.status) {
         showToast('success', 'Refund approved and credited to wallet');
+        const approvedId = singleApproveTarget.id;
         setSelectedIds((prev) => {
           const next = new Set(prev);
-          next.delete(candidateId);
+          next.delete(approvedId);
           return next;
         });
+        setSingleApproveTarget(null);
         fetchSummary();
         fetchGroups();
       } else {
@@ -1334,7 +1353,7 @@ export default function RefundCandidatesPage() {
 
           <button
             type="button"
-            onClick={handleBulkApprove}
+            onClick={handleBulkApproveClick}
             disabled={processing}
             className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
@@ -1344,7 +1363,7 @@ export default function RefundCandidatesPage() {
 
           <button
             type="button"
-            onClick={handleBulkReject}
+            onClick={handleBulkRejectClick}
             disabled={processing}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-200 text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
           >
@@ -1983,40 +2002,294 @@ export default function RefundCandidatesPage() {
         </div>
       )}
 
-      {/* Single Reject Modal with Reason */}
-      {singleRejectTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
-            <div className="flex items-center gap-2 text-rose-600 font-black text-sm">
-              <AlertTriangle size={18} />
-              Reject Refund Candidate
+      {/* ── 1. Bulk Approve & Credit Wallet Modal ── */}
+      {bulkApproveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent p-6 pb-4 border-b border-emerald-100/70">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 ring-4 ring-emerald-100 shrink-0">
+                  <Wallet size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-snug">
+                    Approve &amp; Credit Wallet
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    Review and confirm instant refund credit to customer balances
+                  </p>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-slate-500 font-medium">
-              Please enter the reason for rejecting this refund candidate:
-            </p>
-            <textarea
-              rows={3}
-              value={singleRejectReason}
-              onChange={(e) => setSingleRejectReason(e.target.value)}
-              placeholder="e.g. Delivery was confirmed offline by customer"
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-rose-500"
-            />
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setSingleRejectTarget(null)}
-                className="px-3 py-1.5 text-slate-600 text-xs font-bold hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSingleRejectConfirm}
-                disabled={processing}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {processing ? 'Rejecting...' : 'Confirm Reject'}
-              </button>
+
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">Selected Deliveries</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100/80 text-emerald-800 font-extrabold text-xs rounded-full">
+                    <Package size={13} />
+                    {selectedIds.size} {selectedIds.size === 1 ? 'delivery' : 'deliveries'}
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/60 flex items-baseline justify-between">
+                  <span className="text-xs font-bold text-slate-500">Total Credit Amount</span>
+                  <span className="text-2xl font-black text-emerald-700">
+                    {fmtAmount(selectedTotalAmount)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-100/80 text-emerald-900 text-xs">
+                <ShieldCheck size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                <p className="leading-relaxed font-medium">
+                  Customer wallets will receive an immediate balance credit of{' '}
+                  <span className="font-extrabold text-emerald-800">{fmtAmount(selectedTotalAmount)}</span> and the deliveries will be marked as resolved.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkApproveModalOpen(false)}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 text-slate-700 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkApproveConfirm}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} />
+                      <span>Confirm &amp; Credit</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2. Single Approve Modal ── */}
+      {singleApproveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent p-6 pb-4 border-b border-emerald-100/70">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 ring-4 ring-emerald-100 shrink-0">
+                  <Wallet size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-snug">
+                    Approve Single Refund
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    Credit refund amount directly to customer wallet
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">Refund Amount</span>
+                  <span className="text-2xl font-black text-emerald-700">
+                    {fmtAmount(singleApproveTarget.amount)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-100/80 text-emerald-900 text-xs">
+                <ShieldCheck size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                <p className="leading-relaxed font-medium">
+                  This will immediately credit{' '}
+                  <span className="font-extrabold text-emerald-800">{fmtAmount(singleApproveTarget.amount)}</span> to the customer&apos;s wallet balance.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSingleApproveTarget(null)}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 text-slate-700 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSingleApproveConfirm}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} />
+                      <span>Confirm &amp; Credit</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 3. Bulk Reject Modal with Reason ── */}
+      {bulkRejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-transparent p-6 pb-4 border-b border-rose-100/70">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 ring-4 ring-rose-100 shrink-0">
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-snug">
+                    Reject Refund Candidates
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    Reject {selectedIds.size} selected {selectedIds.size === 1 ? 'delivery' : 'deliveries'} without wallet credit
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-600">
+                  <span>Selected Candidates</span>
+                  <span className="font-extrabold text-rose-700">
+                    {selectedIds.size} deliveries ({fmtAmount(selectedTotalAmount)})
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Rejection Reason <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={bulkRejectReason}
+                  onChange={(e) => setBulkRejectReason(e.target.value)}
+                  placeholder="e.g. Verified delivered / disputed with customer"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:bg-white transition-all resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkRejectModalOpen(false)}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 text-slate-700 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkRejectConfirm}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white text-xs font-black rounded-xl shadow-lg shadow-rose-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Rejecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle size={15} />
+                      <span>Confirm Reject</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. Single Reject Modal with Reason ── */}
+      {singleRejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-transparent p-6 pb-4 border-b border-rose-100/70">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 ring-4 ring-rose-100 shrink-0">
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-snug">
+                    Reject Refund Candidate
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    Candidate will be rejected without credit to customer wallet
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Rejection Reason <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={singleRejectReason}
+                  onChange={(e) => setSingleRejectReason(e.target.value)}
+                  placeholder="e.g. Delivery was confirmed offline by customer"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500 focus:bg-white transition-all resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSingleRejectTarget(null)}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 text-slate-700 bg-slate-100 hover:bg-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSingleRejectConfirm}
+                  disabled={processing}
+                  className="flex-1 py-2.5 px-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white text-xs font-black rounded-xl shadow-lg shadow-rose-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Rejecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle size={15} />
+                      <span>Confirm Reject</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
