@@ -30,8 +30,9 @@ import OrderFilterBar, { OrderTypeTab, DeliverySlotFilter } from './components/O
 import OrderDetailsDrawer from './components/OrderDetailsDrawer';
 import { stripHtml } from './components/OrderDetailsDrawer';
 import OrdersTable from './components/OrdersTable';
-import OrderActionModal, { ModalType, ModalData } from './components/OrderActionModal';
+import OrderActionModal, { ModalType, ModalData, BulkActionPayload } from './components/OrderActionModal';
 import { downloadCSV, downloadExcel, ExportColumn } from '@/lib/exportUtils';
+import { api as apiClient } from '@/services/api.client';
 
 interface TodayOrdersClientProps {
   initialTab?: OrderTypeTab;
@@ -80,33 +81,23 @@ export default function TodayOrdersClient({
   filters = [],
   showDashboard = true,
 }: TodayOrdersClientProps) {
-  const [activeTab, setActiveTab] = useState<OrderTypeTab>(initialTab);
+  const [activeTab, setActiveTab]                     = useState<OrderTypeTab>(initialTab);
+  const [selectedDate, setSelectedDate]               = useState('');
+  const [fromDate, setFromDate]                       = useState('');
+  const [toDate, setToDate]                           = useState('');
+  const [activeStatusFilter, setActiveStatusFilter]   = useState<string | null>(null);
+  const [searchQuery, setSearchQuery]                 = useState('');
+  const [slotFilter, setSlotFilter]                   = useState<DeliverySlotFilter>('all');
+  const [urgentOnly, setUrgentOnly]                   = useState(false);
+  const [tableKey, setTableKey]                       = useState(0);
 
-  // Filter states
-  const [searchQuery, setSearchQuery]   = useState('');
-  const [slotFilter, setSlotFilter]     = useState<DeliverySlotFilter>('all');
-  const [urgentOnly, setUrgentOnly]     = useState(false);
-  const [activeStatusFilter, setActiveStatusFilter] = useState<string | null>(null);
+  // Bulk action state
+  const [bulkLoading, setBulkLoading]                 = useState(false);
+  const [bulkResult, setBulkResult]                   = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading]                   = useState(false);
+  const [exportLoading, setExportLoading]             = useState<'excel' | 'csv' | null>(null);
 
-  // Date filter states
-  const [selectedDate, setSelectedDate] = useState('');
-  const [fromDate, setFromDate]         = useState('');
-  const [toDate, setToDate]             = useState('');
-
-  // Refresh key
-  const [tableKey, setTableKey] = useState(0);
-
-  // Dashboard summary
-  const [summary, setSummary]           = useState<DashboardSummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-
-  // Bulk / PDF
-  const [bulkLoading, setBulkLoading]   = useState(false);
-  const [bulkResult, setBulkResult]     = useState<string | null>(null);
-  const [pdfLoading, setPdfLoading]     = useState(false);
-  const [exportLoading, setExportLoading] = useState<'excel' | 'csv' | null>(null);
-
-  // Action Confirmation Modal
+  // Action modal state
   const [actionModal, setActionModal] = useState<{
     isOpen: boolean;
     type: ModalType;
@@ -116,11 +107,15 @@ export default function TodayOrdersClient({
     type: null,
   });
 
-  // Drawer
-  const [selectedOrder, setSelectedOrder] = useState<Record<string, any> | null>(null);
-  const [items, setItems]                 = useState<any[]>([]);
-  const [loadingItems, setLoadingItems]   = useState(false);
-  const [itemsError, setItemsError]       = useState('');
+  // Summary KPI card state
+  const [summary, setSummary]                         = useState<DashboardSummary | null>(null);
+  const [summaryLoading, setSummaryLoading]           = useState(false);
+
+  // Order Details Drawer state
+  const [selectedOrder, setSelectedOrder]             = useState<Record<string, any> | null>(null);
+  const [items, setItems]                             = useState<any[]>([]);
+  const [loadingItems, setLoadingItems]               = useState(false);
+  const [itemsError, setItemsError]                   = useState('');
 
   useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
 
@@ -135,9 +130,8 @@ export default function TodayOrdersClient({
       if (fromDate)     qp.set('fromDate', fromDate);
       if (toDate)       qp.set('toDate', toDate);
       const qs = qp.toString() ? `?${qp}` : '';
-      const res = await fetch(`${API_URL}/admin/orders/${summaryPath}${qs}`, { credentials: 'include' });
-      const result = await res.json();
-      if (result.status) setSummary(result.data);
+      const result = await apiClient.get<any>(`/admin/orders/${summaryPath}${qs}`);
+      if (result?.status && result?.data) setSummary(result.data);
     } catch { /* silent */ } finally {
       setSummaryLoading(false);
     }
@@ -199,26 +193,17 @@ export default function TodayOrdersClient({
     setLoadingItems(true);
 
     Promise.all([
-      fetch(`${API_URL}/admin/orders/${orderId}/view`, { credentials: 'include' }),
-      fetch(`${API_URL}/admin/orders/${orderId}/items`, { credentials: 'include' }),
+      apiClient.get<any>(`/admin/orders/${orderId}/view`),
+      apiClient.get<any>(`/admin/orders/${orderId}/items`),
     ])
-      .then(async ([detailResponse, itemsResponse]) => {
-        if (!detailResponse.ok || !itemsResponse.ok) {
-          throw new Error('Failed to load complete order details');
-        }
-
-        const [detailResult, itemsResult] = await Promise.all([
-          detailResponse.json(),
-          itemsResponse.json(),
-        ]);
-
-        if (detailResult.status && detailResult.data) {
+      .then(([detailResult, itemsResult]) => {
+        if (detailResult?.status && detailResult?.data) {
           setSelectedOrder((current) => current ? { ...current, ...detailResult.data } : detailResult.data);
         }
-        if (itemsResult.status) {
+        if (itemsResult?.status) {
           setItems(Array.isArray(itemsResult.data) ? itemsResult.data : []);
         } else {
-          setItemsError(itemsResult.message || 'Failed to load order items');
+          setItemsError(itemsResult?.message || 'Failed to load order items');
         }
       })
       .catch(() => setItemsError('Failed to load complete order details'))
@@ -236,18 +221,10 @@ export default function TodayOrdersClient({
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     const cleanId = stripHtml(orderId);
     try {
-      const csrfToken = await getCsrfToken().catch(() => '');
-      const res = await fetch(`${API_URL}/admin/orders/${encodeURIComponent(cleanId)}/status`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-        },
-        body: JSON.stringify({ status: newStatus }),
+      const result = await apiClient.patch<any>(`/admin/orders/${encodeURIComponent(cleanId)}/status`, {
+        status: newStatus,
       });
-      const result = await res.json();
-      if (result.status || res.ok) {
+      if (result?.status) {
         fetchSummary();
         setTableKey((k) => k + 1);
         if (selectedOrder) {
@@ -262,48 +239,63 @@ export default function TodayOrdersClient({
     setActionModal({
       isOpen: true,
       type: 'bulk-deliver',
-      data: { date: 'Today' },
+      data: {
+        date: selectedDate || 'Today',
+        fromDate,
+        toDate,
+      },
     });
   };
 
   // ── Bulk Mark Failed ────────────────────────────────────────────────────────
   const handleBulkFail = () => {
-    const targetDate = selectedDate || fromDate || 'Today';
     setActionModal({
       isOpen: true,
       type: 'bulk-fail',
-      data: { date: targetDate },
+      data: {
+        date: selectedDate,
+        fromDate,
+        toDate,
+        slot: slotFilter,
+        isRange: !!(fromDate && toDate),
+        scopeLabel: fromDate && toDate ? `${fromDate} to ${toDate}` : (selectedDate || 'Today'),
+      },
     });
   };
 
   // ── Confirm Modal Action Execution ─────────────────────────────────────────
-  const handleConfirmModalAction = async () => {
+  const handleConfirmModalAction = async (customPayload?: BulkActionPayload) => {
     if (actionModal.type === 'bulk-fail') {
       setBulkLoading(true);
       setBulkResult(null);
       try {
-        const csrfToken = await getCsrfToken().catch(() => '');
         const p = new URLSearchParams();
-        const targetDate = selectedDate || fromDate || 'today';
-        p.set('date', targetDate);
-        const res = await fetch(`${API_URL}/admin/orders/bulk-fail?${p}`, {
-          method: 'PATCH',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-          },
-        });
-        const result = await res.json();
-        if (result.status) {
+        if (customPayload?.scope === 'last_month') {
+          p.set('scope', 'last_month');
+        } else if (customPayload?.fromDate && customPayload?.toDate) {
+          p.set('fromDate', customPayload.fromDate);
+          p.set('toDate', customPayload.toDate);
+        } else if (fromDate && toDate) {
+          p.set('fromDate', fromDate);
+          p.set('toDate', toDate);
+        } else {
+          const targetDate = customPayload?.date || selectedDate || fromDate || 'today';
+          p.set('date', targetDate);
+        }
+        if (slotFilter && slotFilter !== 'all') {
+          p.set('slot', slotFilter);
+        }
+
+        const result = await apiClient.patch<any>(`/admin/orders/bulk-fail?${p.toString()}`, {});
+        if (result?.status) {
           setBulkResult(`✅ ${result.message || `${result.updated} orders marked as failed`}`);
           setTableKey((k) => k + 1);
           fetchSummary();
         } else {
-          setBulkResult(`❌ ${result.message || 'Failed'}`);
+          setBulkResult(`❌ ${result?.message || 'Failed'}`);
         }
-      } catch {
-        setBulkResult('❌ Network error');
+      } catch (err: any) {
+        setBulkResult(`❌ ${err?.message || 'Network error'}`);
       } finally {
         setBulkLoading(false);
         setActionModal({ isOpen: false, type: null });
