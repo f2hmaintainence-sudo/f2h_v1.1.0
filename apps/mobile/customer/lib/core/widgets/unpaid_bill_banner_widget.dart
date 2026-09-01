@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
@@ -100,52 +101,65 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
     final bills = (_billData!['bills'] as List?) ?? [];
     if (bills.isEmpty) return const SizedBox.shrink();
 
+    final totalDueAmount = bills.fold<double>(
+      0.0,
+      (sum, b) => sum + ((b['due_amount'] as num?)?.toDouble() ?? (b['total_amount'] as num?)?.toDouble() ?? 0.0),
+    );
+    final isMultiBill = bills.length > 1;
     final primaryBill = Map<String, dynamic>.from(bills.first as Map);
-    final dueAmount = (primaryBill['due_amount'] as num?)?.toDouble() ?? 0.0;
-    final billId = primaryBill['bill_id']?.toString() ?? 'BILL';
+    final dueAmount = (primaryBill['due_amount'] as num?)?.toDouble() ?? (primaryBill['total_amount'] as num?)?.toDouble() ?? 0.0;
+    final displayAmount = isMultiBill ? totalDueAmount : dueAmount;
     final monthName = primaryBill['billing_month']?.toString() ?? 'Monthly';
-    final subId = primaryBill['subscription_id']?.toString();
-    final productName = primaryBill['product_name']?.toString() ?? 'Subscription';
+    final productName = primaryBill['product_name']?.toString() ?? 'Postpaid Subscription';
+
+    final amountStr = displayAmount == displayAmount.roundToDouble()
+        ? displayAmount.toInt().toString()
+        : displayAmount.toStringAsFixed(2);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 8),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFEF2F2), Color(0xFFFEE2E2)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFCA5A5), width: 1.2),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFECDD3), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFDC2626).withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFFE11D48).withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           onTap: () => _openPaymentSheet(context, primaryBill),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
             child: Row(
               children: [
-                // Alert Icon Badge
+                // Glowing Icon Badge
                 Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFEE2E2),
-                    shape: BoxShape.circle,
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFE4E6), Color(0xFFFECDD3)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(
-                    Icons.receipt_long_rounded,
-                    color: Color(0xFFDC2626),
+                    Icons.pending_actions_rounded,
+                    color: Color(0xFFE11D48),
                     size: 22,
                   ),
                 ),
@@ -161,55 +175,61 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
                         children: [
                           Flexible(
                             child: Text(
-                              '$monthName Postpaid Bill',
-                              style: const TextStyle(
-                                fontSize: 13,
+                              isMultiBill ? 'Pending Bills (${bills.length})' : 'Pending Bill',
+                              style: GoogleFonts.roboto(
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF991B1B),
+                                color: const Color(0xFF1E293B),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444),
-                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFFE11D48),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
+                            child: Text(
                               'DUE',
-                              style: TextStyle(
+                              style: GoogleFonts.roboto(
                                 color: Colors.white,
-                                fontSize: 8.5,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Amount Due: ₹${dueAmount.toStringAsFixed(0)} · #$billId',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFFB91C1C),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Row(
                         children: [
-                          const Icon(Icons.autorenew_rounded, size: 12, color: Color(0xFF991B1B)),
-                          const SizedBox(width: 3),
+                          Text(
+                            '₹$amountStr Due',
+                            style: GoogleFonts.roboto(
+                              fontSize: 12.5,
+                              color: const Color(0xFFE11D48),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '•',
+                            style: GoogleFonts.roboto(
+                              fontSize: 11,
+                              color: const Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
                           Expanded(
                             child: Text(
-                              subId != null && subId.isNotEmpty
-                                  ? 'Sub: #$subId ($productName)'
-                                  : productName,
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                color: Color(0xFF7F1D1D),
+                              '$monthName • $productName',
+                              style: GoogleFonts.roboto(
+                                fontSize: 11,
+                                color: const Color(0xFF64748B),
                                 fontWeight: FontWeight.w500,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -220,25 +240,55 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
 
-                // Action Button
-                ElevatedButton(
-                  onPressed: () => _openPaymentSheet(context, primaryBill),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                // Pay Now Button
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE11D48), Color(0xFFBE123C)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE11D48).withValues(alpha: 0.28),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Pay Now',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                  child: ElevatedButton(
+                    onPressed: () => _openPaymentSheet(context, primaryBill),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Pay Now',
+                          style: GoogleFonts.roboto(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                      ],
                     ),
                   ),
                 ),
