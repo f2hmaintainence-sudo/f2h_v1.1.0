@@ -109,11 +109,37 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       controller: dobController,
                       readOnly: true,
                       onTap: () async {
+                        final initialDate = dobController.text.trim().isNotEmpty
+                            ? (DateTime.tryParse(dobController.text.trim()) ?? DateTime.now().subtract(const Duration(days: 365 * 20)))
+                            : DateTime.now().subtract(const Duration(days: 365 * 20));
                         final date = await showDatePicker(
                           context: dialogContext,
-                          initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)),
+                          initialDate: initialDate,
                           firstDate: DateTime(1960),
                           lastDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: Color(0xFF16A34A),
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                  onSurface: Color(0xFF0F172A),
+                                ),
+                                dialogBackgroundColor: Colors.white,
+                                datePickerTheme: DatePickerThemeData(
+                                  backgroundColor: Colors.white,
+                                  headerBackgroundColor: const Color(0xFF16A34A),
+                                  headerForegroundColor: Colors.white,
+                                  surfaceTintColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
                         );
                         if (date != null) {
                           setModalState(() {

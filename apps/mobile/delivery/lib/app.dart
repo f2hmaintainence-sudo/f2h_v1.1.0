@@ -39,9 +39,52 @@ class F2HApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.light,
         scaffoldBackgroundColor: kBg,
+        dialogBackgroundColor: Colors.white,
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+        ),
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: Colors.white,
+          headerBackgroundColor: kPrimary,
+          headerForegroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return kPrimary;
+            }
+            return null;
+          }),
+          dayForegroundColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white;
+            }
+            if (states.contains(MaterialState.disabled)) {
+              return Colors.black26;
+            }
+            return const Color(0xFF0F172A);
+          }),
+          todayBackgroundColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return kPrimary;
+            }
+            return Colors.transparent;
+          }),
+          todayForegroundColor: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return Colors.white;
+            }
+            return kPrimary;
+          }),
+          todayBorder: const BorderSide(color: kPrimary, width: 1.5),
+        ),
         textTheme: GoogleFonts.robotoTextTheme(ThemeData.light().textTheme),
         colorScheme: ColorScheme.fromSeed(
           seedColor: kPrimary,
+          surface: Colors.white,
           brightness: Brightness.light,
           primary: kPrimary,
         ),
