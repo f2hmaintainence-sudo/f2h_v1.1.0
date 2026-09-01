@@ -179,8 +179,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       prefixText: '+91 ',
                       placeholder: '10-digit Mobile Number',
                       inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
+                        IndianMobileNumberInputFormatter(),
                       ],
                       validator: (val) {
                         if (emergencyNameController.text.trim().isNotEmpty && (val == null || val.trim().isEmpty)) {
@@ -189,10 +188,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         if (val == null || val.trim().isEmpty) return null;
                         final clean = val.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
                         if (clean.length != 10) {
-                          return 'Mobile number must be exactly 10 digits';
+                          return 'Enter complete 10-digit Indian mobile number';
                         }
                         if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
                           return 'Indian mobile number must start with 6, 7, 8, or 9';
+                        }
+                        if (RegExp(r'^([6-9])\1{9}$').hasMatch(clean)) {
+                          return 'Please enter a valid active Indian mobile number';
                         }
                         if (clean == p.phone.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '')) {
                           return 'Emergency contact cannot be your own mobile number';
@@ -597,6 +599,34 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             color: Color(0xFFF1F5F9),
           ),
       ],
+    );
+  }
+}
+
+class IndianMobileNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) {
+      return newValue;
+    }
+    // Only allow digits
+    final digits = text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue();
+    }
+    // First digit MUST start with 6, 7, 8, or 9
+    if (!RegExp(r'^[6-9]').hasMatch(digits)) {
+      return oldValue; // Rejects 0, 1, 2, 3, 4, 5 as first character
+    }
+    // Maximum 10 digits
+    final clamped = digits.length > 10 ? digits.substring(0, 10) : digits;
+    return TextEditingValue(
+      text: clamped,
+      selection: TextSelection.collapsed(offset: clamped.length),
     );
   }
 }
