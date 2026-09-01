@@ -52,6 +52,7 @@ import {
   Phone,
 } from 'lucide-react';
 import { getApiBaseUrl } from '@/lib/api-config';
+import { api } from '@/services/api.client';
 
 const API = typeof window !== 'undefined' ? getApiBaseUrl() : 'http://localhost:5001/api/v1';
 
@@ -226,9 +227,8 @@ export default function RefundCandidatesPage() {
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/summary`, { credentials: 'include' });
-      const json = await res.json();
-      setSummary(json.data ?? null);
+      const res = await api.get<any>('/subscriptions/refund-candidates/summary');
+      setSummary(res.data?.data ?? res.data ?? null);
     } catch {
       // ignore
     } finally {
@@ -239,12 +239,10 @@ export default function RefundCandidatesPage() {
   const fetchGroups = useCallback(async () => {
     setGroupsLoading(true);
     try {
-      const res = await fetch(
-        `${API}/subscriptions/refund-candidates/customer-groups?${buildQuery()}`,
-        { credentials: 'include' },
+      const res = await api.get<any>(
+        `/subscriptions/refund-candidates/customer-groups?${buildQuery()}`,
       );
-      const json = await res.json();
-      setGroups(json.data ?? []);
+      setGroups(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
     } catch {
       setGroups([]);
     } finally {
@@ -262,13 +260,11 @@ export default function RefundCandidatesPage() {
 
   // Load branches & warehouses for dropdowns
   useEffect(() => {
-    fetch(`${API}/admin/zone/branches-list`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((j) => setBranches(j?.data ?? []))
+    api.get<any>('/admin/zone/branches-list')
+      .then((r) => setBranches(r.data?.data ?? []))
       .catch(() => {});
-    fetch(`${API}/admin/warehouses/active/list`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((j) => setWarehouses(j?.data ?? []))
+    api.get<any>('/admin/warehouses/active/list')
+      .then((r) => setWarehouses(r.data?.data ?? []))
       .catch(() => {});
   }, []);
 
@@ -446,17 +442,13 @@ export default function RefundCandidatesPage() {
   const handleScan = async () => {
     setScanning(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/scan?${buildQuery()}`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const json = await res.json();
-      if (json.status) {
-        showToast('success', json.message ?? 'Prepaid refund calculation complete');
+      const res = await api.post<any>(`/subscriptions/refund-candidates/scan?${buildQuery()}`);
+      if (!res.error && res.data?.status !== false) {
+        showToast('success', res.data?.message ?? 'Prepaid refund calculation complete');
         fetchSummary();
         fetchGroups();
       } else {
-        showToast('error', json.message ?? 'Calculation failed');
+        showToast('error', res.error || res.data?.message || 'Calculation failed');
       }
     } catch {
       showToast('error', 'Network error — please try again');
@@ -472,15 +464,12 @@ export default function RefundCandidatesPage() {
     setPreviewSourceFilter('all');
     setPreviewViewMode('grouped');
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/scan/preview?${buildQuery()}`, {
-        credentials: 'include',
-      });
-      const json = await res.json();
-      if (json.status && json.data) {
-        setPreviewData(json.data);
+      const res = await api.get<any>(`/subscriptions/refund-candidates/scan/preview?${buildQuery()}`);
+      if (!res.error && res.data?.status && res.data?.data) {
+        setPreviewData(res.data.data);
         const custIds = new Set<string>();
         const subIds = new Set<string>();
-        (json.data.rows || []).forEach((r: any) => {
+        (res.data.data.rows || []).forEach((r: any) => {
           if (r.customer_id) custIds.add(r.customer_id);
           if (r.subscription_id) subIds.add(r.subscription_id);
         });
@@ -488,7 +477,7 @@ export default function RefundCandidatesPage() {
         setExpandedPreviewSubs(subIds);
       } else {
         setPreviewData(null);
-        showToast('error', json.message || 'Failed to calculate scan preview');
+        showToast('error', res.error || res.data?.message || 'Failed to calculate scan preview');
       }
     } catch {
       showToast('error', 'Network error during calculation preview');
@@ -502,18 +491,14 @@ export default function RefundCandidatesPage() {
     if (!selectedIds.size) return showToast('error', 'Please select at least one delivery');
     setReviewing(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-review`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_ids: Array.from(selectedIds) }),
+      const res = await api.post<any>('/subscriptions/refund-candidates/bulk-review', {
+        candidate_ids: Array.from(selectedIds),
       });
-      const json = await res.json();
-      if (json.status) {
-        showToast('success', json.message ?? 'Marked as reviewed');
+      if (!res.error && res.data?.status !== false) {
+        showToast('success', res.data?.message ?? 'Marked as reviewed');
         fetchGroups();
       } else {
-        showToast('error', json.message ?? 'Could not mark as reviewed');
+        showToast('error', res.error || res.data?.message || 'Could not mark as reviewed');
       }
     } catch {
       showToast('error', 'Network error — please try again');
@@ -531,21 +516,17 @@ export default function RefundCandidatesPage() {
     if (!selectedIds.size) return;
     setProcessing(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-approve`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_ids: Array.from(selectedIds) }),
+      const res = await api.post<any>('/subscriptions/refund-candidates/bulk-approve', {
+        candidate_ids: Array.from(selectedIds),
       });
-      const json = await res.json();
-      if (json.status) {
-        showToast('success', json.message ?? 'Refunds approved and credited to customer wallets!');
+      if (!res.error && res.data?.status !== false) {
+        showToast('success', res.data?.message ?? 'Refunds approved and credited to customer wallets!');
         setSelectedIds(new Set());
         setBulkApproveModalOpen(false);
         fetchSummary();
         fetchGroups();
       } else {
-        showToast('error', json.message ?? 'Failed to approve refunds');
+        showToast('error', res.error || res.data?.message || 'Failed to approve refunds');
       }
     } catch {
       showToast('error', 'Network error — please try again');
@@ -564,22 +545,19 @@ export default function RefundCandidatesPage() {
     if (!selectedIds.size) return;
     setProcessing(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-reject`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_ids: Array.from(selectedIds), notes: bulkRejectReason }),
+      const res = await api.post<any>('/subscriptions/refund-candidates/bulk-reject', {
+        candidate_ids: Array.from(selectedIds),
+        notes: bulkRejectReason,
       });
-      const json = await res.json();
-      if (json.status) {
-        showToast('success', json.message ?? 'Refunds marked as rejected');
+      if (!res.error && res.data?.status !== false) {
+        showToast('success', res.data?.message ?? 'Refunds marked as rejected');
         setSelectedIds(new Set());
         setBulkRejectModalOpen(false);
         setBulkRejectReason('');
         fetchSummary();
         fetchGroups();
       } else {
-        showToast('error', json.message ?? 'Failed to reject refunds');
+        showToast('error', res.error || res.data?.message || 'Failed to reject refunds');
       }
     } catch {
       showToast('error', 'Network error — please try again');
@@ -596,14 +574,10 @@ export default function RefundCandidatesPage() {
     if (!singleApproveTarget) return;
     setProcessing(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-approve`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_ids: [singleApproveTarget.id] }),
+      const res = await api.post<any>('/subscriptions/refund-candidates/bulk-approve', {
+        candidate_ids: [singleApproveTarget.id],
       });
-      const json = await res.json();
-      if (json.status) {
+      if (!res.error && res.data?.status !== false) {
         showToast('success', 'Refund approved and credited to wallet');
         const approvedId = singleApproveTarget.id;
         setSelectedIds((prev) => {
@@ -615,7 +589,7 @@ export default function RefundCandidatesPage() {
         fetchSummary();
         fetchGroups();
       } else {
-        showToast('error', json.message ?? 'Failed to approve refund');
+        showToast('error', res.error || res.data?.message || 'Failed to approve refund');
       }
     } catch {
       showToast('error', 'Network error — please try again');
@@ -628,14 +602,11 @@ export default function RefundCandidatesPage() {
     if (!singleRejectTarget) return;
     setProcessing(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/bulk-reject`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate_ids: [singleRejectTarget], notes: singleRejectReason }),
+      const res = await api.post<any>('/subscriptions/refund-candidates/bulk-reject', {
+        candidate_ids: [singleRejectTarget],
+        notes: singleRejectReason,
       });
-      const json = await res.json();
-      if (json.status) {
+      if (!res.error && res.data?.status !== false) {
         showToast('success', 'Refund candidate rejected');
         setSingleRejectTarget(null);
         setSingleRejectReason('');
@@ -647,7 +618,7 @@ export default function RefundCandidatesPage() {
         fetchSummary();
         fetchGroups();
       } else {
-        showToast('error', json.message ?? 'Failed to reject');
+        showToast('error', res.error || res.data?.message || 'Failed to reject');
       }
     } catch {
       showToast('error', 'Network error');
@@ -661,11 +632,15 @@ export default function RefundCandidatesPage() {
     setDetailLoading(true);
     setDetail({ loading: true });
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/detail/${candidateId}`, {
-        credentials: 'include',
-      });
-      const json = await res.json();
-      setDetail(json.data ?? null);
+      const res = await api.get<any>(`/subscriptions/refund-candidates/detail/${candidateId}`);
+      if (!res.error && res.data?.data) {
+        setDetail(res.data.data);
+      } else if (!res.error && res.data) {
+        setDetail(res.data);
+      } else {
+        setDetail(null);
+        showToast('error', res.error || 'Could not load refund audit details');
+      }
     } catch {
       setDetail(null);
       showToast('error', 'Could not load refund audit details');
@@ -2728,11 +2703,8 @@ function PayoutsTab() {
   const fetchPayouts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/subscriptions/refund-candidates/payouts?limit=50`, {
-        credentials: 'include',
-      });
-      const json = await res.json();
-      setPayouts(json.data ?? []);
+      const res = await api.get<any>('/subscriptions/refund-candidates/payouts?limit=50');
+      setPayouts(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
     } catch {
       setPayouts([]);
     } finally {
