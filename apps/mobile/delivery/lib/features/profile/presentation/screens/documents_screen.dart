@@ -22,6 +22,174 @@ class UpperCaseTextFormatter extends TextInputFormatter {
   }
 }
 
+/// Strict Indian PAN Formatter:
+/// - Positions 0-4 (first 5 chars): Letters (A-Z) ONLY
+/// - Positions 5-8 (next 4 chars): Digits (0-9) ONLY
+/// - Position 9 (10th char): Letter (A-Z) ONLY
+/// - Total length: Exactly 10 characters
+class PanTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+
+    final raw = newValue.text.toUpperCase();
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < raw.length && i < 10; i++) {
+      final char = raw[i];
+      if (i < 5) {
+        // Positions 0..4 MUST be A-Z
+        if (RegExp(r'[A-Z]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      } else if (i < 9) {
+        // Positions 5..8 MUST be 0-9
+        if (RegExp(r'[0-9]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      } else if (i == 9) {
+        // Position 9 MUST be A-Z
+        if (RegExp(r'[A-Z]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      }
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+/// Strict Indian Aadhaar Formatter:
+/// - First digit: 2-9 ONLY (cannot start with 0 or 1 per UIDAI)
+/// - Digits only
+/// - Length: 12 digits
+class AadhaarTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < digits.length && i < 12; i++) {
+      final char = digits[i];
+      if (i == 0) {
+        if (RegExp(r'[2-9]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      } else {
+        buffer.write(char);
+      }
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+/// Strict Indian Driving License Formatter:
+/// - Positions 0-1: 2-letter State Code (e.g. KA, TS, AP, DL, MH)
+/// - Positions 2-3: 2-digit RTO Code
+/// - Positions 4-15: Alphanumeric
+/// - Length: Max 16 characters
+class DrivingLicenseTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+
+    final raw = newValue.text.toUpperCase().replaceAll(RegExp(r'[\s\-]'), '');
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < raw.length && i < 16; i++) {
+      final char = raw[i];
+      if (i < 2) {
+        if (RegExp(r'[A-Z]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      } else if (i < 4) {
+        if (RegExp(r'[0-9]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      } else {
+        if (RegExp(r'[0-9A-Z]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      }
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+/// Strict Indian Vehicle RC Formatter:
+/// - Positions 0-1: 2-letter State Code (e.g. KA, TS, DL)
+/// - Positions 2-3: 1-2 digits RTO code
+/// - Positions 4+: Alphanumeric series and 4 digits (e.g. KA01AB1234)
+/// - Length: Max 12 characters
+class VehicleRcTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+
+    final raw = newValue.text.toUpperCase().replaceAll(RegExp(r'[\s\-]'), '');
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < raw.length && i < 12; i++) {
+      final char = raw[i];
+      if (i < 2) {
+        if (RegExp(r'[A-Z]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      } else if (i < 4) {
+        if (RegExp(r'[0-9]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      } else {
+        if (RegExp(r'[0-9A-Z]').hasMatch(char)) {
+          buffer.write(char);
+        } else {
+          break;
+        }
+      }
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
 
@@ -43,7 +211,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       case 'pan':
         return (
           label: 'PAN Card',
-          idLabel: 'PAN Number (10 Characters)',
+          idLabel: 'PAN Number (10 Characters: 5 letters, 4 digits, 1 letter)',
           icon: Icons.credit_card_rounded,
           placeholder: 'e.g. ABCDE1234F',
           maxLength: 10,
@@ -87,25 +255,22 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     switch (type) {
       case 'aadhaar':
         return [
-          FilteringTextInputFormatter.digitsOnly,
+          AadhaarTextInputFormatter(),
           LengthLimitingTextInputFormatter(12),
         ];
       case 'pan':
         return [
-          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-          UpperCaseTextFormatter(),
+          PanTextInputFormatter(),
           LengthLimitingTextInputFormatter(10),
         ];
       case 'driving_license':
         return [
-          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\-]')),
-          UpperCaseTextFormatter(),
+          DrivingLicenseTextInputFormatter(),
           LengthLimitingTextInputFormatter(16),
         ];
       case 'vehicle_rc':
         return [
-          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\-]')),
-          UpperCaseTextFormatter(),
+          VehicleRcTextInputFormatter(),
           LengthLimitingTextInputFormatter(12),
         ];
       case 'police_verification':
@@ -137,7 +302,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       }
     } else if (type == 'pan') {
       final cleanPan = clean.toUpperCase();
-      if (cleanPan.length != 10) return 'PAN must be exactly 10 characters';
+      if (cleanPan.length != 10) return 'PAN must be exactly 10 characters (e.g. ABCDE1234F)';
       if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(cleanPan)) {
         return 'Enter valid 10-char PAN (e.g. ABCDE1234F)';
       }
