@@ -145,14 +145,22 @@ export class RefundCandidatesService {
    * one transaction — see that file for the ordering.
    */
   async bulkApprove(candidateIds: string[], adminId: string) {
-    const payouts = await this.processing.approveAndProcess(candidateIds, adminId);
-    const refunded = payouts.reduce((sum, p) => sum + p.total_deliveries, 0);
+    try {
+      const payouts = await this.processing.approveAndProcess(candidateIds, adminId);
+      const refunded = payouts.reduce((sum, p) => sum + p.total_deliveries, 0);
 
-    return {
-      status: true,
-      message: `Approved and credited ${refunded} refund(s) across ${payouts.length} customer(s)`,
-      data: payouts,
-    };
+      return {
+        status: true,
+        message: `Approved and credited ${refunded} refund(s) across ${payouts.length} customer(s)`,
+        data: payouts,
+      };
+    } catch (err: any) {
+      this.logger.error(`bulkApprove failed: ${err.message}`, err.stack);
+      if (err instanceof BadRequestException || err instanceof NotFoundException || err instanceof InternalServerErrorException) {
+        throw err;
+      }
+      throw new BadRequestException(err.message || 'Failed to approve refund candidates');
+    }
   }
 
   // ─── Review step (Eligible → Reviewed) ───────────────────────────────────────

@@ -404,306 +404,306 @@ export default function AdminProfilePage() {
     <>
       <div className="pv-page-wrap">
         {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-5">
-        <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-emerald-600"><Home size={16} /> Dashboard</Link>
-        <ChevronRight size={16} className="text-gray-300" />
-        <span className="text-gray-800 font-semibold">My Profile</span>
-      </nav>
+        <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-5">
+          <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-emerald-600"><Home size={16} /> Dashboard</Link>
+          <ChevronRight size={16} className="text-gray-300" />
+          <span className="text-gray-800 font-semibold">My Profile</span>
+        </nav>
 
-      {/* Page Header */}
-      <div className="pv-page-head">
-        <div>
-          <span className="pv-page-eyebrow">Account Center</span>
-          <h1 className="pv-page-title">My Profile</h1>
-          <p className="pv-page-subtitle">
-            Manage your personal details, branch assignment, and professional information from one clean workspace.
-          </p>
+        {/* Page Header */}
+        <div className="pv-page-head">
+          <div>
+            <span className="pv-page-eyebrow">Account Center</span>
+            <h1 className="pv-page-title">My Profile</h1>
+            <p className="pv-page-subtitle">
+              Manage your personal details, branch assignment, and professional information from one clean workspace.
+            </p>
+          </div>
+          <div className="pv-page-head-actions">
+            <span className={`pv-status-chip ${p?.account_status !== "active" ? "pv-status-chip--inactive" : ""}`}>
+              {val(p?.account_status)}
+            </span>
+            <span className="pv-date-chip">Joined {fmtDate(p?.user_created_at)}</span>
+          </div>
         </div>
-        <div className="pv-page-head-actions">
-          <span className={`pv-status-chip ${p?.account_status !== "active" ? "pv-status-chip--inactive" : ""}`}>
-            {val(p?.account_status)}
-          </span>
-          <span className="pv-date-chip">Joined {fmtDate(p?.user_created_at)}</span>
-        </div>
-      </div>
 
-      <div className="pv-layout">
-        {/* ── Left: Hero Card ── */}
-        <div className="pv-hero-wrapper">
-          <div className="pv-hero">
-            {/* Banner — gradient background + name chip */}
-            <div className="pv-hero-banner">
-              {/* Name chip — bottom-right */}
-              <div className="pv-hero-name-chip">
-                <span className="pv-hero-name-chip-icon">🌿</span>
-                <span>{fullName}</span>
-              </div>
-            </div>
-
-            {/* Avatar — overlaps banner/content boundary */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/png,image/jpeg,image/jpg,image/webp"
-              onChange={handleImageUpload}
-            />
-            <div
-              className="pv-avatar group cursor-pointer relative overflow-hidden"
-              onClick={() => !uploadingImage && fileInputRef.current?.click()}
-              title="Click to change profile picture"
-            >
-              {uploadingImage && (
-                <div className="absolute inset-0 bg-black/60 z-20 flex items-center justify-center">
-                  <Loader2 size={24} className="text-white animate-spin" />
+        <div className="pv-layout">
+          {/* ── Left: Hero Card ── */}
+          <div className="pv-hero-wrapper">
+            <div className="pv-hero">
+              {/* Banner — gradient background + name chip */}
+              <div className="pv-hero-banner">
+                {/* Name chip — bottom-right */}
+                <div className="pv-hero-name-chip">
+                  <span className="pv-hero-name-chip-icon">🌿</span>
+                  <span>{fullName}</span>
                 </div>
-              )}
-              {profileImage && !imageError
-                ? <img src={profileImage} alt="avatar" onError={() => setImageError(true)} />
-                : initials(p?.first_name, p?.last_name)
-              }
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex flex-col items-center justify-center text-white gap-1">
-                <FiCamera size={20} />
-                <span style={{ fontSize: "10px", fontWeight: "600" }}>Upload</span>
               </div>
-            </div>
 
-            <div className="pv-hero-inner">
-              {/* Name + Role left-aligned below banner */}
-              <p className="pv-hero-name">{fullName}</p>
-              {p?.designation && <p className="pv-hero-role">{p.designation}</p>}
-
-              {/* Edit / Save Buttons */}
-              <div className="pv-hero-actions">
-                {editing ? (
-                  <>
-                    <button className="pv-btn pv-btn--save" onClick={saveProfile} disabled={saving}>
-                      {saving ? <Loader2 size={16} className="animate-spin" /> : <FiSave size={16} />}
-                      {saving ? "Saving…" : "Save Changes"}
-                    </button>
-                    <button className="pv-btn pv-btn--cancel" onClick={cancelEdit} disabled={saving}>
-                      <FiX size={16} /> Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button className="pv-btn pv-btn--edit" onClick={startEdit}>
-                      <FiEdit3 size={16} /> Edit Profile
-                    </button>
-                    <button className="pv-btn pv-btn--edit" onClick={() => setShowResetModal(true)}>
-                      <FiLock size={16} /> Reset Password
-                    </button>
-                  </>
+              {/* Avatar — overlaps banner/content boundary */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={handleImageUpload}
+              />
+              <div
+                className="pv-avatar group cursor-pointer relative overflow-hidden"
+                onClick={() => !uploadingImage && fileInputRef.current?.click()}
+                title="Click to change profile picture"
+              >
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-black/60 z-20 flex items-center justify-center">
+                    <Loader2 size={24} className="text-white animate-spin" />
+                  </div>
                 )}
+                {profileImage && !imageError
+                  ? <img src={profileImage} alt="avatar" onError={() => setImageError(true)} />
+                  : initials(p?.first_name, p?.last_name)
+                }
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex flex-col items-center justify-center text-white gap-1">
+                  <FiCamera size={20} />
+                  <span style={{ fontSize: "10px", fontWeight: "600" }}>Upload</span>
+                </div>
               </div>
 
-              <div className="pv-hero-hr" />
+              <div className="pv-hero-inner">
+                {/* Name + Role left-aligned below banner */}
+                <p className="pv-hero-name">{fullName}</p>
+                {p?.designation && <p className="pv-hero-role">{p.designation}</p>}
 
-              {/* Quick Stats */}
-              <div className="pv-hero-stats">
-                <div className="pv-hero-stat">
-                  <span className="pv-hero-stat-lbl">Department</span>
-                  <span className="pv-hero-stat-val">{val(p?.department)}</span>
+                {/* Edit / Save Buttons */}
+                <div className="pv-hero-actions">
+                  {editing ? (
+                    <>
+                      <button className="pv-btn pv-btn--save" onClick={saveProfile} disabled={saving}>
+                        {saving ? <Loader2 size={16} className="animate-spin" /> : <FiSave size={16} />}
+                        {saving ? "Saving…" : "Save Changes"}
+                      </button>
+                      <button className="pv-btn pv-btn--cancel" onClick={cancelEdit} disabled={saving}>
+                        <FiX size={16} /> Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="pv-btn pv-btn--edit" onClick={startEdit}>
+                        <FiEdit3 size={16} /> Edit Profile
+                      </button>
+                      <button className="pv-btn pv-btn--edit" onClick={() => setShowResetModal(true)}>
+                        <FiLock size={16} /> Reset Password
+                      </button>
+                    </>
+                  )}
                 </div>
-                <div className="pv-hero-stat">
-                  <span className="pv-hero-stat-lbl">Branch</span>
-                  <span className="pv-hero-stat-val">{val(p?.branch_name)}</span>
-                </div>
-                <div className="pv-hero-stat">
-                  <span className="pv-hero-stat-lbl">Status</span>
-                  <span className="pv-hero-stat-val" style={{ color: p?.account_status === "active" ? "#15803d" : "#dc2626" }}>
-                    {val(p?.account_status)}
-                  </span>
-                </div>
-                <div className="pv-hero-stat">
-                  <span className="pv-hero-stat-lbl">Member Since</span>
-                  <span className="pv-hero-stat-val">{fmtDate(p?.user_created_at)}</span>
+
+                <div className="pv-hero-hr" />
+
+                {/* Quick Stats */}
+                <div className="pv-hero-stats">
+                  <div className="pv-hero-stat">
+                    <span className="pv-hero-stat-lbl">Department</span>
+                    <span className="pv-hero-stat-val">{val(p?.department)}</span>
+                  </div>
+                  <div className="pv-hero-stat">
+                    <span className="pv-hero-stat-lbl">Branch</span>
+                    <span className="pv-hero-stat-val">{val(p?.branch_name)}</span>
+                  </div>
+                  <div className="pv-hero-stat">
+                    <span className="pv-hero-stat-lbl">Status</span>
+                    <span className="pv-hero-stat-val" style={{ color: p?.account_status === "active" ? "#15803d" : "#dc2626" }}>
+                      {val(p?.account_status)}
+                    </span>
+                  </div>
+                  <div className="pv-hero-stat">
+                    <span className="pv-hero-stat-lbl">Member Since</span>
+                    <span className="pv-hero-stat-val">{fmtDate(p?.user_created_at)}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* ── Right: Tabbed Sections ── */}
-        <div className="pv-details-panel">
-          {/* Tabs */}
-          <div className="pv-tabs">
-            <TabBtn active={activeTab === "personal"} icon={FiUser} label="Personal" onClick={() => setActiveTab("personal")} />
-            <TabBtn active={activeTab === "location"} icon={FiMapPin} label="Location" onClick={() => setActiveTab("location")} />
-            <TabBtn active={activeTab === "professional"} icon={FiBriefcase} label="Professional" onClick={() => setActiveTab("professional")} />
-          </div>
+          {/* ── Right: Tabbed Sections ── */}
+          <div className="pv-details-panel">
+            {/* Tabs */}
+            <div className="pv-tabs">
+              <TabBtn active={activeTab === "personal"} icon={FiUser} label="Personal" onClick={() => setActiveTab("personal")} />
+              <TabBtn active={activeTab === "location"} icon={FiMapPin} label="Location" onClick={() => setActiveTab("location")} />
+              <TabBtn active={activeTab === "professional"} icon={FiBriefcase} label="Professional" onClick={() => setActiveTab("professional")} />
+            </div>
 
-          {/* ── Personal Tab ── */}
-          {activeTab === "personal" && (
-            <Section dot="#2e7d32" title="Personal Information">
-              <div className="pv-fields-grid">
-                {editing ? (
-                  <>
-                    <EditField icon={FiUser} label="First Name" value={form.first_name ?? ""} onChange={v => updateField("first_name", v)} placeholder="Enter first name" />
-                    <EditField icon={FiUser} label="Last Name" value={form.last_name ?? ""} onChange={v => updateField("last_name", v)} placeholder="Enter last name" />
+            {/* ── Personal Tab ── */}
+            {activeTab === "personal" && (
+              <Section dot="#2e7d32" title="Personal Information">
+                <div className="pv-fields-grid">
+                  {editing ? (
+                    <>
+                      <EditField icon={FiUser} label="First Name" value={form.first_name ?? ""} onChange={v => updateField("first_name", v)} placeholder="Enter first name" />
+                      <EditField icon={FiUser} label="Last Name" value={form.last_name ?? ""} onChange={v => updateField("last_name", v)} placeholder="Enter last name" />
 
-                    {/* ── Email — dedicated OTP flow ── */}
-                    <div className="pv-field pv-field--edit" style={{ gridColumn: "1 / -1" }}>
-                      <div className="pv-field-icon" style={{ "--accent": "#2e7d32" } as React.CSSProperties}>
-                        <FiMail size={18} />
-                      </div>
-                      <div className="pv-field-body" style={{ flex: 1 }}>
-                        <label className="pv-field-label">Email</label>
-                        {emailEditing ? (
-                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                            <input
-                              className="pv-input"
-                              type="email"
-                              value={emailDraft}
-                              onChange={e => setEmailDraft(e.target.value)}
-                              placeholder="newemail@example.com"
-                              style={{ flex: 1, minWidth: 180 }}
-                            />
-                            <button
-                              type="button"
-                              className="pv-btn pv-btn--save"
-                              style={{ padding: "5px 12px", fontSize: 12 }}
-                              onClick={() => requestEmailOtp(false)}
-                              disabled={emailOtpSending}
-                            >
-                              {emailOtpSending ? <Loader2 size={12} className="animate-spin" /> : <FiMail size={12} />}
-                              {emailOtpSending ? "Sending…" : "Send OTP"}
-                            </button>
-                            <button
-                              type="button"
-                              className="pv-btn pv-btn--cancel"
-                              style={{ padding: "5px 10px", fontSize: 12 }}
-                              onClick={cancelEmailEdit}
-                              title="Cancel email change"
-                            >
-                              <FiX size={12} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span className="pv-input" style={{ flex: 1, cursor: "default", color: "#374151", background: "#f6f9fc" }}>
-                              {p?.email || "—"}
-                            </span>
-                            <button
-                              type="button"
-                              className="pv-btn pv-btn--edit"
-                              style={{ padding: "5px 12px", fontSize: 12 }}
-                              onClick={startEmailEdit}
-                            >
-                              <FiEdit3 size={12} /> Change
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <EditField icon={FiPhone} label="Phone" value={form.phone ?? ""} onChange={v => updateField("phone", v)} type="tel" placeholder="+91..." />
-                    <EditField icon={FiUser} label="Gender" value={form.gender ?? ""} onChange={v => updateField("gender", v)} options={genderOpts} />
-                    <EditField icon={FiCalendar} label="Date of Birth" value={form.date_of_birth ?? ""} onChange={v => updateField("date_of_birth", v)} type="date" />
-                    <EditField icon={FiHeart} label="Marital Status" value={form.marital_status ?? ""} onChange={v => updateField("marital_status", v)} options={maritalOpts} />
-                  </>
-                ) : (
-                  <>
-                    <ViewField icon={FiUser} label="First Name" value={val(p?.first_name)} />
-                    <ViewField icon={FiUser} label="Last Name" value={val(p?.last_name)} accent="#388e3c" />
-
-                    {/* ── Email view with Edit icon ── */}
-                    <div className="pv-field">
-                      <div className="pv-field-icon" style={{ "--accent": "#2e7d32" } as React.CSSProperties}>
-                        <FiMail size={18} />
-                      </div>
-                      <div className="pv-field-body" style={{ flex: 1 }}>
-                        <span className="pv-field-label">Email</span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span className={`pv-field-value${!p?.email ? " pv-empty" : ""}`}>{val(p?.email)}</span>
-                          <button
-                            type="button"
-                            title="Change email"
-                            style={{
-                              background: "none", border: "none", cursor: "pointer",
-                              color: "#2e7d32", padding: "2px 4px", display: "flex", alignItems: "center",
-                              borderRadius: 4, transition: "opacity .15s", flexShrink: 0,
-                            }}
-                            onClick={startEmailEdit}
-                          >
-                            <FiEdit3 size={16} />
-                          </button>
+                      {/* ── Email — dedicated OTP flow ── */}
+                      <div className="pv-field pv-field--edit" style={{ gridColumn: "1 / -1" }}>
+                        <div className="pv-field-icon" style={{ "--accent": "#2e7d32" } as React.CSSProperties}>
+                          <FiMail size={18} />
+                        </div>
+                        <div className="pv-field-body" style={{ flex: 1 }}>
+                          <label className="pv-field-label">Email</label>
+                          {emailEditing ? (
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                              <input
+                                className="pv-input"
+                                type="email"
+                                value={emailDraft}
+                                onChange={e => setEmailDraft(e.target.value)}
+                                placeholder="newemail@example.com"
+                                style={{ flex: 1, minWidth: 180 }}
+                              />
+                              <button
+                                type="button"
+                                className="pv-btn pv-btn--save"
+                                style={{ padding: "5px 12px", fontSize: 12 }}
+                                onClick={() => requestEmailOtp(false)}
+                                disabled={emailOtpSending}
+                              >
+                                {emailOtpSending ? <Loader2 size={12} className="animate-spin" /> : <FiMail size={12} />}
+                                {emailOtpSending ? "Sending…" : "Send OTP"}
+                              </button>
+                              <button
+                                type="button"
+                                className="pv-btn pv-btn--cancel"
+                                style={{ padding: "5px 10px", fontSize: 12 }}
+                                onClick={cancelEmailEdit}
+                                title="Cancel email change"
+                              >
+                                <FiX size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span className="pv-input" style={{ flex: 1, cursor: "default", color: "#374151", background: "#f6f9fc" }}>
+                                {p?.email || "—"}
+                              </span>
+                              <button
+                                type="button"
+                                className="pv-btn pv-btn--edit"
+                                style={{ padding: "5px 12px", fontSize: 12 }}
+                                onClick={startEmailEdit}
+                              >
+                                <FiEdit3 size={12} /> Change
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
 
-                    <ViewField icon={FiPhone} label="Phone" value={val(p?.phone)} accent="#388e3c" />
-                    <ViewField icon={FiUser} label="Gender" value={val(p?.gender)} />
-                    <ViewField icon={FiCalendar} label="Date of Birth" value={fmtDate(p?.date_of_birth)} accent="#388e3c" />
-                    <ViewField icon={FiHeart} label="Marital Status" value={val(p?.marital_status)} />
-                  </>
-                )}
-              </div>
-              {/* Bio spans full width */}
-              {editing ? (
-                <div style={{ marginTop: 12 }}>
-                  <EditField icon={FiBookOpen} label="Bio" value={form.bio ?? ""} onChange={v => updateField("bio", v)} type="textarea" placeholder="A short bio about yourself…" />
+                      <EditField icon={FiPhone} label="Phone" value={form.phone ?? ""} onChange={v => updateField("phone", v)} type="tel" placeholder="+91..." />
+                      <EditField icon={FiUser} label="Gender" value={form.gender ?? ""} onChange={v => updateField("gender", v)} options={genderOpts} />
+                      <EditField icon={FiCalendar} label="Date of Birth" value={form.date_of_birth ?? ""} onChange={v => updateField("date_of_birth", v)} type="date" />
+                      <EditField icon={FiHeart} label="Marital Status" value={form.marital_status ?? ""} onChange={v => updateField("marital_status", v)} options={maritalOpts} />
+                    </>
+                  ) : (
+                    <>
+                      <ViewField icon={FiUser} label="First Name" value={val(p?.first_name)} />
+                      <ViewField icon={FiUser} label="Last Name" value={val(p?.last_name)} accent="#388e3c" />
+
+                      {/* ── Email view with Edit icon ── */}
+                      <div className="pv-field">
+                        <div className="pv-field-icon" style={{ "--accent": "#2e7d32" } as React.CSSProperties}>
+                          <FiMail size={18} />
+                        </div>
+                        <div className="pv-field-body" style={{ flex: 1 }}>
+                          <span className="pv-field-label">Email</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span className={`pv-field-value${!p?.email ? " pv-empty" : ""}`}>{val(p?.email)}</span>
+                            <button
+                              type="button"
+                              title="Change email"
+                              style={{
+                                background: "none", border: "none", cursor: "pointer",
+                                color: "#2e7d32", padding: "2px 4px", display: "flex", alignItems: "center",
+                                borderRadius: 4, transition: "opacity .15s", flexShrink: 0,
+                              }}
+                              onClick={startEmailEdit}
+                            >
+                              <FiEdit3 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <ViewField icon={FiPhone} label="Phone" value={val(p?.phone)} accent="#388e3c" />
+                      <ViewField icon={FiUser} label="Gender" value={val(p?.gender)} />
+                      <ViewField icon={FiCalendar} label="Date of Birth" value={fmtDate(p?.date_of_birth)} accent="#388e3c" />
+                      <ViewField icon={FiHeart} label="Marital Status" value={val(p?.marital_status)} />
+                    </>
+                  )}
                 </div>
-              ) : p?.bio ? (
-                <div className="pv-bio-block">
-                  <FiBookOpen size={18} style={{ color: "#2e7d32", flexShrink: 0, marginTop: 2 }} />
-                  <p>{p.bio}</p>
+                {/* Bio spans full width */}
+                {editing ? (
+                  <div style={{ marginTop: 12 }}>
+                    <EditField icon={FiBookOpen} label="Bio" value={form.bio ?? ""} onChange={v => updateField("bio", v)} type="textarea" placeholder="A short bio about yourself…" />
+                  </div>
+                ) : p?.bio ? (
+                  <div className="pv-bio-block">
+                    <FiBookOpen size={18} style={{ color: "#2e7d32", flexShrink: 0, marginTop: 2 }} />
+                    <p>{p.bio}</p>
+                  </div>
+                ) : null}
+              </Section>
+            )}
+
+            {/* ── Location Tab ── */}
+            {activeTab === "location" && (
+              <Section dot="#1565c0" title="Location Details">
+                <div className="pv-fields-grid">
+                  {editing ? (
+                    <>
+                      <EditField icon={FiMapPin} label="Address Line 1" value={form.address_line1 ?? ""} onChange={v => updateField("address_line1", v)} placeholder="Street address" accent="#1565c0" />
+                      <EditField icon={FiMapPin} label="Address Line 2" value={form.address_line2 ?? ""} onChange={v => updateField("address_line2", v)} placeholder="Apartment, suite, etc." accent="#1976d2" />
+                      <EditField icon={FiMapPin} label="City" value={form.city ?? ""} onChange={v => updateField("city", v)} placeholder="City" accent="#1565c0" />
+                      <EditField icon={FiMapPin} label="State" value={form.state ?? ""} onChange={v => updateField("state", v)} placeholder="State" accent="#1976d2" />
+                      <EditField icon={FiGlobe} label="Postal Code" value={form.postal_code ?? ""} onChange={v => updateField("postal_code", v)} placeholder="PIN code" accent="#1565c0" />
+                    </>
+                  ) : (
+                    <>
+                      <ViewField icon={FiMapPin} label="Address Line 1" value={val(p?.address_line1)} accent="#1565c0" />
+                      <ViewField icon={FiMapPin} label="Address Line 2" value={val(p?.address_line2)} accent="#1976d2" />
+                      <ViewField icon={FiMapPin} label="City" value={val(p?.city)} accent="#1565c0" />
+                      <ViewField icon={FiMapPin} label="State" value={val(p?.state)} accent="#1976d2" />
+                      <ViewField icon={FiGlobe} label="Postal Code" value={val(p?.postal_code)} accent="#1565c0" />
+                    </>
+                  )}
                 </div>
-              ) : null}
-            </Section>
-          )}
+              </Section>
+            )}
 
-          {/* ── Location Tab ── */}
-          {activeTab === "location" && (
-            <Section dot="#1565c0" title="Location Details">
-              <div className="pv-fields-grid">
-                {editing ? (
-                  <>
-                    <EditField icon={FiMapPin} label="Address Line 1" value={form.address_line1 ?? ""} onChange={v => updateField("address_line1", v)} placeholder="Street address" accent="#1565c0" />
-                    <EditField icon={FiMapPin} label="Address Line 2" value={form.address_line2 ?? ""} onChange={v => updateField("address_line2", v)} placeholder="Apartment, suite, etc." accent="#1976d2" />
-                    <EditField icon={FiMapPin} label="City" value={form.city ?? ""} onChange={v => updateField("city", v)} placeholder="City" accent="#1565c0" />
-                    <EditField icon={FiMapPin} label="State" value={form.state ?? ""} onChange={v => updateField("state", v)} placeholder="State" accent="#1976d2" />
-                    <EditField icon={FiGlobe} label="Postal Code" value={form.postal_code ?? ""} onChange={v => updateField("postal_code", v)} placeholder="PIN code" accent="#1565c0" />
-                  </>
-                ) : (
-                  <>
-                    <ViewField icon={FiMapPin} label="Address Line 1" value={val(p?.address_line1)} accent="#1565c0" />
-                    <ViewField icon={FiMapPin} label="Address Line 2" value={val(p?.address_line2)} accent="#1976d2" />
-                    <ViewField icon={FiMapPin} label="City" value={val(p?.city)} accent="#1565c0" />
-                    <ViewField icon={FiMapPin} label="State" value={val(p?.state)} accent="#1976d2" />
-                    <ViewField icon={FiGlobe} label="Postal Code" value={val(p?.postal_code)} accent="#1565c0" />
-                  </>
-                )}
-              </div>
-            </Section>
-          )}
-
-          {/* ── Professional Tab ── */}
-          {activeTab === "professional" && (
-            <Section dot="#e65100" title="Professional Details">
-              <div className="pv-fields-grid">
-                {editing ? (
-                  <>
-                    <EditField icon={FiBriefcase} label="Department" value={form.department ?? ""} onChange={v => updateField("department", v)} placeholder="e.g. Operations" accent="#e65100" />
-                    <EditField icon={Shield} label="Designation" value={form.designation ?? ""} onChange={v => updateField("designation", v)} placeholder="e.g. Manager" accent="#f57c00" />
-                    <EditField icon={FiBookOpen} label="Education" value={form.education ?? ""} onChange={v => updateField("education", v)} placeholder="e.g. B.Tech" accent="#e65100" />
-                    <EditField icon={FiPhone} label="Alt Phone" value={form.alt_phone ?? ""} onChange={v => updateField("alt_phone", v)} type="tel" placeholder="Alternate number" accent="#f57c00" />
-                    <EditField icon={Building2} label="Branch" value={form.branch_id ?? ""} onChange={v => updateField("branch_id", v)} options={branchOptions} accent="#e65100" />
-                  </>
-                ) : (
-                  <>
-                    <ViewField icon={FiBriefcase} label="Department" value={val(p?.department)} accent="#e65100" />
-                    <ViewField icon={Shield} label="Designation" value={val(p?.designation)} accent="#f57c00" />
-                    <ViewField icon={FiBookOpen} label="Education" value={val(p?.education)} accent="#e65100" />
-                    <ViewField icon={FiPhone} label="Alt Phone" value={val(p?.alt_phone)} accent="#f57c00" />
-                    <ViewField icon={Building2} label="Branch" value={val(p?.branch_name)} accent="#e65100" />
-                  </>
-                )}
-              </div>
-            </Section>
-          )}
+            {/* ── Professional Tab ── */}
+            {activeTab === "professional" && (
+              <Section dot="#e65100" title="Professional Details">
+                <div className="pv-fields-grid">
+                  {editing ? (
+                    <>
+                      <EditField icon={FiBriefcase} label="Department" value={form.department ?? ""} onChange={v => updateField("department", v)} placeholder="e.g. Operations" accent="#e65100" />
+                      <EditField icon={Shield} label="Designation" value={form.designation ?? ""} onChange={v => updateField("designation", v)} placeholder="e.g. Manager" accent="#f57c00" />
+                      <EditField icon={FiBookOpen} label="Education" value={form.education ?? ""} onChange={v => updateField("education", v)} placeholder="e.g. B.Tech" accent="#e65100" />
+                      <EditField icon={FiPhone} label="Alt Phone" value={form.alt_phone ?? ""} onChange={v => updateField("alt_phone", v)} type="tel" placeholder="Alternate number" accent="#f57c00" />
+                      <EditField icon={Building2} label="Branch" value={form.branch_id ?? ""} onChange={v => updateField("branch_id", v)} options={branchOptions} accent="#e65100" />
+                    </>
+                  ) : (
+                    <>
+                      <ViewField icon={FiBriefcase} label="Department" value={val(p?.department)} accent="#e65100" />
+                      <ViewField icon={Shield} label="Designation" value={val(p?.designation)} accent="#f57c00" />
+                      <ViewField icon={FiBookOpen} label="Education" value={val(p?.education)} accent="#e65100" />
+                      <ViewField icon={FiPhone} label="Alt Phone" value={val(p?.alt_phone)} accent="#f57c00" />
+                      <ViewField icon={Building2} label="Branch" value={val(p?.branch_name)} accent="#e65100" />
+                    </>
+                  )}
+                </div>
+              </Section>
+            )}
+          </div>
         </div>
-      </div>
       </div> {/* End pv-page-wrap */}
 
       {/* ══════════════════════════════════════════════

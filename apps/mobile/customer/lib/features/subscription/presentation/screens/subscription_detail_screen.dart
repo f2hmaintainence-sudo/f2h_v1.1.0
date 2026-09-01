@@ -45,6 +45,7 @@ class SubscriptionDetailScreen extends StatefulWidget {
 }
 
 class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
+  late Subscription _subscription;
   List<SubscriptionPauseModel> _pauseHistory = [];
   bool _loadingPauseHistory = false;
 
@@ -84,6 +85,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _subscription = widget.subscription;
     _loadPauseHistory();
     _loadSubscriptionOrders();
     _loadDetailInfo();
@@ -93,7 +95,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   Future<void> _loadDetailInfo() async {
     try {
       final info = await sl<SubscriptionRepository>().getSubscriptionDetail(
-        widget.subscription.id,
+        _subscription.id,
       );
       if (mounted)
         setState(() {
@@ -108,7 +110,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   Future<void> _loadBills() async {
     try {
       final bills = await sl<SubscriptionRepository>().getSubscriptionBills(
-        widget.subscription.id,
+        _subscription.id,
       );
       if (mounted)
         setState(() {
@@ -123,7 +125,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   void _loadPauseHistory() {
     setState(() => _loadingPauseHistory = true);
     context.read<SubscriptionBloc>().add(
-      LoadPauseHistoryRequested(subscriptionId: widget.subscription.id),
+      LoadPauseHistoryRequested(subscriptionId: _subscription.id),
     );
   }
 
@@ -132,7 +134,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     if (state is SubscriptionLoaded) {
       setState(() {
         _subscriptionOrders = state.orders
-            .where((o) => o.subscriptionId == widget.subscription.id)
+            .where((o) => o.subscriptionId == _subscription.id)
             .toList();
       });
     }
@@ -153,7 +155,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           '${picked.end.year}-${picked.end.month.toString().padLeft(2, '0')}-${picked.end.day.toString().padLeft(2, '0')}';
       context.read<SubscriptionBloc>().add(
         PauseSubscriptionRequested(
-          subscriptionId: widget.subscription.id,
+          subscriptionId: _subscription.id,
           startDate: startDate,
           endDate: endDate,
         ),
@@ -164,7 +166,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   }
 
   void _showResumeDialog() {
-    final s = widget.subscription;
+    final s = _subscription;
     final pauseFromDate = s.pauseFromDate;
     final pauseToDate = s.pauseToDate;
 
@@ -415,7 +417,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   }
 
   void _handleRenew() {
-    final sub = widget.subscription;
+    final sub = _subscription;
     final firstItem = sub.items.isNotEmpty ? sub.items.first : null;
     final variantId = firstItem?.productVariantId ?? sub.id;
     final productName = firstItem?.productName ?? sub.productName;
@@ -446,7 +448,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     );
 
     context.read<CartBloc>().add(AddToCartEvent(cartItem));
-    F2HToast.success(context, 'Subscription added to cart for renewal!');
 
     Navigator.push(
       context,
@@ -519,9 +520,17 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
               final today = DateTime.now();
               final endDate =
                   '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+              if (mounted) {
+                setState(() {
+                  _subscription = _subscription.copyWith(
+                    status: 'cancelled',
+                    endDate: endDate,
+                  );
+                });
+              }
               context.read<SubscriptionBloc>().add(
                 CancelSubscriptionRequested(
-                  subscriptionId: widget.subscription.id,
+                  subscriptionId: _subscription.id,
                   cancelReason: reason.isNotEmpty
                       ? reason
                       : 'Cancelled by customer',
@@ -529,7 +538,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 ),
               );
               widget.onDelete();
-              if (mounted) Navigator.pop(context);
             },
             child: const Text(
               'Cancel Subscription',
@@ -1111,7 +1119,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.subscription;
+    final s = _subscription;
     final isActive = s.isActive;
     final isPaused = s.isPaused;
     final isCancelled = s.status == 'cancelled';
@@ -1148,14 +1156,23 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           });
         }
         if (state is SubscriptionLoaded) {
+          final updated = state.subscriptions
+              .where((sub) => sub.id == _subscription.id)
+              .firstOrNull;
           setState(() {
+            if (updated != null) {
+              _subscription = updated;
+            }
             _subscriptionOrders = state.orders
-                .where((o) => o.subscriptionId == widget.subscription.id)
+                .where((o) => o.subscriptionId == _subscription.id)
                 .toList();
           });
         }
         if (state is SubscriptionActionSuccess) {
           F2HToast.success(context, state.message);
+          _loadDetailInfo();
+          _loadBills();
+          _loadPauseHistory();
         }
         if (state is SubscriptionError) {
           F2HToast.error(context, state.message);
@@ -1613,9 +1630,57 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     required bool isCancelled,
     required bool isTerminal,
   }) {
-    final s = widget.subscription;
+    final s = _subscription;
     final isExpired = s.status == 'expaired' || s.status == 'expired';
     final isCompleted = s.status == 'completed';
+
+    if (isCancelled) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(
+          color: kSurface,
+          border: const Border(top: BorderSide(color: kBorderLt)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _handleRenew,
+              icon: const Icon(
+                Icons.replay_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
+              label: const Text(
+                'RESTART SUBSCRIPTION',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     if (isCompleted) {
       return Container(

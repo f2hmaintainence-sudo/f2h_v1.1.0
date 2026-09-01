@@ -910,7 +910,7 @@ export class SubscriptionStatusService {
     message: string,
   ): Promise<void> {
     try {
-      const sql = `SELECT email, first_name FROM customers WHERE customer_id = $1 LIMIT 1`;
+      const sql = `SELECT u.email, u.first_name FROM users u WHERE u.user_id = $1 LIMIT 1`;
       const res = await this.db.query(sql, [customerId]);
       const customer = res?.[0];
       if (customer && customer.email) {

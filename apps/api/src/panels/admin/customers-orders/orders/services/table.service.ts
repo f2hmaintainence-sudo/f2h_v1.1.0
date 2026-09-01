@@ -194,7 +194,7 @@ export class OrdersTableService {
           partner_last_name: ['dpu.last_name AS partner_last_name', true],
           partner_phone: ['dpu.phone AS partner_phone', true],
           partner_vehicle: ['dp.vehicle_type AS partner_vehicle', true],
-          partner_name: ["TRIM(CONCAT(dpu.first_name, ' ', COALESCE(dpu.last_name, ''))) AS partner_name", true],
+          partner_name: ["TRIM(CONCAT(dpu.first_name, ' ', COALESCE(dpu.last_name, ''))) AS partner_name", false],
           order_source: ['orders.order_source', true],
           subscription_id: ['orders.subscription_id', true],
           scheduled_date: ['orders.scheduled_date', true],

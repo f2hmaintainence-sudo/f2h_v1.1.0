@@ -220,54 +220,101 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Doc Type Dropdown
+                    // Direct Document Type Selection Grid
                     Text(
-                      'Document Type',
-                      style: GoogleFonts.roboto(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedType,
-                      dropdownColor: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                      onChanged: document == null
-                          ? (val) {
-                              if (val != null) {
-                                setModalState(() {
-                                  selectedType = val;
-                                  numberController.clear();
-                                });
-                              }
-                            }
-                          : null,
-                      style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5)),
+                      'Select Document Type',
+                      style: GoogleFonts.roboto(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF334155),
                       ),
-                      items: documentTypes
-                          .map((t) {
-                            final meta = _getDocumentMeta(t);
-                            return DropdownMenuItem(
-                              value: t,
+                    ),
+                    const SizedBox(height: 8),
+
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 2.7,
+                      children: documentTypes.map((t) {
+                        final meta = _getDocumentMeta(t);
+                        final isSelected = selectedType == t;
+                        final isEnabled = document == null;
+
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: isEnabled
+                                ? () {
+                                    setModalState(() {
+                                      selectedType = t;
+                                      numberController.clear();
+                                    });
+                                  }
+                                : null,
+                            borderRadius: BorderRadius.circular(12),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFFDCFCE7) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+                                  width: isSelected ? 1.6 : 1.0,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
                               child: Row(
                                 children: [
-                                  Icon(meta.icon, size: 18, color: const Color(0xFF16A34A)),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    meta.label,
-                                    style: GoogleFonts.roboto(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      meta.icon,
+                                      size: 15,
+                                      color: isSelected ? Colors.white : const Color(0xFF64748B),
+                                    ),
                                   ),
+                                  const SizedBox(width: 7),
+                                  Expanded(
+                                    child: Text(
+                                      meta.label,
+                                      style: GoogleFonts.roboto(
+                                        fontSize: 11,
+                                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                        color: isSelected ? const Color(0xFF15803D) : const Color(0xFF334155),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      size: 15,
+                                      color: Color(0xFF16A34A),
+                                    ),
                                 ],
                               ),
-                            );
-                          })
-                          .toList(),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
                     const SizedBox(height: 14),
 
