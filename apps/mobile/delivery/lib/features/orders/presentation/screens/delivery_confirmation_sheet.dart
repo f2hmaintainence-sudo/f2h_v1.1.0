@@ -1204,12 +1204,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       onDec: state.returned > 0
                                           ? () => setState(() => state.returned--)
                                           : null,
-                                      onInc: () => setState(() {
-                                            state.returned++;
-                                            if (state.returned + state.damaged + state.lost > state.customerBalance) {
-                                              state.customerBalance = state.returned + state.damaged + state.lost;
-                                            }
-                                          }),
+                                      onInc: (state.returned + state.damaged + state.lost) < state.customerBalance
+                                          ? () => setState(() => state.returned++)
+                                          : null,
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -1228,12 +1225,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                                 }
                                               })
                                           : null,
-                                      onInc: () => setState(() {
-                                            state.lost++;
-                                            if (state.returned + state.damaged + state.lost > state.customerBalance) {
-                                              state.customerBalance = state.returned + state.damaged + state.lost;
-                                            }
-                                          }),
+                                      onInc: (state.returned + state.damaged + state.lost) < state.customerBalance
+                                          ? () => setState(() => state.lost++)
+                                          : null,
                                     ),
                                   ),
                                 ],
