@@ -77,10 +77,25 @@ export class CustomerBootstrapController {
   private normalizeAddress(addr: any) {
     if (!addr) return addr;
     const resolvedId = String(addr.address_id || addr.id || addr.action_id || '');
+    const branchIsActive = addr.branch_id
+      ? (addr.branch_is_active === true ||
+         addr.branch_is_active === 'true' ||
+         addr.branch_is_active === 1 ||
+         String(addr.branch_status || '').toUpperCase() === 'ACTIVE')
+      : false;
+    const isServiceable = Boolean(addr.branch_id && branchIsActive);
+
     return {
       ...addr,
       address_id: resolvedId,
       id: resolvedId,
+      branch_id: addr.branch_id || null,
+      branch_name: addr.branch_name || null,
+      branch_is_active: branchIsActive,
+      is_serviceable: isServiceable,
+      unserviceable_reason: !addr.branch_id
+        ? 'No delivery hub assigned to this address'
+        : (!branchIsActive ? 'Delivery currently unavailable (Branch is inactive)' : null),
       is_default: (addr.is_default === true || addr.is_default === 'true' || addr.is_default === 1 || addr.is_default === '1') ? true : false,
       status: (addr.status === false || addr.status === 'false' || addr.status === '0') ? false : true
     };
@@ -138,12 +153,28 @@ export class CustomerBootstrapController {
     const profile = await this.resolveCustomer(userId, email);
     const customerId = profile?.customer_id || userId;
 
-    const addressesResult = await this.Data.query('customer_addresses', {
-      where: [
-        { column: 'customer_id', operator: '=', value: customerId },
-        { column: 'status', operator: '=', value: true },
-      ],
-    });
+    let addressesResult: any[] = [];
+    try {
+      addressesResult = await this.db.query(
+        `SELECT ca.*,
+                b.branch_name,
+                b.is_active AS branch_is_active
+         FROM customer_addresses ca
+         LEFT JOIN branches b ON b.branch_id = ca.branch_id
+         WHERE (ca.customer_id = $1)
+           AND ca.status = true
+         ORDER BY ca.is_default DESC, ca.id ASC`,
+        [customerId],
+      );
+    } catch {
+      const fallback = await this.Data.query('customer_addresses', {
+        where: [
+          { column: 'customer_id', operator: '=', value: customerId },
+          { column: 'status', operator: '=', value: true },
+        ],
+      });
+      addressesResult = fallback?.data || [];
+    }
     const subscriptionSummary = await this.getSubscriptionSummary(customerId);
 
     const branchesResult = await this.Data.query('branches', {
@@ -207,9 +238,11 @@ export class CustomerBootstrapController {
 
     const todayPartnersData = await this.getTodayDeliveryPartners(customerId);
 
+    const addressesList = Array.isArray(addressesResult) ? addressesResult : ((addressesResult as any)?.data || []);
+
     return {
       profile,
-      addresses: (addressesResult?.data || []).map((addr: any) => this.normalizeAddress(addr)),
+      addresses: addressesList.map((addr: any) => this.normalizeAddress(addr)),
       wallet: {
         balance: Number(profile?.wallet_balance || 0),
         referral_code: profile?.referral_code || null,

@@ -343,22 +343,40 @@ export default function OrderDetailsDrawer({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white text-slate-800 font-medium">
-                    {items.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-3.5 py-2.5 font-semibold text-slate-900">
-                          {stripHtml(item.variant_name || item.product_name || 'Product')}
-                          {item.is_free && (
-                            <span className="ml-1.5 bg-amber-100 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-300">
-                              FREE
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3.5 py-2.5 text-center font-bold">
-                          {item.quantity ?? `${item.default_m_quantity ?? 0}/${item.default_e_quantity ?? 0}`}
-                        </td>
-                        <td className="px-3.5 py-2.5 text-right font-medium text-slate-600">
-                          {formatMoney(item.unit_price)}
-                        </td>
+                    {items.map((item) => {
+                      const prodName = stripHtml(item.product_name || item.variant_name || 'Produce Item');
+                      const varName = stripHtml(item.variant_name || '');
+                      const showVar = varName && prodName && varName.toLowerCase() !== prodName.toLowerCase();
+                      const numQty = Number(item.quantity);
+                      const displayQty = !isNaN(numQty) && numQty > 0
+                        ? numQty
+                        : (item.quantity ?? `${item.default_m_quantity ?? 0}/${item.default_e_quantity ?? 0}`);
+
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                                {prodName}
+                                {item.is_free && (
+                                  <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-300">
+                                    FREE
+                                  </span>
+                                )}
+                              </span>
+                              {showVar && (
+                                <span className="text-[11px] text-slate-500 font-medium">
+                                  {varName}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3.5 py-2.5 text-center font-bold text-slate-900">
+                            {displayQty}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right font-medium text-slate-600">
+                            {formatMoney(item.unit_price)}
+                          </td>
                         <td className="px-3.5 py-2.5 text-right font-medium text-rose-600">
                           {getItemDiscount(item) > 0 ? (
                             <span className="inline-flex flex-col items-end">
@@ -375,7 +393,8 @@ export default function OrderDetailsDrawer({
                           {formatMoney(getItemTotal(item))}
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>

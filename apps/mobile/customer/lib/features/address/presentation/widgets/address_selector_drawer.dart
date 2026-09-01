@@ -226,8 +226,12 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                   final isSelected = addr.uniqueId == _selectedAddressId;
                   final isExpanded = addr.uniqueId == _expandedAddressId;
 
+                  final bool isServiceable = addr.isServiceable && addr.branchIsActive;
+
                   return Container(
-                    color: isSelected ? kPrimaryPl.withValues(alpha: 0.12) : Colors.transparent,
+                    color: !isServiceable
+                        ? const Color(0xFFFEF2F2).withValues(alpha: 0.6)
+                        : (isSelected ? kPrimaryPl.withValues(alpha: 0.12) : Colors.transparent),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       crossAxisAlignment: isExpanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,
@@ -244,20 +248,27 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                                 shape: BoxShape.circle,
                                 border: isSelected
                                     ? null
-                                    : Border.all(color: kMuted, width: 2),
-                                color: isSelected ? kPrimary : Colors.transparent,
+                                    : Border.all(
+                                        color: !isServiceable ? const Color(0xFFFCA5A5) : kMuted,
+                                        width: 2,
+                                      ),
+                                color: !isServiceable
+                                    ? const Color(0xFFFEE2E2)
+                                    : (isSelected ? kPrimary : Colors.transparent),
                               ),
-                              child: isSelected
-                                  ? (_isUpdating
-                                      ? const Padding(
-                                          padding: EdgeInsets.all(3),
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                          ),
-                                        )
-                                      : const Icon(Icons.check, color: Colors.white, size: 12))
-                                  : null,
+                              child: !isServiceable
+                                  ? const Icon(Icons.block_rounded, color: Color(0xFFDC2626), size: 12)
+                                  : (isSelected
+                                      ? (_isUpdating
+                                          ? const Padding(
+                                              padding: EdgeInsets.all(3),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                              ),
+                                            )
+                                          : const Icon(Icons.check, color: Colors.white, size: 12))
+                                      : null),
                             ),
                           ),
                         ),
@@ -275,10 +286,10 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                                     Flexible(
                                       child: Text(
                                         addr.name,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w900,
-                                          color: kText,
+                                          color: !isServiceable ? const Color(0xFF991B1B) : kText,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -300,6 +311,33 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                                         ),
                                       ),
                                     ),
+                                    if (!isServiceable) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEE2E2),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFFECACA), width: 0.8),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.error_outline_rounded, size: 10, color: Color(0xFFDC2626)),
+                                            SizedBox(width: 3),
+                                            Text(
+                                              'UNAVAILABLE',
+                                              style: TextStyle(
+                                                fontSize: 8.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xFFDC2626),
+                                                letterSpacing: 0.3,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 const SizedBox(height: 4),
@@ -335,6 +373,37 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: kTextSub,
+                                    ),
+                                  ),
+                                ],
+                                if (!isServiceable) ...[
+                                  const SizedBox(height: 5),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF2F2),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFECACA), width: 0.8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.info_outline_rounded, size: 11, color: Color(0xFFDC2626)),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            addr.unserviceableReason ??
+                                                'Branch inactive · Delivery unavailable in this area',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFFDC2626),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -417,6 +486,18 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
   }
 
   Future<void> _selectAddress(BuildContext context, AddressModel addr) async {
+    final bool isServiceable = addr.isServiceable && addr.branchIsActive;
+    if (!isServiceable) {
+      final reason = addr.unserviceableReason ??
+          'Delivery is currently unavailable at this address because the local branch is inactive.';
+      F2HToast.error(
+        context,
+        reason,
+        title: 'Delivery Unavailable',
+      );
+      return;
+    }
+
     final targetUniqueId = addr.uniqueId;
     final dbAddressId = (addr.addressId != null && addr.addressId!.isNotEmpty)
         ? addr.addressId!

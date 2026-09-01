@@ -548,6 +548,17 @@ export class CartService {
       );
     }
 
+    const branchRows = await this.db.query(
+      `SELECT branch_id, branch_name, is_active FROM branches WHERE branch_id = $1 LIMIT 1`,
+      [branchId],
+    );
+    if (!branchRows.length || branchRows[0].is_active === false) {
+      const branchLabel = branchRows[0]?.branch_name || branchId;
+      throw new BadRequestException(
+        `Delivery is currently unavailable for this address because the local branch (${branchLabel}) is inactive. Please choose a serviceable address.`,
+      );
+    }
+
     const customerName =
       contactName ||
       customer.full_name ||

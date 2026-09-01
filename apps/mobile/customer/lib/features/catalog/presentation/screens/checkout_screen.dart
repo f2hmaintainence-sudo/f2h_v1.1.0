@@ -833,99 +833,164 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       decoration: BoxDecoration(
                                         color: kSurface,
                                         borderRadius: BorderRadius.circular(24),
-                                        border: Border.all(color: kBorder),
+                                        border: Border.all(
+                                          color: !isServiceable
+                                              ? const Color(0xFFFCA5A5)
+                                              : kBorder,
+                                          width: !isServiceable ? 1.5 : 1.0,
+                                        ),
                                       ),
-                                      child: Row(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(
-                                            Icons.location_on_outlined,
-                                            size: 24,
-                                            color: kPrimary,
-                                          ),
-                                          const SizedBox(width: 14),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  'Delivery to ${primaryAddress.addressType.toUpperCase()}',
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: kMuted,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  primaryAddress.name,
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: kText,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  primaryAddress.detail,
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color: kTextSub,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          TextButton(
-                                            onPressed: () async {
-                                              final AddressModel? selectedAddress = await AddressSelectorDrawer.show(context);
-                                              if (selectedAddress != null && context.mounted) {
-                                                setState(() {
-                                                  _isAddressLoading = true;
-                                                });
-                                                try {
-                                                  final sessionCubit = context.read<CustomerSessionCubit>();
-                                                  final addrId = (selectedAddress.addressId != null && selectedAddress.addressId!.isNotEmpty)
-                                                      ? selectedAddress.addressId!
-                                                      : ((selectedAddress.id != null && selectedAddress.id!.isNotEmpty) ? selectedAddress.id! : selectedAddress.uniqueId);
-                                                  await sessionCubit.updateDefaultAddress(addrId);
-                                                  if (context.mounted) {
-                                                    F2HToast.success(
-                                                      context,
-                                                      'Address updated successfully',
-                                                    );
-                                                  }
-                                                } catch (e) {
-                                                  if (context.mounted) {
-                                                    F2HToast.error(
-                                                      context,
-                                                      extractErrorMessage(e),
-                                                    );
-                                                  }
-                                                } finally {
-                                                  if (context.mounted) {
-                                                    setState(() {
-                                                      _isAddressLoading = false;
-                                                    });
-                                                  }
-                                                }
-                                              }
-                                            },
-                                            child: const Text(
-                                              'Change',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w800,
-                                                color: kPrimary,
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                !isServiceable
+                                                    ? Icons.location_off_rounded
+                                                    : Icons.location_on_outlined,
+                                                size: 24,
+                                                color: !isServiceable
+                                                    ? const Color(0xFFDC2626)
+                                                    : kPrimary,
                                               ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
+                                              const SizedBox(width: 14),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Text(
+                                                          'Delivery to ${primaryAddress.addressType.toUpperCase()}',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w600,
+                                                            color: !isServiceable ? const Color(0xFFB91C1C) : kMuted,
+                                                          ),
+                                                        ),
+                                                        if (!isServiceable) ...[
+                                                          const SizedBox(width: 6),
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                                            decoration: BoxDecoration(
+                                                              color: const Color(0xFFFEE2E2),
+                                                              borderRadius: BorderRadius.circular(4),
+                                                              border: Border.all(color: const Color(0xFFFECACA)),
+                                                            ),
+                                                            child: const Text(
+                                                              'UNAVAILABLE',
+                                                              style: TextStyle(
+                                                                fontSize: 8.5,
+                                                                fontWeight: FontWeight.w900,
+                                                                color: Color(0xFFDC2626),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      primaryAddress.name,
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: !isServiceable ? const Color(0xFF991B1B) : kText,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      primaryAddress.detail,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: !isServiceable ? const Color(0xFFB91C1C) : kTextSub,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                               TextButton(
+                                                 onPressed: () async {
+                                                   final AddressModel? selectedAddress = await AddressSelectorDrawer.show(context);
+                                                   if (selectedAddress != null && context.mounted) {
+                                                     setState(() {
+                                                       _isAddressLoading = true;
+                                                     });
+                                                     try {
+                                                       final sessionCubit = context.read<CustomerSessionCubit>();
+                                                       final addrId = (selectedAddress.addressId != null && selectedAddress.addressId!.isNotEmpty)
+                                                           ? selectedAddress.addressId!
+                                                           : ((selectedAddress.id != null && selectedAddress.id!.isNotEmpty) ? selectedAddress.id! : selectedAddress.uniqueId);
+                                                       await sessionCubit.updateDefaultAddress(addrId);
+                                                       if (context.mounted) {
+                                                         F2HToast.success(
+                                                           context,
+                                                           'Address updated successfully',
+                                                         );
+                                                       }
+                                                     } catch (e) {
+                                                       if (context.mounted) {
+                                                         F2HToast.error(
+                                                           context,
+                                                           extractErrorMessage(e),
+                                                         );
+                                                       }
+                                                     } finally {
+                                                       if (context.mounted) {
+                                                         setState(() {
+                                                           _isAddressLoading = false;
+                                                         });
+                                                       }
+                                                     }
+                                                   }
+                                                 },
+                                                 child: const Text(
+                                                   'Change',
+                                                   style: TextStyle(
+                                                     fontSize: 12,
+                                                     fontWeight: FontWeight.w800,
+                                                     color: kPrimary,
+                                                   ),
+                                                 ),
+                                               ),
+                                             ],
+                                           ),
+                                           if (!isServiceable) ...[
+                                             const SizedBox(height: 10),
+                                             Container(
+                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                               decoration: BoxDecoration(
+                                                 color: const Color(0xFFFEE2E2),
+                                                 borderRadius: BorderRadius.circular(8),
+                                                 border: Border.all(color: const Color(0xFFFECACA)),
+                                               ),
+                                               child: Row(
+                                                 children: [
+                                                   const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFDC2626)),
+                                                   const SizedBox(width: 6),
+                                                   Expanded(
+                                                     child: Text(
+                                                       primaryAddress.unserviceableReason ??
+                                                           'Branch is currently inactive. Delivery is unavailable at this address.',
+                                                       style: const TextStyle(
+                                                         fontSize: 11,
+                                                         fontWeight: FontWeight.w700,
+                                                         color: Color(0xFFDC2626),
+                                                       ),
+                                                     ),
+                                                   ),
+                                                 ],
+                                               ),
+                                             ),
+                                           ],
+                                         ],
+                                       ),
+                                     );
                                   },
                                 ),
                                 const SizedBox(height: 16),
@@ -1317,7 +1382,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           }
                                         }
                                       }
-
                                       final updatedList = context
                                           .read<CustomerSessionCubit>()
                                           .state
@@ -1339,6 +1403,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                         (a) => a.isDefault,
                                         orElse: () => updatedList.first,
                                       );
+
+                                      if (!selectedAddr.isServiceable || !selectedAddr.branchIsActive) {
+                                        if (context.mounted) {
+                                          final reason = selectedAddr.unserviceableReason ??
+                                              'Delivery is currently unavailable at this address because the local branch is inactive.';
+                                          F2HToast.error(
+                                            context,
+                                            reason,
+                                            title: 'Delivery Unavailable',
+                                          );
+                                          setState(() {
+                                            _dragKey++;
+                                          });
+                                        }
+                                        return;
+                                      }
+
                                       final addressId =
                                           (selectedAddr.id != null &&
                                                   selectedAddr.id!.isNotEmpty)

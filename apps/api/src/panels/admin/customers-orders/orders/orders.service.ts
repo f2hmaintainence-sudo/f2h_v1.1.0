@@ -61,10 +61,17 @@ export class OrdersService {
         [cleanId, orderId],
       );
 
+      const order = rows?.[0] ?? null;
+      let items: any[] = [];
+      if (order) {
+        const itemsRes = await this.getOrderItems(order.order_id || cleanId);
+        items = itemsRes?.data ?? [];
+      }
+
       return {
         status: true,
-        data: rows?.[0] ?? null,
-        message: rows?.[0] ? 'Order fetched' : 'Order not found',
+        data: order ? { ...order, items } : null,
+        message: order ? 'Order fetched' : 'Order not found',
       };
     } catch (error) {
       this.developer.error('getOrderView error', { error, orderId });

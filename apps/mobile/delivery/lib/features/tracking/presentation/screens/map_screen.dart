@@ -186,10 +186,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             );
 
       if (!mounted) return;
-      final bool drawable = result.fullRoutePoints.length >= 2;
+
+      // A 2-point straight-line fallback has exactly 2 points and isRoadGeometry == false.
+      // We require real road geometry AND at least 5 points to consider the route drawable.
+      final bool drawable = result.isRoadGeometry && result.fullRoutePoints.length >= 5;
+
+      debugPrint('[MapRoute] status=${result.status} isRoad=${result.isRoadGeometry} '
+          'fullPts=${result.fullRoutePoints.length} activePts=${result.activeLegPoints.length} '
+          'drawable=$drawable reason=${result.unavailableReason}');
 
       setState(() {
-        // Replacing a drawn route with an empty one blanks a map that was working.
+        // Replacing a drawn road route with a fallback blanks a map that was working.
         if (drawable || _optimizedRoute == null) _optimizedRoute = result;
         _routeNotice = result.isRoadGeometry ? null : result.unavailableReason;
         _selectedStop = result.orderedStops

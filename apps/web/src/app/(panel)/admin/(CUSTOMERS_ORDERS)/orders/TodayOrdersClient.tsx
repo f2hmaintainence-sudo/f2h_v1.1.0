@@ -205,9 +205,16 @@ export default function TodayOrdersClient({
           setSelectedOrder((current) => ({ ...(current || {}), ...detailData }));
         }
 
-        const rawItems = itemsResult?.data?.data ?? itemsResult?.data;
-        const itemsList = Array.isArray(rawItems) ? rawItems : [];
-        setItems(itemsList);
+        const itemsFromItemsEndpoint = Array.isArray(itemsResult?.data?.data)
+          ? itemsResult.data.data
+          : Array.isArray(itemsResult?.data)
+            ? itemsResult.data
+            : [];
+
+        const itemsFromViewEndpoint = Array.isArray(detailData?.items) ? detailData.items : [];
+
+        const finalItems = itemsFromItemsEndpoint.length > 0 ? itemsFromItemsEndpoint : itemsFromViewEndpoint;
+        setItems(finalItems);
       })
       .catch(() => setItemsError('Failed to load complete order details'))
       .finally(() => setLoadingItems(false));

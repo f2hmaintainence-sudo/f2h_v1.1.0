@@ -9,6 +9,7 @@
 // ============================================================================
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/utils/google_polyline.dart';
@@ -263,6 +264,7 @@ class RouteOptimizationService {
     }
 
     if (data == null || data['status'] != 'OK') {
+      debugPrint('[fetchDirectRoute] BAD STATUS: status=${data?["status"]} msg=${data?["message"]}');
       return _buildDirectStraightLineFallback(
         origin: origin,
         stops: stops,
@@ -275,7 +277,12 @@ class RouteOptimizationService {
     final fullPoints = decodeGooglePolylineSegments((data['polyline'] as String?) ?? '');
     final points = fullPoints.isNotEmpty ? fullPoints : legs.expand((l) => l.points).toList();
 
+    debugPrint('[fetchDirectRoute] status=${data["status"]} '
+        'polylineLen=${(data["polyline"] as String?)?.length ?? 0} '
+        'fullPts=${fullPoints.length} legCount=${legs.length} finalPts=${points.length}');
+
     if (points.length < 2) {
+      debugPrint('[fetchDirectRoute] FALLBACK: points=${points.length}');
       return _buildDirectStraightLineFallback(
         origin: origin,
         stops: stops,
@@ -446,6 +453,7 @@ class RouteOptimizationService {
       );
 
       final body = response.data;
+      debugPrint('[fetchShortestPathRoute] API response body type=${body.runtimeType} isMap=${body is Map}');
       if (body is Map) data = Map<String, dynamic>.from(body);
     } on DioException catch (e) {
       return _buildStraightLineFallback(
@@ -466,6 +474,7 @@ class RouteOptimizationService {
     }
 
     if (data == null || data['status'] != 'OK') {
+      debugPrint('[fetchShortestPathRoute] BAD STATUS: status=${data?["status"]} message=${data?["message"]}');
       return _buildStraightLineFallback(
         currentPosition: origin,
         orderedPending: orderedPending,
@@ -516,9 +525,16 @@ class RouteOptimizationService {
       ...completed,
     ];
 
+    debugPrint('[_buildResult] data.status=${data["status"]} '
+        'polyline type=${data["polyline"]?.runtimeType} '
+        'polyline len=${(data["polyline"] as String?)?.length ?? 0} '
+        'legs type=${data["legs"]?.runtimeType}');
+
     final fullPoints =
         decodeGooglePolylineSegments((data['polyline'] as String?) ?? '');
     final legs = _parseLegs(data['legs']);
+
+    debugPrint('[_buildResult] fullPoints=${fullPoints.length} legCount=${legs.length}');
 
     final List<LatLng> allRoutePoints = fullPoints.isNotEmpty
         ? fullPoints
@@ -526,6 +542,7 @@ class RouteOptimizationService {
 
     if (allRoutePoints.length < 2) {
       final pendingStops = orderedStops.where(_isPending).toList();
+      debugPrint('[_buildResult] FALLBACK: allRoutePoints=${allRoutePoints.length}');
       return _buildStraightLineFallback(
         currentPosition: origin,
         orderedPending: pendingStops,

@@ -29,6 +29,10 @@ class AddressModel {
   final String branchId;
 
   final String status;
+  final String? branchName;
+  final bool branchIsActive;
+  final bool isServiceable;
+  final String? unserviceableReason;
 
   AddressModel({
     this.addressId,
@@ -53,6 +57,10 @@ class AddressModel {
     required this.routeId,
     required this.branchId,
     required this.status,
+    this.branchName,
+    this.branchIsActive = true,
+    this.isServiceable = true,
+    this.unserviceableReason,
   });
 
   // Compatibility getters for Address class interfaces
@@ -107,11 +115,26 @@ class AddressModel {
       case 'isDefault': return isDefault;
       case 'label': return label;
       case 'detail': return detail;
+      case 'branch_name': return branchName;
+      case 'branch_is_active': return branchIsActive;
+      case 'is_serviceable': return isServiceable;
+      case 'unserviceable_reason': return unserviceableReason;
       default: return null;
     }
   }
 
   factory AddressModel.fromJson(Map<String, dynamic> json) {
+    final rawBranchActive = json['branch_is_active'];
+    final bool branchIsActive = rawBranchActive == null
+        ? (json['branch_status'] != null ? json['branch_status'].toString().toUpperCase() == 'ACTIVE' : true)
+        : _isTruthy(rawBranchActive);
+
+    final rawServiceable = json['is_serviceable'];
+    final String branchId = json['branch_id']?.toString() ?? '';
+    final bool isServiceable = rawServiceable != null
+        ? _isTruthy(rawServiceable)
+        : (branchId.isNotEmpty ? branchIsActive : true);
+
     return AddressModel(
       addressId: (json['address_id'] ?? json['addressId'] ?? json['action_id'] ?? json['id'])?.toString(),
       customerId: json['customer_id']?.toString() ?? '',
@@ -133,8 +156,12 @@ class AddressModel {
       isDefault: _isTruthy(json['is_default']),
       zoneId: json['zone_id']?.toString() ?? '',
       routeId: json['route_id']?.toString() ?? '',
-      branchId: json['branch_id']?.toString() ?? '',
+      branchId: branchId,
       status: (json['customer_status'] ?? json['status'])?.toString() ?? '',
+      branchName: json['branch_name']?.toString(),
+      branchIsActive: branchIsActive,
+      isServiceable: isServiceable,
+      unserviceableReason: json['unserviceable_reason']?.toString(),
     );
   }
 
@@ -162,6 +189,10 @@ class AddressModel {
       'route_id': routeId,
       'branch_id': branchId,
       'status': status,
+      'branch_name': branchName,
+      'branch_is_active': branchIsActive,
+      'is_serviceable': isServiceable,
+      'unserviceable_reason': unserviceableReason,
     };
   }
 
@@ -188,6 +219,10 @@ class AddressModel {
     String? routeId,
     String? branchId,
     String? status,
+    String? branchName,
+    bool? branchIsActive,
+    bool? isServiceable,
+    String? unserviceableReason,
   }) {
     return AddressModel(
       addressId: addressId ?? this.addressId,
@@ -212,6 +247,10 @@ class AddressModel {
       routeId: routeId ?? this.routeId,
       branchId: branchId ?? this.branchId,
       status: status ?? this.status,
+      branchName: branchName ?? this.branchName,
+      branchIsActive: branchIsActive ?? this.branchIsActive,
+      isServiceable: isServiceable ?? this.isServiceable,
+      unserviceableReason: unserviceableReason ?? this.unserviceableReason,
     );
   }
 }

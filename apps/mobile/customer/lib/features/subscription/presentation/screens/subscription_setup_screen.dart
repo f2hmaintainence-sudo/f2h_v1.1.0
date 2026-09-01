@@ -398,6 +398,17 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       return;
     }
 
+    if (!_selectedAddress!.isServiceable || !_selectedAddress!.branchIsActive) {
+      final reason = _selectedAddress!.unserviceableReason ??
+          'Delivery is currently unavailable at this address because the local branch is inactive.';
+      F2HToast.error(
+        context,
+        reason,
+        title: 'Delivery Unavailable',
+      );
+      return;
+    }
+
     final estimate = _currentMonthEstimate;
     if (estimate.total <= 0 || estimate.qty <= 0) {
       F2HToast.error(context, 'Please set delivery quantity to continue');
