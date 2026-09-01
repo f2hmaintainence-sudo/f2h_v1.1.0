@@ -12,6 +12,6 @@ export class WalletTopupDto {
   @IsPositive()
   // An upper bound turns a fat-fingered or scripted credit into a rejected request
   // rather than an arbitrary balance.
-  @Max(100000)
+  @Max(5000)
   amount: number;
 }

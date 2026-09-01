@@ -28,7 +28,7 @@ export const SUBSCRIPTION_PENDING_REFERENCE = 'SUBSCRIPTION_PENDING';
 export type PaymentPurpose = 'wallet_topup' | 'bill' | 'order' | 'subscription';
 
 const MIN_ONLINE_AMOUNT = 1;
-const MAX_TOPUP_AMOUNT = 100000;
+const MAX_TOPUP_AMOUNT = 5000;
 /** An 'order' payment not consumed by checkout within this window is swept
  *  into the customer's wallet so money is never left stranded. */
 const ORDER_PAYMENT_RECONCILE_MINUTES = 20;

@@ -13,18 +13,19 @@ import 'package:latlong2/latlong.dart';
 /// Decodes a standard Google Encoded Polyline string (precision 1e5).
 /// Returns a list of [LatLng] points along the road path.
 List<LatLng> decodeGooglePolyline(String encoded) {
-  if (encoded.trim().isEmpty) return const [];
+  final clean = encoded.trim();
+  if (clean.isEmpty) return const [];
 
   final List<LatLng> points = [];
   int index = 0;
   int lat = 0;
   int lng = 0;
 
-  final codeUnits = encoded.codeUnits;
+  final codeUnits = clean.codeUnits;
   final length = codeUnits.length;
 
   while (index < length) {
-    int b;
+    int b = 0;
     int shift = 0;
     int result = 0;
     do {
@@ -54,7 +55,6 @@ List<LatLng> decodeGooglePolyline(String encoded) {
 
     if (latitude.isFinite &&
         longitude.isFinite &&
-        (latitude.abs() > 0.001 || longitude.abs() > 0.001) &&
         latitude >= -90.0 &&
         latitude <= 90.0 &&
         longitude >= -180.0 &&
@@ -66,14 +66,20 @@ List<LatLng> decodeGooglePolyline(String encoded) {
   return points;
 }
 
-/// Decodes semicolon-separated polyline segments into a continuous road path.
+/// Decodes polyline string into a continuous road path.
 List<LatLng> decodeGooglePolylineSegments(
   String encodedJoined, {
   String separator = ';',
 }) {
-  if (encodedJoined.trim().isEmpty) return const [];
+  final cleanStr = encodedJoined.trim();
+  if (cleanStr.isEmpty) return const [];
 
-  final segments = encodedJoined.split(separator);
+  // If there are no segment separators, decode directly as a single continuous polyline
+  if (!cleanStr.contains(separator)) {
+    return decodeGooglePolyline(cleanStr);
+  }
+
+  final segments = cleanStr.split(separator);
   final List<LatLng> allPoints = [];
 
   for (final seg in segments) {
@@ -86,7 +92,6 @@ List<LatLng> decodeGooglePolylineSegments(
     if (allPoints.isNotEmpty) {
       final last = allPoints.last;
       final first = pts.first;
-      // Skip duplicate consecutive junction point
       if ((last.latitude - first.latitude).abs() < 1e-6 &&
           (last.longitude - first.longitude).abs() < 1e-6) {
         allPoints.addAll(pts.skip(1));
