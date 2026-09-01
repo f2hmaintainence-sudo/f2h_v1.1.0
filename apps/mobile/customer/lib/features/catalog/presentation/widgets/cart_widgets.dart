@@ -302,6 +302,8 @@ class QuantityCounter extends StatelessWidget {
   /// Optional fixed width for the counter container.
   final double? width;
 
+  final double? height;
+
   const QuantityCounter({
     super.key,
     required this.quantity,
@@ -310,18 +312,22 @@ class QuantityCounter extends StatelessWidget {
     this.isLoading = false,
     this.canIncrement = true,
     this.width,
+    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
+    final w = width ?? 88.0;
+    final h = height ?? 34.0;
+
     if (isLoading) {
       return Container(
-        width: width ?? 92,
-        height: 34,
+        width: w,
+        height: h,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: kPrimary.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(10),
+          color: kPrimary.withOpacity(0.55),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: const SizedBox(
           width: 15,
@@ -335,11 +341,11 @@ class QuantityCounter extends StatelessWidget {
     }
 
     return Container(
-      height: 34,
-      width: width ?? 92,
+      height: h,
+      width: w,
       decoration: BoxDecoration(
         color: kPrimary,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -347,26 +353,44 @@ class QuantityCounter extends StatelessWidget {
           GestureDetector(
             onTap: onDecrement,
             behavior: HitTestBehavior.opaque,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Icon(Icons.remove_rounded, color: Colors.white, size: 16),
+            child: SizedBox(
+              width: 28,
+              height: h,
+              child: const Center(
+                child: Icon(
+                  Icons.remove,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
             ),
           ),
-          Text(
-            '$quantity',
-            style: const TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+          Expanded(
+            child: Center(
+              child: Text(
+                '$quantity',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1.1,
+                ),
+              ),
             ),
           ),
           GestureDetector(
             onTap: canIncrement ? onIncrement : null,
             behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Icon(Icons.add_rounded,
-                  color: canIncrement ? Colors.white : Colors.white38, size: 16),
+            child: SizedBox(
+              width: 28,
+              height: h,
+              child: Center(
+                child: Icon(
+                  Icons.add,
+                  color: canIncrement ? Colors.white : Colors.white38,
+                  size: 18,
+                ),
+              ),
             ),
           ),
         ],

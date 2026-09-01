@@ -1065,23 +1065,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                         ],
                                                       ),
                                                     ),
-                                                    SizedBox(width: 6 * s),
-                                                    SizedBox(
-                                                      width: 70 * s,
-                                                      child: Align(
-                                                        alignment: Alignment
-                                                            .centerRight,
-                                                        child:
-                                                            _buildCheckoutItemCounter(
-                                                              item,
-                                                            ),
-                                                      ),
+                                                    SizedBox(width: 8 * s),
+                                                    _buildCheckoutItemCounter(
+                                                      item,
                                                     ),
-                                                    SizedBox(width: 6 * s),
+                                                    SizedBox(width: 10 * s),
                                                     Text(
                                                       '₹${(displayPrice * qty).toStringAsFixed(0)}',
                                                       style: TextStyle(
-                                                        fontSize: 16 * s,
+                                                        fontSize: 15 * s,
                                                         fontWeight:
                                                             FontWeight.w900,
                                                         color: kText,
@@ -1974,7 +1966,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return QuantityCounter(
       quantity: qty,
-      width: 80,
+      width: 84,
+      height: 32,
       canIncrement: !(catalogVariant?.isOutOfStock ?? false),
       onDecrement: () {
         context.read<CartBloc>().add(

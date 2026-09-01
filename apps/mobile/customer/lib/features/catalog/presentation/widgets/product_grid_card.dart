@@ -619,7 +619,7 @@ class _CardAction extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _StepperButton(
-                  icon: Icons.remove_rounded,
+                  icon: Icons.remove,
                   onTap: () => _remove(context),
                 ),
                 Text(
@@ -631,7 +631,7 @@ class _CardAction extends StatelessWidget {
                   ),
                 ),
                 _StepperButton(
-                  icon: Icons.add_rounded,
+                  icon: Icons.add,
                   onTap: isAtMaxStock
                       ? () => F2HToast.error(context, 'Only $maxStock unit(s) available in stock')
                       : () => _add(context),

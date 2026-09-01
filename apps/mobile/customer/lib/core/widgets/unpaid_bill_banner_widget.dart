@@ -69,6 +69,9 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
     final primaryBill = Map<String, dynamic>.from(bills.first as Map);
     final dueAmount = (primaryBill['due_amount'] as num?)?.toDouble() ?? 0.0;
     final billId = primaryBill['bill_id']?.toString() ?? 'BILL';
+    final monthName = primaryBill['billing_month']?.toString() ?? 'Monthly';
+    final subId = primaryBill['subscription_id']?.toString();
+    final productName = primaryBill['product_name']?.toString() ?? 'Subscription';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -100,8 +103,8 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
               children: [
                 // Alert Icon Badge
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 42,
+                  height: 42,
                   decoration: const BoxDecoration(
                     color: Color(0xFFFEE2E2),
                     shape: BoxShape.circle,
@@ -122,12 +125,15 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
                     children: [
                       Row(
                         children: [
-                          const Text(
-                            'Pending Postpaid Bill',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF991B1B),
+                          Flexible(
+                            child: Text(
+                              '$monthName Postpaid Bill',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF991B1B),
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -154,8 +160,28 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
                         style: const TextStyle(
                           fontSize: 11.5,
                           color: Color(0xFFB91C1C),
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.autorenew_rounded, size: 12, color: Color(0xFF991B1B)),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              subId != null && subId.isNotEmpty
+                                  ? 'Sub: #$subId ($productName)'
+                                  : productName,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                color: Color(0xFF7F1D1D),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -320,6 +346,10 @@ class _UnpaidBillPaymentSheetState extends State<UnpaidBillPaymentSheet> {
         double.tryParse(widget.bill['total_amount']?.toString() ?? '0') ??
         0.0);
     final billId = widget.bill['bill_id']?.toString() ?? widget.bill['id']?.toString() ?? 'BILL';
+    final monthName = widget.bill['billing_month']?.toString() ?? widget.bill['billing_period_label']?.toString() ?? 'Monthly';
+    final subId = widget.bill['subscription_id']?.toString();
+    final productName = widget.bill['product_name']?.toString() ?? widget.bill['item_name']?.toString() ?? 'Daily Subscription';
+
     final hasSufficientWallet = widget.walletBalance >= dueAmount;
     final shortfall = math.max(0.0, dueAmount - widget.walletBalance);
 
@@ -357,19 +387,19 @@ class _UnpaidBillPaymentSheetState extends State<UnpaidBillPaymentSheet> {
                     child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF16A34A), size: 22),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Settle Postpaid Bill',
-                          style: TextStyle(
+                          '$monthName Bill',
+                          style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w900,
                             color: kText,
                           ),
                         ),
-                        Text(
+                        const Text(
                           'Choose your preferred payment method',
                           style: TextStyle(
                             fontSize: 11,
@@ -402,6 +432,31 @@ class _UnpaidBillPaymentSheetState extends State<UnpaidBillPaymentSheet> {
                       children: [
                         const Text('Bill Reference ID', style: TextStyle(fontSize: 12.5, color: kTextSub)),
                         Text('#$billId', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: kText)),
+                      ],
+                    ),
+                    if (subId != null && subId.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Subscription ID', style: TextStyle(fontSize: 12.5, color: kTextSub)),
+                          Text('#$subId', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF059669))),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Subscribed Item', style: TextStyle(fontSize: 12.5, color: kTextSub)),
+                        Expanded(
+                          child: Text(
+                            productName,
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: kText),
+                            textAlign: TextAlign.right,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),

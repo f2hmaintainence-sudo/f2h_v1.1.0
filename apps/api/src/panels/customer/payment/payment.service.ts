@@ -1063,6 +1063,89 @@ export class CustomerPaymentService {
 
       const gateway = await this.razorpay.getPublicConfig();
 
+      const enrichedBills = await Promise.all(
+        (bills || []).map(async (b: any) => {
+          // Determine Month Name
+          const fromDate = b.billing_from
+            ? new Date(b.billing_from)
+            : b.created_at
+              ? new Date(b.created_at)
+              : new Date();
+          const monthName = new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            month: 'long',
+            year: 'numeric',
+          }).format(fromDate);
+
+          const periodLabel =
+            b.billing_from && b.billing_to
+              ? `${new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }).format(new Date(b.billing_from))} – ${new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(b.billing_to))}`
+              : monthName;
+
+          // Fetch associated subscriptions from bill items or customer active subscriptions
+          let subRows = await this.db.query(
+            `SELECT DISTINCT o.subscription_id, COALESCE(p.name, 'Subscription') AS product_name
+             FROM customer_bill_items cbi
+             JOIN orders o ON o.order_id = cbi.reference_id
+             LEFT JOIN subscriptions s ON s.subscription_id = o.subscription_id
+             LEFT JOIN products p ON p.product_id = s.product_id
+             WHERE cbi.bill_id = $1 AND o.subscription_id IS NOT NULL`,
+            [b.bill_id],
+          );
+
+          if (!subRows || subRows.length === 0) {
+            subRows = await this.db.query(
+              `SELECT s.subscription_id, COALESCE(p.name, 'Subscription') AS product_name
+               FROM subscriptions s
+               LEFT JOIN products p ON p.product_id = s.product_id
+               WHERE (s.customer_id = $1 OR s.customer_id IN (SELECT customer_id FROM customers WHERE user_id = $1))
+                 AND s.payment_mode = 'postpaid'
+               LIMIT 3`,
+              [resolvedCustomerId],
+            );
+          }
+
+          const subscriptionIds = Array.from(
+            new Set((subRows || []).map((r: any) => r.subscription_id).filter(Boolean)),
+          );
+          const productNames = Array.from(
+            new Set((subRows || []).map((r: any) => r.product_name).filter(Boolean)),
+          );
+          const primarySubId =
+            subscriptionIds.length > 0
+              ? subscriptionIds[0]
+              : b.reference_id && b.reference_id !== 'CONSOLIDATED'
+                ? b.reference_id
+                : null;
+          const primaryProductName =
+            productNames.length > 0 ? productNames.join(', ') : 'Daily Subscription';
+
+          return {
+            bill_id: b.bill_id,
+            customer_id: b.customer_id,
+            bill_type: b.bill_type,
+            reference_id: b.reference_id,
+            billing_from: b.billing_from,
+            billing_to: b.billing_to,
+            due_date: b.due_date,
+            total_amount: Number(b.total_amount),
+            paid_amount: Number(b.paid_amount),
+            due_amount: Number(b.due_amount),
+            status: b.status,
+            remarks: b.remarks,
+            created_at: b.created_at,
+            billing_month: monthName,
+            billing_period_label: periodLabel,
+            subscription_id: primarySubId,
+            subscription_ids: subscriptionIds,
+            product_name: primaryProductName,
+            product_names: productNames,
+            has_sufficient_wallet: walletBalance >= Number(b.due_amount),
+            wallet_shortfall: Math.max(0, Number(b.due_amount) - walletBalance),
+          };
+        }),
+      );
+
       return {
         status: true,
         has_unpaid_bills: (bills || []).length > 0,
@@ -1072,26 +1155,7 @@ export class CustomerPaymentService {
         has_sufficient_wallet:
           walletBalance >= totalUnpaidAmount && totalUnpaidAmount > 0,
         online_payment_enabled: gateway.enabled,
-        bills: (bills || []).map((b: any) => ({
-          bill_id: b.bill_id,
-          customer_id: b.customer_id,
-          bill_type: b.bill_type,
-          reference_id: b.reference_id,
-          billing_from: b.billing_from,
-          billing_to: b.billing_to,
-          due_date: b.due_date,
-          total_amount: Number(b.total_amount),
-          paid_amount: Number(b.paid_amount),
-          due_amount: Number(b.due_amount),
-          status: b.status,
-          remarks: b.remarks,
-          created_at: b.created_at,
-          has_sufficient_wallet: walletBalance >= Number(b.due_amount),
-          wallet_shortfall: Math.max(
-            0,
-            Number(b.due_amount) - walletBalance,
-          ),
-        })),
+        bills: enrichedBills,
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
