@@ -28,10 +28,10 @@ export const envValidationSchema = Joi.object({
   // long-lived session.
   JWT_ACCESS_EXPIRES_IN: Joi.string()
     .pattern(/^\d+[smhdw]?$/)
-    .default('15m'),
+    .default('365d'),
   JWT_REFRESH_EXPIRES_IN: Joi.string()
     .pattern(/^\d+[smhdw]?$/)
-    .default('30d'),
+    .default('365d'),
 
   // Comma-separated browser origins allowed to send credentialed requests.
   // Required in production — an empty list there denies every browser origin.

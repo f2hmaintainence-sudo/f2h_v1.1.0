@@ -612,9 +612,9 @@ export class AuthController {
     // Cookie lifetimes track the tokens they carry. A 100-year cookie kept a leaked
     // session alive on the client long after the token itself should have died.
     const accessMaxAge =
-      parseDurationToSeconds(process.env.JWT_ACCESS_EXPIRES_IN || '15m') * 1000;
+      parseDurationToSeconds(process.env.JWT_ACCESS_EXPIRES_IN || '365d') * 1000;
     const refreshMaxAge =
-      parseDurationToSeconds(process.env.JWT_REFRESH_EXPIRES_IN || '30d') *
+      parseDurationToSeconds(process.env.JWT_REFRESH_EXPIRES_IN || '365d') *
       1000;
 
     res.cookie('access_token', accessToken, {
