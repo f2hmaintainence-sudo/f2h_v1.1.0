@@ -155,8 +155,16 @@ export class ProfileService {
 
       if (dto.emergency_contact !== undefined) {
         const contactName = dto.emergency_contact?.trim();
-        if (contactName && contactName.length < 2) {
-          throw new BadRequestException('Emergency contact name must be at least 2 characters');
+        if (contactName) {
+          if (contactName.length < 2) {
+            throw new BadRequestException('Emergency contact name must be at least 2 characters');
+          }
+          if (contactName.length > 50) {
+            throw new BadRequestException('Emergency contact name cannot exceed 50 characters');
+          }
+          if (!/^[a-zA-Z\s.\-']+$/.test(contactName) || /\d/.test(contactName)) {
+            throw new BadRequestException('Emergency contact name can only contain letters and spaces (no numbers)');
+          }
         }
         deliveryPartnerUpdates.emergency_contact = contactName || null;
       }
@@ -216,6 +224,12 @@ export class ProfileService {
         const fullName = dto.full_name.trim();
         if (fullName.length < 2) {
           throw new BadRequestException('Full name must be at least 2 characters');
+        }
+        if (fullName.length > 50) {
+          throw new BadRequestException('Full name cannot exceed 50 characters');
+        }
+        if (!/^[a-zA-Z\s.\-']+$/.test(fullName) || /\d/.test(fullName)) {
+          throw new BadRequestException('Full name can only contain letters and spaces (no numbers or special symbols)');
         }
         const parts = fullName.split(/\s+/);
         userUpdates.first_name = parts[0] || '';

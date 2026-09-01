@@ -88,9 +88,22 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                     _buildEditTextField(
                       label: 'Full Name',
                       controller: nameController,
+                      placeholder: 'Enter full name',
+                      maxLength: 50,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\.\-']")),
+                      ],
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) return 'Enter full name';
-                        if (val.trim().length < 2) return 'Full name must be at least 2 characters';
+                        final clean = val.trim();
+                        if (clean.length < 2) return 'Full name must be at least 2 characters';
+                        if (clean.length > 50) return 'Full name cannot exceed 50 characters';
+                        if (!RegExp(r"^[a-zA-Z\s\.\-']+$").hasMatch(clean)) {
+                          return 'Name can only contain letters and spaces';
+                        }
+                        if (RegExp(r'\d').hasMatch(clean)) {
+                          return 'Name cannot contain numbers';
+                        }
                         return null;
                       },
                     ),
@@ -273,9 +286,24 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       label: 'Contact Name / Relationship',
                       controller: emergencyNameController,
                       placeholder: 'e.g. Brother / Ashok',
+                      maxLength: 50,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s\.\-']")),
+                      ],
                       validator: (val) {
-                        if (emergencyPhoneController.text.trim().isNotEmpty && (val == null || val.trim().length < 2)) {
-                          return 'Enter emergency contact person name (min 2 characters)';
+                        if (emergencyPhoneController.text.trim().isNotEmpty && (val == null || val.trim().isEmpty)) {
+                          return 'Enter emergency contact person name';
+                        }
+                        if (val != null && val.trim().isNotEmpty) {
+                          final clean = val.trim();
+                          if (clean.length < 2) return 'Enter emergency contact name (min 2 characters)';
+                          if (clean.length > 50) return 'Name cannot exceed 50 characters';
+                          if (!RegExp(r"^[a-zA-Z\s\.\-']+$").hasMatch(clean)) {
+                            return 'Name can only contain letters and spaces';
+                          }
+                          if (RegExp(r'\d').hasMatch(clean)) {
+                            return 'Name cannot contain numbers';
+                          }
                         }
                         return null;
                       },
