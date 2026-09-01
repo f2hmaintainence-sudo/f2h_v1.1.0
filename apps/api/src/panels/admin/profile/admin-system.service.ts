@@ -6,6 +6,10 @@ import {
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
 import { AuditLogQueryDto } from './admin-system.dto';
+import {
+  APP_VERSION_PATTERN,
+  compareAppVersions,
+} from '../../../shared/version/app-version.util';
 
 export interface AuditActionBreakdown {
   action: string;
@@ -550,25 +554,72 @@ export class AdminSystemService {
         force_update,
         store_url,
         update_message,
+        update_title,
+        release_notes,
       } = body;
-      await this.db.query(
-        `UPDATE app_configs 
-         SET latest_version = $2, min_version = $3, force_update = $4, store_url = $5, update_message = $6, updated_at = NOW() 
-         WHERE platform = $1`,
+
+      // These two values decide whether every installed copy of the app keeps
+      // working. A typo in `min_version` that parses as a huge number would
+      // force-update the entire customer base with no way back, so the format
+      // is checked before it can reach the table.
+      for (const [field, value] of [
+        ['latest_version', latest_version],
+        ['min_version', min_version],
+      ] as const) {
+        if (!APP_VERSION_PATTERN.test(String(value ?? '').trim())) {
+          throw new BadRequestException(
+            `${field} must look like 1.2.3 or 1.2.3+45 — received "${value ?? ''}"`,
+          );
+        }
+      }
+
+      // A minimum above the latest release would demand a build nobody can
+      // install, which is the same outage by a different route.
+      if (compareAppVersions(min_version, latest_version) > 0) {
+        throw new BadRequestException(
+          `min_version (${min_version}) cannot be newer than latest_version (${latest_version})`,
+        );
+      }
+
+      if (!String(store_url ?? '').trim().startsWith('https://')) {
+        throw new BadRequestException('store_url must be an https:// link to the store listing');
+      }
+
+      const result = await this.db.query(
+        `UPDATE app_configs
+         SET latest_version = $2,
+             min_version = $3,
+             force_update = $4,
+             store_url = $5,
+             update_message = $6,
+             update_title = COALESCE($7, update_title),
+             release_notes = COALESCE($8, release_notes),
+             updated_at = NOW()
+         WHERE platform = $1 AND deleted_at IS NULL
+         RETURNING platform`,
         [
           platform,
-          latest_version,
-          min_version,
-          force_update,
-          store_url,
+          String(latest_version).trim(),
+          String(min_version).trim(),
+          force_update === true || force_update === 'true',
+          String(store_url).trim(),
           update_message,
+          update_title ?? null,
+          release_notes ?? null,
         ],
       );
+
+      if (!result || result.length === 0) {
+        throw new BadRequestException(`No app configuration exists for platform "${platform}"`);
+      }
       return {
         status: true,
         message: 'App configuration updated successfully',
       };
     } catch (error) {
+      // A rejected value is the admin's to fix — turning it into a 500 would
+      // hide which field was wrong on the one screen that can lock out the app.
+      if (error instanceof BadRequestException) throw error;
       this.developer.error('updateAppConfig error', { error });
       throw new InternalServerErrorException(
         'Failed to update app configuration',

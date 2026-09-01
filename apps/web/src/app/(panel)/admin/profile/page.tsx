@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FiUser, FiMail, FiPhone, FiMapPin, FiCalendar, FiGlobe,
-  FiBriefcase, FiBookOpen, FiEdit3, FiSave, FiX, FiHeart, FiLock,
+  FiBriefcase, FiBookOpen, FiEdit3, FiSave, FiX, FiHeart, FiLock, FiCamera,
 } from "react-icons/fi";
 import { Home, ChevronRight, Building2, Shield, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -56,8 +56,8 @@ const resolveProfileImage = (path?: string) => {
   if (!path) return "";
   if (/^(https?:|data:|blob:)/i.test(path)) return path;
   const backendOrigin = getBackendOrigin();
-  const apiPath = `/api/profile/image/${path.trim()}`;
-  const url = backendOrigin ? `${backendOrigin}${apiPath}` : apiPath;
+  const cleanPath = path.trim().replace(/^\//, '');
+  const url = backendOrigin ? `${backendOrigin}/${cleanPath}` : `/${cleanPath}`;
   return `${url}?v=${Date.now()}`;
 };
 
@@ -150,6 +150,46 @@ export default function AdminProfilePage() {
   const [imageError, setImageError] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [branches, setBranches] = useState<any[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Image Upload Handler ──
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showErrorToast("Please select a valid image file (PNG, JPG, WEBP)");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showErrorToast("Image size must be less than 10MB");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setUploadingImage(true);
+    try {
+      const res = await api.upload<any>("/admin/profile/photo", formData);
+      if (res.error) {
+        showErrorToast(res.error);
+      } else if (res.data?.status || res.data?.success || res.status === 200) {
+        showSuccessToast(res.data?.message || "Profile updated successfully");
+        setImageError(false);
+        await fetchProfile();
+      } else {
+        showErrorToast(res.data?.message || "Failed to upload profile picture");
+      }
+    } catch (err: any) {
+      showErrorToast(err?.message || "Failed to upload profile picture");
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   // ── Reset Password States ──
   const [showResetModal, setShowResetModal] = useState(false);
@@ -401,11 +441,31 @@ export default function AdminProfilePage() {
             </div>
 
             {/* Avatar — overlaps banner/content boundary */}
-            <div className="pv-avatar">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              onChange={handleImageUpload}
+            />
+            <div
+              className="pv-avatar group cursor-pointer relative overflow-hidden"
+              onClick={() => !uploadingImage && fileInputRef.current?.click()}
+              title="Click to change profile picture"
+            >
+              {uploadingImage && (
+                <div className="absolute inset-0 bg-black/60 z-20 flex items-center justify-center">
+                  <Loader2 size={24} className="text-white animate-spin" />
+                </div>
+              )}
               {profileImage && !imageError
                 ? <img src={profileImage} alt="avatar" onError={() => setImageError(true)} />
                 : initials(p?.first_name, p?.last_name)
               }
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex flex-col items-center justify-center text-white gap-1">
+                <FiCamera size={20} />
+                <span style={{ fontSize: "10px", fontWeight: "600" }}>Upload</span>
+              </div>
             </div>
 
             <div className="pv-hero-inner">

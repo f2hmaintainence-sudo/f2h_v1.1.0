@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Headers, Param, Req, Query, UnauthorizedException, BadRequestException, InternalServerErrorException, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
+import { Controller, Get, Post, Headers, Logger, Param, Req, Query, UnauthorizedException, BadRequestException, InternalServerErrorException, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { Public } from './auth/decorators/public.decorator';
 import { Roles, ROLE } from './auth/decorators/roles.decorator';
@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { DatabaseService } from './shared/database/Database.service';
+import { APP_VERSION_PATTERN, compareAppVersions } from './shared/version/app-version.util';
 
 /** Only these two platforms may receive an uploaded release. */
 const APK_PLATFORMS = {
@@ -83,6 +84,8 @@ const CLIENT_CONFIG_STATIC = {
 
 @Controller({ version: '1' })
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
+
   constructor(
     private readonly appService: AppService,
     @InjectQueue('default-queue') private readonly defaultQueue: Queue,
@@ -364,13 +367,29 @@ export class AppController {
       };
     }
 
-    // Query database for app configs
-    const rows = await this.db.query(
-      `SELECT latest_version, min_version, force_update, store_url, update_message, update_title, release_notes, file_size, build_number, published_date 
-       FROM app_configs 
-       WHERE platform = $1`,
-      [platform]
-    );
+    // Query database for app configs.
+    //
+    // Every failure below answers "no update required". This endpoint gates
+    // access to the whole customer app, so a database blip must not lock out
+    // customers who are running a perfectly supported build.
+    let rows: any[];
+    try {
+      rows = await this.db.query(
+        `SELECT latest_version, min_version, force_update, store_url, update_message, update_title, release_notes, file_size, build_number, published_date
+         FROM app_configs
+         WHERE platform = $1 AND deleted_at IS NULL`,
+        [platform]
+      );
+    } catch (err: any) {
+      this.logger.error(`check-version lookup failed for ${platform}: ${err?.message}`);
+      return {
+        updateRequired: false,
+        forceUpdate: false,
+        latestVersion: '',
+        storeUrl: '',
+        message: 'Version service unavailable',
+      };
+    }
 
     if (!rows || rows.length === 0) {
       return {
@@ -384,9 +403,21 @@ export class AppController {
 
     const config = rows[0];
 
+    // An unparseable client version must not be read as "ancient" — that would
+    // force-update a device over a malformed header it did not choose to send.
+    if (!APP_VERSION_PATTERN.test(clientVersion.trim())) {
+      return {
+        updateRequired: false,
+        forceUpdate: false,
+        latestVersion: config.latest_version,
+        storeUrl: config.store_url,
+        message: 'Unrecognised client version',
+      };
+    }
+
     // Compare versions
-    const belowMin = this.compareVersions(clientVersion, config.min_version) < 0;
-    const belowLatest = this.compareVersions(clientVersion, config.latest_version) < 0;
+    const belowMin = compareAppVersions(clientVersion, config.min_version) < 0;
+    const belowLatest = compareAppVersions(clientVersion, config.latest_version) < 0;
 
     let updateRequired = false;
     let forceUpdate = false;
@@ -413,27 +444,6 @@ export class AppController {
     };
   }
 
-  private compareVersions(v1: string, v2: string): number {
-    const [name1, build1] = v1.split('+');
-    const [name2, build2] = v2.split('+');
-
-    const parts1 = name1.split('.').map(Number);
-    const parts2 = name2.split('.').map(Number);
-
-    for (let i = 0; i < 3; i++) {
-      const p1 = parts1[i] || 0;
-      const p2 = parts2[i] || 0;
-      if (p1 > p2) return 1;
-      if (p1 < p2) return -1;
-    }
-
-    const b1 = Number(build1) || 0;
-    const b2 = Number(build2) || 0;
-    if (b1 > b2) return 1;
-    if (b1 < b2) return -1;
-
-    return 0;
-  }
 
   @Public()
   @Post(['delivery-partner/onboarding-request', 'partner/become-partner', 'delivery-partner/become-partner'])

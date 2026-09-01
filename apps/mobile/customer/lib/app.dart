@@ -34,6 +34,7 @@ import 'package:f2h_customer/features/orders/presentation/bloc/order_history_blo
 import 'package:f2h_customer/features/orders/presentation/bloc/order_history_event.dart';
 import 'package:f2h_customer/core/services/notification_service.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_customer/core/widgets/force_update_gate.dart';
 
 class F2HApp extends StatelessWidget {
   const F2HApp({super.key});
@@ -47,9 +48,7 @@ class F2HApp extends StatelessWidget {
         lazy: false,
         create: (_) => sl<AuthBloc>()..add(const AuthCheckRequested()),
       ),
-      BlocProvider<CustomerSessionCubit>(
-        create: (_) => sl<CustomerSessionCubit>(),
-      ),
+      BlocProvider<CustomerSessionCubit>(create: (_) => sl<CustomerSessionCubit>()),
       BlocProvider<CatalogBloc>(create: (_) => sl<CatalogBloc>()),
       BlocProvider<ProfileBloc>(create: (_) => sl<ProfileBloc>()),
       BlocProvider<SubscriptionBloc>(create: (_) => sl<SubscriptionBloc>()),
@@ -66,33 +65,39 @@ class F2HApp extends StatelessWidget {
       builder: (context, child) => NetworkOverlay(child: child!),
       theme: AppTheme.lightTheme,
       home: DynamicSplashScreen(
-        child: BlocListener<AuthBloc, AuthState>(
-          listener: (context, state) {
-            if (state is Authenticated) {
-              context.read<CustomerSessionCubit>().bootstrap();
-            } else if (state is Unauthenticated || state is AuthFailure) {
-              // Clear session cubit on logout so re-login always starts fresh
-              context.read<CustomerSessionCubit>().clear(clearToken: false);
-              context.read<CartBloc>().add(ClearCartEvent());
-            }
-          },
-          child: BlocBuilder<AuthBloc, AuthState>(
-            buildWhen: (previous, current) {
-              // Skip intermediate AuthLoading rebuilds — the login screen handles its own loading UI
-              if (current is AuthLoading) return false;
-              return true;
-            },
-            builder: (context, state) {
+        // Wraps both the signed-in and signed-out trees: an unsupported build
+        // must not reach the login form either, since the session it would
+        // create belongs to a client the API no longer supports.
+        child: ForceUpdateGate(
+          pending: const InitialLoadingScreen(),
+          child: BlocListener<AuthBloc, AuthState>(
+            listener: (context, state) {
               if (state is Authenticated) {
-                return const CustomerSessionGate();
+                context.read<CustomerSessionCubit>().bootstrap();
+              } else if (state is Unauthenticated || state is AuthFailure) {
+                // Clear session cubit on logout so re-login always starts fresh
+                context.read<CustomerSessionCubit>().clear(clearToken: false);
+                context.read<CartBloc>().add(ClearCartEvent());
               }
-              // Session still unknown — hold a loading screen rather than
-              // showing a login form to someone who is already signed in.
-              if (state is AuthInitial || state is AuthCheckInProgress) {
-                return const InitialLoadingScreen();
-              }
-              return const LoginScreen();
             },
+            child: BlocBuilder<AuthBloc, AuthState>(
+              buildWhen: (previous, current) {
+                // Skip intermediate AuthLoading rebuilds — the login screen handles its own loading UI
+                if (current is AuthLoading) return false;
+                return true;
+              },
+              builder: (context, state) {
+                if (state is Authenticated) {
+                  return const CustomerSessionGate();
+                }
+                // Session still unknown — hold a loading screen rather than
+                // showing a login form to someone who is already signed in.
+                if (state is AuthInitial || state is AuthCheckInProgress) {
+                  return const InitialLoadingScreen();
+                }
+                return const LoginScreen();
+              },
+            ),
           ),
         ),
       ),
@@ -189,11 +194,7 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
                       const SizedBox(height: 24),
                       const Text(
                         'Connection Failed',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: kText,
-                        ),
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kText),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -213,16 +214,11 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kPrimary,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: const Text(
                             'Retry Connection',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
@@ -330,11 +326,11 @@ class AppShellState extends State<AppShell> {
   }
 
   List<Widget> get _screens => [
-        HomeScreen(isNavVisible: _showNav),
-        BrowseScreen(isNavVisible: _showNav),
-        const SubsScreen(),
-        const ProfileScreen(),
-      ];
+    HomeScreen(isNavVisible: _showNav),
+    BrowseScreen(isNavVisible: _showNav),
+    const SubsScreen(),
+    const ProfileScreen(),
+  ];
 
   static const _tabs = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
@@ -438,11 +434,7 @@ class _BottomNav extends StatelessWidget {
   final int activeIndex;
   final ValueChanged<int> onSelect;
 
-  const _BottomNav({
-    required this.tabs,
-    required this.activeIndex,
-    required this.onSelect,
-  });
+  const _BottomNav({required this.tabs, required this.activeIndex, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
@@ -542,12 +534,7 @@ class _NavItem extends StatelessWidget {
                       size: 20,
                     ),
                   ),
-                  if (badge != null)
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: badge!,
-                    ),
+                  if (badge != null) Positioned(top: 0, right: 0, child: badge!),
                 ],
               ),
             ),
@@ -561,12 +548,7 @@ class _NavItem extends StatelessWidget {
               color: isActive ? activeColor : kTextSub,
               letterSpacing: 0.1,
             ),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.visible,
-              softWrap: false,
-            ),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.visible, softWrap: false),
           ),
         ],
       ),
@@ -585,8 +567,7 @@ class _SubscriptionBadgeCount extends StatefulWidget {
   const _SubscriptionBadgeCount();
 
   @override
-  State<_SubscriptionBadgeCount> createState() =>
-      _SubscriptionBadgeCountState();
+  State<_SubscriptionBadgeCount> createState() => _SubscriptionBadgeCountState();
 }
 
 class _SubscriptionBadgeCountState extends State<_SubscriptionBadgeCount> {
@@ -628,31 +609,31 @@ class _CountPip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        constraints: const BoxConstraints(minWidth: 19, minHeight: 19),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEF4444),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
+    constraints: const BoxConstraints(minWidth: 19, minHeight: 19),
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+    decoration: BoxDecoration(
+      color: const Color(0xFFEF4444),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.white, width: 1.5),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.25),
+          blurRadius: 3,
+          offset: const Offset(0, 1),
         ),
-        child: Center(
-          child: Text(
-            count > 99 ? '99+' : '$count',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w900,
-              height: 1.0,
-            ),
-          ),
+      ],
+    ),
+    child: Center(
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+          height: 1.0,
         ),
-      );
+      ),
+    ),
+  );
 }
