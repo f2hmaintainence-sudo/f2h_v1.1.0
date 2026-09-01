@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { registerToastCallback } from '@/services/toast.service';
-import { FaTimes, FaCheckCircle, FaExclamationCircle, FaInfoCircle, FaBell } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaExclamationCircle, FaBell } from 'react-icons/fa';
 
-interface ToastState {
+export interface ToastState {
   id: string;
   message: string;
   visible: boolean;
@@ -14,239 +14,256 @@ interface ToastState {
 
 let toastId = 0;
 const activeToasts = new Map<string, ToastState>();
-let updateCallback: (() => void) | null = null;
+const listeners = new Set<() => void>();
+
+function notifyListeners() {
+  listeners.forEach((fn) => {
+    try {
+      fn();
+    } catch (e) {
+      console.error(e);
+    }
+  });
+}
 
 // Toast manager functions
-export const showToast = (message: string, type: 'error' | 'success' | 'warning' | 'info' = 'error', duration = 5000) => {
+export const showToast = (
+  message: string,
+  type: 'error' | 'success' | 'warning' | 'info' = 'error',
+  duration = 4000
+) => {
   const id = `toast-${++toastId}`;
-  
+
   // Clear existing toast for same message
   for (const [key, toast] of activeToasts.entries()) {
     if (toast.message === message) {
-      clearTimeout(toast.timeout);
+      if (toast.timeout) clearTimeout(toast.timeout);
       activeToasts.delete(key);
     }
   }
-  
+
   const toast: ToastState = { id, message, visible: true, type };
-  
+
   toast.timeout = setTimeout(() => {
     toast.visible = false;
-    updateCallback?.();
+    notifyListeners();
     setTimeout(() => {
       activeToasts.delete(id);
-      updateCallback?.();
-    }, 350);
+      notifyListeners();
+    }, 300);
   }, duration);
-  
+
   activeToasts.set(id, toast);
-  updateCallback?.();
-  
+  notifyListeners();
+
   return id;
 };
 
-export const showErrorToast = (message: string, duration = 5000) => showToast(message, 'error', duration);
-export const showSuccessToast = (message: string, duration = 3000) => showToast(message, 'success', duration);
-export const showWarningToast = (message: string, duration = 4000) => showToast(message, 'warning', duration);
-export const showInfoToast = (message: string, duration = 4000) => showToast(message, 'info', duration);
+export const showErrorToast = (message: string, duration = 4500) =>
+  showToast(message, 'error', duration);
+export const showSuccessToast = (message: string, duration = 3500) =>
+  showToast(message, 'success', duration);
+export const showWarningToast = (message: string, duration = 4000) =>
+  showToast(message, 'warning', duration);
+export const showInfoToast = (message: string, duration = 4000) =>
+  showToast(message, 'info', duration);
 
 export const hideToast = (id: string) => {
   const toast = activeToasts.get(id);
   if (toast) {
     toast.visible = false;
-    clearTimeout(toast.timeout);
-    updateCallback?.();
+    if (toast.timeout) clearTimeout(toast.timeout);
+    notifyListeners();
     setTimeout(() => {
       activeToasts.delete(id);
-      updateCallback?.();
-    }, 350);
+      notifyListeners();
+    }, 300);
   }
 };
 
 export const clearAllToasts = () => {
   for (const [id, toast] of activeToasts.entries()) {
-    clearTimeout(toast.timeout);
+    if (toast.timeout) clearTimeout(toast.timeout);
     activeToasts.delete(id);
   }
-  updateCallback?.();
+  notifyListeners();
 };
 
-// Theme-aware styles — matches F2H dashboard palette (deep-green / fresh-green / gold)
 const getToastStyles = (type: 'error' | 'success' | 'warning' | 'info') => {
   const styles = {
     error: {
-      borderColor: '#dc2626',
       accentBar: '#dc2626',
-      bgColor: '#ffffff',
-      textColor: '#1a1a1a',
       labelColor: '#dc2626',
       Icon: FaExclamationCircle,
-      label: 'Error',
+      label: 'ERROR',
     },
     success: {
-      borderColor: '#2d8a45',   // fresh-green
-      accentBar: '#2d8a45',
-      bgColor: '#ffffff',
-      textColor: '#1a1a1a',
-      labelColor: '#2d8a45',
+      accentBar: '#16a34a',
+      labelColor: '#16a34a',
       Icon: FaCheckCircle,
-      label: 'Success',
+      label: 'SUCCESS',
     },
     warning: {
-      borderColor: '#f0a500',   // gold
-      accentBar: '#f0a500',
-      bgColor: '#ffffff',
-      textColor: '#1a1a1a',
-      labelColor: '#92600a',
+      accentBar: '#f59e0b',
+      labelColor: '#d97706',
       Icon: FaExclamationCircle,
-      label: 'Warning',
+      label: 'WARNING',
     },
     info: {
-      borderColor: '#0d3d1a',   // deep-green
-      accentBar: '#0d3d1a',
-      bgColor: '#ffffff',
-      textColor: '#1a1a1a',
-      labelColor: '#0d3d1a',
+      accentBar: '#2563eb',
+      labelColor: '#2563eb',
       Icon: FaBell,
-      label: 'Notification',
+      label: 'INFO',
     },
   };
-  return styles[type];
+  return styles[type] || styles.info;
 };
 
 // Toast Container Component
 export function ToastContainer() {
   const [toasts, setToasts] = useState<ToastState[]>([]);
-  
-  React.useEffect(() => {
-    updateCallback = () => {
+
+  useEffect(() => {
+    const update = () => {
       setToasts(Array.from(activeToasts.values()));
     };
 
+    listeners.add(update);
+    update();
+
     const unregisterCallbacks = [
-      registerToastCallback('success', (message, duration) => showToast(message, 'success', duration)),
-      registerToastCallback('error', (message, duration) => showToast(message, 'error', duration)),
-      registerToastCallback('info', (message, duration) => showToast(message, 'info', duration)),
-      registerToastCallback('warning', (message, duration) => showToast(message, 'warning', duration)),
+      registerToastCallback('success', (message, duration) =>
+        showToast(message, 'success', duration)
+      ),
+      registerToastCallback('error', (message, duration) =>
+        showToast(message, 'error', duration)
+      ),
+      registerToastCallback('info', (message, duration) =>
+        showToast(message, 'info', duration)
+      ),
+      registerToastCallback('warning', (message, duration) =>
+        showToast(message, 'warning', duration)
+      ),
     ];
-    
+
     return () => {
-      unregisterCallbacks.forEach(unregister => unregister());
-      for (const [id, toast] of activeToasts.entries()) {
-        clearTimeout(toast.timeout);
-        activeToasts.delete(id);
-      }
-      updateCallback = null;
+      unregisterCallbacks.forEach((unregister) => unregister());
+      listeners.delete(update);
     };
   }, []);
-  
+
+  if (toasts.length === 0) return null;
+
   return (
-    <div 
+    <div
       style={{
         position: 'fixed',
-        bottom: '28px',
+        bottom: '24px',
         right: '24px',
         zIndex: 999999,
-        pointerEvents: toasts.length === 0 ? 'none' : 'auto',
         display: 'flex',
         flexDirection: 'column-reverse',
         gap: '10px',
-        maxWidth: '380px',
-        width: '100%',
+        maxWidth: '420px',
+        width: 'calc(100% - 48px)',
+        pointerEvents: 'none',
       }}
     >
-      {toasts.length === 0 ? null : toasts.map(toast => {
-        const { borderColor, accentBar, bgColor, textColor, labelColor, Icon, label } = getToastStyles(toast.type);
-        
+      {toasts.map((toast) => {
+        const { accentBar, labelColor, Icon, label } = getToastStyles(toast.type);
+
         return (
           <div
             key={toast.id}
             style={{
-              background: bgColor,
-              border: `1px solid #e5e7eb`,
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
               borderLeft: `4px solid ${accentBar}`,
               borderRadius: '10px',
-              padding: '14px 16px',
+              padding: '12px 16px',
               display: 'flex',
-              alignItems: 'flex-start',
+              alignItems: 'center',
               gap: '12px',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0,0,0,0.06)',
-              animation: toast.visible ? 'slideInToast 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'slideOutToast 0.25s ease-in forwards',
-              fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
+              boxShadow:
+                '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.06)',
+              opacity: toast.visible ? 1 : 0,
+              transform: toast.visible ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.96)',
+              transition: 'opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
               pointerEvents: 'auto',
-              minWidth: '300px',
             }}
           >
-            {/* Icon */}
+            {/* Left circular icon badge */}
             <div
               style={{
                 color: accentBar,
-                fontSize: '18px',
+                fontSize: '20px',
                 flexShrink: 0,
-                marginTop: '1px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               <Icon />
             </div>
 
-            {/* Content */}
+            {/* Content Text */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: labelColor, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '3px' }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '800',
+                  color: labelColor,
+                  letterSpacing: '0.5px',
+                  lineHeight: '1.2',
+                  marginBottom: '2px',
+                }}
+              >
                 {label}
               </div>
-              <div style={{ fontSize: '13.5px', fontWeight: '500', color: textColor, lineHeight: '1.45', wordBreak: 'break-word' }}>
+              <div
+                style={{
+                  fontSize: '13.5px',
+                  fontWeight: '500',
+                  color: '#1e293b',
+                  lineHeight: '1.4',
+                  wordBreak: 'break-word',
+                }}
+              >
                 {toast.message}
               </div>
             </div>
 
-            {/* Close button */}
+            {/* Right Close Button */}
             <button
               onClick={() => hideToast(toast.id)}
               style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                padding: '2px 4px',
+                padding: '4px',
                 display: 'flex',
                 alignItems: 'center',
-                color: '#9ca3af',
-                fontSize: '13px',
-                transition: 'color 0.15s ease',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                fontSize: '14px',
+                borderRadius: '6px',
                 flexShrink: 0,
-                marginTop: '2px',
+                transition: 'color 0.15s ease, background 0.15s ease',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#374151'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af'; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#475569';
+                e.currentTarget.style.backgroundColor = '#f1f5f9';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#94a3b8';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               <FaTimes />
             </button>
           </div>
         );
       })}
-      
-      <style>{`
-        @keyframes slideInToast {
-          from {
-            opacity: 0;
-            transform: translateX(60px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        
-        @keyframes slideOutToast {
-          from {
-            opacity: 1;
-            transform: translateX(0);
-          }
-          to {
-            opacity: 0;
-            transform: translateX(60px);
-          }
-        }
-      `}</style>
     </div>
   );
 }

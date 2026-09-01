@@ -498,6 +498,7 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                             walletBalance: walletBalance,
                             onPaymentSuccess: () {
                               _fetchBills();
+                              UnpaidBillBannerWidget.refresh();
                               context.read<CustomerSessionCubit>().refresh();
                             },
                           );
@@ -1475,6 +1476,7 @@ class BillDetailSheet extends StatelessWidget {
                         walletBalance: walletBalance,
                         onPaymentSuccess: () {
                           onPaymentSuccess?.call();
+                          UnpaidBillBannerWidget.refresh();
                           context.read<CustomerSessionCubit>().refresh();
                         },
                       );

@@ -155,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen>
                     context.read<NotificationsBloc>().add(LoadNotifications());
                   }
                   await context.read<CustomerSessionCubit>().refreshSilently();
+                  UnpaidBillBannerWidget.refresh();
 
                   await Future.wait([
                     context.read<CatalogBloc>().stream.firstWhere(

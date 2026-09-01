@@ -250,14 +250,22 @@ export default function AdminProfilePage() {
   const saveProfile = async () => {
     setSaving(true);
     try {
-      const { data } = await api.put<any>("/admin/profile/me", form);
-      if (data?.status) {
-        showSuccessToast(data.message || "Profile updated successfully");
+      const res = await api.put<any>("/admin/profile/me", form);
+      const data = res.data;
+      if (res.error) {
+        showErrorToast(res.error);
+      } else if (data?.status || res.status === 200) {
+        showSuccessToast(data?.message || "Profile updated successfully");
         setEditing(false);
         fetchProfile();
-      } else { showErrorToast(data?.message || "Failed to update profile"); }
-    } catch { showErrorToast("Failed to update profile"); }
-    finally { setSaving(false); }
+      } else {
+        showErrorToast(data?.message || "Failed to update profile");
+      }
+    } catch (err: any) {
+      showErrorToast(err?.message || "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── Email Change Handlers ──

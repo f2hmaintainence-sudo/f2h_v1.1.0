@@ -11,6 +11,13 @@ import 'package:f2h_customer/core/payments/payment_models.dart';
 class UnpaidBillBannerWidget extends StatefulWidget {
   const UnpaidBillBannerWidget({super.key});
 
+  /// Global notifier to trigger instant refresh on all active UnpaidBillBannerWidgets
+  static final ValueNotifier<int> refreshTrigger = ValueNotifier<int>(0);
+
+  static void refresh() {
+    refreshTrigger.value++;
+  }
+
   @override
   State<UnpaidBillBannerWidget> createState() => _UnpaidBillBannerWidgetState();
 }
@@ -22,7 +29,20 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
   @override
   void initState() {
     super.initState();
+    UnpaidBillBannerWidget.refreshTrigger.addListener(_onRefreshTrigger);
     _fetchUnpaidBills();
+  }
+
+  @override
+  void dispose() {
+    UnpaidBillBannerWidget.refreshTrigger.removeListener(_onRefreshTrigger);
+    super.dispose();
+  }
+
+  void _onRefreshTrigger() {
+    if (mounted) {
+      _fetchUnpaidBills();
+    }
   }
 
   Future<void> _fetchUnpaidBills() async {
@@ -30,7 +50,10 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
       final dio = DioClient().dio;
       final response = await dio.get(ApiEndpoints.paymentUnpaidBills);
       final data = response.data;
-      if (data is Map && data['status'] == true && data['has_unpaid_bills'] == true) {
+      if (data is Map &&
+          data['status'] == true &&
+          data['has_unpaid_bills'] == true &&
+          (data['bills'] as List?)?.isNotEmpty == true) {
         if (mounted) {
           setState(() {
             _billData = Map<String, dynamic>.from(data);
@@ -44,7 +67,10 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
     }
 
     if (mounted) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _billData = null;
+        _isLoading = false;
+      });
     }
   }
 
@@ -55,6 +81,10 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
       walletBalance: (_billData?['wallet_balance'] as num?)?.toDouble() ?? 0.0,
       onPaymentSuccess: () {
         _fetchUnpaidBills();
+        try {
+          // ignore: use_build_context_synchronously
+          context.read<CustomerSessionCubit>().refreshSilently();
+        } catch (_) {}
       },
     );
   }
@@ -284,6 +314,11 @@ class _UnpaidBillPaymentSheetState extends State<UnpaidBillPaymentSheet> {
         );
 
         widget.onPaymentSuccess();
+        UnpaidBillBannerWidget.refresh();
+        try {
+          // ignore: use_build_context_synchronously
+          context.read<CustomerSessionCubit>().refreshSilently();
+        } catch (_) {}
         await Future.delayed(const Duration(milliseconds: 1800));
         if (mounted) Navigator.pop(context);
         return;
@@ -338,6 +373,11 @@ class _UnpaidBillPaymentSheetState extends State<UnpaidBillPaymentSheet> {
     );
 
     widget.onPaymentSuccess();
+    UnpaidBillBannerWidget.refresh();
+    try {
+      // ignore: use_build_context_synchronously
+      context.read<CustomerSessionCubit>().refreshSilently();
+    } catch (_) {}
     await Future.delayed(const Duration(milliseconds: 1800));
     if (mounted) Navigator.pop(context);
   }

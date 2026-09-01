@@ -16,8 +16,6 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { AdminSidebar } from "@/components/f2h/AdminSidebar";
 import { AdminHeader } from "@/components/f2h/AdminHeader";
 import { DeliveryHeader } from "@/components/f2h/Deliveryheader";
-import { DeliverySidebar } from "@/components/f2h/Deliverysidebar";
-import { ToastContainer } from "@/components/Toast";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 
@@ -177,7 +175,6 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   return (
     <AuthProvider>
       <NotificationProvider>
-        <ToastContainer />
         <RealtimeNotifications />
         <PanelGuard>{children}</PanelGuard>
       </NotificationProvider>
