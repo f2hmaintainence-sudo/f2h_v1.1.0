@@ -25,7 +25,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     final nameController = TextEditingController(text: p.fullName);
     final emailController = TextEditingController(text: p.email);
     final dobController = TextEditingController(text: p.dateOfBirth?.split('T')[0] ?? '');
-    final genderController = TextEditingController(text: p.gender ?? '');
+    String selectedGender = 'Male';
+    if (p.gender != null && p.gender!.isNotEmpty) {
+      final match = ['Male', 'Female', 'Other', 'Prefer not to say'].firstWhere(
+        (g) => g.toLowerCase() == p.gender!.toLowerCase().trim(),
+        orElse: () => 'Male',
+      );
+      selectedGender = match;
+    }
     final addressController = TextEditingController(text: p.residentialAddress ?? '');
     final emergencyNameController = TextEditingController(text: p.emergencyContact ?? '');
 
@@ -128,10 +135,59 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    _buildEditTextField(
-                      label: 'Gender',
-                      controller: genderController,
-                      placeholder: 'e.g. Male / Female',
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Gender',
+                          style: GoogleFonts.roboto(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF475569),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedGender,
+                          onChanged: (val) {
+                            if (val != null) {
+                              setModalState(() {
+                                selectedGender = val;
+                              });
+                            }
+                          },
+                          style: GoogleFonts.roboto(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF0F172A),
+                          ),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                          dropdownColor: Colors.white,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'Male', child: Text('Male')),
+                            DropdownMenuItem(value: 'Female', child: Text('Female')),
+                            DropdownMenuItem(value: 'Other', child: Text('Other')),
+                            DropdownMenuItem(value: 'Prefer not to say', child: Text('Prefer not to say')),
+                          ],
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
 
@@ -219,7 +275,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                               'full_name': nameController.text.trim(),
                               'email': emailController.text.trim(),
                               'date_of_birth': dobController.text.trim().isEmpty ? null : dobController.text.trim(),
-                              'gender': genderController.text.trim().isEmpty ? null : genderController.text.trim(),
+                              'gender': selectedGender,
                               'residential_address': addressController.text.trim().isEmpty ? null : addressController.text.trim(),
                               'emergency_contact': emergencyNameController.text.trim().isEmpty ? null : emergencyNameController.text.trim(),
                               'emergency_contact_number': cleanEmergencyPhone,

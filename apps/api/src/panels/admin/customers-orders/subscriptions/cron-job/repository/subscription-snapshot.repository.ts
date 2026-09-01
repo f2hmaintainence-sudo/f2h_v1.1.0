@@ -230,7 +230,11 @@ export class SubscriptionSnapshotRepository {
       WITH items_to_insert AS (
         SELECT
           o.order_id,
-          si.id                  AS subscription_item_id,
+          -- The business key, not the surrogate si.id. Everything that reads
+          -- this column back joins on subscription_items.subscription_item_id,
+          -- so writing the numeric id made the row unjoinable — which is why
+          -- failed prepaid deliveries never produced a refund candidate.
+          si.subscription_item_id AS subscription_item_id,
           si.product_variant_id  AS variant_id,
           ${qtyExpr}             AS quantity,
           COALESCE(NULLIF(si.final_price, 0), NULLIF(si.unit_price, 0), pv.price, 0) AS unit_price,
