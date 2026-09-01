@@ -168,13 +168,25 @@ function DeliveryRouteSvg() {
 // ── Leaflet Radius Map Component ──────────────────────────────────
 function BranchRadiusMap({ lat, lng, radiusKm, branchName }: { lat: number; lng: number; radiusKm: number; branchName: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
-    let mapInstance: any = null;
+    let isCancelled = false;
 
     import("leaflet").then((L) => {
-      if (!containerRef.current) return;
+      if (isCancelled || !containerRef.current) return;
+
+      // Clean up previous instance if any
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+
+      // Clear any leftover Leaflet container property
+      if ((containerRef.current as any)._leaflet_id) {
+        delete (containerRef.current as any)._leaflet_id;
+      }
 
       // Inject Leaflet CSS if not already loaded
       if (!document.getElementById("leaflet-css-cdn")) {
@@ -193,12 +205,13 @@ function BranchRadiusMap({ lat, lng, radiusKm, branchName }: { lat: number; lng:
         shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       });
 
-      mapInstance = L.map(containerRef.current, { scrollWheelZoom: false }).setView([lat, lng], 12);
+      const map = L.map(containerRef.current, { scrollWheelZoom: false }).setView([lat, lng], 12);
+      mapInstanceRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; OpenStreetMap',
         maxZoom: 18,
-      }).addTo(mapInstance);
+      }).addTo(map);
 
       // Delivery Radius Circle overlay (radius in meters)
       const circle = L.circle([lat, lng], {
@@ -208,11 +221,11 @@ function BranchRadiusMap({ lat, lng, radiusKm, branchName }: { lat: number; lng:
         weight: 3,
         dashArray: "6, 6",
         radius: radiusKm * 1000,
-      }).addTo(mapInstance);
+      }).addTo(map);
 
       // Center Marker with Popup
       L.marker([lat, lng])
-        .addTo(mapInstance)
+        .addTo(map)
         .bindPopup(`
           <div style="font-family: system-ui, sans-serif; text-align: center; padding: 4px 2px;">
             <strong style="color: #0d3d1a; font-size: 14px; font-weight: 700;">${branchName}</strong>
@@ -223,12 +236,17 @@ function BranchRadiusMap({ lat, lng, radiusKm, branchName }: { lat: number; lng:
         `)
         .openPopup();
 
-      mapInstance.fitBounds(circle.getBounds(), { padding: [30, 30] });
+      map.fitBounds(circle.getBounds(), { padding: [30, 30] });
     });
 
     return () => {
-      if (mapInstance) {
-        mapInstance.remove();
+      isCancelled = true;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+      if (containerRef.current && (containerRef.current as any)._leaflet_id) {
+        delete (containerRef.current as any)._leaflet_id;
       }
     };
   }, [lat, lng, radiusKm, branchName]);

@@ -307,6 +307,7 @@ export class FinanceService {
     doc.font('Helvetica-Bold').fillColor(isPaid ? '#059669' : '#dc2626').text(isPaid ? 'PAID' : (dueAmount > 0 ? `DUE (${fmtMoney(dueAmount)})` : 'PENDING'), 410, cardY + 66, { width: 145, align: 'right' });
 
     // -------------------------------------------------------------
+    // -------------------------------------------------------------
     // LINE ITEMS TABLE HEADER
     // -------------------------------------------------------------
     const tableTop = 196;
@@ -314,8 +315,8 @@ export class FinanceService {
 
     doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
     doc.text('SL', 40, tableTop + 7, { width: 20 });
-    doc.text('ITEM DESCRIPTION / PRODUCE', 65, tableTop + 7, { width: 230 });
-    doc.text('SCHEDULE / REF', 300, tableTop + 7, { width: 85 });
+    doc.text('DELIVERY DATE & SLOT', 65, tableTop + 7, { width: 140 });
+    doc.text('ITEM / PRODUCE', 210, tableTop + 7, { width: 175 });
     doc.text('QTY', 390, tableTop + 7, { width: 35, align: 'center' });
     doc.text('RATE', 430, tableTop + 7, { width: 60, align: 'right' });
     doc.text('TOTAL', 495, tableTop + 7, { width: 60, align: 'right' });
@@ -342,20 +343,27 @@ export class FinanceService {
       doc.font('Helvetica').fontSize(8).fillColor('#64748b');
       doc.text(String(idx + 1), 40, currentY + 6, { width: 20 });
 
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0f172a');
+      // Delivery Date & Slot
+      doc.font('Helvetica').fontSize(8).fillColor('#0f172a');
+      const dateStr = item.scheduled_date
+        ? `${fmtDate(item.scheduled_date)} (${item.delivery_slot ? item.delivery_slot.charAt(0).toUpperCase() + item.delivery_slot.slice(1) : 'Morning'})`
+        : String(item.reference_id || item.order_id || '—');
+      doc.text(dateStr.slice(0, 24), 65, currentY + 6, { width: 140 });
+
+      // Item Description
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a');
       const itemName = String(item.item_name || item.product_name || 'Produce Item').trim();
-      doc.text(itemName.length > 38 ? itemName.slice(0, 36) + '...' : itemName, 65, currentY + 6, { width: 230 });
+      doc.text(itemName.length > 28 ? itemName.slice(0, 26) + '...' : itemName, 210, currentY + 6, { width: 175 });
 
-      doc.font('Helvetica').fontSize(7.5).fillColor('#64748b');
-      const refOrDate = item.scheduled_date ? fmtDate(item.scheduled_date) : String(item.reference_id || item.order_id || '—');
-      doc.text(refOrDate.slice(0, 18), 300, currentY + 6, { width: 85 });
-
+      // Qty
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#334155');
       doc.text(String(item.quantity || 1), 390, currentY + 6, { width: 35, align: 'center' });
 
+      // Rate
       doc.font('Helvetica').fontSize(8.5).fillColor('#475569');
       doc.text(fmtMoney(item.unit_price || 0), 430, currentY + 6, { width: 60, align: 'right' });
 
+      // Total
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#047857');
       doc.text(fmtMoney(item.total_amount || 0), 495, currentY + 6, { width: 60, align: 'right' });
 

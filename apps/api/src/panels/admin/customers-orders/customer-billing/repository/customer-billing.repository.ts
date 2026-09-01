@@ -43,14 +43,33 @@ export class CustomerBillingRepository {
 
   // ─── NEW CUSTOMER_BILLS METHODS ──────────────────────────────────────────
 
-  async checkBillExists(customerId: string, periodStart: string, periodEnd: string): Promise<any> {
+  /**
+   * Finds a bill already raised for this customer and period.
+   *
+   * Billing is one bill per subscription, so a customer with two subscriptions
+   * legitimately has two bills for the same month — [referenceId] narrows the
+   * check to one of them. Without it the second subscription would be reported
+   * as "already billed" and never invoiced.
+   */
+  async checkBillExists(
+    customerId: string,
+    periodStart: string,
+    periodEnd: string,
+    referenceId?: string | null,
+  ): Promise<any> {
     const sql = `
       SELECT bill_id, status, total_amount
       FROM public.customer_bills
       WHERE customer_id = $1 AND billing_from = $2 AND billing_to = $3
+        AND ($4::varchar IS NULL OR reference_id = $4)
       LIMIT 1
     `;
-    const rows = await this.databaseService.query(sql, [customerId, periodStart, periodEnd]);
+    const rows = await this.databaseService.query(sql, [
+      customerId,
+      periodStart,
+      periodEnd,
+      referenceId ?? null,
+    ]);
     if (!rows || rows.length === 0) return null;
     return {
       id: rows[0].bill_id,

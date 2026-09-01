@@ -1096,8 +1096,141 @@ class BillDetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Delivered Items List
-                  if (rawItems.isNotEmpty) ...[
+                  // Delivered Items / Subscription Orders Breakdown
+                  if (isSubscription) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFBBF7D0), width: 1.2),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.calendar_month_rounded, color: Color(0xFF16653A), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Monthly Subscription Orders',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF14532D),
+                                      ),
+                                    ),
+                                    Text(
+                                      'Itemized deliveries for ${_getBillMonthYear(bill)}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF16653A),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  rawItems.isNotEmpty ? '${rawItems.length} Deliveries' : 'Active Sub',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF16653A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFDCFCE7)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF059669)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Includes all scheduled daily deliveries with exact date, delivery slot (Morning/Evening), product quantity and status.',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade700,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                try {
+                                  final token = await TokenStorage.getAccessToken();
+                                  final basePdfUrl = ApiEndpoints.receiptPdf(billId);
+                                  final pdfUrl = token != null && token.isNotEmpty
+                                      ? '$basePdfUrl?token=$token'
+                                      : basePdfUrl;
+                                  final uri = Uri.parse(pdfUrl);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  } else {
+                                    await launchUrl(uri, mode: LaunchMode.platformDefault);
+                                  }
+                                } catch (e) {
+                                  debugPrint('Error downloading monthly orders list PDF: $e');
+                                }
+                              },
+                              icon: const Icon(Icons.file_download_rounded, size: 18, color: Colors.white),
+                              label: const Text(
+                                'DOWNLOAD ORDERS LIST (DATE & SLOT)',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16653A),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ] else if (rawItems.isNotEmpty) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1287,9 +1420,9 @@ class BillDetailSheet extends StatelessWidget {
                     }
                   },
                   icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
-                  label: const Text(
-                    'DOWNLOAD INVOICE PDF',
-                    style: TextStyle(
+                  label: Text(
+                    isSubscription ? 'DOWNLOAD STATEMENT' : 'DOWNLOAD INVOICE PDF',
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
@@ -1313,11 +1446,18 @@ class BillDetailSheet extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      Navigator.push(
+                      final sessionState = context.read<CustomerSessionCubit>().state;
+                      final walletBalance = (sessionState.wallet['balance'] as num?)?.toDouble() ??
+                          sessionState.profile?.walletBalance ??
+                          0.0;
+                      UnpaidBillPaymentSheet.show(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const WalletScreen(),
-                        ),
+                        bill: bill,
+                        walletBalance: walletBalance,
+                        onPaymentSuccess: () {
+                          _fetchBills();
+                          context.read<CustomerSessionCubit>().refresh();
+                        },
                       );
                     },
                     icon: const Icon(

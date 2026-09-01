@@ -408,6 +408,45 @@ export class CustomerOrderController {
         }
       }
 
+      // 4. For subscription bills, fetch delivered orders with date & slot for that monthly billing period
+      for (const bill of bills) {
+        if (
+          bill.bill_type === 'subscription' ||
+          (bill.reference_id && String(bill.reference_id).startsWith('CONSOLIDATED')) ||
+          (bill.bill_id && String(bill.bill_id).includes('PB'))
+        ) {
+          if (bill.billing_from && bill.billing_to) {
+            try {
+              const deliveredOrders = await this.db.query(
+                `SELECT o.order_id, o.scheduled_date, o.delivery_slot, o.status,
+                        oi.variant_id, oi.quantity, oi.unit_price, oi.final_price,
+                        COALESCE(NULLIF(TRIM(CONCAT(p.name, ' - ', pv.name)), ' - '), oi.product_name, p.name, 'Subscription Item') AS item_name,
+                        COALESCE(p.name, '') AS product_name,
+                        COALESCE(pv.name, '') AS variant_name
+                 FROM orders o
+                 JOIN order_items oi ON oi.order_id = o.order_id
+                 LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+                 LEFT JOIN products p ON p.product_id = pv.product_id
+                 WHERE (o.customer_id = $1 OR o.customer_id IN (SELECT customer_id FROM customers WHERE user_id = $1))
+                   AND (o.scheduled_date >= $2::date AND o.scheduled_date <= $3::date)
+                   AND o.status IN ('delivered', 'completed', 'active', 'confirmed')
+                 ORDER BY o.scheduled_date ASC`,
+                [userId, bill.billing_from, bill.billing_to],
+              );
+              if (deliveredOrders && deliveredOrders.length > 0) {
+                bill.items = deliveredOrders;
+                bill.item_name = Array.from(
+                  new Set(deliveredOrders.map((d: any) => d.item_name)),
+                ).join(', ');
+                bill.deliveries_count = deliveredOrders.length;
+              }
+            } catch (err) {
+              console.error('getBills: Error fetching delivered orders for subscription bill', err);
+            }
+          }
+        }
+      }
+
       // Sort combined by created_at DESC
       bills.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 

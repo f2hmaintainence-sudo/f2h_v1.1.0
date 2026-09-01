@@ -10,7 +10,12 @@ import { NestFactory } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
+import { CustomerBillingService } from 'src/panels/admin/customers-orders/customer-billing/services/customer-billing.service';
 import { CustomerBillingRepository } from 'src/panels/admin/customers-orders/customer-billing/repository/customer-billing.repository';
+import { NotificationService } from 'src/notifications/notification.service';
+import { AuthService } from 'src/panels/admin/auth/auth.service';
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
+import { CronLockService } from 'src/shared/scheduling/cron-lock.service';
 import { RefundCandidatesRepository } from 'src/panels/admin/customers-orders/subscriptions/refund-candidates/refund-candidates.repository';
 import { RefundEligibilityService } from 'src/panels/admin/customers-orders/subscriptions/refund-candidates/refund-eligibility.service';
 
@@ -20,8 +25,17 @@ import { RefundEligibilityService } from 'src/panels/admin/customers-orders/subs
     DatabaseService,
     DeveloperService,
     CustomerBillingRepository,
+    CustomerBillingService,
     RefundCandidatesRepository,
     RefundEligibilityService,
+    // Outbound notifications are not what this harness verifies, and wiring the
+    // real ones drags in the whole admin auth graph. The billing logic under
+    // test never reads their return values.
+    { provide: NotificationService, useValue: { sendNotification: async () => undefined } },
+    { provide: AuthService, useValue: { getUsersByRole: async () => ({ user_ids: [] }) } },
+    { provide: PushNotificationService, useValue: { sendNotificationToUsers: async () => undefined } },
+    // The cron lock is Redis-backed; granting it keeps the batch path identical.
+    { provide: CronLockService, useValue: { acquire: async () => true } },
   ],
 })
 class QaModule {}
@@ -41,7 +55,7 @@ const DUE_DATE = (() => {
 
 async function main() {
   const app = await NestFactory.createApplicationContext(QaModule, { logger: ['error'] });
-  const billing = app.get(CustomerBillingRepository);
+  const billingService = app.get(CustomerBillingService);
   const eligibility = app.get(RefundEligibilityService);
   const db = app.get(DatabaseService);
   const q = async (sql: string, p: any[] = []) => (await db.query(sql, p)) as any[];
@@ -50,73 +64,53 @@ async function main() {
   console.log(`MONTH-CLOSE VERIFY — ${MONTH} (${PERIOD_START} → ${PERIOD_END}, due ${DUE_DATE})`);
   console.log('═'.repeat(78));
 
-  // ── 1. Postpaid bill generation (the path both the cron and the admin
-  //       "Generate" button take) ────────────────────────────────────────────
-  console.log('\n[1] POSTPAID BILL GENERATION');
-  const eligible = await billing.findEligiblePostpaidCustomers();
-  console.log(`  eligible postpaid customers: ${eligible.length}`);
-
-  let generated = 0;
-  let skipped = 0;
-  let failed = 0;
-
-  for (const c of eligible) {
-    const cid = c.customer_id;
-    const orders = await billing.findDeliveredOrdersForPeriod(cid, PERIOD_START, PERIOD_END, true);
-    const existing = await billing.checkBillExists(cid, PERIOD_START, PERIOD_END);
-
-    if (existing) {
-      skipped++;
-      console.log(`  - ${cid}: SKIPPED (bill ${existing.bill_number} already covers this period)`);
-      continue;
-    }
-    if (!orders.length) {
-      skipped++;
-      console.log(`  - ${cid}: SKIPPED (no unbilled delivered postpaid orders)`);
-      continue;
-    }
-
-    const total = orders.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-    const paid = orders
-      .filter((o) => o.order_source === 'one-time' && o.payment_status === 'paid')
-      .reduce((s, o) => s + Number(o.total_amount || 0), 0);
-    const status = paid >= total ? 'paid' : 'pending';
-
-    try {
-      const bill = await billing.createBillTransaction(
-        cid, PERIOD_START, PERIOD_END, DUE_DATE, orders, total, paid, status, 'postpaid',
-      );
-      generated++;
-      const row = (
-        await q(
-          `SELECT bill_id, payment_method, payment_type, bill_type, total_amount, paid_amount, due_amount, status
-           FROM customer_bills WHERE bill_id = $1`,
-          [bill.bill_number],
-        )
-      )[0];
-      console.log(`  - ${cid}: GENERATED ${bill.bill_number} from ${orders.length} order(s)`);
-      console.log(`      ${JSON.stringify(row)}`);
-      const items = (
-        await q(`SELECT count(*)::int AS n FROM customer_bill_items WHERE bill_id = $1`, [bill.bill_number])
-      )[0];
-      console.log(`      customer_bill_items rows: ${items.n}`);
-    } catch (err: any) {
-      failed++;
-      console.log(`  - ${cid}: FAILED — ${err?.message}`);
-    }
+  // ── 1. Postpaid bill generation — the exact call the monthly cron and the
+  //       admin "Generate" button both make ────────────────────────────────────
+  console.log('\n[1] POSTPAID BILL GENERATION (via CustomerBillingService.runMonthlyBatchBilling)');
+  const run = await billingService.runMonthlyBatchBilling({
+    periodStart: PERIOD_START,
+    periodEnd: PERIOD_END,
+    dueDate: DUE_DATE,
+  } as any);
+  console.log(`  summary: ${JSON.stringify(run.summary)}`);
+  for (const r of run.data ?? []) {
+    const sub = r.subscriptionId ? ` sub=${r.subscriptionId}` : '';
+    console.log(`  - ${r.customerId}${sub}: ${String(r.action).toUpperCase()} ${r.billNumber ?? ''} ${r.message ?? ''}`);
   }
-  console.log(`  summary: { eligible: ${eligible.length}, generated: ${generated}, skipped: ${skipped}, failed: ${failed} }`);
 
-  // ── 2. Idempotency: a second run must not double-bill ─────────────────────
-  console.log('\n[2] RE-RUN (idempotency — the admin pressing Generate twice)');
-  let reSkipped = 0;
-  for (const c of eligible) {
-    const existing = await billing.checkBillExists(c.customer_id, PERIOD_START, PERIOD_END);
-    const orders = await billing.findDeliveredOrdersForPeriod(c.customer_id, PERIOD_START, PERIOD_END, true);
-    if (existing || !orders.length) reSkipped++;
+  const madeBills = await q(
+    `SELECT bill_id, customer_id, bill_type, reference_id, payment_type, payment_method,
+            total_amount, due_amount, status
+     FROM customer_bills
+     WHERE billing_from = $1 AND billing_to = $2 AND payment_type = 'postpaid'
+     ORDER BY reference_id`,
+    [PERIOD_START, PERIOD_END],
+  );
+  console.log(`\n  bills now on record for ${PERIOD_START}..${PERIOD_END}:`);
+  for (const b of madeBills) {
+    const items = (
+      await q(`SELECT count(*)::int AS n, sum(total_amount) AS amt FROM customer_bill_items WHERE bill_id = $1`, [b.bill_id])
+    )[0];
+    console.log(`    ${b.bill_id}  type=${b.bill_type}  ref=${b.reference_id}  ` +
+      `Rs.${b.total_amount} due=${b.due_amount} ${b.status}  items=${items.n} (Rs.${items.amt})`);
   }
-  console.log(`  ${reSkipped}/${eligible.length} customers would be skipped on a second run` +
-    `${reSkipped === eligible.length ? ' — no duplicate bills possible' : ' — CHECK THIS'}`);
+
+  // ── 2. Idempotency: pressing Generate again must not duplicate ────────────
+  console.log('\n[2] RE-RUN (the admin pressing Generate twice)');
+  const rerun = await billingService.runMonthlyBatchBilling({
+    periodStart: PERIOD_START,
+    periodEnd: PERIOD_END,
+    dueDate: DUE_DATE,
+  } as any);
+  const afterBills = Number(
+    (await q(
+      `SELECT count(*)::int AS n FROM customer_bills WHERE billing_from = $1 AND billing_to = $2 AND payment_type = 'postpaid'`,
+      [PERIOD_START, PERIOD_END],
+    ))[0].n,
+  );
+  console.log(`  summary: ${JSON.stringify(rerun.summary)}`);
+  console.log(`  bill count: ${madeBills.length} -> ${afterBills}` +
+    `${afterBills === madeBills.length ? ' — no duplicates' : ' — DUPLICATES CREATED, CHECK THIS'}`);
 
   // ── 3. Refund candidate scan (the path the new cron and the developer
   //       "Run Live Scan & Materialize" button take) ──────────────────────────

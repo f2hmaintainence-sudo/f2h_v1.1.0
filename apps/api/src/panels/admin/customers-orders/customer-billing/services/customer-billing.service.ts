@@ -185,15 +185,18 @@ export class CustomerBillingService {
           continue;
         }
 
+        // One result per subscription — a customer can yield several bills.
         const res = await this.processSingleCustomerBill(cid, periodStart, periodEnd, dueDate);
-        if (res.action === 'generated') {
-          generated++;
-        } else if (res.action === 'skipped') {
-          skipped++;
-        } else {
-          failed++;
+        for (const r of res) {
+          if (r.action === 'generated') {
+            generated++;
+          } else if (r.action === 'skipped') {
+            skipped++;
+          } else {
+            failed++;
+          }
+          results.push(r);
         }
-        results.push(res);
       } catch (err: any) {
         this.logger.error(`Error generating bill for customer ${cid}: ${err.message}`, err.stack);
         failed++;
@@ -310,24 +313,21 @@ export class CustomerBillingService {
         const customerName = nameParts.length > 0 ? nameParts.join(' ') : 'Customer';
         const customerPhone = custInfo?.phone || c.phone || '';
 
-        const existingBill = await this.repository.checkBillExists(cid, periodStart, periodEnd);
-        if (existingBill) {
-          skipped.push({
-            customer_id: cid,
-            customer_name: customerName,
-            customer_phone: customerPhone,
-            reason: `Bill #${existingBill.bill_number} already exists (${existingBill.status}, ₹${existingBill.total_amount})`,
-          });
-          continue;
-        }
-
+        // Billing is per subscription, so a customer can have one subscription
+        // already billed and another still outstanding. `findDeliveredOrdersForPeriod`
+        // already excludes anything sitting on a bill, so an empty result — not the
+        // existence of some bill — is what means "nothing left to raise". Skipping
+        // the whole customer on the first bill found hid the unbilled subscription.
         const deliveredOrders = await this.repository.findDeliveredOrdersForPeriod(cid, periodStart, periodEnd, true);
         if (!deliveredOrders || deliveredOrders.length === 0) {
+          const existingBill = await this.repository.checkBillExists(cid, periodStart, periodEnd);
           skipped.push({
             customer_id: cid,
             customer_name: customerName,
             customer_phone: customerPhone,
-            reason: 'No delivered orders found in this billing period',
+            reason: existingBill
+              ? `Already billed — #${existingBill.bill_number} (${existingBill.status}, ₹${existingBill.total_amount})`
+              : 'No delivered orders found in this billing period',
           });
           continue;
         }
@@ -414,12 +414,24 @@ export class CustomerBillingService {
     };
   }
 
+  /**
+   * Raises this customer's bills for the period — **one bill per subscription**.
+   *
+   * A customer running two subscriptions gets two bills, each carrying its own
+   * `subscription_id` in `reference_id`, so they can see which subscription they
+   * are being charged for. Consolidating them into a single customer-level bill
+   * left `reference_id` unable to name any one subscription and gave the customer
+   * no way to trace the charge.
+   *
+   * Returns one result row per subscription considered, so the batch summary
+   * counts bills rather than customers.
+   */
   private async processSingleCustomerBill(
     customerId: string,
     periodStart: string,
     periodEnd: string,
     dueDate: string,
-  ): Promise<any> {
+  ): Promise<any[]> {
     const customer = await this.repository.checkCustomerPostpaidEnabled(customerId);
     const isPostpaid = customer ? Boolean(customer.is_postpaid_enabled) : true;
 
@@ -430,109 +442,159 @@ export class CustomerBillingService {
       isPostpaid,
     );
 
-    const existingBill = await this.repository.checkBillExists(
-      customerId,
-      periodStart,
-      periodEnd,
-    );
-    if (existingBill) {
-      return {
-        status: false,
-        action: 'skipped',
-        message: 'Bill already exists for this customer and billing period.',
-        billNumber: existingBill.bill_number,
-        'Bill Number': existingBill.bill_number,
-        customerId,
-        'Customer ID': customerId,
-        billingPeriod: { start: periodStart, end: periodEnd },
-        'Billing Period': `${periodStart} to ${periodEnd}`,
-        totalAmount: Number(existingBill.total_amount || 0),
-        'Total Amount': Number(existingBill.total_amount || 0),
-        billStatus: existingBill.status,
-        'Bill Status': existingBill.status,
-      };
-    }
-
     if (!deliveredOrders || deliveredOrders.length === 0) {
-      return {
-        status: false,
-        action: 'skipped',
-        message: isPostpaid
-          ? 'No delivered orders found for this customer within the given billing period.'
-          : 'No scheduled orders found for this customer within the given billing period.',
-        customerId,
-        'Customer ID': customerId,
-        deliveredOrdersCount: 0,
-        'Number of Delivered Orders': 0,
-      };
+      return [
+        {
+          status: false,
+          action: 'skipped',
+          message: isPostpaid
+            ? 'No delivered orders found for this customer within the given billing period.'
+            : 'No scheduled orders found for this customer within the given billing period.',
+          customerId,
+          'Customer ID': customerId,
+          deliveredOrdersCount: 0,
+          'Number of Delivered Orders': 0,
+        },
+      ];
     }
 
-    let totalAmount = 0;
-    let paidAmount = 0;
+    // Group the month's deliveries by the subscription that produced them.
+    const bySubscription = new Map<string, any[]>();
     for (const ord of deliveredOrders) {
-      const amt = Number(ord.total_amount || 0);
-      totalAmount += amt;
-      if (isPostpaid) {
-        if (ord.order_source === 'one-time' && ord.payment_status === 'paid') {
+      const key = ord.subscription_id || 'NON_SUBSCRIPTION';
+      const bucket = bySubscription.get(key);
+      if (bucket) bucket.push(ord);
+      else bySubscription.set(key, [ord]);
+    }
+
+    const results: any[] = [];
+
+    for (const [subscriptionKey, orders] of bySubscription) {
+      const subscriptionId = subscriptionKey === 'NON_SUBSCRIPTION' ? null : subscriptionKey;
+
+      const existingBill = await this.repository.checkBillExists(
+        customerId,
+        periodStart,
+        periodEnd,
+        subscriptionId,
+      );
+      if (existingBill) {
+        results.push({
+          status: false,
+          action: 'skipped',
+          message: 'Bill already exists for this subscription and billing period.',
+          billNumber: existingBill.bill_number,
+          'Bill Number': existingBill.bill_number,
+          customerId,
+          'Customer ID': customerId,
+          subscriptionId,
+          'Subscription ID': subscriptionId,
+          billingPeriod: { start: periodStart, end: periodEnd },
+          'Billing Period': `${periodStart} to ${periodEnd}`,
+          totalAmount: Number(existingBill.total_amount || 0),
+          'Total Amount': Number(existingBill.total_amount || 0),
+          billStatus: existingBill.status,
+          'Bill Status': existingBill.status,
+        });
+        continue;
+      }
+
+      let totalAmount = 0;
+      let paidAmount = 0;
+      for (const ord of orders) {
+        const amt = Number(ord.total_amount || 0);
+        totalAmount += amt;
+        if (isPostpaid) {
+          if (ord.order_source === 'one-time' && ord.payment_status === 'paid') {
+            paidAmount += amt;
+          }
+        } else {
           paidAmount += amt;
         }
-      } else {
-        paidAmount += amt;
+      }
+
+      const status = paidAmount >= totalAmount ? 'paid' : 'pending';
+
+      try {
+        const createdBill = await this.repository.createBillTransaction(
+          customerId,
+          periodStart,
+          periodEnd,
+          dueDate,
+          orders,
+          totalAmount,
+          paidAmount,
+          status,
+          isPostpaid ? 'postpaid' : 'prepaid',
+        );
+
+        this.logger.log(
+          `Successfully generated postpaid bill #${createdBill.bill_number} for ${customerId}` +
+            `${subscriptionId ? ` (subscription ${subscriptionId})` : ''}`,
+        );
+
+        // The product name lets a customer with several subscriptions tell one
+        // bill's push notification from another.
+        const productName = orders.find((o) => o.order_name)?.order_name || '';
+
+        setImmediate(async () => {
+          try {
+            const amountFormatted = `₹${Number(createdBill.total_amount || 0).toFixed(2)}`;
+            const dueDateFormatted = new Date(dueDate).toLocaleDateString('en-IN', {
+              day: '2-digit', month: 'short', year: 'numeric',
+            });
+            await this.pushNotificationService.sendNotificationToUsers(
+              [customerId],
+              {
+                title: '🧾 Your Postpaid Bill is Ready',
+                body:
+                  `Bill #${createdBill.bill_number}${productName ? ` for ${productName}` : ''} ` +
+                  `of ${amountFormatted} has been generated. Due by ${dueDateFormatted}.`,
+              },
+            );
+            this.logger.log(`Push notification sent to customer ${customerId} for bill #${createdBill.bill_number}`);
+          } catch (pushErr) {
+            this.logger.error(`Failed to send push notification to customer ${customerId}`, pushErr);
+          }
+        });
+
+        results.push({
+          status: true,
+          action: 'generated',
+          message: 'Postpaid bill generated successfully.',
+          billNumber: createdBill.bill_number,
+          'Bill Number': createdBill.bill_number,
+          customerId,
+          'Customer ID': customerId,
+          subscriptionId,
+          'Subscription ID': subscriptionId,
+          billingPeriod: { start: periodStart, end: periodEnd },
+          'Billing Period': { start: periodStart, end: periodEnd },
+          totalAmount: Number(createdBill.total_amount || 0),
+          'Total Amount': Number(createdBill.total_amount || 0),
+          deliveredOrdersCount: orders.length,
+          'Number of Delivered Orders': orders.length,
+          billStatus: createdBill.status,
+          'Bill Status': createdBill.status,
+        });
+      } catch (err: any) {
+        this.logger.error(
+          `Error generating bill for ${customerId} subscription ${subscriptionId}: ${err.message}`,
+          err.stack,
+        );
+        results.push({
+          status: false,
+          action: 'failed',
+          customerId,
+          'Customer ID': customerId,
+          subscriptionId,
+          'Subscription ID': subscriptionId,
+          message: err.message || 'Error occurred during bill processing.',
+        });
       }
     }
 
-    const status = paidAmount >= totalAmount ? 'paid' : 'pending';
-
-    const createdBill = await this.repository.createBillTransaction(
-      customerId,
-      periodStart,
-      periodEnd,
-      dueDate,
-      deliveredOrders,
-      totalAmount,
-      paidAmount,
-      status,
-      isPostpaid ? 'postpaid' : 'prepaid',
-    );
-
-    this.logger.log(`Successfully generated postpaid bill #${createdBill.bill_number} for ${customerId}`);
-
-    setImmediate(async () => {
-      try {
-        const amountFormatted = `₹${Number(createdBill.total_amount || 0).toFixed(2)}`;
-        const dueDateFormatted = new Date(dueDate).toLocaleDateString('en-IN', {
-          day: '2-digit', month: 'short', year: 'numeric',
-        });
-        await this.pushNotificationService.sendNotificationToUsers(
-          [customerId],
-          {
-            title: '🧾 Your Postpaid Bill is Ready',
-            body: `Bill #${createdBill.bill_number} for ${amountFormatted} has been generated. Due by ${dueDateFormatted}.`,
-          },
-        );
-        this.logger.log(`Push notification sent to customer ${customerId} for bill #${createdBill.bill_number}`);
-      } catch (pushErr) {
-        this.logger.error(`Failed to send push notification to customer ${customerId}`, pushErr);
-      }
-    });
-
-    return {
-      status: true,
-      action: 'generated',
-      message: 'Postpaid bill generated successfully.',
-      billNumber: createdBill.bill_number,
-      'Bill Number': createdBill.bill_number,
-      customerId,
-      'Customer ID': customerId,
-      billingPeriod: { start: periodStart, end: periodEnd },
-      'Billing Period': { start: periodStart, end: periodEnd },
-      totalAmount: Number(createdBill.total_amount || 0),
-      'Total Amount': Number(createdBill.total_amount || 0),
-      deliveredOrdersCount: deliveredOrders.length,
-      'Number of Delivered Orders': deliveredOrders.length,
-      billStatus: createdBill.status,
-      'Bill Status': createdBill.status,
-    };
+    return results;
   }
 
   async getEligibleCustomers(): Promise<any> {

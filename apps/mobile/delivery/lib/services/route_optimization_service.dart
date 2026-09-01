@@ -415,12 +415,8 @@ class RouteOptimizationService {
       }
     }
 
-    final safeIntermediates = intermediates.length > 23
-        ? intermediates.sublist(0, 23)
-        : intermediates;
-
     final cacheKey =
-        '${_buildCacheKey(origin, [destination, ...safeIntermediates])}#tgt:${targetedStop?.stop}';
+        '${_buildCacheKey(origin, [destination, ...intermediates])}#tgt:${targetedStop?.stop}';
     if (!forceRefresh && _isCacheFresh(cacheKey)) return _cachedResult!;
 
     Map<String, dynamic>? data;
@@ -433,10 +429,10 @@ class RouteOptimizationService {
             'lat': destination.addressLat,
             'lng': destination.addressLng,
           },
-          'intermediates': safeIntermediates
+          'intermediates': intermediates
               .map((s) => {'lat': s.addressLat, 'lng': s.addressLng})
               .toList(),
-          'optimizeWaypointOrder': targetedStop == null && safeIntermediates.isNotEmpty,
+          'optimizeWaypointOrder': targetedStop == null && intermediates.isNotEmpty,
           'travelMode': _kTravelMode,
         },
       );
@@ -503,7 +499,7 @@ class RouteOptimizationService {
         _applyOptimizedOrder(intermediates, data['optimizedOrder']);
 
     final orderedStops = <GroupedStop>[
-      if (leadingStop != null) leadingStop,
+      ?leadingStop,
       ...orderedIntermediates,
       destination,
       ...completed,
