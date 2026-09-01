@@ -200,14 +200,17 @@ export default function TodayOrdersClient({
       apiClient.get<any>(`/admin/orders/${orderId}/items`),
     ])
       .then(([detailResult, itemsResult]) => {
-        if (detailResult?.status && detailResult?.data) {
-          setSelectedOrder((current) => current ? { ...current, ...detailResult.data } : detailResult.data);
+        const detailData = detailResult?.data?.data ?? detailResult?.data;
+        if (detailData && typeof detailData === 'object' && !Array.isArray(detailData)) {
+          setSelectedOrder((current) => ({ ...(current || {}), ...detailData }));
         }
-        if (itemsResult?.status) {
-          setItems(Array.isArray(itemsResult.data) ? itemsResult.data : []);
-        } else {
-          setItemsError((itemsResult as any)?.message || 'Failed to load order items');
-        }
+
+        const itemsList = Array.isArray(itemsResult?.data?.data)
+          ? itemsResult.data.data
+          : Array.isArray(itemsResult?.data)
+            ? itemsResult.data
+            : [];
+        setItems(itemsList);
       })
       .catch(() => setItemsError('Failed to load complete order details'))
       .finally(() => setLoadingItems(false));

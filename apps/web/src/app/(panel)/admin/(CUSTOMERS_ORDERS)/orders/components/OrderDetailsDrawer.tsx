@@ -114,8 +114,14 @@ function getLightStatusBadge(statusRaw: unknown) {
   if (status.includes('confirm')) {
     return { label: 'Confirmed', bg: 'bg-teal-50 text-teal-900 border-teal-200', icon: CheckCircle2 };
   }
+  if (status.includes('assign')) {
+    return { label: 'Assigned', bg: 'bg-indigo-50 text-indigo-900 border-indigo-200', icon: Bike };
+  }
+  if (status.includes('place')) {
+    return { label: 'Placed', bg: 'bg-sky-50 text-sky-900 border-sky-200', icon: Clock };
+  }
   if (status.includes('fail') || status.includes('undeliver')) {
-    return { label: 'Failed / Undelivered', bg: 'bg-amber-50 text-amber-900 border-amber-200', icon: AlertCircle };
+    return { label: 'Failed', bg: 'bg-amber-50 text-amber-900 border-amber-200', icon: AlertCircle };
   }
   if (status.includes('cancel')) {
     return { label: 'Cancelled', bg: 'bg-rose-50 text-rose-900 border-rose-200', icon: AlertCircle };
@@ -417,7 +423,7 @@ export default function OrderDetailsDrawer({
         {/* Light Drawer Footer */}
         <div className="px-6 py-3.5 bg-white border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
-            {onUpdateStatus && statusInfo.label !== 'Failed / Undelivered' && statusInfo.label !== 'Cancelled' && (
+            {onUpdateStatus && statusInfo.label !== 'Failed' && statusInfo.label !== 'Cancelled' && statusInfo.label !== 'Delivered' && (
               <button
                 type="button"
                 onClick={() => {
@@ -441,7 +447,7 @@ export default function OrderDetailsDrawer({
               </button>
             )}
 
-            {onUpdateStatus && statusInfo.label !== 'Delivered' && statusInfo.label !== 'Cancelled' && (
+            {onUpdateStatus && statusInfo.label !== 'Delivered' && statusInfo.label !== 'Cancelled' && statusInfo.label !== 'Failed' && (
               <button
                 type="button"
                 onClick={() => {

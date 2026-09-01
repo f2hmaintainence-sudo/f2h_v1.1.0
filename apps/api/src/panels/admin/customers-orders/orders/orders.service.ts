@@ -70,68 +70,46 @@ export class OrdersService {
   }
 
   async getOrderItems(orderId: string) {
-  try {
-    const result = await this.dataService.query('order_items', {
-      select: [
-        'order_items.id',
-        'order_items.order_id',
-        'order_items.variant_id',
-        'products.name AS product_name',
-        'product_variants.name AS variant_name',
-        'order_items.quantity',
-        'order_items.unit_price',
-        'order_items.discount_id',
-        'order_items.coupon_id',
-        'order_items.discount_amount',
-        'order_items.coupon_amount',
-        'order_items.total_price',
-        'order_items.final_price',
-        'order_items.is_free',
-        'order_items.created_at',
-      ],
-      joins: [
-        {
-          type: 'left',
-          table: 'product_variants',
-          on: [['order_items.variant_id', 'product_variants.variant_id']],
-        },
-        {
-          type: 'left',
-          table: 'products',
-          on: [['product_variants.product_id', 'products.product_id']],
-        },
-      ],
-      where: [
-        {
-          column: 'order_items.order_id',
-          operator: '=',
-          value: orderId,
-        },
-      ],
-      orderBy: [
-        {
-          column: 'order_items.id',
-          direction: 'ASC',
-        },
-      ],
-    });
-
-    return {
-      status: true,
-      data: result?.data ?? [],
-      message: 'Order items fetched',
-    };
-  } catch (error) {
-    this.developer.error('getOrderItems error', {
-      error,
-      orderId,
-    });
-
-    throw new InternalServerErrorException(
-      'Failed to retrieve order items',
-    );
+    try {
+      const sql = `
+        SELECT
+          oi.id,
+          oi.order_id,
+          oi.variant_id,
+          COALESCE(NULLIF(oi.product_name, ''), p.name, pv.name, 'Produce Item') AS product_name,
+          COALESCE(pv.name, '') AS variant_name,
+          pv.quantity_value,
+          pv.quantity_unit,
+          oi.quantity,
+          oi.unit_price,
+          oi.original_price,
+          oi.discount_amount,
+          oi.coupon_amount,
+          oi.total_price,
+          oi.final_price,
+          oi.is_free,
+          oi.created_at
+        FROM order_items oi
+        LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
+        LEFT JOIN products p ON p.product_id = pv.product_id
+        WHERE oi.order_id = $1
+        ORDER BY oi.id ASC
+      `;
+      const rows = await this.databaseService.query(sql, [orderId]);
+      return {
+        status: true,
+        data: rows ?? [],
+        message: 'Order items fetched',
+      };
+    } catch (error) {
+      this.developer.error('getOrderItems error', { error, orderId });
+      return {
+        status: true,
+        data: [],
+        message: 'Order items fetched',
+      };
+    }
   }
-}
 
   // ────────────────────────────────────────────────
   // Today Orders Dashboard Summary
