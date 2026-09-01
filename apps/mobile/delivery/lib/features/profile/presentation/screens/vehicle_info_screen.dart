@@ -94,7 +94,14 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
                   EditableField(
                     label: 'Registration Number',
                     controller: registrationController,
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Enter registration number' : null,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Enter registration number';
+                      final clean = val.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase();
+                      if (clean.length < 6 || !RegExp(r'^[A-Z0-9]{6,15}$').hasMatch(clean)) {
+                        return 'Enter valid vehicle registration number (e.g. KA03HA1234)';
+                      }
+                      return null;
+                    },
                     placeholder: 'e.g. KA-03-HA-1234',
                   ),
                   const SizedBox(height: 12),

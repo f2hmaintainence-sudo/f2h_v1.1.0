@@ -70,7 +70,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                     _buildEditTextField(
                       label: 'Full Name',
                       controller: nameController,
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Enter full name' : null,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Enter full name';
+                        if (val.trim().length < 2) return 'Full name must be at least 2 characters';
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -78,7 +82,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       label: 'Email Address',
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Enter email address' : null,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Enter email address';
+                        if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(val.trim())) {
+                          return 'Enter a valid email address';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -89,15 +99,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       onTap: () async {
                         final date = await showDatePicker(
                           context: dialogContext,
-                          initialDate: DateTime(1998, 1, 1),
+                          initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)),
                           firstDate: DateTime(1960),
-                          lastDate: DateTime.now(),
+                          lastDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
                         );
                         if (date != null) {
                           setModalState(() {
                             dobController.text = date.toIso8601String().split('T')[0];
                           });
                         }
+                      },
+                      validator: (val) {
+                        if (val != null && val.trim().isNotEmpty) {
+                          try {
+                            final dob = DateTime.parse(val.trim());
+                            final now = DateTime.now();
+                            final age = now.year - dob.year - ((now.month < dob.month || (now.month == dob.month && now.day < dob.day)) ? 1 : 0);
+                            if (age < 18) return 'Delivery partner must be at least 18 years old';
+                          } catch (_) {}
+                        }
+                        return null;
                       },
                     ),
                     const SizedBox(height: 12),
@@ -113,6 +134,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       label: 'Residential Address',
                       controller: addressController,
                       maxLines: 2,
+                      validator: (val) {
+                        if (val != null && val.trim().isNotEmpty && val.trim().length < 5) {
+                          return 'Enter complete address (min 5 characters)';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -130,6 +157,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       label: 'Contact Name / Relationship',
                       controller: emergencyNameController,
                       placeholder: 'e.g. Brother / Ashok',
+                      validator: (val) {
+                        if (emergencyPhoneController.text.trim().isNotEmpty && (val == null || val.trim().length < 2)) {
+                          return 'Enter emergency contact person name (min 2 characters)';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -137,6 +170,21 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       label: 'Emergency Mobile Number',
                       controller: emergencyPhoneController,
                       keyboardType: TextInputType.phone,
+                      placeholder: '10-digit Indian Mobile Number (e.g. 9876543210)',
+                      validator: (val) {
+                        if (emergencyNameController.text.trim().isNotEmpty && (val == null || val.trim().isEmpty)) {
+                          return 'Enter emergency mobile number';
+                        }
+                        if (val == null || val.trim().isEmpty) return null;
+                        final clean = val.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                          return 'Enter a valid 10-digit Indian mobile number (e.g. 9876543210)';
+                        }
+                        if (clean == p.phone.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '')) {
+                          return 'Emergency contact cannot be your own mobile number';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 24),
 
@@ -146,6 +194,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           if (formKey.currentState!.validate()) {
+                            final rawEmergencyPhone = emergencyPhoneController.text.trim();
+                            final cleanEmergencyPhone = rawEmergencyPhone.isEmpty
+                                ? null
+                                : rawEmergencyPhone.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+
                             final updates = {
                               'full_name': nameController.text.trim(),
                               'email': emailController.text.trim(),
@@ -153,7 +206,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                               'gender': genderController.text.trim().isEmpty ? null : genderController.text.trim(),
                               'residential_address': addressController.text.trim().isEmpty ? null : addressController.text.trim(),
                               'emergency_contact': emergencyNameController.text.trim().isEmpty ? null : emergencyNameController.text.trim(),
-                              'emergency_contact_number': emergencyPhoneController.text.trim().isEmpty ? null : emergencyPhoneController.text.trim(),
+                              'emergency_contact_number': cleanEmergencyPhone,
                             };
 
                             dialogContext.read<ProfileBloc>().add(UpdatePersonalInfoEvent(updates));

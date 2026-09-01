@@ -152,24 +152,85 @@ export class ProfileService {
     try {
       // Update delivery_partners table — only valid columns (no full_name, phone, email)
       const deliveryPartnerUpdates: Record<string, any> = {};
-      if (dto.emergency_contact !== undefined) deliveryPartnerUpdates.emergency_contact = dto.emergency_contact;
-      if (dto.emergency_contact_number !== undefined) deliveryPartnerUpdates.emergency_contact_number = dto.emergency_contact_number;
-      if (dto.date_of_birth !== undefined) deliveryPartnerUpdates.date_of_birth = dto.date_of_birth;
-      if (dto.gender !== undefined) deliveryPartnerUpdates.gender = dto.gender;
-      if (dto.residential_address !== undefined) deliveryPartnerUpdates.residential_address = dto.residential_address;
+
+      if (dto.emergency_contact !== undefined) {
+        const contactName = dto.emergency_contact?.trim();
+        if (contactName && contactName.length < 2) {
+          throw new BadRequestException('Emergency contact name must be at least 2 characters');
+        }
+        deliveryPartnerUpdates.emergency_contact = contactName || null;
+      }
+
+      if (dto.emergency_contact_number !== undefined) {
+        if (dto.emergency_contact_number && dto.emergency_contact_number.trim()) {
+          const raw = dto.emergency_contact_number.trim();
+          const clean = raw.replace(/[\s\-+()]/g, '').replace(/^(91|0)/, '');
+          if (!/^[6-9]\d{9}$/.test(clean)) {
+            throw new BadRequestException(
+              'Please provide a valid 10-digit Indian mobile number for emergency contact (starting with 6, 7, 8, or 9)',
+            );
+          }
+          deliveryPartnerUpdates.emergency_contact_number = clean;
+        } else {
+          deliveryPartnerUpdates.emergency_contact_number = null;
+        }
+      }
+
+      if (dto.date_of_birth !== undefined) {
+        if (dto.date_of_birth && dto.date_of_birth.trim()) {
+          const dob = new Date(dto.date_of_birth);
+          if (isNaN(dob.getTime())) {
+            throw new BadRequestException('Invalid date of birth format. Use YYYY-MM-DD');
+          }
+          const today = new Date();
+          let age = today.getFullYear() - dob.getFullYear();
+          const m = today.getMonth() - dob.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+            age--;
+          }
+          if (age < 18) {
+            throw new BadRequestException('Delivery partner must be at least 18 years of age');
+          }
+          deliveryPartnerUpdates.date_of_birth = dto.date_of_birth.trim();
+        } else {
+          deliveryPartnerUpdates.date_of_birth = null;
+        }
+      }
+
+      if (dto.gender !== undefined) {
+        deliveryPartnerUpdates.gender = dto.gender?.trim() || null;
+      }
+
+      if (dto.residential_address !== undefined) {
+        const addr = dto.residential_address?.trim();
+        if (addr && addr.length < 5) {
+          throw new BadRequestException('Residential address must be at least 5 characters');
+        }
+        deliveryPartnerUpdates.residential_address = addr || null;
+      }
       deliveryPartnerUpdates.updated_at = new Date();
 
       // Update users table for shared identity fields (first_name, last_name, email)
       const userUpdates: Record<string, any> = {};
       if (dto.full_name !== undefined) {
-        const parts = dto.full_name.trim().split(/\s+/);
+        const fullName = dto.full_name.trim();
+        if (fullName.length < 2) {
+          throw new BadRequestException('Full name must be at least 2 characters');
+        }
+        const parts = fullName.split(/\s+/);
         userUpdates.first_name = parts[0] || '';
         userUpdates.last_name = parts.slice(1).join(' ') || '';
-        userUpdates.user_name = dto.full_name.trim();
+        userUpdates.user_name = fullName;
       }
-      if ((dto as any).first_name !== undefined) userUpdates.first_name = (dto as any).first_name;
-      if ((dto as any).last_name !== undefined) userUpdates.last_name = (dto as any).last_name;
-      if (dto.email !== undefined) userUpdates.email = dto.email;
+      if ((dto as any).first_name !== undefined) userUpdates.first_name = (dto as any).first_name?.trim();
+      if ((dto as any).last_name !== undefined) userUpdates.last_name = (dto as any).last_name?.trim();
+      if (dto.email !== undefined) {
+        const email = dto.email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          throw new BadRequestException('Please provide a valid email address');
+        }
+        userUpdates.email = email;
+      }
       userUpdates.updated_at = new Date();
 
       // Update both tables
@@ -230,8 +291,6 @@ export class ProfileService {
 
   // ─── Documents ──────────────────────────────────────────────────────────────
 
-  // ─── Documents ──────────────────────────────────────────────────────────────
-
   async getDocuments(deliveryPartnerId: string) {
     try {
       const res = await this.Data.query('delivery_partners', {
@@ -252,6 +311,19 @@ export class ProfileService {
 
   async createDocument(deliveryPartnerId: string, dto: CreateDocumentDto, files?: { front_image?: any; back_image?: any }) {
     try {
+      if (dto.document_type === 'aadhaar' && dto.document_number) {
+        const cleanAadhaar = dto.document_number.replace(/\s+/g, '');
+        if (!/^\d{12}$/.test(cleanAadhaar)) {
+          throw new BadRequestException('Please provide a valid 12-digit Aadhaar number');
+        }
+      }
+      if (dto.document_type === 'pan' && dto.document_number) {
+        const cleanPan = dto.document_number.replace(/\s+/g, '').toUpperCase();
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+          throw new BadRequestException('Please provide a valid 10-character PAN number (e.g. ABCDE1234F)');
+        }
+      }
+
       const updates: Record<string, any> = { updated_at: new Date() };
       if (files?.front_image) {
         updates.aadhaar_url = await this.saveDocumentFile(deliveryPartnerId, 'front', files.front_image);
@@ -300,9 +372,14 @@ export class ProfileService {
 
   async createVehicle(deliveryPartnerId: string, dto: CreateVehicleDto, files?: { rc_front_image?: any; rc_back_image?: any; insurance_image?: any }) {
     try {
+      const regNumber = dto.registration_number?.replace(/[\s\-]/g, '').toUpperCase();
+      if (!regNumber || regNumber.length < 6 || !/^[A-Z0-9]{6,15}$/.test(regNumber)) {
+        throw new BadRequestException('Please enter a valid Indian vehicle registration number (e.g. KA03HA1234)');
+      }
+
       await this.Data.update('delivery_partners', {
-        vehicle_type: dto.vehicle_type,
-        vehicle_number: dto.registration_number,
+        vehicle_type: dto.vehicle_type?.toLowerCase() || 'bike',
+        vehicle_number: regNumber,
         updated_at: new Date(),
       }, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
       return { success: true, message: 'Vehicle details updated successfully.' };
@@ -347,11 +424,38 @@ export class ProfileService {
 
   async createBankAccount(deliveryPartnerId: string, dto: CreateBankAccountDto, file?: any) {
     try {
+      const holderName = dto.account_holder_name?.trim();
+      if (!holderName || holderName.length < 2) {
+        throw new BadRequestException('Please provide a valid account holder name');
+      }
+
+      const bankName = dto.bank_name?.trim();
+      if (!bankName || bankName.length < 2) {
+        throw new BadRequestException('Please provide a valid bank name');
+      }
+
+      const accountNumber = dto.account_number?.replace(/\s+/g, '');
+      if (!accountNumber || !/^\d{9,18}$/.test(accountNumber)) {
+        throw new BadRequestException('Bank account number must be between 9 and 18 digits');
+      }
+
+      const ifscCode = dto.ifsc_code?.replace(/\s+/g, '').toUpperCase();
+      if (!ifscCode || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode)) {
+        throw new BadRequestException('Please provide a valid 11-character Indian IFSC code (e.g. SBIN0001234)');
+      }
+
+      if (dto.upi_id && dto.upi_id.trim()) {
+        const upi = dto.upi_id.trim();
+        if (!/^[\w.\-_]+@[\w]+$/.test(upi)) {
+          throw new BadRequestException('Please provide a valid UPI ID (e.g. name@bank)');
+        }
+      }
+
       await this.Data.update('delivery_partners', {
-        bank_account_number: dto.account_number,
-        bank_ifsc: dto.ifsc_code,
-        bank_name: dto.bank_name,
-        account_holder_name: dto.account_holder_name,
+        bank_account_number: accountNumber,
+        bank_ifsc: ifscCode,
+        bank_name: bankName,
+        account_holder_name: holderName,
         updated_at: new Date(),
       }, [{ column: 'delivery_partner_id', operator: '=', value: deliveryPartnerId }]);
       return { success: true, message: 'Bank account updated successfully.' };

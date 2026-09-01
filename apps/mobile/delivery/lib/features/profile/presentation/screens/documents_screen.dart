@@ -103,8 +103,33 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     EditableField(
                       label: 'Document ID Number',
                       controller: numberController,
-                      validator: (val) => val == null || val.trim().isEmpty ? 'Enter document number' : null,
-                      placeholder: 'e.g. 1234 5678 9012',
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Enter document number';
+                        final clean = val.replaceAll(RegExp(r'\s+'), '');
+                        if (selectedType == 'aadhaar') {
+                          if (!RegExp(r'^\d{12}$').hasMatch(clean)) {
+                            return 'Aadhaar number must be exactly 12 digits';
+                          }
+                        } else if (selectedType == 'pan') {
+                          if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(clean.toUpperCase())) {
+                            return 'Enter valid 10-char PAN (e.g. ABCDE1234F)';
+                          }
+                        } else if (selectedType == 'driving_license') {
+                          if (clean.length < 10) {
+                            return 'Enter a valid driving license number';
+                          }
+                        } else if (selectedType == 'vehicle_rc') {
+                          if (clean.length < 6) {
+                            return 'Enter a valid vehicle RC number';
+                          }
+                        }
+                        return null;
+                      },
+                      placeholder: selectedType == 'aadhaar'
+                          ? '12-digit Aadhaar Number'
+                          : selectedType == 'pan'
+                              ? '10-character PAN (e.g. ABCDE1234F)'
+                              : 'Document ID Number',
                     ),
                     const SizedBox(height: 14),
 

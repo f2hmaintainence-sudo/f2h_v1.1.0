@@ -69,7 +69,11 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   EditableField(
                     label: 'Account Holder Name',
                     controller: holderController,
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Enter holder name' : null,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Enter account holder name';
+                      if (val.trim().length < 2) return 'Holder name must be at least 2 characters';
+                      return null;
+                    },
                     placeholder: 'Holder Name (As in Bank)',
                   ),
                   const SizedBox(height: 12),
@@ -77,7 +81,11 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   EditableField(
                     label: 'Bank Name',
                     controller: bankNameController,
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Enter bank name' : null,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Enter bank name';
+                      if (val.trim().length < 2) return 'Bank name must be at least 2 characters';
+                      return null;
+                    },
                     placeholder: 'e.g. State Bank of India',
                   ),
                   const SizedBox(height: 12),
@@ -85,7 +93,14 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   EditableField(
                     label: 'Account Number',
                     controller: numberController,
-                    validator: (val) => val == null || val.trim().isEmpty ? 'Enter account number' : null,
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Enter account number';
+                      final clean = val.replaceAll(RegExp(r'\s+'), '');
+                      if (!RegExp(r'^\d{9,18}$').hasMatch(clean)) {
+                        return 'Account number must be between 9 and 18 digits';
+                      }
+                      return null;
+                    },
                     keyboardType: TextInputType.number,
                     placeholder: 'Payout Bank Account Number',
                   ),
@@ -97,7 +112,14 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         child: EditableField(
                           label: 'IFSC Code',
                           controller: ifscController,
-                          validator: (val) => val == null || val.trim().isEmpty ? 'Enter IFSC' : null,
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Enter IFSC code';
+                            final clean = val.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+                            if (!RegExp(r'^[A-Z]{4}0[A-Z0-9]{6}$').hasMatch(clean)) {
+                              return 'Enter valid 11-character IFSC (e.g. SBIN0001234)';
+                            }
+                            return null;
+                          },
                           placeholder: 'e.g. SBIN0001234',
                         ),
                       ),
@@ -117,6 +139,14 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     label: 'UPI ID (Optional)',
                     controller: upiController,
                     placeholder: 'e.g. rider@ybl',
+                    validator: (val) {
+                      if (val != null && val.trim().isNotEmpty) {
+                        if (!RegExp(r'^[\w.\-_]+@[\w]+$').hasMatch(val.trim())) {
+                          return 'Enter valid UPI ID (e.g. name@bank)';
+                        }
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
 
