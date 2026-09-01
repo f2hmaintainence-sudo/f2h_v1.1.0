@@ -113,14 +113,21 @@ export class CustomerBillingRepository {
       const referenceId = orders && orders.length > 0 ? orders[0].order_id : 'CONSOLIDATED';
       const dueAmount = Math.max(0, totalAmount - paidAmount);
 
+      // `customer_bills.payment_method` is NOT NULL with no default, but a monthly
+      // postpaid bill is raised before anyone pays it — there is no method to record
+      // yet. Omitting the column made every insert die with 23502 and the monthly
+      // cron produce nothing. 'pending' stands in until `updateBillPayment` writes
+      // the method the bill was actually settled with.
+      const paymentMethod = paidAmount >= totalAmount && totalAmount > 0 ? 'wallet' : 'pending';
+
       const insertBillSql = `
         INSERT INTO public.customer_bills (
-          bill_id, customer_id, bill_type, reference_id, payment_type,
+          bill_id, customer_id, bill_type, reference_id, payment_type, payment_method,
           billing_from, billing_to, due_date, subtotal, discount_amount,
           tax_amount, total_amount, paid_amount, due_amount, status,
           remarks, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
         RETURNING bill_id AS id, bill_id AS bill_number, total_amount, status
       `;
       const billRes = await client.query(insertBillSql, [
@@ -129,6 +136,7 @@ export class CustomerBillingRepository {
         'order',
         referenceId,
         paymentType,
+        paymentMethod,
         periodStart,
         periodEnd,
         dueDate,
@@ -460,17 +468,35 @@ export class CustomerBillingRepository {
     return bill;
   }
 
-  async updateBillPayment(id: string, paidAmount: number, status: string): Promise<any> {
+  /**
+   * Records a payment against a bill.
+   *
+   * [paymentMethod] is how the bill was actually settled. It used to be dropped on
+   * the floor here, which left every generated bill reading 'pending' forever even
+   * after it was paid; passing null keeps whatever the bill already carries.
+   */
+  async updateBillPayment(
+    id: string,
+    paidAmount: number,
+    status: string,
+    paymentMethod?: string | null,
+  ): Promise<any> {
     const sql = `
       UPDATE public.customer_bills
-      SET paid_amount = $2, 
+      SET paid_amount = $2,
           due_amount = GREATEST(0, total_amount - $2),
-          status = $3, 
+          status = $3,
+          payment_method = COALESCE($4, payment_method),
           updated_at = NOW()
       WHERE bill_id = $1::varchar
-      RETURNING bill_id AS id, bill_id AS bill_number, total_amount, status
+      RETURNING bill_id AS id, bill_id AS bill_number, total_amount, status, payment_method
     `;
-    const rows = await this.databaseService.query(sql, [id, paidAmount, status]);
+    const rows = await this.databaseService.query(sql, [
+      id,
+      paidAmount,
+      status,
+      paymentMethod?.trim() ? paymentMethod.trim().toLowerCase() : null,
+    ]);
     return rows?.[0] ?? null;
   }
 }

@@ -30,7 +30,7 @@ export class CustomerBillingService {
   /**
    * Automated monthly cron job: runs at 12:05 AM on the 1st day of every month (@Cron('0 5 0 1 * *'))
    */
-  @Cron('0 5 0 1 * *')
+  @Cron('0 5 0 1 * *', { timeZone: 'Asia/Kolkata' })
   async handleMonthlyCron() {
     // Only one instance may run this tick — see CronLockService.
     if (!(await this.cronLock.acquire('handleMonthlyCron', 3600))) return;
@@ -38,7 +38,22 @@ export class CustomerBillingService {
     this.logger.log('Executing automated monthly cron job for postpaid bills (@Cron 0 5 0 1 * *)...');
     try {
       const res = await this.runMonthlyBatchBilling({});
-      this.logger.log(`Cron job finished successfully: ${JSON.stringify(res.summary)}`);
+      const summary = res?.summary ?? {};
+
+      // A run that billed nobody because every insert failed used to log
+      // "finished successfully", which is why a month of broken billing went
+      // unnoticed. Any failure now logs at error level.
+      if (Number(summary.failed) > 0) {
+        const reasons = (res?.data ?? [])
+          .filter((r: any) => r?.action === 'failed')
+          .map((r: any) => `${r.customerId}: ${r.message}`)
+          .join('; ');
+        this.logger.error(
+          `Monthly postpaid billing completed with failures: ${JSON.stringify(summary)} — ${reasons}`,
+        );
+      } else {
+        this.logger.log(`Monthly postpaid billing finished: ${JSON.stringify(summary)}`);
+      }
     } catch (err: any) {
       this.logger.error(`Error executing monthly cron job: ${err.message}`, err.stack);
     }
@@ -48,7 +63,7 @@ export class CustomerBillingService {
    * Daily automated cron job at 9:00 AM (@Cron('0 9 * * *'))
    * Sends 7-day, 3-day, and 1-day gentle postpaid due push notifications to customer app via Firebase
    */
-  @Cron('0 9 * * *')
+  @Cron('0 9 * * *', { timeZone: 'Asia/Kolkata' })
   async handlePostpaidRemindersCron() {
     // Only one instance may run this tick — see CronLockService.
     if (!(await this.cronLock.acquire('handlePostpaidRemindersCron', 3600))) return;
@@ -631,7 +646,7 @@ export class CustomerBillingService {
       newStatus = 'paid';
     }
 
-    const updated = await this.repository.updateBillPayment(bill.id, newPaid, newStatus);
+    const updated = await this.repository.updateBillPayment(bill.id, newPaid, newStatus, paymentMode);
     return {
       status: true,
       message: 'Payment recorded successfully.',

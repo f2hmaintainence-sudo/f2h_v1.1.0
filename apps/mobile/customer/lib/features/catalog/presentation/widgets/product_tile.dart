@@ -209,67 +209,95 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
               style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: kTextSub, letterSpacing: 1.2),
             ),
             const SizedBox(height: 10),
-            // Variant pills
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: p.variants.map((v) {
-                final isSel = v.id == _selected.id;
-                final isGone = v.isOutOfStock;
-                // A sold-out pack stays selectable so the reason lands in the
-                // banner and the ADD button, rather than the tap doing nothing.
-                return GestureDetector(
-                  onTap: () => setState(() {
-                    _selected = v;
-                    _sheetQty = 1;
-                  }),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSel ? (isGone ? kMuted : kPrimary) : kSurface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSel ? (isGone ? kMuted : kPrimary) : kBorder,
-                        width: isSel ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          v.label,
-                          style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w800,
-                            color: isSel ? Colors.white : (isGone ? kTextSub : kText),
+            // Equal-sized responsive variant boxes
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final count = p.variants.length;
+                final columns = count == 2
+                    ? 2
+                    : (constraints.maxWidth >= 330 && count % 3 == 0 ? 3 : (constraints.maxWidth >= 360 ? 3 : 2));
+                const spacing = 8.0;
+                final itemWidth = (constraints.maxWidth - (columns - 1) * spacing) / columns;
+
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: p.variants.map((v) {
+                    final isSel = v.id == _selected.id;
+                    final isGone = v.isOutOfStock;
+                    // A sold-out pack stays selectable so the reason lands in the
+                    // banner and the ADD button, rather than the tap doing nothing.
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        _selected = v;
+                        _sheetQty = 1;
+                      }),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: itemWidth,
+                        height: 74,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSel ? (isGone ? kMuted : kPrimary) : kSurface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSel ? (isGone ? kMuted : kPrimary) : kBorder,
+                            width: isSel ? 1.8 : 1.0,
                           ),
+                          boxShadow: isSel
+                              ? [
+                                  BoxShadow(
+                                    color: (isGone ? kMuted : kPrimary).withValues(alpha: 0.20),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '₹${v.price.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700,
-                            color: isSel ? Colors.white70 : (isGone ? kMuted : kPrimary),
-                            decoration: isGone ? TextDecoration.lineThrough : null,
-                          ),
-                        ),
-                        if (isGone) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Out of stock',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.3,
-                              color: isSel ? Colors.white : const Color(0xFFD32F2F),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              v.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: isSel ? Colors.white : (isGone ? kTextSub : kText),
+                              ),
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '₹${v.price.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: isSel ? Colors.white70 : (isGone ? kMuted : kPrimary),
+                                decoration: isGone ? TextDecoration.lineThrough : null,
+                              ),
+                            ),
+                            if (isGone) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Out of stock',
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.3,
+                                  color: isSel ? Colors.white : const Color(0xFFD32F2F),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 );
-              }).toList(),
+              },
             ),
             const SizedBox(height: 20),
           ],

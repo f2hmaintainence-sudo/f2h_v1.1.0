@@ -5,11 +5,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import {
   CreateCandidateInput,
   RefundCandidatesRepository,
 } from './refund-candidates.repository';
 import { DatabaseService } from '../../../../../shared/database/Database.service';
+import { CronLockService } from 'src/shared/scheduling/cron-lock.service';
 import { RefundEligibilityService } from './refund-eligibility.service';
 import { RefundProcessingService } from './refund-processing.service';
 
@@ -20,9 +22,48 @@ export class RefundCandidatesService {
   constructor(
     private readonly repo: RefundCandidatesRepository,
     private readonly db: DatabaseService,
+    private readonly cronLock: CronLockService,
     private readonly eligibility: RefundEligibilityService,
     private readonly processing: RefundProcessingService,
   ) {}
+
+  // ─── Scheduled month-close scan ────────────────────────────────────────────
+
+  /**
+   * Materialises the closed month's refund candidates at 00:20 IST on the 1st.
+   *
+   * Until this existed, nothing ever called `scan()` on a schedule: candidates
+   * only appeared when an admin pressed "Run Live Scan" in the developer panel,
+   * so `subscription_refund_candidates` stayed empty every month while paused
+   * days and failed deliveries accumulated unrefunded.
+   *
+   * It runs after the 00:05 postpaid billing cron so the two never contend, and
+   * `scan()` is keyed per paused day / failed order — re-running a month adds
+   * nothing, so a retry or a manual admin scan on top of this is safe.
+   */
+  @Cron('0 20 0 1 * *', { timeZone: 'Asia/Kolkata' })
+  async handleMonthlyRefundScanCron() {
+    // Only one instance may run this tick — see CronLockService.
+    if (!(await this.cronLock.acquire('handleMonthlyRefundScanCron', 3600))) return;
+
+    const now = new Date();
+    const closed = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const month = `${closed.getFullYear()}-${String(closed.getMonth() + 1).padStart(2, '0')}`;
+
+    this.logger.log(`Executing monthly refund candidate scan for ${month} (@Cron 0 20 0 1 * *)...`);
+    try {
+      const res = await this.eligibility.scan({ month });
+      this.logger.log(
+        `Monthly refund scan finished for ${month}: ${res.found} refundable item(s) — ` +
+          `${res.created} new, ${res.skipped_existing} already tracked`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Monthly refund candidate scan failed for ${month}: ${err?.message}`,
+        err?.stack,
+      );
+    }
+  }
 
   // ─── Candidate Creation (called from cron / order handlers) ─────────────────
 
