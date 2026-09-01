@@ -537,7 +537,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   endDate: endDate,
                 ),
               );
-              widget.onDelete();
             },
             child: const Text(
               'Cancel Subscription',

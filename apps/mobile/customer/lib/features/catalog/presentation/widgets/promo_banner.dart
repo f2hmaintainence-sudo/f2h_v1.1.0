@@ -79,41 +79,13 @@ class _PromoBannerState extends State<PromoBanner> {
           return;
         }
       }
-      _useDefaultBanners();
-    } catch (_) {
-      _useDefaultBanners();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _banners = [];
+        _loading = false;
+      });
     }
-  }
-
-  void _useDefaultBanners() {
-    if (!mounted) return;
-    setState(() {
-      _banners = [
-        {
-          'id': 'promo-1',
-          'imageUrl':
-              '${ApiEndpoints.host}/uploads/banners/subscription_banner.png',
-          'title': 'Subscription Savings',
-          'subtitle':
-              'Subscribe to fresh milk, curd, paneer & more for hassle-free morning deliveries.',
-          'cta': 'Subscribe Now',
-          'route': 'subscribe',
-          'isActive': true,
-        },
-        {
-          'id': 'promo-2',
-          'imageUrl': '${ApiEndpoints.host}/uploads/banners/wallet_banner.png',
-          'title': 'F2H Wallet',
-          'subtitle':
-              'Add cash to your wallet & get instant cashback on orders.',
-          'cta': 'Add Money',
-          'route': 'wallet',
-          'isActive': true,
-        },
-      ];
-      _loading = false;
-    });
-    _startAutoScroll();
   }
 
   void _onBannerTap(Map<String, dynamic> banner) {
@@ -216,29 +188,7 @@ class _PromoBannerState extends State<PromoBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: AspectRatio(
-            aspectRatio: 2.0,
-            child: Container(
-              color: Colors.grey.shade200,
-              child: const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_banners.isEmpty) return const SizedBox.shrink();
+    if (_loading || _banners.isEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),

@@ -1151,38 +1151,17 @@ class InitialLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  // Cow Drinking Milk Animation with Green Loading Bar below
-                  CowLoadingWidget(
-                    size: 240,
-                    showLoadingBar: true,
-                    loadingBarWidth: 180,
-                  ),
-
-                  SizedBox(height: 16),
-
-                  // F2H Fresh Brand Title
-                  Text(
-                    'F2H Fresh',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: kPrimary,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                ],
+              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+              child: CowLoadingWidget(
+                size: 240,
+                showLoadingBar: true,
+                loadingBarWidth: 180,
               ),
             ),
           ),

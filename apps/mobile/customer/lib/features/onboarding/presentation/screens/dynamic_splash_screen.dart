@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 class DynamicSplashScreen extends StatefulWidget {
   final Widget child;
@@ -27,6 +28,14 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _startSplashSequence();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Pre-cache both brand logo and cow animation into memory cache immediately
+    precacheImage(const AssetImage('assets/icon/app_icon.png'), context);
+    AssetLottie('assets/loading/cow_drink_milk.json').load();
   }
 
   @override

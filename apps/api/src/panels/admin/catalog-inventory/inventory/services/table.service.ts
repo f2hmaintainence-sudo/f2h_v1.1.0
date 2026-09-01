@@ -259,6 +259,7 @@ export class InventoryTableService {
               const colors: Record<string, string> = {
                 purchase: 'badge-success',
                 production: 'badge-success',
+                stock_in: 'badge-success',
                 stock_transfer: 'badge-info',
                 dispatch: 'badge-warning',
                 delivery_return: 'badge-primary',

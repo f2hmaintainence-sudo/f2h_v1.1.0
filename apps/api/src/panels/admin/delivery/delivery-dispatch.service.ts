@@ -116,11 +116,31 @@ export class DeliveryDispatchService {
 
           // If delta > 0, we need additional stock from the warehouse
           if (delta > 0) {
-            const stock = await this.stockCore.getLockedStockBalance(
+            let stock = await this.stockCore.getLockedStockBalance(
               client,
               targetWarehouseId,
               item.product_variant_id,
             );
+
+            // These units were already moved out of `available` and into
+            // `reserved` when the customer's order was accepted. Releasing them
+            // back first means the OUT movement below decrements `available`
+            // exactly once — without this the same units are subtracted twice
+            // and a fully-stocked run fails with "insufficient stock".
+            const releaseQty = Math.min(delta, stock.reserved_quantity);
+            if (releaseQty > 0) {
+              await this.stockCore.unreserveStock(
+                client,
+                targetWarehouseId,
+                item.product_variant_id,
+                releaseQty,
+              );
+              stock = await this.stockCore.getLockedStockBalance(
+                client,
+                targetWarehouseId,
+                item.product_variant_id,
+              );
+            }
 
             if (stock.available_quantity < delta) {
               const [varRes, whRes] = await Promise.all([
@@ -158,12 +178,16 @@ export class DeliveryDispatchService {
               created_by: adminId,
             });
           } else if (delta < 0) {
-            // Reduced loaded quantity: return excess back to warehouse stock
+            // Reduced loaded quantity: only the difference comes back, never the
+            // whole line. Recorded as a stock IN rather than an adjustment —
+            // these are goods physically returning to the warehouse, and the
+            // adjustments report is meant for genuine count corrections, not for
+            // every edit of a handover.
             const returnQty = Math.abs(delta);
             await this.stockCore.recordStockMovement(client, {
               warehouse_id: targetWarehouseId,
               product_variant_id: item.product_variant_id,
-              movement_type: 'stock_adjustment',
+              movement_type: 'stock_in',
               direction: 1,
               quantity: returnQty,
               reference_type: 'delivery_run',
@@ -194,7 +218,7 @@ export class DeliveryDispatchService {
             await this.stockCore.recordStockMovement(client, {
               warehouse_id: warehouseId,
               product_variant_id: prevVarId,
-              movement_type: 'stock_adjustment',
+              movement_type: 'stock_in',
               direction: 1,
               quantity: prevQty,
               reference_type: 'delivery_run',

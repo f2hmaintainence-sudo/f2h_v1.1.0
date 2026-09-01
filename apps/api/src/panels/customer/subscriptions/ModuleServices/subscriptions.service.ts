@@ -148,17 +148,29 @@ export class SubscriptionsService {
       };
     }
 
-    // A sold-out variant must be refused before money moves, not after.
-    const unavailableItems = await this.stockAvailability.findUnavailableVariants(
-      (body.items || [])
-        .map((item) => item.product_variant_id)
-        .filter((id): id is string => Boolean(id)),
-      await this.stockAvailability.resolveWarehouseId(body.branch_id || DEFAULT_BRANCH_ID),
-    );
+    // Subscriptions are never gated on stock, and never reserve it.
+    //
+    // A subscription is a standing commitment whose orders are generated nightly
+    // for dates weeks ahead. Today's warehouse balance says nothing about what
+    // will be on hand then, so refusing a subscription because a variant happens
+    // to be at zero this morning would cancel future business over a temporary
+    // gap — and reserving against it would freeze the warehouse. Availability is
+    // enforced per generated order at dispatch instead.
+    //
+    // Only a variant that cannot be sold at all still blocks: an inactive or
+    // deleted variant would generate orders nobody can fulfil.
+    const unavailableItems = (
+      await this.stockAvailability.findUnavailableVariants(
+        (body.items || [])
+          .map((item) => item.product_variant_id)
+          .filter((id): id is string => Boolean(id)),
+        await this.stockAvailability.resolveWarehouseId(body.branch_id || DEFAULT_BRANCH_ID),
+      )
+    ).filter((u) => u.reason !== 'out_of_stock');
     if (unavailableItems.length > 0) {
       return {
         status: false,
-        error_code: 'out_of_stock',
+        error_code: 'unavailable_product',
         message: this.stockAvailability.describe(unavailableItems),
         unavailable_items: unavailableItems,
       };

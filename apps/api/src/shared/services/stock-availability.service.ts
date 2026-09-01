@@ -196,6 +196,97 @@ export class StockAvailabilityService {
     }
   }
 
+  /**
+   * Moves stock from available to reserved for an order being placed.
+   *
+   * `assertQuantitiesAvailable` only *reads*, so two checkouts racing for the
+   * last units both pass it. The conditional `available_quantity >= $3` here is
+   * what actually settles that: PostgreSQL takes a row lock for the UPDATE, so
+   * the second one sees the first one's decrement and matches no row.
+   *
+   * Must be called with the same transaction handle that writes the order —
+   * reserving outside it would leak stock whenever the order insert rolls back.
+   *
+   * [tx] is a shared-connection handle whose `query` resolves to `[rows]`;
+   * rowCount is not exposed, which is why every statement uses RETURNING.
+   */
+  async reserveQuantities(
+    tx: { query: (sql: string, params?: any[]) => Promise<any> },
+    items: { variantId: string; quantity: number }[],
+    warehouseId: string,
+  ): Promise<void> {
+    for (const item of items) {
+      const qty = Number(item.quantity || 0);
+      if (!item.variantId || qty <= 0) continue;
+
+      const [rows] = await tx.query(
+        `UPDATE stock_balances
+            SET available_quantity = available_quantity - $3,
+                reserved_quantity  = reserved_quantity + $3,
+                last_stock_update  = NOW(),
+                updated_at         = NOW()
+          WHERE warehouse_id = $1
+            AND product_variant_id = $2
+            AND deleted_at IS NULL
+            AND available_quantity >= $3
+          RETURNING available_quantity`,
+        [warehouseId, item.variantId, qty],
+      );
+
+      if (!rows || rows.length === 0) {
+        // Either no balance row for this warehouse, or someone took the units
+        // between the pre-check and here. Report what is actually left.
+        const [current] = await tx.query(
+          `SELECT COALESCE(available_quantity, 0) AS available_quantity
+             FROM stock_balances
+            WHERE warehouse_id = $1 AND product_variant_id = $2 AND deleted_at IS NULL`,
+          [warehouseId, item.variantId],
+        );
+        const available = Number(current?.[0]?.available_quantity ?? 0);
+        const [named] = await tx.query(
+          `SELECT COALESCE(pv.name, p.name, $1) AS name
+             FROM product_variants pv
+             LEFT JOIN products p ON p.product_id = pv.product_id
+            WHERE pv.variant_id = $1`,
+          [item.variantId],
+        );
+        const name = named?.[0]?.name || item.variantId;
+        throw new BadRequestException(
+          `Only ${available} unit(s) of "${name}" available in stock (requested ${qty})`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Returns reserved stock to available — an order cancelled before dispatch.
+   *
+   * Deliberately unconditional and floored at zero: releasing is always safe,
+   * and refusing to release would strand stock nobody can sell.
+   */
+  async releaseQuantities(
+    tx: { query: (sql: string, params?: any[]) => Promise<any> },
+    items: { variantId: string; quantity: number }[],
+    warehouseId: string,
+  ): Promise<void> {
+    for (const item of items) {
+      const qty = Number(item.quantity || 0);
+      if (!item.variantId || qty <= 0) continue;
+
+      await tx.query(
+        `UPDATE stock_balances
+            SET available_quantity = available_quantity + LEAST($3, reserved_quantity),
+                reserved_quantity  = GREATEST(reserved_quantity - $3, 0),
+                last_stock_update  = NOW(),
+                updated_at         = NOW()
+          WHERE warehouse_id = $1
+            AND product_variant_id = $2
+            AND deleted_at IS NULL`,
+        [warehouseId, item.variantId, qty],
+      );
+    }
+  }
+
   /** Customer-facing sentence naming the offending items. */
   describe(unavailable: UnavailableVariant[]): string {
     const outOfStock = unavailable.filter((u) => u.reason === 'out_of_stock');

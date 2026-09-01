@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -2744,11 +2745,20 @@ class _HomeBottomPromoBanners extends StatefulWidget {
 class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
   List<Map<String, dynamic>> _promoBanners = [];
   bool _loaded = false;
+  int _currentPage = 0;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(viewportFraction: 0.94);
     _fetchPromoBanners();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchPromoBanners() async {
@@ -2791,6 +2801,30 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
   }
 
   void _onPromoTap(BuildContext context, Map<String, dynamic> banner) {
+    // 1. Check for coupon code
+    final couponCode = (banner['couponCode'] ?? banner['coupon_code'] ?? banner['promoCode'] ?? banner['promo_code'] ?? banner['code'])?.toString();
+    String? resolvedCode = couponCode;
+    if (resolvedCode == null || resolvedCode.isEmpty) {
+      final cta = (banner['ctaLabel'] ?? banner['cta_label'] ?? '').toString();
+      final match = RegExp(r'(?:USE CODE|CODE):\s*([A-Z0-9_-]+)', caseSensitive: false).firstMatch(cta);
+      if (match != null) {
+        resolvedCode = match.group(1);
+      }
+    }
+
+    if (resolvedCode != null && resolvedCode.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: resolvedCode));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Coupon code "$resolvedCode" copied! Use at checkout.'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF16653A),
+        ),
+      );
+    }
+
+    // 2. Redirection
     final actionType = (banner['actionType'] ?? banner['action_type'] ?? '').toString().toUpperCase();
     final actionVal = (banner['actionValue'] ?? banner['action_value'] ?? banner['productId'] ?? banner['product_id'] ?? '').toString();
     final categoryId = (banner['categoryId'] ?? banner['category_id'] ?? '').toString();
@@ -2841,25 +2875,24 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (!_loaded || _promoBanners.isEmpty) return const SizedBox.shrink();
+  Widget _buildCard(BuildContext context, Map<String, dynamic> banner) {
+    final title = banner['title']?.toString() ?? 'Special Offer';
+    final description = banner['description']?.toString() ?? banner['subtitle']?.toString() ?? '';
+    final discountText = banner['discountText']?.toString() ?? banner['discount_text']?.toString();
+    final ctaLabel = banner['ctaLabel']?.toString() ?? banner['cta_label']?.toString() ?? banner['cta']?.toString() ?? 'Grab Offer';
+    final imageUrl = _formatImg(banner['imageUrl']?.toString() ?? banner['image_url']?.toString() ?? '');
+    final bType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
+    final tagLabel = bType == 'checkout_banner' || bType == 'checkout_promo'
+        ? 'CHECKOUT PROMO'
+        : (discountText?.isNotEmpty == true ? discountText!.toUpperCase() : 'SPECIAL OFFER');
 
-    return Column(
-      children: _promoBanners.map((banner) {
-        final title = banner['title']?.toString() ?? 'Special Offer';
-        final description = banner['description']?.toString() ?? banner['subtitle']?.toString() ?? '';
-        final discountText = banner['discountText']?.toString() ?? banner['discount_text']?.toString();
-        final ctaLabel = banner['ctaLabel']?.toString() ?? banner['cta_label']?.toString() ?? banner['cta']?.toString() ?? 'Grab Offer';
-        final imageUrl = _formatImg(banner['imageUrl']?.toString() ?? banner['image_url']?.toString() ?? '');
-        final bType = (banner['bannerType'] ?? banner['banner_type'] ?? '').toString().toLowerCase();
-        final tagLabel = bType == 'checkout_banner' || bType == 'checkout_promo'
-            ? 'CHECKOUT PROMO'
-            : (discountText?.isNotEmpty == true ? discountText!.toUpperCase() : 'SPECIAL OFFER');
-
-        return Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          padding: const EdgeInsets.all(14),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _onPromoTap(context, banner),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: const Color(0xFFF0FDF4),
             borderRadius: BorderRadius.circular(16),
@@ -2870,6 +2903,7 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Top tag badge
               Container(
@@ -2895,7 +2929,7 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
               // Content Row: Thumbnail -> Text (Title + Discount Pill) -> CTA Button
               Row(
@@ -2904,9 +2938,9 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                   // Thumbnail
                   if (imageUrl.isNotEmpty)
                     Container(
-                      width: 58,
-                      height: 58,
-                      margin: const EdgeInsets.only(right: 12),
+                      width: 52,
+                      height: 52,
+                      margin: const EdgeInsets.only(right: 10),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: Colors.white,
@@ -2920,7 +2954,7 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.local_offer_rounded,
                             color: Color(0xFF16A34A),
-                            size: 24,
+                            size: 22,
                           ),
                         ),
                       ),
@@ -2930,6 +2964,7 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           children: [
@@ -2937,7 +2972,7 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                               child: Text(
                                 title,
                                 style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w900,
                                   color: kText,
                                   height: 1.2,
@@ -2949,15 +2984,15 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                             if (discountText != null && discountText.isNotEmpty) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(5),
                                 ),
                                 child: Text(
                                   discountText.toUpperCase(),
                                   style: const TextStyle(
-                                    fontSize: 9,
+                                    fontSize: 8.5,
                                     fontWeight: FontWeight.w800,
                                     color: Color(0xFF16653A),
                                   ),
@@ -2967,15 +3002,15 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                           ],
                         ),
                         if (description.isNotEmpty) ...[
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             description,
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 10.5,
                               color: kTextSub,
-                              height: 1.3,
+                              height: 1.25,
                             ),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -2991,9 +3026,9 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                       backgroundColor: const Color(0xFF00875A),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: Row(
@@ -3002,12 +3037,12 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                         Text(
                           ctaLabel,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.arrow_forward_rounded, size: 13),
+                        const SizedBox(width: 3),
+                        const Icon(Icons.arrow_forward_rounded, size: 12),
                       ],
                     ),
                   ),
@@ -3015,8 +3050,60 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
               ),
             ],
           ),
-        );
-      }).toList(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _promoBanners.isEmpty) return const SizedBox.shrink();
+
+    if (_promoBanners.length == 1) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: _buildCard(context, _promoBanners.first),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 118,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _promoBanners.length,
+              onPageChanged: (i) => setState(() => _currentPage = i),
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: _buildCard(context, _promoBanners[index]),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_promoBanners.length, (i) {
+              final isSel = i == _currentPage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: isSel ? 14 : 5,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isSel ? const Color(0xFF16A34A) : const Color(0xFFD1D5DB),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 }

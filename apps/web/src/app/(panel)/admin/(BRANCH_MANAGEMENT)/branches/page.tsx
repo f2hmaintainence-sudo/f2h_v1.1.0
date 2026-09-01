@@ -165,6 +165,8 @@ export default function BranchesPage() {
     }
   };
 
+  const [createdBranchForNextStep, setCreatedBranchForNextStep] = useState<{ branch_id: string; branch_name: string } | null>(null);
+
   // Create branch
   const handleSave = async () => {
     if (!form.branch_name.trim()) { setError('Branch name is required'); return; }
@@ -178,6 +180,8 @@ export default function BranchesPage() {
     try {
       const res = await api.post<any>('/admin/branch/saveAdd', form);
       if (res.data?.status) {
+        const branchId = res.data?.data?.branch_id || form.branch_code;
+        const branchName = form.branch_name;
         showSuccessToast(res.data.message || 'Branch created!', 3000);
         setMode('list');
         setStep('list');
@@ -185,6 +189,7 @@ export default function BranchesPage() {
         setFormModalOpen(false);
         resetForm();
         fetchBranches();
+        setCreatedBranchForNextStep({ branch_id: branchId, branch_name: branchName });
       } else {
         setError(res.data?.message || res.error || 'Failed to create branch');
       }
@@ -710,6 +715,64 @@ export default function BranchesPage() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stage 1 -> Stage 2 Lifecycle Guided Modal */}
+      {createdBranchForNextStep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-5">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
+              <Building2 size={32} />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/70 text-emerald-800 text-xs font-bold mb-2">
+                <Check size={12} /> Stage 1 Complete: Branch Created
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">
+                "{createdBranchForNextStep.branch_name}" is Ready!
+              </h3>
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                To start storing inventory and fulfilling customer orders in this delivery area, you need to set up a <strong>Warehouse / Hub</strong> for this branch.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left space-y-2 text-xs">
+              <div className="font-semibold text-emerald-700 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">2</span>
+                Next Step: Create Warehouse
+              </div>
+              <p className="text-slate-500 pl-7 text-[11px]">
+                Map a cold storage or ambient warehouse hub to this branch.
+              </p>
+              <div className="font-semibold text-slate-400 flex items-center gap-2 pt-1 opacity-70">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold">3</span>
+                Subsequent Step: Update Containers
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setCreatedBranchForNextStep(null)}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all border border-slate-200 cursor-pointer"
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const bId = createdBranchForNextStep.branch_id;
+                  const bName = encodeURIComponent(createdBranchForNextStep.branch_name);
+                  setCreatedBranchForNextStep(null);
+                  router.push(`/admin/warehouse/list?create=true&branch_id=${bId}&branch_name=${bName}`);
+                }}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold bg-[#16a34a] hover:bg-[#15803d] text-white transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Create Warehouse <ChevronRight size={14} />
+              </button>
             </div>
           </div>
         </div>

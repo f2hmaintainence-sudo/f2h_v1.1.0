@@ -241,6 +241,11 @@ export class ProfileService {
     try {
       let rows: any[] = [];
       try {
+        // `updateMyProfile` writes the staff detail fields to `management_staff`,
+        // so they have to be read back from there. Selecting from `users` alone
+        // returned them as undefined, which made the edit form seed every one of
+        // them blank — so the page always looked unchanged after a save, and the
+        // next save wrote those blanks over whatever was stored.
         const sql = `
           SELECT
             u.user_id,
@@ -248,12 +253,28 @@ export class ProfileService {
             u.user_name,
             COALESCE(u.first_name, u.user_name) AS first_name,
             COALESCE(u.last_name, '') AS last_name,
-            COALESCE(u.phone, '') AS phone,
+            COALESCE(u.phone, ms.phone, '') AS phone,
             COALESCE(u.profile_image_url, '') AS profile,
             u.role_id,
             u.account_status,
-            u.created_at AS user_created_at
+            u.created_at AS user_created_at,
+            COALESCE(ms.gender, '') AS gender,
+            ms.date_of_birth,
+            COALESCE(ms.marital_status, '') AS marital_status,
+            COALESCE(ms.bio, '') AS bio,
+            COALESCE(ms.department, '') AS department,
+            COALESCE(ms.designation, '') AS designation,
+            COALESCE(ms.education, '') AS education,
+            COALESCE(ms.address_line1, '') AS address_line1,
+            COALESCE(ms.address_line2, '') AS address_line2,
+            COALESCE(ms.city, '') AS city,
+            COALESCE(ms.state, '') AS state,
+            COALESCE(ms.postal_code, '') AS postal_code,
+            COALESCE(ms.alt_phone, '') AS alt_phone,
+            COALESCE(ms.branch_id, '') AS branch_id
           FROM users u
+          LEFT JOIN management_staff ms
+            ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
           WHERE u.user_id = $1 OR u.email = $1
           LIMIT 1
         `;
@@ -327,12 +348,23 @@ export class ProfileService {
         branch_id,
       } = body;
 
+      // A key the caller did not send arrives as undefined, which pg binds as
+      // NULL. Without COALESCE that silently blanked every field the request
+      // happened to omit, so saving one field wiped the rest. An explicit empty
+      // string still clears a field — only an absent key is treated as "keep".
+      // `email` is deliberately not written here; it has its own OTP-verified
+      // endpoint.
+      const keep = (v: unknown) => (v === undefined ? null : v);
+
       // 1) Update users table
       await this.db.query(
         `UPDATE users
-         SET first_name = $2, last_name = $3, phone = $4, updated_at = NOW()
-         WHERE user_id = $1`,
-        [userId, first_name, last_name, phone],
+         SET first_name = COALESCE($2, first_name),
+             last_name  = COALESCE($3, last_name),
+             phone      = COALESCE($4, phone),
+             updated_at = NOW()
+         WHERE user_id = $1 OR email = $1`,
+        [userId, keep(first_name), keep(last_name), keep(phone)],
       );
 
       // 2) Upsert management_staff
@@ -344,30 +376,44 @@ export class ProfileService {
       if (existing.length > 0) {
         await this.db.query(
           `UPDATE management_staff
-           SET gender = $2, date_of_birth = $3, marital_status = $4, bio = $5,
-               department = $6, designation = $7, education = $8,
-               address_line1 = $9, address_line2 = $10, city = $11, state = $12,
-               postal_code = $13, alt_phone = $14, branch_id = $15,
-               phone = $16, user_name = $17, updated_at = NOW()
+           SET gender         = COALESCE($2, gender),
+               date_of_birth  = COALESCE($3, date_of_birth),
+               marital_status = COALESCE($4, marital_status),
+               bio            = COALESCE($5, bio),
+               department     = COALESCE($6, department),
+               designation    = COALESCE($7, designation),
+               education      = COALESCE($8, education),
+               address_line1  = COALESCE($9, address_line1),
+               address_line2  = COALESCE($10, address_line2),
+               city           = COALESCE($11, city),
+               state          = COALESCE($12, state),
+               postal_code    = COALESCE($13, postal_code),
+               alt_phone      = COALESCE($14, alt_phone),
+               branch_id      = COALESCE($15, branch_id),
+               phone          = COALESCE($16, phone),
+               user_name      = COALESCE($17, user_name),
+               updated_at     = NOW()
            WHERE user_id = $1`,
           [
             userId,
-            gender,
+            keep(gender),
+            // An empty date input is not a date — it must stay NULL-as-"keep"
+            // rather than reach a date column as ''.
             date_of_birth || null,
-            marital_status,
-            bio,
-            department,
-            designation,
-            education,
-            address_line1,
-            address_line2,
-            city,
-            state,
-            postal_code,
-            alt_phone,
+            keep(marital_status),
+            keep(bio),
+            keep(department),
+            keep(designation),
+            keep(education),
+            keep(address_line1),
+            keep(address_line2),
+            keep(city),
+            keep(state),
+            keep(postal_code),
+            keep(alt_phone),
             branch_id || null,
-            phone,
-            [first_name, last_name].filter(Boolean).join(' '),
+            keep(phone),
+            [first_name, last_name].filter(Boolean).join(' ') || null,
           ],
         );
       } else {

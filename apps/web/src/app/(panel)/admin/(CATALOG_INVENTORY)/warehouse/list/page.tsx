@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronRight,
@@ -11,6 +12,9 @@ import {
   Plus,
   PackageSearch,
   Sparkles,
+  Check,
+  Building2,
+  Box,
 } from "lucide-react";
 import { api as apiClient } from "@/services/api.client";
 import WarehouseSummaryCards from "@/components/warehouse/WarehouseSummaryCards";
@@ -23,6 +27,11 @@ import TableComponents from "@/components/Table Generator/TableComponents";
 const API = "/admin/warehouses";
 
 export default function WarehouseListPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const branchIdParam = searchParams.get("branch_id") || "";
+  const createParam = searchParams.get("create") === "true";
+
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
@@ -44,6 +53,18 @@ export default function WarehouseListPage() {
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedWarehouse, setSelectedWarehouse] = useState<WarehouseItem | null>(null);
   const [pendingMapWarehouse, setPendingMapWarehouse] = useState<WarehouseItem | null>(null);
+  const [initialBranchId, setInitialBranchId] = useState<string>(branchIdParam);
+  const [createdWarehouseForNextStep, setCreatedWarehouseForNextStep] = useState<{ id?: string | number; name: string; code?: string } | null>(null);
+
+  // Auto-open create modal if create=true is in query
+  useEffect(() => {
+    if (createParam) {
+      setModalMode("create");
+      setSelectedWarehouse(null);
+      if (branchIdParam) setInitialBranchId(branchIdParam);
+      setModalOpen(true);
+    }
+  }, [createParam, branchIdParam]);
 
   // Listen for default edit form close to show map pin form next
   useEffect(() => {
@@ -469,10 +490,73 @@ export default function WarehouseListPage() {
       <WarehouseModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSuccess={fetchWarehouses}
+        onSuccess={(savedData) => {
+          fetchWarehouses();
+          if (modalMode === "create" && savedData) {
+            setCreatedWarehouseForNextStep({
+              id: savedData.id || savedData.warehouse_id,
+              name: savedData.name || "New Warehouse",
+              code: savedData.code,
+            });
+          }
+        }}
         mode={modalMode}
         warehouse={selectedWarehouse}
+        initialBranchId={initialBranchId}
       />
+
+      {/* Stage 2 -> Stage 3 Lifecycle Guided Modal */}
+      {createdWarehouseForNextStep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-5">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
+              <WarehouseIcon size={32} />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/70 text-emerald-800 text-xs font-bold mb-2">
+                <Check size={12} /> Stage 2 Complete: Warehouse Configured
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">
+                "{createdWarehouseForNextStep.name}" is Ready!
+              </h3>
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                To prepare for deliveries and customer dispatch, you need to <strong>Update &amp; Allocate Storage Containers / Crates</strong> to this warehouse hub.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left space-y-2 text-xs">
+              <div className="font-semibold text-emerald-700 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">3</span>
+                Next Step: Update Containers Master
+              </div>
+              <p className="text-slate-500 pl-7 text-[11px]">
+                Assign milk cans, glass bottle crates, and insulated delivery bags to this warehouse.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setCreatedWarehouseForNextStep(null)}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all border border-slate-200 cursor-pointer"
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const whId = createdWarehouseForNextStep.id || createdWarehouseForNextStep.code || "";
+                  setCreatedWarehouseForNextStep(null);
+                  router.push(`/admin/packages/dashboard?warehouse_id=${whId}`);
+                }}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold bg-[#16a34a] hover:bg-[#15803d] text-white transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Update Containers <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL FORMS & DRAWERS (VIEW, EDIT, DELETE) */}
       <TableComponents

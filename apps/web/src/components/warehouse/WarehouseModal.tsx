@@ -29,10 +29,11 @@ const MapPicker = dynamic(() => import('@/components/shared/MapPicker'), { ssr: 
 interface WarehouseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (savedWarehouse?: any) => void;
   mode: 'create' | 'edit';
   warehouse?: WarehouseItem | null;
   initialStep?: 1 | 2;
+  initialBranchId?: string;
 }
 
 export interface WarehouseFormData {
@@ -88,6 +89,7 @@ export default function WarehouseModal({
   mode,
   warehouse,
   initialStep,
+  initialBranchId,
 }: WarehouseModalProps) {
   const [formStep, setFormStep] = useState<1 | 2>(initialStep || (mode === 'edit' ? 2 : 1));
   const [form, setForm] = useState<WarehouseFormData>(DEFAULT_FORM);
@@ -174,10 +176,13 @@ export default function WarehouseModal({
           })
           .finally(() => setLoading(false));
       } else {
-        setForm(DEFAULT_FORM);
+        setForm({
+          ...DEFAULT_FORM,
+          branch_id: initialBranchId || DEFAULT_FORM.branch_id,
+        });
       }
     }
-  }, [isOpen, mode, warehouse]);
+  }, [isOpen, mode, warehouse, initialBranchId, initialStep]);
 
   if (!isOpen) return null;
 
@@ -213,7 +218,8 @@ export default function WarehouseModal({
       if (res.error || (res as any)?.status === false) {
         setError(res.error || (res as any)?.message || 'Failed to save warehouse');
       } else {
-        onSuccess();
+        const savedData = res.data?.data || res.data || payload;
+        onSuccess(savedData);
         onClose();
       }
     } catch (err: any) {

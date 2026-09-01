@@ -28,6 +28,7 @@ import '../../../address/presentation/widgets/address_selector_drawer.dart';
 import '../../../address/presentation/screens/add_address_screen.dart';
 import '../../../../core/widgets/hot_toast.dart';
 import '../../../address/data/models/profile_address.dart';
+import '../../../wallet/presentation/screens/wallet_screen.dart';
 import '../../../../core/widgets/scrolling_items_loader.dart';
 import '../../../../core/widgets/cow_loading_widget.dart';
 import '../helpers/cart_helpers.dart';
@@ -716,7 +717,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // ===== Checkout Promo Banner (Live Preview Style) =====
-                                const _CheckoutPromoBannerWidget(),
+                                _CheckoutPromoBannerWidget(
+                                  onApplyCoupon: (code) {
+                                    _couponController.text = code;
+                                    _applyCoupon(checkoutItems, subtotal, customerId);
+                                  },
+                                ),
 
                                 // ===== Delivery Address =====
                                 BlocBuilder<
@@ -2219,11 +2225,12 @@ class _SlideToPayButtonState extends State<SlideToPayButton> {
 }
 
 // ══════════════════════════════════════════════════════════
-//  CHECKOUT PROMO BANNER WIDGET (LIVE PREVIEW STYLE)
+//  CHECKOUT PROMO BANNER WIDGET (LIVE PREVIEW STYLE - SLIDER)
 // ══════════════════════════════════════════════════════════
 
 class _CheckoutPromoBannerWidget extends StatefulWidget {
-  const _CheckoutPromoBannerWidget();
+  final void Function(String code)? onApplyCoupon;
+  const _CheckoutPromoBannerWidget({this.onApplyCoupon});
 
   @override
   State<_CheckoutPromoBannerWidget> createState() => _CheckoutPromoBannerWidgetState();
@@ -2232,11 +2239,20 @@ class _CheckoutPromoBannerWidget extends StatefulWidget {
 class _CheckoutPromoBannerWidgetState extends State<_CheckoutPromoBannerWidget> {
   List<Map<String, dynamic>> _banners = [];
   bool _loaded = false;
+  int _currentPage = 0;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(viewportFraction: 0.96);
     _fetchCheckoutBanners();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchCheckoutBanners() async {
@@ -2299,6 +2315,23 @@ class _CheckoutPromoBannerWidgetState extends State<_CheckoutPromoBannerWidget> 
   }
 
   void _onBannerTap(Map<String, dynamic> banner) {
+    // 1. Try to extract coupon code to apply directly
+    final couponCode = (banner['couponCode'] ?? banner['coupon_code'] ?? banner['promoCode'] ?? banner['promo_code'] ?? banner['code'])?.toString();
+    String? resolvedCode = couponCode;
+    if (resolvedCode == null || resolvedCode.isEmpty) {
+      final cta = (banner['ctaLabel'] ?? banner['cta_label'] ?? '').toString();
+      final match = RegExp(r'(?:USE CODE|CODE):\s*([A-Z0-9_-]+)', caseSensitive: false).firstMatch(cta);
+      if (match != null) {
+        resolvedCode = match.group(1);
+      }
+    }
+
+    if (resolvedCode != null && resolvedCode.isNotEmpty && widget.onApplyCoupon != null) {
+      widget.onApplyCoupon!(resolvedCode);
+      return;
+    }
+
+    // 2. Navigation / Redirection
     final actionType = (banner['actionType'] ?? banner['action_type'] ?? banner['type'] ?? '').toString().toUpperCase();
     final actionVal = (banner['actionValue'] ?? banner['action_value'] ?? '').toString();
     final categoryId = (banner['categoryId'] ?? banner['category_id'] ?? '').toString();
@@ -2316,6 +2349,7 @@ class _CheckoutPromoBannerWidgetState extends State<_CheckoutPromoBannerWidget> 
           productId: targetPid,
           productName: title,
         );
+        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
         return;
       }
     }
@@ -2326,180 +2360,249 @@ class _CheckoutPromoBannerWidgetState extends State<_CheckoutPromoBannerWidget> 
 
     if (targetCategory.isNotEmpty) {
       AppShell.of(context)?.setTab(1, category: targetCategory);
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      return;
     }
+
+    if (actionType == 'SUBSCRIPTION') {
+      AppShell.of(context)?.setTab(2);
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      return;
+    }
+
+    if (actionType == 'WALLET') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
+      );
+      return;
+    }
+
+    AppShell.of(context)?.setTab(1);
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+  }
+
+  Widget _buildBannerCard(Map<String, dynamic> banner) {
+    final title = banner['title']?.toString() ?? 'Special Offer';
+    final description = banner['description']?.toString() ?? banner['subtitle']?.toString() ?? '';
+    final discountText = banner['discountText']?.toString() ?? banner['discount_text']?.toString();
+    final ctaLabel = banner['ctaLabel']?.toString() ?? banner['cta_label']?.toString() ?? 'Grab Offer';
+    final imageUrl = _formatImageUrl(banner['imageUrl']?.toString() ?? banner['image_url']?.toString() ?? '');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _onBannerTap(banner),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFF86EFAC),
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Top Tag
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shopping_bag_outlined, size: 12, color: Color(0xFF92400E)),
+                    SizedBox(width: 4),
+                    Text(
+                      'CHECKOUT PROMO',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF92400E),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Content Row: Thumbnail -> Title + Discount + Description -> CTA
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (imageUrl.isNotEmpty)
+                    Container(
+                      width: 52,
+                      height: 52,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.local_offer_rounded,
+                            color: Color(0xFF16A34A),
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                  height: 1.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (discountText != null && discountText.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  discountText.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF16653A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            description,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: kTextSub,
+                              height: 1.25,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  ElevatedButton(
+                    onPressed: () => _onBannerTap(banner),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00875A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          ctaLabel,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(Icons.arrow_forward_rounded, size: 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_loaded || _banners.isEmpty) return const SizedBox.shrink();
 
+    if (_banners.length == 1) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: _buildBannerCard(_banners.first),
+      );
+    }
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
-        children: _banners.map((banner) {
-          final title = banner['title']?.toString() ?? 'Special Offer';
-          final description = banner['description']?.toString() ?? banner['subtitle']?.toString() ?? '';
-          final discountText = banner['discountText']?.toString() ?? banner['discount_text']?.toString();
-          final ctaLabel = banner['ctaLabel']?.toString() ?? banner['cta_label']?.toString() ?? 'Grab Offer';
-          final imageUrl = _formatImageUrl(banner['imageUrl']?.toString() ?? banner['image_url']?.toString() ?? '');
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFF86EFAC),
-                width: 1.2,
-              ),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 118,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _banners.length,
+              onPageChanged: (i) => setState(() => _currentPage = i),
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: _buildBannerCard(_banners[index]),
+                );
+              },
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Tag
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.shopping_bag_outlined, size: 12, color: Color(0xFF92400E)),
-                      SizedBox(width: 4),
-                      Text(
-                        'CHECKOUT PROMO',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF92400E),
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ],
-                  ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_banners.length, (i) {
+              final isSel = i == _currentPage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: isSel ? 14 : 5,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isSel ? const Color(0xFF16A34A) : const Color(0xFFD1D5DB),
+                  borderRadius: BorderRadius.circular(3),
                 ),
-                const SizedBox(height: 10),
-
-                // Content Row: Thumbnail -> Title + Discount + Description -> CTA
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    if (imageUrl.isNotEmpty)
-                      Container(
-                        width: 58,
-                        height: 58,
-                        margin: const EdgeInsets.only(right: 12),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: Colors.white,
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(11),
-                          child: Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.local_offer_rounded,
-                              color: Color(0xFF16A34A),
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  title,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                    color: kText,
-                                    height: 1.2,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (discountText != null && discountText.isNotEmpty) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDCFCE7),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    discountText.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF16653A),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          if (description.isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              description,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: kTextSub,
-                                height: 1.3,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-
-                    ElevatedButton(
-                      onPressed: () => _onBannerTap(banner),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00875A),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            ctaLabel,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward_rounded, size: 13),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }).toList(),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }

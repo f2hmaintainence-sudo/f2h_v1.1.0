@@ -46,9 +46,7 @@ import 'home_screen.dart';
 /// Finds the live catalog entry for a cart line's variant.
 ///
 /// A product card IS a variant, so the id matches either a Product directly or
-/// one of its sibling variants. Returns null when the catalog has not loaded,
-/// in which case callers must not assume the item is in stock — the server
-/// revalidates on checkout regardless.
+/// one of its sibling variants. Returns null when the catalog has not loaded.
 ProductVariant? _findCatalogVariant(BuildContext context, String variantId) {
   final state = context.read<CatalogBloc>().state;
   if (state is! CatalogLoaded) return null;
@@ -66,8 +64,24 @@ ProductVariant? _findCatalogVariant(BuildContext context, String variantId) {
           originalPrice: product.originalPrice,
           isOutOfStock: product.isOutOfStock,
           isLowStock: product.isLowStock,
+          availableQuantity: product.availableQuantity,
+          lowStockThreshold: product.lowStockThreshold,
         ),
       );
+    }
+  }
+  return null;
+}
+
+/// Finds the parent product in catalog for a cart line to check product-level stock flags.
+Product? _findCatalogProduct(BuildContext context, String variantId, {String? productId}) {
+  final state = context.read<CatalogBloc>().state;
+  if (state is! CatalogLoaded) return null;
+  for (final product in state.products) {
+    if (productId != null && product.id == productId) return product;
+    if (product.id == variantId) return product;
+    for (final v in product.variants) {
+      if (v.id == variantId) return product;
     }
   }
   return null;
@@ -96,29 +110,28 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    // Load cart on first build if not already loaded and refresh session/slot timings
+    // Load cart on first build and ALWAYS refresh catalog & branch inventory for live stock check
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CustomerSessionCubit>().refreshSilently();
       final bloc = context.read<CartBloc>();
       final sessionState = context.read<CustomerSessionCubit>().state;
       final customerId = sessionState.profile?.customerId;
-      if (bloc.state is CartInitialState && customerId != null) {
+      if (customerId != null) {
         bloc.add(LoadCartEvent(customerId));
       }
       final catBloc = context.read<CatalogBloc>();
-      if (catBloc.state is! CatalogLoaded) {
-        String? branchId;
-        try {
-          if (sessionState.addresses.isNotEmpty) {
-            final def = sessionState.addresses.firstWhere(
-              (a) => a.isDefault,
-              orElse: () => sessionState.addresses.first,
-            );
-            if (def.branchId.isNotEmpty) branchId = def.branchId;
-          }
-        } catch (_) {}
-        catBloc.add(LoadCatalog(branchId: branchId));
-      }
+      String? branchId;
+      try {
+        if (sessionState.addresses.isNotEmpty) {
+          final def = sessionState.addresses.firstWhere(
+            (a) => a.isDefault,
+            orElse: () => sessionState.addresses.first,
+          );
+          if (def.branchId.isNotEmpty) branchId = def.branchId;
+        }
+      } catch (_) {}
+      // Always load latest catalog to check live warehouse/branch stock balances
+      catBloc.add(LoadCatalog(branchId: branchId));
     });
   }
 
@@ -603,6 +616,12 @@ class _CartScreenState extends State<CartScreen> {
                 // catalog and carry its real flags across. Without this the
                 // cart shows a sold-out line as freshly addable.
                 final catalogMatch = _findCatalogVariant(context, matchedItem.variantId);
+                final catalogProduct = _findCatalogProduct(context, matchedItem.variantId, productId: matchedItem.productId);
+                final isOos = (catalogMatch?.isOutOfStock == true) ||
+                    (catalogProduct?.isOutOfStock == true) ||
+                    (catalogMatch != null && catalogMatch.maxStock == 0);
+                final isLow = !isOos && ((catalogMatch?.isLowStock == true) || (catalogProduct?.isLowStock == true));
+
                 final p = getProductById(
                   matchedItem.variantId,
                   name: matchedItem.productName,
@@ -611,11 +630,11 @@ class _CartScreenState extends State<CartScreen> {
                   imageAsset: matchedItem.imageAsset,
                   isSubscribable: matchedItem.isSubscribable,
                   isOneTime: matchedItem.isOneTime,
-                  isOutOfStock: catalogMatch?.isOutOfStock ?? false,
-                  isLowStock: catalogMatch?.isLowStock ?? false,
+                  isOutOfStock: isOos,
+                  isLowStock: isLow,
                 );
-                final qty = items[key] ?? 0;
-                final isChecked = _selectedItems[key] ?? true;
+                final qty = getItemQuantity(matchedItem);
+                final isChecked = !isOos && (_selectedItems[key] ?? true);
 
                 return _CartItemTile(
                   key: ValueKey(key),
@@ -627,7 +646,7 @@ class _CartScreenState extends State<CartScreen> {
                   isChecked: isChecked,
                   globalOnetimeDate: _globalOnetimeDate,
                   globalOnetimeSlot: _globalOnetimeSlot,
-                  onCheckChanged: (val) {
+                  onCheckChanged: isOos ? null : (val) {
                     setState(() {
                       _selectedItems[key] = val ?? false;
                     });
@@ -652,7 +671,11 @@ class _CartScreenState extends State<CartScreen> {
 
     for (final item in filteredItems) {
       final key = '${item.variantId}_once';
-      if (_selectedItems[key] ?? true) {
+      final v = _findCatalogVariant(context, item.variantId);
+      final prod = _findCatalogProduct(context, item.variantId, productId: item.productId);
+      final isOos = (v?.isOutOfStock == true) || (prod?.isOutOfStock == true) || (v != null && v.maxStock == 0);
+
+      if (!isOos && (_selectedItems[key] ?? true)) {
         final price = getEffectivePrice(item);
         final qty = getItemQuantity(item);
         final itemAmount = price * qty;
@@ -837,16 +860,47 @@ class _CartScreenState extends State<CartScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: () {
-                    final selectedKeys = itemKeys
-                        .where((k) => _selectedItems[k] ?? true)
-                        .toList();
+                    // Check only available / in-stock items among selected
+                    final selectedKeys = itemKeys.where((k) {
+                      CartItemEntity? item;
+                      try {
+                        item = filteredItems.firstWhere((it) => '${it.variantId}_once' == k || it.variantId == k);
+                      } catch (_) {}
+                      if (item == null) return false;
+                      final v = _findCatalogVariant(context, item.variantId);
+                      final prod = _findCatalogProduct(context, item.variantId, productId: item.productId);
+                      final isOos = (v?.isOutOfStock == true) || (prod?.isOutOfStock == true) || (v != null && v.maxStock == 0);
+                      if (isOos) return false;
+                      return _selectedItems[k] ?? true;
+                    }).toList();
 
                     if (selectedKeys.isEmpty) {
                       F2HToast.error(
                         context,
-                        'Please select at least one item to proceed.',
+                        'Please select at least one available item to proceed.',
                       );
                       return;
+                    }
+
+                    // Check stock limit for all selected items
+                    for (final key in selectedKeys) {
+                      CartItemEntity? item;
+                      try {
+                        item = filteredItems.firstWhere((it) => '${it.variantId}_once' == key || it.variantId == key);
+                      } catch (_) {}
+                      if (item == null) continue;
+                      final v = _findCatalogVariant(context, item.variantId);
+                      final prod = _findCatalogProduct(context, item.variantId, productId: item.productId);
+                      final maxStock = v?.maxStock ?? prod?.maxStock ?? 999;
+                      final qty = getItemQuantity(item);
+                      if (qty > maxStock) {
+                        F2HToast.error(
+                          context,
+                          '${item.productName} exceeds available stock (Only $maxStock available). Please reduce quantity.',
+                          title: 'Stock Exceeded',
+                        );
+                        return;
+                      }
                     }
 
                     // Navigate to Checkout Screen
@@ -1312,7 +1366,7 @@ class _CartItemTile extends StatefulWidget {
   final int baseQty;
   final int index;
   final bool isChecked;
-  final Function(bool?) onCheckChanged;
+  final ValueChanged<bool?>? onCheckChanged;
   final DateTime? globalOnetimeDate;
   final String globalOnetimeSlot;
 
@@ -1324,7 +1378,7 @@ class _CartItemTile extends StatefulWidget {
     required this.baseQty,
     required this.index,
     required this.isChecked,
-    required this.onCheckChanged,
+    this.onCheckChanged,
     required this.globalOnetimeDate,
     required this.globalOnetimeSlot,
   });
@@ -1352,6 +1406,11 @@ class _CartItemTileState extends State<_CartItemTile> {
     final p = widget.product;
     final displayPrice = p.price;
     final effectiveQty = widget.baseQty;
+    final matchedVar = p.allVariants.where((v) => v.id == (widget.cartItem?.variantId ?? p.id)).firstOrNull;
+    final maxStock = matchedVar?.maxStock ?? p.maxStock;
+    final isOutOfStock = p.isOutOfStock || (matchedVar != null && matchedVar.isOutOfStock) || maxStock == 0;
+    final isLowStock = !isOutOfStock && (p.isLowStock || (matchedVar != null && matchedVar.isLowStock));
+    final isExceededStock = !isOutOfStock && effectiveQty > maxStock;
 
     return Container(
       color: Colors.white,
@@ -1360,14 +1419,17 @@ class _CartItemTileState extends State<_CartItemTile> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Checkbox(
-            value: widget.isChecked,
+            value: isOutOfStock ? false : widget.isChecked,
             activeColor: kPrimary,
             checkColor: Colors.white,
-            side: const BorderSide(color: Color(0xFFC7D0CB), width: 1.6),
+            side: BorderSide(
+              color: isOutOfStock ? const Color(0xFFE5E7EB) : const Color(0xFFC7D0CB),
+              width: 1.6,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(5),
             ),
-            onChanged: widget.onCheckChanged,
+            onChanged: isOutOfStock ? null : widget.onCheckChanged,
           ),
           const SizedBox(width: 2),
           GestureDetector(
@@ -1399,10 +1461,13 @@ class _CartItemTileState extends State<_CartItemTile> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFEDF1EE)),
               ),
-              child: buildProductImage(
-                p.name,
-                imageAsset: p.imageAsset,
-                fit: BoxFit.contain,
+              child: Opacity(
+                opacity: isOutOfStock ? 0.45 : 1.0,
+                child: buildProductImage(
+                  p.name,
+                  imageAsset: p.imageAsset,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -1420,12 +1485,13 @@ class _CartItemTileState extends State<_CartItemTile> {
                         children: [
                           Text(
                             p.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: kText,
+                              color: isOutOfStock ? kTextSub : kText,
                               letterSpacing: -0.2,
                               height: 1.25,
+                              decoration: isOutOfStock ? TextDecoration.lineThrough : null,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -1433,12 +1499,74 @@ class _CartItemTileState extends State<_CartItemTile> {
                           const SizedBox(height: 3),
                           Text(
                             '${p.unit}  ·  ₹${displayPrice.toStringAsFixed(0)}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13.5,
                               fontWeight: FontWeight.w700,
-                              color: kPrimary,
+                              color: isOutOfStock ? kTextSub : kPrimary,
                             ),
                           ),
+                          if (isOutOfStock) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEE2E2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFFCA5A5)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFFDC2626)),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Out of Stock',
+                                    style: TextStyle(
+                                      color: Color(0xFFDC2626),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (isExceededStock) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFFCD34D)),
+                              ),
+                              child: Text(
+                                'Only $maxStock available in stock',
+                                style: const TextStyle(
+                                  color: Color(0xFF92400E),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ] else if (isLowStock) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFFBEB),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFFDE68A)),
+                              ),
+                              child: Text(
+                                'Only $maxStock left in stock',
+                                style: const TextStyle(
+                                  color: Color(0xFFB45309),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1475,13 +1603,13 @@ class _CartItemTileState extends State<_CartItemTile> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildBaseCounter(p, effectiveQty),
+                    _buildBaseCounter(p, effectiveQty, isOutOfStock, maxStock, isExceededStock),
                     Text(
                       '₹${(displayPrice * effectiveQty).toStringAsFixed(0)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
-                        color: kText,
+                        color: isOutOfStock ? kTextSub : kText,
                       ),
                     ),
                   ],
@@ -1494,9 +1622,25 @@ class _CartItemTileState extends State<_CartItemTile> {
     );
   }
 
-  Widget _buildBaseCounter(Product p, int qty) {
-    final matchedVar = p.allVariants.where((v) => v.id == (widget.cartItem?.variantId ?? p.id)).firstOrNull;
-    final maxStock = matchedVar?.maxStock ?? p.maxStock;
+  Widget _buildBaseCounter(Product p, int qty, bool isOutOfStock, int maxStock, bool isExceededStock) {
+    if (isOutOfStock) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Unavailable',
+          style: TextStyle(
+            color: Color(0xFF9CA3AF),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
     final isAtMaxStock = qty >= maxStock;
 
     void dispatchAdd() {
@@ -1556,7 +1700,7 @@ class _CartItemTileState extends State<_CartItemTile> {
       onIncrement: isAtMaxStock
           ? () => F2HToast.error(context, 'Only $maxStock unit(s) available in stock')
           : dispatchAdd,
-      canIncrement: !p.isOutOfStock && !isAtMaxStock,
+      canIncrement: !isAtMaxStock,
     );
   }
 }

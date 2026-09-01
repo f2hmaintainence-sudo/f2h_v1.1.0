@@ -273,6 +273,22 @@ export class CartService {
         [plan.customerId],
       );
 
+      // Commit the stock before anything else in this transaction. Reserving
+      // here rather than at dispatch is what stops two customers being sold the
+      // same units for the same day: the units leave `available` the moment the
+      // order is accepted, and roll back with it if anything below fails.
+      //
+      // Subscriptions are deliberately not reserved — their orders are generated
+      // nightly for future dates, and holding stock weeks ahead would freeze the
+      // whole warehouse.
+      if (plan.stockWarehouseId) {
+        await this.stockAvailability.reserveQuantities(
+          tx,
+          plan.stockItems,
+          plan.stockWarehouseId,
+        );
+      }
+
       // Concurrency lock on coupon if applied
       if (plan.discountResolution?.summary?.coupon_id) {
         await tx.query(
@@ -614,10 +630,11 @@ export class CartService {
         quantity: qty,
       };
     });
-    await this.stockAvailability.assertQuantitiesAvailable(
-      stockItems,
-      await this.stockAvailability.resolveWarehouseId(branchId),
-    );
+    const stockWarehouseId = await this.stockAvailability.resolveWarehouseId(branchId);
+    // Fast feedback for the customer. It is only a read, so two checkouts can
+    // both pass it — `reserveQuantities` inside the write transaction is what
+    // actually settles who gets the last units.
+    await this.stockAvailability.assertQuantitiesAvailable(stockItems, stockWarehouseId);
 
     // Resolve discounts & coupons for one-time checkout
     const discountItems = itemsToCheckout.map((item) => {
@@ -799,6 +816,8 @@ export class CartService {
       customerName,
       remainingCartItems,
       groups,
+      stockItems,
+      stockWarehouseId,
       onetimeTotal,
       walletBalance,
       newBalance: walletBalance,
