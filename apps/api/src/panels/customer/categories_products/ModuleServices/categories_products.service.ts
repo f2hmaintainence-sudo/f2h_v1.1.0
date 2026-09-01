@@ -474,17 +474,30 @@ export class CategoriesProductsService {
         targetProductId = variantRows[0].product_id;
       }
 
+      // Fetch all variant_ids for this product so we capture reviews attached to product or any of its variants
+      const allVariantRows = await this.db.query(
+        `SELECT variant_id FROM product_variants WHERE product_id = $1`,
+        [targetProductId],
+      );
+      const allReferenceIds = Array.from(
+        new Set([
+          targetProductId,
+          productIdOrVariantId,
+          ...(allVariantRows || []).map((v: any) => v.variant_id),
+        ].filter(Boolean)),
+      );
+
       const rows = await this.db.query(
         `SELECT
            cf.rating,
            cf.feedback,
            cf.created_at,
-           TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name
+           COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), 'Verified Customer') AS customer_name
          FROM customer_feedback cf
-         LEFT JOIN customers c ON c.customer_id = cf.customer_id
-         WHERE (cf.reference_id = $1 OR cf.reference_id = $2) AND cf.reference_type = 'product'
+         LEFT JOIN users u ON u.user_id = cf.customer_id
+         WHERE cf.reference_id = ANY($1::text[]) AND cf.reference_type = 'product'
          ORDER BY cf.created_at DESC`,
-        [targetProductId, productIdOrVariantId],
+        [allReferenceIds],
       );
       return { status: true, data: rows || [] };
     } catch (e) {
