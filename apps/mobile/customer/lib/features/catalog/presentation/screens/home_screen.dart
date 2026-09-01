@@ -36,6 +36,7 @@ import '../../../notifications/presentation/bloc/notifications_event.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../wallet/presentation/screens/wallet_screen.dart';
 import '../../../../core/widgets/popup_banner_widget.dart';
+import '../../../../core/widgets/unpaid_bill_banner_widget.dart';
 
 // ══════════════════════════════════════════════════════════
 //  HOME SCREEN
@@ -191,6 +192,9 @@ class _HomeScreenState extends State<HomeScreen>
                         },
                       ),
                     ),
+
+                    // 1B. Unpaid / Pending Postpaid Bill Banner
+                    const SliverToBoxAdapter(child: UnpaidBillBannerWidget()),
 
                     // 2. Delivery Address Prompt (if no default address/branch set)
                     SliverToBoxAdapter(child: _noAddressPromptCard(context)),

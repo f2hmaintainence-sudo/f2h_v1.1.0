@@ -245,7 +245,8 @@ export class DirectionsService {
     });
 
     if (intermediates.length > 0) {
-      const points = intermediates.map((p) => this.latLngParam(p));
+      const safeIntermediates = intermediates.slice(0, 23);
+      const points = safeIntermediates.map((p) => this.latLngParam(p));
       params.set(
         'waypoints',
         (optimize ? ['optimize:true', ...points] : points).join('|'),

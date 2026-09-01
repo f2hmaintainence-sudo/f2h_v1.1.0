@@ -18,6 +18,7 @@ import 'package:f2h_customer/features/catalog/presentation/screens/product_detai
 import 'package:f2h_customer/core/network/network_bloc.dart';
 import 'package:f2h_customer/core/network/network_state.dart';
 import 'package:f2h_customer/core/widgets/scrolling_items_loader.dart';
+import 'package:f2h_customer/core/widgets/unpaid_bill_banner_widget.dart';
 
 // ══════════════════════════════════════════════════════════
 //  SUBSCRIPTIONS
@@ -1063,6 +1064,9 @@ class _SubsScreenState extends State<SubsScreen> {
                   surfaceTintColor: Colors.transparent,
                   pinned: true,
                   title: const Text('My Subscriptions', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: kText)),
+                ),
+                const SliverToBoxAdapter(
+                  child: UnpaidBillBannerWidget(),
                 ),
                 SliverToBoxAdapter(
                   child: _subscriptionWalletCard(context),

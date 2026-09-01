@@ -388,16 +388,6 @@ export class CustomerBootstrapController {
         const partnerId = row.delivery_partner_id;
         if (!partnerId) continue;
 
-        const slot = (row.delivery_slot || '').toLowerCase();
-        // If morning delivery window has ended, do not return morning delivery partner for today
-        if (slot === 'morning' && timeMinutes > morningEnd) {
-          continue;
-        }
-        // If evening delivery window has ended, do not return evening delivery partner for today
-        if (slot === 'evening' && timeMinutes > eveningEnd) {
-          continue;
-        }
-
         const isCurrentSlot = (row.delivery_slot || '').toLowerCase() === currentSlot.toLowerCase();
 
         if (!partnerMap.has(partnerId)) {

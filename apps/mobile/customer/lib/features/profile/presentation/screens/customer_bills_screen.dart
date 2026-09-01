@@ -4,6 +4,9 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import 'package:f2h_customer/core/widgets/unpaid_bill_banner_widget.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 import 'package:f2h_customer/core/widgets/cow_loading_widget.dart';
 
@@ -484,10 +487,21 @@ class _CustomerBillsScreenState extends State<CustomerBillsScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const WalletScreen()),
-                        ),
+                        onPressed: () {
+                          final sessionState = context.read<CustomerSessionCubit>().state;
+                          final walletBalance = (sessionState.wallet['balance'] as num?)?.toDouble() ??
+                              sessionState.profile?.walletBalance ??
+                              0.0;
+                          UnpaidBillPaymentSheet.show(
+                            context,
+                            bill: bill,
+                            walletBalance: walletBalance,
+                            onPaymentSuccess: () {
+                              _fetchBills();
+                              context.read<CustomerSessionCubit>().refresh();
+                            },
+                          );
+                        },
                         icon: const Icon(Icons.payment_rounded, size: 16, color: Colors.white),
                         label: Text(
                           'Pay ₹${dueAmount.toStringAsFixed(0)}',

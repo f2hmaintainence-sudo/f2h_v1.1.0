@@ -147,17 +147,39 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     _isCalculatingRoute = true;
     try {
-      final result = await sl<RouteOptimizationService>().fetchDirectRoute(
-        currentPosition: _currentPosition,
-        stops: stops,
-        destinationStop: destination,
-        forceRefresh: force,
-      );
+      final routeService = sl<RouteOptimizationService>();
+      final OptimizedRouteResult result;
+
+      if (_isFocusedNavigation) {
+        result = await routeService.fetchDirectRoute(
+          currentPosition: _currentPosition,
+          stops: stops,
+          destinationStop: destination,
+          forceRefresh: force,
+        );
+      } else {
+        result = await routeService.fetchShortestPathRoute(
+          currentPosition: _currentPosition,
+          stops: stops,
+          targetedStop: targetedStop ?? (_userPickedStop ? _selectedStop : null),
+          forceRefresh: force,
+        );
+      }
 
       if (mounted) {
         setState(() {
           _optimizedRoute = result;
-          _selectedStop = destination;
+          if (_isFocusedNavigation) {
+            _selectedStop = destination;
+          } else {
+            final activePending = result.orderedStops
+                .where((s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed')
+                .toList();
+            _selectedStop = targetedStop ??
+                (_userPickedStop && _selectedStop != null
+                    ? _selectedStop
+                    : (activePending.isNotEmpty ? activePending.first : destination));
+          }
         });
         _lastRouteFetchAt = DateTime.now();
         _lastRoutedFrom = _currentPosition;
