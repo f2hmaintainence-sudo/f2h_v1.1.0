@@ -619,19 +619,19 @@ class _CardAction extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _StepperButton(
-                  icon: Icons.remove,
+                  isPlus: false,
                   onTap: () => _remove(context),
                 ),
                 Text(
                   '$qty',
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
                 ),
                 _StepperButton(
-                  icon: Icons.add,
+                  isPlus: true,
                   onTap: isAtMaxStock
                       ? () => F2HToast.error(context, 'Only $maxStock unit(s) available in stock')
                       : () => _add(context),
@@ -710,18 +710,53 @@ class _ActionShell extends StatelessWidget {
 }
 
 class _StepperButton extends StatelessWidget {
-  final IconData icon;
+  final bool isPlus;
   final VoidCallback onTap;
-  const _StepperButton({required this.icon, required this.onTap});
+  const _StepperButton({this.isPlus = false, required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     behavior: HitTestBehavior.opaque,
     child: SizedBox(
-      width: 40,
-      height: 34,
-      child: Icon(icon, size: 18, color: Colors.white),
+      width: 36,
+      height: 32,
+      child: Center(
+        child: isPlus
+            ? SizedBox(
+                width: 12,
+                height: 12,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 2.4,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                    ),
+                    Container(
+                      width: 2.4,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Container(
+                width: 12,
+                height: 2.4,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(1.5),
+                ),
+              ),
+      ),
     ),
   );
 }

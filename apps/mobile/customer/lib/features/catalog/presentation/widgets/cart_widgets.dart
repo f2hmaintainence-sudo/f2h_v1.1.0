@@ -350,45 +350,74 @@ class QuantityCounter extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Bold Minus (-)
           GestureDetector(
             onTap: onDecrement,
             behavior: HitTestBehavior.opaque,
             child: SizedBox(
-              width: 28,
+              width: 30,
               height: h,
-              child: const Center(
-                child: Icon(
-                  Icons.remove,
-                  color: Colors.white,
-                  size: 18,
+              child: Center(
+                child: Container(
+                  width: 13,
+                  height: 2.6,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
             ),
           ),
+
+          // Quantity text
           Expanded(
             child: Center(
               child: Text(
                 '$quantity',
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
-                  height: 1.1,
+                  height: 1.0,
+                  letterSpacing: -0.2,
                 ),
               ),
             ),
           ),
+
+          // Bold Plus (+)
           GestureDetector(
             onTap: canIncrement ? onIncrement : null,
             behavior: HitTestBehavior.opaque,
             child: SizedBox(
-              width: 28,
+              width: 30,
               height: h,
               child: Center(
-                child: Icon(
-                  Icons.add,
-                  color: canIncrement ? Colors.white : Colors.white38,
-                  size: 18,
+                child: SizedBox(
+                  width: 13,
+                  height: 13,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 13,
+                        height: 2.6,
+                        decoration: BoxDecoration(
+                          color: canIncrement ? Colors.white : Colors.white38,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Container(
+                        width: 2.6,
+                        height: 13,
+                        decoration: BoxDecoration(
+                          color: canIncrement ? Colors.white : Colors.white38,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
