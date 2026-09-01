@@ -1014,44 +1014,99 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Address Section ───────────────────────────────────
 
   Widget _buildAddressSection() {
+    final isUnserviceable = _selectedAddress != null &&
+        (!_selectedAddress!.isServiceable || !_selectedAddress!.branchIsActive);
+
     return _SectionCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      child: InkWell(
-        onTap: _changeAddress,
-        borderRadius: BorderRadius.circular(10),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: kPrimaryPl,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.location_on_rounded,
-                size: 16,
-                color: kPrimary,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _selectedAddress != null
-                    ? '${_selectedAddress!.addressType.toUpperCase()} · ${_selectedAddress!.detail.isNotEmpty ? _selectedAddress!.detail : _selectedAddress!.name}'
-                    : 'Select Delivery Address',
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: kText,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: _changeAddress,
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: isUnserviceable ? const Color(0xFFFEE2E2) : kPrimaryPl,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    isUnserviceable ? Icons.location_off_rounded : Icons.location_on_rounded,
+                    size: 16,
+                    color: isUnserviceable ? const Color(0xFFDC2626) : kPrimary,
+                  ),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _selectedAddress != null
+                        ? '${_selectedAddress!.addressType.toUpperCase()} · ${_selectedAddress!.detail.isNotEmpty ? _selectedAddress!.detail : _selectedAddress!.name}'
+                        : 'Select Delivery Address',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: isUnserviceable ? const Color(0xFF991B1B) : kText,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isUnserviceable) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFECACA)),
+                    ),
+                    child: const Text(
+                      'UNAVAILABLE',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded, size: 20, color: kTextSub),
+              ],
+            ),
+          ),
+          if (isUnserviceable) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFFECACA), width: 0.8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 12, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      _selectedAddress!.unserviceableReason ??
+                          'Branch inactive · Delivery unavailable at this address',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: kTextSub),
           ],
-        ),
+        ],
       ),
     );
   }

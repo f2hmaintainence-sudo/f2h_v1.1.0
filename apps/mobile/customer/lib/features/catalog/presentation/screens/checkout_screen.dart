@@ -828,6 +828,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       );
                                     }
 
+                                    final bool isServiceable = primaryAddress.isServiceable && primaryAddress.branchIsActive;
+
                                     return Container(
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
