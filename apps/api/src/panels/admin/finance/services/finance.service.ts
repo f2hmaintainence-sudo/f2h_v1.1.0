@@ -146,11 +146,12 @@ export class FinanceService {
     let targetBills: any[] = [];
 
     if (billIds && billIds.length > 0) {
-      targetBills = await this.repository.findBillsByIds(billIds);
+      const cleanIds = billIds.map(id => String(id || '').replace(/^[#\s]+|[#\s]+$/g, '').trim()).filter(Boolean);
+      targetBills = await this.repository.findBillsByIds(cleanIds);
     } else {
       const res = await this.repository.getSubscriberOutstandingBills({
         status: overdueOnly ? 'overdue' : undefined,
-        limit: 500,
+        limit: 5000,
       });
       targetBills = res.bills || [];
     }

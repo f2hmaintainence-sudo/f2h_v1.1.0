@@ -856,6 +856,7 @@ export class FinanceRepository {
 
   async findBillsByIds(ids: string[]): Promise<any[]> {
     if (!ids || ids.length === 0) return [];
+    const cleanIds = ids.map(id => String(id || '').replace(/^[#\s]+|[#\s]+$/g, '').trim()).filter(Boolean);
     const sql = `
       SELECT 
         pb.bill_id AS id,
@@ -875,8 +876,10 @@ export class FinanceRepository {
       LEFT JOIN public.customers c ON (c.customer_id = pb.customer_id)
       LEFT JOIN public.users u ON (u.user_id = pb.customer_id)
       WHERE pb.bill_id = ANY($1::varchar[])
+         OR pb.bill_id = ANY($2::varchar[])
+         OR pb.id::text = ANY($1::varchar[])
     `;
-    const rows = await this.db.query(sql, [ids]);
+    const rows = await this.db.query(sql, [cleanIds, ids]);
     return Array.isArray(rows) ? rows : [];
   }
 

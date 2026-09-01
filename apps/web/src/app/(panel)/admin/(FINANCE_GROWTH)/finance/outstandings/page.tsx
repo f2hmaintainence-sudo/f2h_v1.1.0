@@ -121,6 +121,7 @@ export default function OutstandingPage() {
   // Due Reminder / Intimation Modal
   const [intimationModalOpen, setIntimationModalOpen] = useState(false);
   const [intimationTargetBill, setIntimationTargetBill] = useState<OutstandingBill | null>(null); // null means bulk
+  const [bulkIntimationTarget, setBulkIntimationTarget] = useState<'all_unpaid' | 'overdue_only'>('all_unpaid');
   const [customIntimationMessage, setCustomIntimationMessage] = useState("");
   const [sendingIntimation, setSendingIntimation] = useState(false);
 
@@ -357,7 +358,14 @@ export default function OutstandingPage() {
 
   const openBulkReminderModal = () => {
     setIntimationTargetBill(null);
-    const count = selectedBillIds.length > 0 ? selectedBillIds.length : (stats?.summary?.overdue_count || "all overdue");
+    if (selectedBillIds.length > 0) {
+      setBulkIntimationTarget('all_unpaid');
+    } else if (statusFilter === "overdue") {
+      setBulkIntimationTarget('overdue_only');
+    } else {
+      setBulkIntimationTarget('all_unpaid');
+    }
+
     setCustomIntimationMessage(
       `Dear Customer, gentle reminder from F2H Fresh regarding your pending invoice dues. Please settle promptly in the app to maintain uninterrupted fresh daily deliveries.`
     );
@@ -381,7 +389,7 @@ export default function OutstandingPage() {
         if (selectedBillIds.length > 0) {
           payload.billIds = selectedBillIds;
         } else {
-          payload.overdueOnly = statusFilter === "overdue" || statusFilter === "all";
+          payload.overdueOnly = bulkIntimationTarget === "overdue_only";
         }
         const res = await api.post<any>("/admin/finance/outstandings/bulk-remind", payload);
         showToast(res.data?.message || `Intimations dispatched to ${res.data?.sentCount || 0} customers!`, true);
@@ -861,7 +869,11 @@ export default function OutstandingPage() {
                   <p className="text-xs text-slate-500 font-medium">
                     {intimationTargetBill
                       ? `Recipient: ${intimationTargetBill.customer_name || intimationTargetBill.customer_id}`
-                      : `Recipients: ${selectedBillIds.length > 0 ? `${selectedBillIds.length} selected bills` : `All ${overdueCount} overdue subscribers`}`}
+                      : selectedBillIds.length > 0
+                        ? `Recipients: ${selectedBillIds.length} selected bills`
+                        : bulkIntimationTarget === 'overdue_only'
+                          ? `Recipients: All ${overdueCount} overdue subscribers`
+                          : `Recipients: All ${stats?.summary?.total_bills || totalCount || bills.length} unpaid subscribers (${formatMoney(totalOutstanding)})`}
                   </p>
                 </div>
               </div>
@@ -872,6 +884,34 @@ export default function OutstandingPage() {
                 <X size={18} />
               </button>
             </div>
+
+            {/* Scope Selection Pill for Bulk Mode */}
+            {!intimationTargetBill && selectedBillIds.length === 0 && (
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setBulkIntimationTarget('all_unpaid')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bulkIntimationTarget === 'all_unpaid'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Unpaid ({stats?.summary?.total_bills || totalCount || bills.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkIntimationTarget('overdue_only')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bulkIntimationTarget === 'overdue_only'
+                      ? 'bg-white text-rose-700 shadow-sm border border-rose-200'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Overdue Only ({overdueCount})
+                </button>
+              </div>
+            )}
 
             {intimationTargetBill && (
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs space-y-1">
