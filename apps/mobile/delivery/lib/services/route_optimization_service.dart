@@ -385,32 +385,41 @@ class RouteOptimizationService {
       );
     }
 
+    const int _kMaxRoutableStops = 24;
+
+    List<GroupedStop> routable = orderedPending;
+    List<GroupedStop> tail = const [];
+    if (orderedPending.length > _kMaxRoutableStops) {
+      routable = orderedPending.sublist(0, _kMaxRoutableStops);
+      tail = orderedPending.sublist(_kMaxRoutableStops);
+    }
+
     final GroupedStop destination;
     final List<GroupedStop> intermediates;
 
     if (originIsRider) {
-      if (orderedPending.length == 1) {
-        destination = orderedPending.first;
+      if (routable.length == 1) {
+        destination = routable.first;
         intermediates = const [];
       } else {
-        destination = orderedPending.last;
-        intermediates = orderedPending.sublist(0, orderedPending.length - 1);
+        destination = routable.last;
+        intermediates = routable.sublist(0, routable.length - 1);
       }
     } else {
       // GPS not available: first pending stop acts as origin
-      if (orderedPending.length <= 1) {
+      if (routable.length <= 1) {
         return _buildStraightLineFallback(
           currentPosition: origin,
           orderedPending: orderedPending,
           completed: completed,
           reason: 'Waiting for GPS location fix',
         );
-      } else if (orderedPending.length == 2) {
-        destination = orderedPending[1];
+      } else if (routable.length == 2) {
+        destination = routable[1];
         intermediates = const [];
       } else {
-        destination = orderedPending.last;
-        intermediates = orderedPending.sublist(1, orderedPending.length - 1);
+        destination = routable.last;
+        intermediates = routable.sublist(1, routable.length - 1);
       }
     }
 
@@ -471,6 +480,7 @@ class RouteOptimizationService {
       leadingStop: originIsRider ? null : orderedPending.first,
       intermediates: intermediates,
       destination: destination,
+      tail: tail,
       completed: completed,
     );
 
@@ -492,6 +502,7 @@ class RouteOptimizationService {
     required GroupedStop? leadingStop,
     required List<GroupedStop> intermediates,
     required GroupedStop destination,
+    List<GroupedStop> tail = const [],
     required List<GroupedStop> completed,
   }) {
     final orderedIntermediates =
@@ -501,6 +512,7 @@ class RouteOptimizationService {
       ?leadingStop,
       ...orderedIntermediates,
       destination,
+      ...tail,
       ...completed,
     ];
 

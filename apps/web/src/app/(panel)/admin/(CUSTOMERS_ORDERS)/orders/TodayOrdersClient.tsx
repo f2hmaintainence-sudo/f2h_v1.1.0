@@ -131,7 +131,10 @@ export default function TodayOrdersClient({
       if (toDate)       qp.set('toDate', toDate);
       const qs = qp.toString() ? `?${qp}` : '';
       const result = await apiClient.get<any>(`/admin/orders/${summaryPath}${qs}`);
-      if (result?.status && result?.data) setSummary(result.data);
+      const payload = result?.data?.data ?? result?.data;
+      if (payload && typeof payload === 'object') {
+        setSummary(payload);
+      }
     } catch { /* silent */ } finally {
       setSummaryLoading(false);
     }
@@ -517,6 +520,7 @@ export default function TodayOrdersClient({
           loading={summaryLoading}
           activeStatusFilter={activeStatusFilter}
           onSelectStatusFilter={setActiveStatusFilter}
+          scope={scope}
         />
       )}
 

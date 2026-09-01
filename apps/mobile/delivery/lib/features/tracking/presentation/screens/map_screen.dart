@@ -61,6 +61,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   OptimizedRouteResult? _optimizedRoute;
   bool _isCalculatingRoute = false;
   bool _hasInitialCameraFitted = false;
+  Timer? _routeRetryTimer;
+  int _routeRetryCount = 0;
+  static const int _kMaxRouteRetries = 5;
+  static const Duration _kRouteRetryDelay = Duration(seconds: 6);
+  String? _routeNotice;
+
+  void _scheduleRouteRetry() {
+    if (_routeRetryCount >= _kMaxRouteRetries) return;
+    _routeRetryCount++;
+    _routeRetryTimer?.cancel();
+    _routeRetryTimer = Timer(_kRouteRetryDelay, () {
+      if (!mounted) return;
+      final state = context.read<DeliverySessionBloc>().state;
+      if (state is! DeliverySessionLoaded) return;
+      _calculateShortestPath(_visibleStops(state.groupedStops), force: true);
+    });
+  }
 
   // Live GPS tracking
   StreamSubscription<Position>? _positionSub;
@@ -104,11 +121,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   String get _currentTileUrl {
     switch (_currentLayer) {
       case MapLayerType.googleSatellite:
-        return 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+        return 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
       case MapLayerType.googleTerrain:
-        return 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}';
+        return 'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}';
       case MapLayerType.googleRoadmap:
-        return 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+        return 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
     }
   }
 
@@ -150,47 +167,48 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     _isCalculatingRoute = true;
     try {
-      final routeService = sl<RouteOptimizationService>();
-      final OptimizedRouteResult result;
+      final service = sl<RouteOptimizationService>();
 
-      if (_isFocusedNavigation) {
-        // Single-stop focused mode: direct road route to that specific stop
-        result = await routeService.fetchDirectRoute(
-          currentPosition: _currentPosition,
-          stops: stops,
-          destinationStop: destination,
-          forceRefresh: force,
-        );
-      } else {
-        // Full-run overview mode: shortest path route through all pending stops
-        result = await routeService.fetchShortestPathRoute(
-          currentPosition: _currentPosition,
-          stops: stops,
-          targetedStop: targetedStop ?? _selectedStop,
-          forceRefresh: force,
-        );
+      // Navigating from a stop card is about that stop alone → one leg.
+      // The map tab is about the run → the whole remaining route.
+      final result = _isFocusedNavigation
+          ? await service.fetchDirectRoute(
+              currentPosition: _currentPosition,
+              stops: stops,
+              destinationStop: destination,
+              forceRefresh: force,
+            )
+          : await service.fetchShortestPathRoute(
+              currentPosition: _currentPosition,
+              stops: stops,
+              targetedStop: _userPickedStop ? destination : null,
+              forceRefresh: force,
+            );
+
+      if (!mounted) return;
+      final bool drawable = result.fullRoutePoints.length >= 2;
+
+      setState(() {
+        // Replacing a drawn route with an empty one blanks a map that was working.
+        if (drawable || _optimizedRoute == null) _optimizedRoute = result;
+        _routeNotice = result.isRoadGeometry ? null : result.unavailableReason;
+        _selectedStop = result.orderedStops
+            .where((s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed')
+            .firstOrNull ?? destination;
+      });
+
+      _lastRouteFetchAt = DateTime.now();
+      _lastRoutedFrom = _currentPosition;
+
+      if (drawable && !_hasInitialCameraFitted) {
+        _hasInitialCameraFitted = true;
+        _fitRouteBounds();
       }
 
-      if (mounted) {
-        setState(() {
-          _optimizedRoute = result;
-          if (_isFocusedNavigation) {
-            _selectedStop = destination;
-          } else {
-            _selectedStop = targetedStop ??
-                _selectedStop ??
-                (result.orderedStops.isNotEmpty
-                    ? result.orderedStops.firstWhere(_isStopPending, orElse: () => destination)
-                    : destination);
-          }
-        });
-        _lastRouteFetchAt = DateTime.now();
-        _lastRoutedFrom = _currentPosition;
-
-        if (!_hasInitialCameraFitted) {
-          _hasInitialCameraFitted = true;
-          _fitRouteBounds();
-        }
+      if (!drawable) {
+        _scheduleRouteRetry();
+      } else {
+        _routeRetryCount = 0;
       }
     } catch (e) {
       debugPrint('Error calculating route: $e');
@@ -592,6 +610,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _positionSub?.cancel();
+    _routeRetryTimer?.cancel();
     _pulsateController.dispose();
     _refreshController.dispose();
     _searchController.dispose();
@@ -847,86 +866,105 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
           final List<Polyline> polylines = [];
 
-          if (pendingStops.isNotEmpty && _optimizedRoute != null && _optimizedRoute!.isRoadGeometry) {
-            final activePts = _optimizedRoute!.activeLegPoints;
-            final remainingPts = _optimizedRoute!.remainingRoutePoints;
-            final fullPts = _optimizedRoute!.fullRoutePoints;
+          if (pendingStops.isNotEmpty && _optimizedRoute != null) {
+            final route = _optimizedRoute!;
+            final activePts = route.activeLegPoints;
+            final remainingPts = route.remainingRoutePoints;
+            final fullPts = route.fullRoutePoints;
 
-            // 1. Remaining / Subsequent Delivery Path (Google Maps Secondary Route Style)
-            if (remainingPts.length >= 2) {
-              // Casing outline for remaining path
-              polylines.add(
-                Polyline(
-                  points: remainingPts,
-                  strokeWidth: 7.0,
-                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              );
-              // Light blue core for remaining path
-              polylines.add(
-                Polyline(
-                  points: remainingPts,
-                  strokeWidth: 4.5,
-                  color: const Color(0xFF60A5FA),
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              );
-            } else if (fullPts.length >= 2 && activePts.length < 2) {
-              polylines.add(
-                Polyline(
-                  points: fullPts,
-                  strokeWidth: 7.0,
-                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              );
-              polylines.add(
-                Polyline(
-                  points: fullPts,
-                  strokeWidth: 4.5,
-                  color: const Color(0xFF60A5FA),
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              );
-            }
+            if (!route.isRoadGeometry) {
+              // A straight line is not a road — drawing it in the road styling tells the
+              // rider to ride through buildings.
+              final approx = fullPts.length >= 2 ? fullPts : activePts;
+              if (approx.length >= 2) {
+                polylines.add(
+                  Polyline(
+                    points: approx,
+                    strokeWidth: 4.0,
+                    color: const Color(0xFF94A3B8),
+                    pattern: const StrokePattern.dashed(segments: [12, 10]),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+              }
+            } else {
+              // 1. Remaining / Subsequent Delivery Path (Google Maps Secondary Route Style)
+              if (remainingPts.length >= 2) {
+                // Casing outline for remaining path
+                polylines.add(
+                  Polyline(
+                    points: remainingPts,
+                    strokeWidth: 7.0,
+                    color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+                // Light blue core for remaining path
+                polylines.add(
+                  Polyline(
+                    points: remainingPts,
+                    strokeWidth: 4.5,
+                    color: const Color(0xFF60A5FA),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+              } else if (fullPts.length >= 2 && activePts.length < 2) {
+                polylines.add(
+                  Polyline(
+                    points: fullPts,
+                    strokeWidth: 7.0,
+                    color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+                polylines.add(
+                  Polyline(
+                    points: fullPts,
+                    strokeWidth: 4.5,
+                    color: const Color(0xFF60A5FA),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+              }
 
-            // 2. Active Navigation Leg (Google Maps Active Route Style: Aura + Navy Casing + High-contrast Vibrant Blue)
-            if (activePts.length >= 2) {
-              // Outer glow aura
-              polylines.add(
-                Polyline(
-                  points: activePts,
-                  strokeWidth: 13.0,
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.22),
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              );
-              // Deep navy casing border
-              polylines.add(
-                Polyline(
-                  points: activePts,
-                  strokeWidth: 8.5,
-                  color: const Color(0xFF1557B0),
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              );
-              // Solid high-contrast Google Blue core (#1A73E8)
-              polylines.add(
-                Polyline(
-                  points: activePts,
-                  strokeWidth: 5.5,
-                  color: const Color(0xFF1A73E8),
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              );
+              // 2. Active Navigation Leg (Google Maps Active Route Style: Aura + Navy Casing + High-contrast Vibrant Blue)
+              if (activePts.length >= 2) {
+                // Outer glow aura
+                polylines.add(
+                  Polyline(
+                    points: activePts,
+                    strokeWidth: 13.0,
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.22),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+                // Deep navy casing border
+                polylines.add(
+                  Polyline(
+                    points: activePts,
+                    strokeWidth: 8.5,
+                    color: const Color(0xFF1557B0),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+                // Solid high-contrast Google Blue core (#1A73E8)
+                polylines.add(
+                  Polyline(
+                    points: activePts,
+                    strokeWidth: 5.5,
+                    color: const Color(0xFF1A73E8),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                );
+              }
             }
           }
 
@@ -1044,13 +1082,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // 4. Floating Shortest Route Summary Card
+                // 4. Floating Shortest Route Summary Card & Route Notice Banner
                 if (!_showSearch)
                   Positioned(
                     top: MediaQuery.of(context).padding.top + 70,
                     left: 16,
                     right: 72,
-                    child: _buildShortestRouteCard(vehicleType: state.vehicleType),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildShortestRouteCard(vehicleType: state.vehicleType),
+                        if (_routeNotice != null) ...[
+                          const SizedBox(height: 6),
+                          _buildRouteNoticeBanner(effectiveStops),
+                        ],
+                      ],
+                    ),
                   ),
 
                 // 5. Floating Side Map Options
@@ -1349,6 +1397,65 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ],
             )
           : const SizedBox.shrink(key: ValueKey('search_closed')),
+    );
+  }
+
+  Widget _buildRouteNoticeBanner(List<GroupedStop> effectiveStops) {
+    if (_routeNotice == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 14),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              _routeNotice!,
+              style: GoogleFonts.roboto(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF92400E),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () {
+              _routeRetryCount = 0;
+              _calculateShortestPath(effectiveStops, force: true);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD97706),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Retry',
+                style: GoogleFonts.roboto(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

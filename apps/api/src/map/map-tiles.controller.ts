@@ -99,7 +99,7 @@ export class MapTilesController {
    * Computes driving road polylines, duration, distance, and optimal stop order.
    */
   @Public()
-  @Throttle({ short: { limit: 120, ttl: 60_000 } })
+  @Throttle({ short: { limit: 600, ttl: 60_000 } })
   @Post('directions')
   async directions(@Body() body: DirectionsRequestDto) {
     return this.directionsService.computeRoute(body);

@@ -44,6 +44,7 @@ interface OrderMetricsBarProps {
   loading: boolean;
   activeStatusFilter: string | null;
   onSelectStatusFilter: (status: string | null) => void;
+  scope?: 'today' | 'all';
 }
 
 function formatMoney(value: unknown) {
@@ -71,6 +72,7 @@ export default function OrderMetricsBar({
   loading,
   activeStatusFilter,
   onSelectStatusFilter,
+  scope = 'today',
 }: OrderMetricsBarProps) {
   return (
     <div className="space-y-3">
@@ -80,7 +82,7 @@ export default function OrderMetricsBar({
         <div className="bg-white rounded-2xl p-4 border border-gray-200/90 shadow-2xs space-y-1">
           <div className="flex items-center justify-between text-xs font-bold text-emerald-800 uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
-              <TrendingUp size={15} className="text-emerald-600" /> Total Revenue Today
+              <TrendingUp size={15} className="text-emerald-600" /> {scope === 'today' ? 'Total Revenue Today' : 'Total Revenue'}
             </span>
             <span className="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
               Live
