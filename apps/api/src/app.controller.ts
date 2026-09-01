@@ -452,17 +452,48 @@ export class AppController {
       source,
     } = body;
 
-    if (!fullName || !fullName.trim()) {
+    const cleanedName = String(fullName || '').trim();
+    if (!cleanedName) {
       throw new BadRequestException('Full name is required');
     }
-    if (!phone || !phone.trim()) {
+    if (!/^[a-zA-Z\s.'-]+$/.test(cleanedName)) {
+      throw new BadRequestException('Full name must only contain letters and spaces');
+    }
+    if (cleanedName.length < 2 || cleanedName.length > 80) {
+      throw new BadRequestException('Full name must be between 2 and 80 characters');
+    }
+
+    const cleanedPhone = String(phone || '').replace(/\D/g, '');
+    if (!cleanedPhone) {
       throw new BadRequestException('Phone number is required');
     }
-    if (!area || !area.trim()) {
+    if (cleanedPhone.length !== 10) {
+      throw new BadRequestException('Please enter a valid 10-digit mobile number');
+    }
+
+    if (!area || !String(area).trim()) {
       throw new BadRequestException('Area/Locality is required');
     }
-    if (!vehicleType || !vehicleType.trim()) {
+    if (!vehicleType || !String(vehicleType).trim()) {
       throw new BadRequestException('Vehicle type is required');
+    }
+
+    let cleanedDL: string | null = null;
+    if (drivingLicenseNumber && String(drivingLicenseNumber).trim()) {
+      const dlStr = String(drivingLicenseNumber).trim().toUpperCase();
+      if (!/^[A-Z0-9\s-]{5,25}$/.test(dlStr)) {
+        throw new BadRequestException('Driving License must only contain letters and numbers');
+      }
+      cleanedDL = dlStr;
+    }
+
+    let cleanedEmail: string | null = null;
+    if (email && String(email).trim()) {
+      const em = String(email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+        throw new BadRequestException('Please enter a valid email address');
+      }
+      cleanedEmail = em;
     }
 
     const rows = await this.db.query(
@@ -482,18 +513,18 @@ export class AppController {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
-        fullName.trim(),
-        phone.trim(),
-        email?.trim() || null,
+        cleanedName,
+        cleanedPhone,
+        cleanedEmail,
         city?.trim() || 'Bengaluru',
         area.trim(),
         vehicleType.trim(),
         vehicleNumber?.trim() || null,
-        drivingLicenseNumber?.trim() || null,
+        cleanedDL,
         preferredShift?.trim() || 'Both',
         experienceYears?.trim() || 'Fresher',
         'PENDING',
-        source || 'website_landing',
+        source || 'website',
       ],
     );
 

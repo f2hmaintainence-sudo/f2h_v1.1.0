@@ -359,7 +359,6 @@ export class CustomerBootstrapController {
         LEFT JOIN users u ON ( u.user_id = dr.delivery_partner_id)
         WHERE (
           dra.customer_id = $1 
-          OR dra.customer_id IN (SELECT customer_id FROM customers WHERE user_id = $1)
           OR dra.address_id IN (
             SELECT address_id FROM customer_addresses WHERE customer_id = $1 OR user_id = $1
             UNION

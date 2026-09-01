@@ -47,14 +47,58 @@ export default function BecomeAPartnerPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setErrorMessage("");
+
+    // Client-side validations
+    const name = formData.fullName.trim();
+    if (!name) {
+      setErrorMessage("Please enter your full name.");
+      return;
+    }
+    if (!/^[a-zA-Z\s.'-]{2,60}$/.test(name)) {
+      setErrorMessage("Full Name must contain letters and spaces only (minimum 2 characters, no numbers).");
+      return;
+    }
+
+    const phoneDigits = formData.phone.replace(/\D/g, "");
+    if (!phoneDigits) {
+      setErrorMessage("Please enter your 10-digit mobile phone number.");
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
+      setErrorMessage("Please enter a valid 10-digit Indian mobile number (starting with 6, 7, 8, or 9).");
+      return;
+    }
+
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    if (!formData.area.trim()) {
+      setErrorMessage("Please specify your preferred locality / delivery area.");
+      return;
+    }
+
+    const dl = formData.drivingLicenseNumber.trim();
+    if (dl && !/^[A-Z0-9\s-]{5,20}$/i.test(dl)) {
+      setErrorMessage("Driving License must contain only letters and numbers (e.g. KA03 20210001234).");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const res = await fetch("/api/v1/delivery-partner/onboarding-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, source: "website_partner_page" }),
+        body: JSON.stringify({
+          ...formData,
+          fullName: name,
+          phone: phoneDigits,
+          drivingLicenseNumber: dl ? dl.toUpperCase() : null,
+          source: "website_partner_page",
+        }),
       });
 
       const data = await res.json();
@@ -291,11 +335,13 @@ export default function BecomeAPartnerPage() {
                       <input
                         type="text"
                         required
+                        maxLength={60}
                         value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value.replace(/[^a-zA-Z\s.'-]/g, "") })}
                         placeholder="Ashok Gowda"
                         className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
+                      <p className="mt-1 text-[10px] text-slate-400">Letters and spaces only (no numbers)</p>
                     </div>
 
                     <div>
@@ -307,10 +353,11 @@ export default function BecomeAPartnerPage() {
                         required
                         maxLength={10}
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^0-9]/g, "") })}
-                        placeholder="+91 98765 43210"
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^0-9]/g, "").slice(0, 10) })}
+                        placeholder="9876543210"
                         className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
+                      <p className="mt-1 text-[10px] text-slate-400">10-digit mobile number</p>
                     </div>
                   </div>
 
@@ -410,11 +457,13 @@ export default function BecomeAPartnerPage() {
                       </label>
                       <input
                         type="text"
+                        maxLength={20}
                         value={formData.drivingLicenseNumber}
-                        onChange={(e) => setFormData({ ...formData, drivingLicenseNumber: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, drivingLicenseNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9\s-]/g, "").slice(0, 20) })}
                         placeholder="KA03 20210001234"
                         className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
+                      <p className="mt-1 text-[10px] text-slate-400">Letters and numbers only</p>
                     </div>
                   </div>
 

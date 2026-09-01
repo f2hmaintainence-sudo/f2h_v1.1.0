@@ -1011,27 +1011,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   // ─── Alert banners ──────────────────────────────────────────
 
   Widget _buildAlertBanners() {
-    final info = _detailInfo;
-    if (_loadingDetail || info == null) return const SizedBox.shrink();
-    if (!info.alertOutstandingBills) return const SizedBox.shrink();
-
-    return Column(
-      children: [
-        if (info.alertOutstandingBills) ...[
-          _AlertBanner(
-            icon: Icons.receipt_long_outlined,
-            message:
-                '${info.outstandingBillCount} outstanding bill${info.outstandingBillCount > 1 ? 's' : ''} found (₹${info.outstandingAmount.toStringAsFixed(0)}). Please pay to avoid interruption.',
-            color: kRed,
-            bgColor: kRed.withValues(alpha: 0.05),
-            borderColor: kRed.withValues(alpha: 0.2),
-            onTap: _showBillsSheet,
-            actionLabel: 'View Bills',
-          ),
-          const SizedBox(height: 8),
-        ],
-      ],
-    );
+    return const SizedBox.shrink();
   }
 
   // ─── Bills section ──────────────────────────────────────────

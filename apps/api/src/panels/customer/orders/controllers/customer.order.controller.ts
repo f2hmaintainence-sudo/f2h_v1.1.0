@@ -427,8 +427,8 @@ export class CustomerOrderController {
                  JOIN order_items oi ON oi.order_id = o.order_id
                  LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
                  LEFT JOIN products p ON p.product_id = pv.product_id
-                 WHERE (o.customer_id = $1 OR o.customer_id IN (SELECT customer_id FROM customers WHERE user_id = $1))
-                   AND (o.scheduled_date >= $2::date AND o.scheduled_date <= $3::date)
+                  WHERE o.customer_id = $1
+                    AND (o.scheduled_date >= $2::date AND o.scheduled_date <= $3::date)
                    AND o.status IN ('delivered', 'completed', 'active', 'confirmed')
                  ORDER BY o.scheduled_date ASC`,
                 [userId, bill.billing_from, bill.billing_to],

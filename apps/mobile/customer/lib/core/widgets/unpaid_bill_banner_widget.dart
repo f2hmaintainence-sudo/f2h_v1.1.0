@@ -28,7 +28,7 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
   Future<void> _fetchUnpaidBills() async {
     try {
       final dio = DioClient().dio;
-      final response = await dio.get('${ApiEndpoints.apiBaseUrl}/customer/payment/unpaid-bills');
+      final response = await dio.get(ApiEndpoints.paymentUnpaidBills);
       final data = response.data;
       if (data is Map && data['status'] == true && data['has_unpaid_bills'] == true) {
         if (mounted) {
@@ -39,7 +39,9 @@ class _UnpaidBillBannerWidgetState extends State<UnpaidBillBannerWidget> {
         }
         return;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('UnpaidBillBannerWidget: Error fetching unpaid bills: $e');
+    }
 
     if (mounted) {
       setState(() => _isLoading = false);

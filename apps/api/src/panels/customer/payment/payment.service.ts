@@ -1098,9 +1098,9 @@ export class CustomerPaymentService {
               `SELECT s.subscription_id, COALESCE(p.name, 'Subscription') AS product_name
                FROM subscriptions s
                LEFT JOIN products p ON p.product_id = s.product_id
-               WHERE (s.customer_id = $1 OR s.customer_id IN (SELECT customer_id FROM customers WHERE user_id = $1))
-                 AND s.payment_mode = 'postpaid'
-               LIMIT 3`,
+                WHERE s.customer_id = $1
+                  AND s.payment_mode = 'postpaid'
+                LIMIT 3`,
               [resolvedCustomerId],
             );
           }
