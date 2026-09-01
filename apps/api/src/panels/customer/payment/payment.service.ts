@@ -1084,23 +1084,27 @@ export class CustomerPaymentService {
 
           // Fetch associated subscriptions from bill items or customer active subscriptions
           let subRows = await this.db.query(
-            `SELECT DISTINCT o.subscription_id, COALESCE(p.name, 'Subscription') AS product_name
+            `SELECT DISTINCT o.subscription_id, COALESCE(p.name, pv.name, 'Subscription') AS product_name
              FROM customer_bill_items cbi
              JOIN orders o ON o.order_id = cbi.reference_id
              LEFT JOIN subscriptions s ON s.subscription_id = o.subscription_id
-             LEFT JOIN products p ON p.product_id = s.product_id
+             LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
+             LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
+             LEFT JOIN products p ON p.product_id = pv.product_id
              WHERE cbi.bill_id = $1 AND o.subscription_id IS NOT NULL`,
             [b.bill_id],
           );
 
           if (!subRows || subRows.length === 0) {
             subRows = await this.db.query(
-              `SELECT s.subscription_id, COALESCE(p.name, 'Subscription') AS product_name
+              `SELECT s.subscription_id, COALESCE(p.name, pv.name, 'Subscription') AS product_name
                FROM subscriptions s
-               LEFT JOIN products p ON p.product_id = s.product_id
-                WHERE s.customer_id = $1
-                  AND s.payment_mode = 'postpaid'
-                LIMIT 3`,
+               LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
+               LEFT JOIN product_variants pv ON pv.variant_id = si.product_variant_id
+               LEFT JOIN products p ON p.product_id = pv.product_id
+               WHERE s.customer_id = $1
+                 AND (s.payment_type = 'postpaid' OR s.status = 'active')
+               LIMIT 3`,
               [resolvedCustomerId],
             );
           }
