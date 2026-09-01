@@ -1054,21 +1054,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  actions: [
-                    IconButton(
-                      onPressed: () => _showHelpCenter(context),
-                      icon: const Icon(Icons.support_agent_rounded, size: 22),
-                      color: kPrimary,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        padding: const EdgeInsets.all(12),
-                        side: const BorderSide(color: kBorderLt, width: 1.2),
-                        shadowColor: Colors.black.withValues(alpha: 0.04),
-                        elevation: 4,
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                  ],
                 ),
 
                 SliverToBoxAdapter(

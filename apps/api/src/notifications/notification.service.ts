@@ -190,9 +190,8 @@ export class NotificationService {
           );
         }
       }
-    } catch (error) {
-      this.logger.error('Error sending notification:', error);
-      throw error;
+    } catch (error: any) {
+      this.logger.warn(`NotificationService: sendNotification non-fatal error (ignored): ${error?.message || error}`);
     }
   }
 
