@@ -678,47 +678,6 @@ class _SubsScreenState extends State<SubsScreen> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: () => _showContactSupportOptions(context),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isCompact ? 8 : 12,
-                                    vertical: isCompact ? 5 : 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.25),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        isPostpaidEnabled ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-                                        color: isPostpaidEnabled ? kAccent : Colors.orangeAccent,
-                                        size: isCompact ? 12 : 14,
-                                      ),
-                                      SizedBox(width: isCompact ? 4 : 6),
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          isPostpaidEnabled ? 'Postpaid Active' : 'Contact Support',
-                                          style: TextStyle(
-                                            fontSize: isCompact ? 10 : 11,
-                                            fontWeight: FontWeight.w900,
-                                            color: Colors.white,
-                                          ),
-                                          maxLines: 1,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ),

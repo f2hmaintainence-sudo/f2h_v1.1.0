@@ -385,13 +385,13 @@ class RouteOptimizationService {
       );
     }
 
-    const int _kMaxRoutableStops = 24;
+    const int maxRoutableStops = 24;
 
     List<GroupedStop> routable = orderedPending;
     List<GroupedStop> tail = const [];
-    if (orderedPending.length > _kMaxRoutableStops) {
-      routable = orderedPending.sublist(0, _kMaxRoutableStops);
-      tail = orderedPending.sublist(_kMaxRoutableStops);
+    if (orderedPending.length > maxRoutableStops) {
+      routable = orderedPending.sublist(0, maxRoutableStops);
+      tail = orderedPending.sublist(maxRoutableStops);
     }
 
     final GroupedStop destination;

@@ -193,7 +193,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         if (drawable || _optimizedRoute == null) _optimizedRoute = result;
         _routeNotice = result.isRoadGeometry ? null : result.unavailableReason;
         _selectedStop = result.orderedStops
-            .where((s) => s.status != 'delivered' && s.status != 'completed' && s.status != 'failed')
+            .where(_isStopPending)
             .firstOrNull ?? destination;
       });
 
@@ -882,7 +882,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     points: approx,
                     strokeWidth: 4.0,
                     color: const Color(0xFF94A3B8),
-                    pattern: const StrokePattern.dashed(segments: [12, 10]),
+                    pattern: StrokePattern.dashed(segments: const [12, 10]),
                     strokeCap: StrokeCap.round,
                     strokeJoin: StrokeJoin.round,
                   ),

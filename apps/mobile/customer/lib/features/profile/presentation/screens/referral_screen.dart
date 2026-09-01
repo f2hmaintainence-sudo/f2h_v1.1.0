@@ -413,20 +413,6 @@ class _ReferralScreenState extends State<ReferralScreen>
               ],
             ),
           ),
-          GestureDetector(
-            onTap: _showSupportInfo,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F4F2),
-                shape: BoxShape.circle,
-                border: Border.all(color: kBorder),
-              ),
-              child: const Icon(Icons.headset_mic_outlined,
-                  color: _kGreenMid, size: 20),
-            ),
-          ),
         ],
       ),
     );
