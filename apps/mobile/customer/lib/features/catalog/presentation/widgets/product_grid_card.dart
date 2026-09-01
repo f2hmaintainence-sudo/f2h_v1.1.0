@@ -25,6 +25,7 @@ import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/subscription_setup_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/core/widgets/hot_toast.dart';
 
 /// Violet used for everything subscription-related on the card.
 const Color kSubscribe = Color(0xFF7C3AED);
@@ -592,6 +593,8 @@ class _CardAction extends StatelessWidget {
       );
     }
 
+    final maxStock = product.maxStock;
+
     return BlocBuilder<CartBloc, CartState>(
       builder: (context, _) {
         final qty = context
@@ -608,6 +611,7 @@ class _CardAction extends StatelessWidget {
             );
 
         if (qty > 0) {
+          final isAtMaxStock = qty >= maxStock;
           return _ActionShell(
             color: kPrimary,
             fill: true,
@@ -628,7 +632,9 @@ class _CardAction extends StatelessWidget {
                 ),
                 _StepperButton(
                   icon: Icons.add_rounded,
-                  onTap: () => _add(context),
+                  onTap: isAtMaxStock
+                      ? () => F2HToast.error(context, 'Only $maxStock unit(s) available in stock')
+                      : () => _add(context),
                 ),
               ],
             ),

@@ -1435,7 +1435,15 @@ class _CartItemTileState extends State<_CartItemTile> {
   }
 
   Widget _buildBaseCounter(Product p, int qty) {
+    final matchedVar = p.allVariants.where((v) => v.id == (widget.cartItem?.variantId ?? p.id)).firstOrNull;
+    final maxStock = matchedVar?.maxStock ?? p.maxStock;
+    final isAtMaxStock = qty >= maxStock;
+
     void dispatchAdd() {
+      if (qty + 1 > maxStock) {
+        F2HToast.error(context, 'Only $maxStock unit(s) available in stock');
+        return;
+      }
       setState(() {
         _isUpdating = true;
       });
@@ -1485,8 +1493,10 @@ class _CartItemTileState extends State<_CartItemTile> {
       quantity: qty,
       isLoading: _isUpdating,
       onDecrement: dispatchRemove,
-      onIncrement: dispatchAdd,
-      canIncrement: !p.isOutOfStock,
+      onIncrement: isAtMaxStock
+          ? () => F2HToast.error(context, 'Only $maxStock unit(s) available in stock')
+          : dispatchAdd,
+      canIncrement: !p.isOutOfStock && !isAtMaxStock,
     );
   }
 }

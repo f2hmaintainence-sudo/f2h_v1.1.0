@@ -65,6 +65,14 @@ class ProductVariant {
     return 0;
   }
 
+  int get maxStock {
+    if (isOutOfStock) return 0;
+    if (availableQuantity != null && availableQuantity! >= 0) {
+      return availableQuantity!.toInt();
+    }
+    return 999;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -139,6 +147,8 @@ class Product {
   final String? unitType;
   final double price, originalPrice, rating;
   final double? subscriptionPrice;
+  final double? availableQuantity;
+  final double? lowStockThreshold;
   final int reviews;
   final bool isOrganic, isSubscribable, isOneTime, isOutOfStock, isLowStock;
   final String? description;
@@ -163,6 +173,8 @@ class Product {
     required this.price,
     required this.originalPrice,
     this.subscriptionPrice,
+    this.availableQuantity,
+    this.lowStockThreshold,
     required this.rating,
     required this.reviews,
     this.isOrganic = false,
@@ -203,6 +215,18 @@ class Product {
     return 0;
   }
 
+  int get maxStock {
+    if (isOutOfStock) return 0;
+    if (availableQuantity != null && availableQuantity! >= 0) {
+      return availableQuantity!.toInt();
+    }
+    if (variants.isNotEmpty) {
+      final stocks = variants.map((v) => v.maxStock).toList();
+      return stocks.isNotEmpty ? stocks.reduce((a, b) => a > b ? a : b) : 999;
+    }
+    return 999;
+  }
+
   List<ProductVariant> get allVariants {
     if (variants.isNotEmpty) {
       final unique = <ProductVariant>[];
@@ -223,6 +247,8 @@ class Product {
         price: price,
         originalPrice: originalPrice,
         subscriptionPrice: subscriptionPrice,
+        availableQuantity: availableQuantity,
+        lowStockThreshold: lowStockThreshold,
         // Carry the parent's stock state through: this synthesized variant IS
         // the product, so reporting it as in-stock would re-enable Add on a
         // sold-out product that simply has no variant rows.
@@ -254,6 +280,8 @@ class Product {
       'price': price,
       'originalPrice': originalPrice,
       'subscriptionPrice': subscriptionPrice,
+      'availableQuantity': availableQuantity,
+      'lowStockThreshold': lowStockThreshold,
       'rating': rating,
       'reviews': reviews,
       'isOrganic': isOrganic,
@@ -303,6 +331,8 @@ class Product {
       price: priceVal,
       originalPrice: origPriceVal,
       subscriptionPrice: subPriceVal,
+      availableQuantity: double.tryParse(json['available_quantity']?.toString() ?? json['availableQuantity']?.toString() ?? ''),
+      lowStockThreshold: double.tryParse(json['low_stock_threshold']?.toString() ?? json['lowStockThreshold']?.toString() ?? ''),
       rating: double.tryParse(json['rating']?.toString() ?? '') ?? 0.0,
       reviews: int.tryParse(json['reviews']?.toString() ?? '') ?? 0,
       isOrganic: json['isOrganic'] == true || json['is_organic'] == true,

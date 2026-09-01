@@ -594,10 +594,17 @@ export class CartService {
     }
 
     // Stock is warehouse-scoped, and this is the one write path that already
-    // knows the delivery branch — so the same rule the catalog uses to grey a
-    // variant out is applied here before any order row is written.
-    await this.stockAvailability.assertAllPurchasable(
-      variantIds,
+    // knows the delivery branch — enforce stock availability and quantity limits.
+    const stockItems = itemsToCheckout.map((item) => {
+      const onetimeItem = item as OnetimeCheckoutItemDto;
+      const qty = onetimeItem.onetime_details?.quantity || item.quantity || 1;
+      return {
+        variantId: item.product_variant_id,
+        quantity: qty,
+      };
+    });
+    await this.stockAvailability.assertQuantitiesAvailable(
+      stockItems,
       await this.stockAvailability.resolveWarehouseId(branchId),
     );
 

@@ -12,7 +12,7 @@ import '../../domain/entities/cart/cart_item_entity.dart';
 import '../../../../core/guards/auth_guard.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
 import '../helpers/cart_helpers.dart';
-import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import 'package:f2h_customer/core/widgets/hot_toast.dart';
 
 // ── Product image widget ─────────────────────────────────
 Widget _productImage(Product p, {BoxFit fit = BoxFit.cover, double padding = 0.0}) {
@@ -313,7 +313,13 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                   .fold(0, (sum, item) => sum + (item.purchaseType == 'subscription' ? (item.schedules?.fold<int>(0, (s, sc) => s + sc.mQuantity + sc.eQuantity) ?? 1) : (item.quantity ?? 0)));
               final displayPrice = _selected.price;
 
+              final maxStock = _selected.maxStock;
+
               void dispatchAdd({int quantity = 1}) {
+                if (qty + quantity > maxStock) {
+                  F2HToast.error(ctx, 'Only $maxStock unit(s) available in stock');
+                  return;
+                }
                 final now = DateTime.now();
                 // Slot windows/cutoffs come from admin Configurations; the
                 // helper's built-in defaults are only a fallback and are
@@ -364,7 +370,9 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                 );
                 ctx.read<CartBloc>().add(RemoveFromCartEvent(cartItem));
               }
- 
+
+              final isAtMaxStock = qty >= maxStock;
+
               return Row(
                 children: [
                   Column(
@@ -412,11 +420,16 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                               Text('$_sheetQty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kPrimary)),
                               GestureDetector(
                                 onTap: () {
-                                  setState(() => _sheetQty++);
+                                  if (_sheetQty < maxStock) {
+                                    setState(() => _sheetQty++);
+                                  } else {
+                                    F2HToast.error(context, 'Only $maxStock unit(s) available in stock');
+                                  }
                                 },
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 14),
-                                  child: Icon(Icons.add_rounded, color: kPrimary, size: 18),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  child: Icon(Icons.add_rounded,
+                                      color: _sheetQty >= maxStock ? kMuted : kPrimary, size: 18),
                                 ),
                               ),
                             ],
@@ -424,7 +437,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
-                          onPressed: _selectionUnavailable
+                          onPressed: (_selectionUnavailable || maxStock <= 0)
                               ? null
                               : () {
                                   ctx.runWithAuth(() {
@@ -434,10 +447,10 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                                   });
                                 },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _selectionUnavailable
+                            backgroundColor: (_selectionUnavailable || maxStock <= 0)
                                 ? const Color(0xFFE0E0E0)
                                 : kPrimary,
-                            foregroundColor: _selectionUnavailable
+                            foregroundColor: (_selectionUnavailable || maxStock <= 0)
                                 ? const Color(0xFF757575)
                                 : Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
@@ -445,7 +458,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                             elevation: 0,
                           ),
                           child: Text(
-                            _selectionOutOfStock
+                            (_selectionOutOfStock || maxStock <= 0)
                                 ? 'OUT OF STOCK'
                                 : (_selectionUnavailable ? 'UNAVAILABLE' : 'ADD'),
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
@@ -477,10 +490,12 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                           ),
                           Text('$qty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
                           GestureDetector(
-                            // Already-in-cart items could top up without any
-                            // stock check at all before this guard.
-                            onTap: _selectionUnavailable
-                                ? null
+                            onTap: (_selectionUnavailable || isAtMaxStock)
+                                ? () {
+                                    if (isAtMaxStock) {
+                                      F2HToast.error(ctx, 'Only $maxStock unit(s) available in stock');
+                                    }
+                                  }
                                 : () {
                                     ctx.runWithAuth(() {
                                       HapticFeedback.lightImpact();
@@ -490,7 +505,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 14),
                               child: Icon(Icons.add_rounded,
-                                  color: _selectionUnavailable ? Colors.white38 : Colors.white, size: 18),
+                                  color: (_selectionUnavailable || isAtMaxStock) ? Colors.white38 : Colors.white, size: 18),
                             ),
                           ),
                         ],

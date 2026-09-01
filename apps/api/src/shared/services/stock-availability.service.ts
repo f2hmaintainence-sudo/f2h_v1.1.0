@@ -131,6 +131,71 @@ export class StockAvailabilityService {
     }
   }
 
+  /**
+   * Asserts that every requested item not only exists and is active, but that
+   * the requested quantity does not exceed the available stock balance.
+   */
+  async assertQuantitiesAvailable(
+    items: { variantId: string; quantity: number }[],
+    warehouseId?: string | null,
+  ): Promise<void> {
+    const variantIds = Array.from(
+      new Set(items.map((i) => i.variantId).filter(Boolean)),
+    );
+    if (variantIds.length === 0) return;
+
+    const rows = await this.db.query<{
+      variant_id: string;
+      variant_name: string | null;
+      product_name: string | null;
+      available_quantity: number | string | null;
+      is_listable: boolean | null;
+      is_out_of_stock: boolean | null;
+    }>(
+      `WITH sb AS (
+         SELECT product_variant_id,
+                COALESCE(SUM(available_quantity), 0) AS available_quantity,
+                BOOL_AND(COALESCE(is_out_of_stock, false)) AS is_out_of_stock
+           FROM stock_balances
+          WHERE deleted_at IS NULL
+            AND ($2::varchar IS NULL OR warehouse_id = $2)
+          GROUP BY product_variant_id
+       )
+       SELECT pv.variant_id,
+              pv.name AS variant_name,
+              p.name  AS product_name,
+              COALESCE(sb.available_quantity, 0) AS available_quantity,
+              ((pv.status = 'active' OR pv.status IS NULL)
+                AND (p.is_active = true OR p.is_active IS NULL)
+                AND p.deleted_at IS NULL) AS is_listable,
+              (COALESCE(p.is_out_of_stock, false)
+                OR COALESCE(sb.is_out_of_stock, false)
+                OR COALESCE(sb.available_quantity, 0) <= 0) AS is_out_of_stock
+         FROM product_variants pv
+         LEFT JOIN products p ON pv.product_id = p.product_id
+         LEFT JOIN sb ON sb.product_variant_id = pv.variant_id
+        WHERE pv.variant_id = ANY($1)`,
+      [variantIds, warehouseId ?? null],
+    );
+
+    const byVariantId = new Map<string, (typeof rows)[number]>();
+    for (const row of rows || []) byVariantId.set(row.variant_id, row);
+
+    for (const item of items) {
+      const row = byVariantId.get(item.variantId);
+      const name = row?.variant_name || row?.product_name || item.variantId;
+      if (!row || row.is_listable !== true || row.is_out_of_stock === true) {
+        throw new BadRequestException(`"${name}" is currently out of stock`);
+      }
+      const available = Number(row.available_quantity || 0);
+      if (item.quantity > available) {
+        throw new BadRequestException(
+          `Only ${available} unit(s) of "${name}" available in stock (requested ${item.quantity})`,
+        );
+      }
+    }
+  }
+
   /** Customer-facing sentence naming the offending items. */
   describe(unavailable: UnavailableVariant[]): string {
     const outOfStock = unavailable.filter((u) => u.reason === 'out_of_stock');

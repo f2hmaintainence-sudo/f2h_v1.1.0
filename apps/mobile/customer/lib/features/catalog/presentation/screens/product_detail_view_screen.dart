@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import '../../data/models/product_model.dart';
 import '../widgets/product_tile.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -1016,7 +1017,13 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               .fold(0, (sum, item) => sum + (item.quantity ?? 1));
         }
 
+        final maxStock = _selectedVariant.maxStock;
+
         void dispatchAdd() {
+          if (qty + 1 > maxStock) {
+            F2HToast.error(context, 'Only $maxStock unit(s) available in stock');
+            return;
+          }
           final variantId = _selectedVariant.id;
           final variantLabel = _selectedVariant.label;
 
@@ -1092,6 +1099,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             !p.isOneTime ||
             _selectedVariant.isOutOfStock ||
             _selectedVariant.isLowStock ||
+            maxStock <= 0 ||
             (isSelfVariant && (p.isLowStock || p.isOutOfStock));
 
         if (qty == 0) {
@@ -1119,7 +1127,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               ),
               child: Text(
                 isLowStockOrNoOneTime
-                    ? (p.isOutOfStock
+                    ? (p.isOutOfStock || maxStock <= 0
                           ? 'OUT OF STOCK'
                           : 'LOW STOCK — ONE TIME ORDER UNAVAILABLE')
                     : 'ADD TO CART — ₹${_selectedVariant.price.toStringAsFixed(0)}',
@@ -1132,6 +1140,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
             ),
           );
         }
+        final isAtMaxStock = qty >= maxStock;
         return Container(
           width: double.infinity,
           height: 48,
@@ -1160,11 +1169,13 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               ),
               IconButton(
                 icon: Icon(Icons.add,
-                    color: isLowStockOrNoOneTime ? Colors.white38 : Colors.white, size: 22),
-                // Topping up an item already in the cart skipped every stock
-                // check before this guard.
-                onPressed: isLowStockOrNoOneTime
-                    ? null
+                    color: (isLowStockOrNoOneTime || isAtMaxStock) ? Colors.white38 : Colors.white, size: 22),
+                onPressed: (isLowStockOrNoOneTime || isAtMaxStock)
+                    ? () {
+                        if (isAtMaxStock) {
+                          F2HToast.error(context, 'Only $maxStock unit(s) available in stock');
+                        }
+                      }
                     : () {
                         HapticFeedback.lightImpact();
                         ctx.runWithAuth(() => dispatchAdd());

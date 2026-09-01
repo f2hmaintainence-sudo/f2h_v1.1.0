@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import '../../../../core/session/customer_session_cubit.dart';
 import '../../../../core/widgets/custom_date_picker.dart';
 import '../../data/models/product_model.dart';
@@ -38,6 +39,8 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
     ('Sat', 'sat'),
     ('Sun', 'sun'),
   ];
+
+  int get _maxStock => widget.product.maxStock;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +185,11 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                           ),
                         ),
                         _qtyBtn(Icons.add, () {
-                          setState(() => _quantity++);
+                          if (_quantity < _maxStock) {
+                            setState(() => _quantity++);
+                          } else {
+                            F2HToast.error(context, 'Only $_maxStock unit(s) available in stock');
+                          }
                         }),
                       ],
                     ),
