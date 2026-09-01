@@ -314,16 +314,48 @@ export default function DeliveryRunsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/warehouse/dispatch"
+            className="flex items-center gap-2 px-4 py-2 bg-[#16a34a] hover:bg-[#15803d] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+          >
+            <Truck size={15} /> Warehouse Dispatch <ChevronRight size={14} />
+          </Link>
           <button
             onClick={() => {
               fetchSummary();
               fetchRunsWithOrders();
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
           >
             <RefreshCw size={14} /> Refresh
           </button>
         </div>
+      </div>
+
+      {/* Guided Lifecycle Banner: Assignment ➔ Warehouse Dispatch */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-emerald-300/60 rounded-2xl text-xs shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+            <Truck size={20} />
+          </div>
+          <div>
+            <div className="font-bold text-slate-900 flex items-center gap-2">
+              <span>Operations Flow: Partner Assignment ➔ Warehouse Dispatch Required</span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-200 text-amber-900 text-[10px] font-extrabold uppercase">
+                Mandatory Step
+              </span>
+            </div>
+            <p className="text-slate-600 mt-0.5 leading-relaxed">
+              Once delivery runs are assigned to delivery partners, the warehouse team must <strong>Pack Orders, Verify Containers, &amp; Dispatch Runs</strong> before delivery partners can begin delivery routes in their app.
+            </p>
+          </div>
+        </div>
+        <Link
+          href={`/admin/warehouse/dispatch?date=${manageDate}`}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-xl transition-all shadow-xs shrink-0 self-start md:self-auto"
+        >
+          <Truck size={14} className="text-amber-400" /> Go to Warehouse Dispatch <ArrowRight size={14} />
+        </Link>
       </div>
 
       {/* Summary Cards */}
@@ -686,6 +718,14 @@ export default function DeliveryRunsPage() {
                     <span>Assignment Results Summary</span>
                   </h3>
                   <div className="flex items-center gap-2">
+                    <Link
+                      href={`/admin/warehouse/dispatch?date=${generateDate}${selectedSlot ? `&slot=${selectedSlot}` : ""}${selectedBranch ? `&branch_id=${selectedBranch}` : ""}`}
+                      className="px-3.5 py-1.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-600/20"
+                    >
+                      <Truck size={13} />
+                      <span>Proceed to Warehouse Dispatch</span>
+                      <ChevronRight size={13} />
+                    </Link>
                     <button
                       onClick={() => setActiveTab("drag_board")}
                       className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
@@ -701,6 +741,25 @@ export default function DeliveryRunsPage() {
                       <span>View Address Stops</span>
                     </button>
                   </div>
+                </div>
+
+                {/* Mandatory Next Step Notice */}
+                <div className="p-3.5 bg-gradient-to-r from-amber-50 to-emerald-50 border border-amber-300/80 rounded-xl flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Truck size={16} className="text-amber-600 shrink-0" />
+                    <div>
+                      <span className="font-bold text-slate-900">Next Action Required: Warehouse Dispatch</span>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        These {result.runs_created} runs are assigned. The warehouse team must pack and dispatch stock before partners can start deliveries.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/admin/warehouse/dispatch?date=${generateDate}`}
+                    className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shrink-0"
+                  >
+                    <span>Dispatch Runs</span> <ArrowRight size={12} />
+                  </Link>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1016,6 +1075,17 @@ export default function DeliveryRunsPage() {
                             >
                               {run.status}
                             </span>
+                            {(run.status === "assigned" || run.status === "planned") && (
+                              <Link
+                                href={`/admin/warehouse/dispatch?date=${manageDate}&slot=${run.delivery_slot || ""}&branch_id=${run.branch_id || ""}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 transition-all shadow-2xs"
+                              >
+                                <Clock size={10} className="text-amber-700" />
+                                <span>Dispatch Required</span>
+                                <ArrowRight size={10} />
+                              </Link>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
@@ -1029,9 +1099,19 @@ export default function DeliveryRunsPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4 text-xs font-bold text-slate-800">
+                      <div className="flex items-center gap-3 text-xs font-bold text-slate-800">
                         <span>{stopsCount} Stops</span>
                         <span>{ordersCount} Orders</span>
+                        {(run.status === "assigned" || run.status === "planned") && (
+                          <Link
+                            href={`/admin/warehouse/dispatch?date=${manageDate}&slot=${run.delivery_slot || ""}&branch_id=${run.branch_id || ""}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#16a34a] hover:bg-[#15803d] text-white rounded-xl text-xs font-bold transition-all shadow-xs shadow-emerald-600/20"
+                          >
+                            <Truck size={13} />
+                            <span>Dispatch</span>
+                          </Link>
+                        )}
                         <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
                           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </div>
