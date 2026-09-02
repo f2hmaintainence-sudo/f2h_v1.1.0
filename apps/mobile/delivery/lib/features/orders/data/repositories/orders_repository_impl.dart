@@ -347,6 +347,27 @@ class OrdersRepositoryImpl implements OrdersRepository {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>?> checkPaymentStatus({
+    required String runId,
+    required String addressId,
+    String? qrId,
+  }) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.checkPaymentStatus(runId, addressId, qrId: qrId),
+      );
+      final data = response.data;
+      if (data != null && data is Map<String, dynamic>) {
+        return Map<String, dynamic>.from(data);
+      }
+      return null;
+    } catch (e) {
+      print('Error checking payment status: $e');
+      return null;
+    }
+  }
+
   Exception _handleDioError(dynamic e, String defaultMessage) {
     if (e is DioException) {
       final serverMessage = apiErrorMessage(e, '');

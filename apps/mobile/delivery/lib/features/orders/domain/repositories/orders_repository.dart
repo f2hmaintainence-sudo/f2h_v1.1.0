@@ -49,4 +49,9 @@ abstract class OrdersRepository {
     required String runId,
     required String addressId,
   });
+  Future<Map<String, dynamic>?> checkPaymentStatus({
+    required String runId,
+    required String addressId,
+    String? qrId,
+  });
 }

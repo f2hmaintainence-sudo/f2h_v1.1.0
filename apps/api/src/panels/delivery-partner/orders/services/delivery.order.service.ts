@@ -2203,9 +2203,123 @@ export class DeliveryOrderService {
     };
   }
 
+  async checkPaymentStatusForStop(
+    userId: string,
+    runId: string,
+    addressId: string,
+    qrId?: string,
+  ) {
+    const boy = await this.resolveDeliveryPartner(userId);
+    let run: any = null;
+    let runIds: string[] = [runId];
+    try {
+      run = await this.findDeliveryRunByIdAndBoy(runId, boy);
+      runIds = this.getRunIdentifiers(run);
+    } catch {
+      // Fallback if run lookup fails
+    }
+
+    const orders = await this.db.query<{
+      order_id: string;
+      customer_id: string;
+      status: string;
+      total_amount: number | string;
+      payment_mode: string | null;
+      payment_status: string | null;
+    }>(
+      `SELECT order_id, customer_id, status, total_amount, payment_mode, payment_status
+       FROM orders
+       WHERE (delivery_run_id = ANY($1) OR delivery_partner_id = $3) AND address_id = $2`,
+      [runIds, addressId, boy.id],
+    );
+
+    if (!orders?.length) {
+      return {
+        status: false,
+        is_paid: false,
+        message: 'No orders found for this stop',
+        payment: null,
+      };
+    }
+
+    // 1. If Razorpay dynamic QR was generated, query Razorpay live payments for this QR
+    if (qrId && qrId.startsWith('qr_')) {
+      try {
+        const paymentsRes = await this.razorpayService.fetchQrPayments(qrId);
+        const successfulPayment = (paymentsRes?.items || []).find(
+          (p) => p.status === 'captured' || p.status === 'authorized',
+        );
+
+        if (successfulPayment) {
+          const paidAmount = Number(successfulPayment.amount) / 100;
+          const boyName = boy.full_name || 'Delivery Partner';
+
+          // Settle customer_bills and payment_transactions
+          for (const ord of orders) {
+            await this.handleCodDeliveryPaymentAndBill(
+              this.db as any,
+              ord,
+              boyName,
+              'upi',
+            );
+          }
+
+          return {
+            status: true,
+            is_paid: true,
+            payment: {
+              payment_id: successfulPayment.id,
+              amount: paidAmount,
+              currency: successfulPayment.currency || 'INR',
+              method: successfulPayment.method || 'upi',
+              vpa: successfulPayment.vpa || null,
+              created_at: successfulPayment.created_at,
+            },
+          };
+        }
+      } catch (err: any) {
+        this.developer.error('Error fetching QR payments from Razorpay', {
+          error: err?.message,
+          qrId,
+        });
+      }
+    }
+
+    // 2. Check local database payment_transactions table
+    const orderIds = orders.map((o) => o.order_id);
+    const dbTxns = await this.db.query(
+      `SELECT transaction_id, amount, method, paid_at
+       FROM payment_transactions
+       WHERE reference_id = ANY($1) AND purpose = 'order' AND status = 'paid'
+       LIMIT 1`,
+      [orderIds],
+    );
+
+    if (dbTxns?.length) {
+      const txn = dbTxns[0];
+      return {
+        status: true,
+        is_paid: true,
+        payment: {
+          payment_id: txn.transaction_id,
+          amount: Number(txn.amount || 0),
+          currency: 'INR',
+          method: txn.method || 'upi',
+          paid_at: txn.paid_at,
+        },
+      };
+    }
+
+    return {
+      status: true,
+      is_paid: false,
+      payment: null,
+    };
+  }
+
   private async handleCodDeliveryPaymentAndBill(
     client: { query: (sql: string, params?: any[]) => Promise<any> },
-    order: { order_id: string; customer_id: string; total_amount: number | string; payment_mode?: string; scheduled_date?: string },
+    order: { order_id: string; customer_id: string; total_amount: number | string; payment_mode?: string | null; scheduled_date?: string },
     boyFullName: string,
     collectedMode?: string,
   ) {

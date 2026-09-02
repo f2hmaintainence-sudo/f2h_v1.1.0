@@ -304,6 +304,8 @@ class GroupedStop {
 
   bool get isCod => orders.any((o) => o.isCod);
 
+  String? get runId => orders.isNotEmpty ? orders.first.runId : null;
+
   double get totalAmount => orders.fold(0.0, (sum, o) => sum + o.totalAmount);
 
   double get codAmount => orders.where((o) => o.isCod).fold(0.0, (sum, o) => sum + (o.codAmount ?? o.totalAmount));

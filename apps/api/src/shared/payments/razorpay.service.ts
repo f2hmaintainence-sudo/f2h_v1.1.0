@@ -379,6 +379,30 @@ export class RazorpayService {
     });
   }
 
+  /**
+   * Fetches payments made against a dynamic Razorpay QR code.
+   */
+  async fetchQrPayments(qrId: string): Promise<{
+    count: number;
+    items: Array<{
+      id: string;
+      entity: string;
+      amount: number;
+      currency: string;
+      status: string;
+      method: string;
+      vpa?: string;
+      email?: string;
+      contact?: string;
+      created_at: number;
+    }>;
+  }> {
+    return this.request<any>(
+      'GET',
+      `/payments/qr_codes/${encodeURIComponent(qrId)}/payments`,
+    );
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   //  Signature verification
   // ──────────────────────────────────────────────────────────────────────────

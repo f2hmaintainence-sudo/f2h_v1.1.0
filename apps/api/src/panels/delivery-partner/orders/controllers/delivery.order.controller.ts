@@ -131,6 +131,17 @@ export class DeliveryOrderController {
     return this.service.getPaymentQrForStop(userId, runId, addressId);
   }
 
+  @Get('run/:runId/address/:addressId/payment-status')
+  async checkPaymentStatusForStop(
+    @Request() req: any,
+    @Param('runId') runId: string,
+    @Param('addressId') addressId: string,
+    @Query('qr_id') qrId?: string,
+  ) {
+    const userId = req.user?.user_id;
+    return this.service.checkPaymentStatusForStop(userId, runId, addressId, qrId);
+  }
+
   @Patch('run/:runId/address/:addressId/deliver')
   @HttpCode(HttpStatus.OK)
   async markStopDelivered(

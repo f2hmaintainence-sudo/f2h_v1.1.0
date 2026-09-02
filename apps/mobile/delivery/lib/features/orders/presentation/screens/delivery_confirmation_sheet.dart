@@ -82,12 +82,23 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   bool _photoTaken = false;
   bool _isUpi = true;
   bool _paymentConfirmed = false;
+  bool _paymentReceivedOnline = false;
+  bool _isCheckingPayment = false;
+  String? _paymentTxnId;
+  String? _paymentMethodDetail;
   String? _imagePath;
   Uint8List? _imageBytes;
   Map<String, dynamic>? _paymentQrData;
   bool _isLoadingQr = false;
+  Timer? _paymentPollTimer;
 
   final Map<String, ContainerItemState> _containerStates = {};
+
+  @override
+  void dispose() {
+    _paymentPollTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -138,11 +149,12 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   Future<void> _fetchPaymentQr() async {
-    if (widget.stop.runId == null || widget.stop.addressId.isEmpty) return;
+    final runId = widget.stop.runId ?? (widget.stop.orders.isNotEmpty ? widget.stop.orders.first.runId : null);
+    if (runId == null || widget.stop.addressId.isEmpty) return;
     setState(() => _isLoadingQr = true);
     try {
       final qr = await sl<OrdersRepository>().getPaymentQr(
-        runId: widget.stop.runId!,
+        runId: runId,
         addressId: widget.stop.addressId,
       );
       if (mounted && qr != null) {
@@ -150,11 +162,64 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           _paymentQrData = qr;
           _isLoadingQr = false;
         });
+        _startPaymentPolling();
       } else {
         if (mounted) setState(() => _isLoadingQr = false);
+        _startPaymentPolling();
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingQr = false);
+    }
+  }
+
+  void _startPaymentPolling() {
+    _paymentPollTimer?.cancel();
+    if (!widget.stop.isCod || widget.stop.codAmount <= 0) return;
+    _paymentPollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!mounted || !_isUpi || _paymentReceivedOnline) {
+        timer.cancel();
+        return;
+      }
+      await _verifyPaymentStatus(silent: true);
+    });
+  }
+
+  Future<void> _verifyPaymentStatus({bool silent = false}) async {
+    if (_isCheckingPayment) return;
+    final runId = widget.stop.runId ?? (widget.stop.orders.isNotEmpty ? widget.stop.orders.first.runId : null);
+    if (runId == null || widget.stop.addressId.isEmpty) return;
+    final qrId = _paymentQrData?['qr_id'] as String?;
+
+    if (!silent && mounted) setState(() => _isCheckingPayment = true);
+    try {
+      final res = await sl<OrdersRepository>().checkPaymentStatus(
+        runId: runId,
+        addressId: widget.stop.addressId,
+        qrId: qrId,
+      );
+      if (mounted && res != null && res['is_paid'] == true) {
+        _paymentPollTimer?.cancel();
+        final p = res['payment'] as Map<String, dynamic>?;
+        setState(() {
+          _paymentReceivedOnline = true;
+          _paymentConfirmed = true;
+          _paymentTxnId = p?['payment_id']?.toString() ?? 'VERIFIED';
+          _paymentMethodDetail = p?['vpa'] != null ? 'UPI (${p!['vpa']})' : 'UPI';
+          _isCheckingPayment = false;
+        });
+      } else {
+        if (!silent && mounted) {
+          setState(() => _isCheckingPayment = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment not received yet. Please ask customer to complete payment.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (!silent && mounted) setState(() => _isCheckingPayment = false);
     }
   }
 
@@ -787,98 +852,210 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                 ),
                 if (_isUpi) ...[
                   const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: kBgDeep,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: kBorder),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Scan to Pay via UPI',
-                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: kText),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Collect ₹${widget.stop.codAmount.round()}',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: kPrimary),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: kBorder),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                          child: _isLoadingQr
-                              ? const Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
-                                  ),
-                                )
-                              : _ScannerAnimationWrapper(
-                                  child: Image.network(
-                                    _paymentQrData?['qr_image_url'] as String? ??
-                                        'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent('upi://pay?pa=f2hfresh@ybl&pn=F2H Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}')}',
-                                    fit: BoxFit.contain,
-                                    loadingBuilder: (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return const Center(
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return CustomPaint(
-                                        painter: _QrCodePainter(),
-                                      );
-                                    },
-                                  ),
+                  if (_paymentReceivedOnline) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF22C55E),
+                                  shape: BoxShape.circle,
                                 ),
-                        ),
-                        if (_paymentQrData?['provider'] == 'razorpay') ...[
-                          const SizedBox(height: 6),
+                                child: const Icon(Icons.check_rounded, color: Colors.white, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'PAYMENT RECEIVED ONLINE!',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF15803D), letterSpacing: 0.5),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '₹${widget.stop.codAmount.round()} via ${_paymentMethodDetail ?? "UPI"}',
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kText),
+                                    ),
+                                    if (_paymentTxnId != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Ref: $_paymentTxnId',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: kTextSub),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFBBF7D0)),
                             ),
-                            child: const Text(
-                              '⚡ Dynamic UPI Gateway QR',
-                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8)),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.verified_rounded, size: 14, color: Color(0xFF16A34A)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Verified automatically by payment gateway',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                        const SizedBox(height: 8),
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.qr_code_scanner_rounded, size: 14, color: kTextSub),
-                            SizedBox(width: 4),
-                            Text(
-                              'Supports Google Pay, PhonePe, Paytm, etc.',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: kTextSub),
+                      ),
+                    ),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: kBgDeep,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: kBorder),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Scan to Pay via UPI',
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: kText),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Collect ₹${widget.stop.codAmount.round()}',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: kPrimary),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: 140,
+                            height: 140,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: kBorder),
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            child: _isLoadingQr
+                                ? const Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
+                                    ),
+                                  )
+                                : _ScannerAnimationWrapper(
+                                    child: Image.network(
+                                      _paymentQrData?['qr_image_url'] as String? ??
+                                          'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent('upi://pay?pa=f2hfresh@ybl&pn=F2H Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}')}',
+                                      fit: BoxFit.contain,
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return CustomPaint(
+                                          painter: _QrCodePainter(),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                          ),
+                          if (_paymentQrData?['provider'] == 'razorpay') ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFBFDBFE)),
+                              ),
+                              child: const Text(
+                                '⚡ Dynamic UPI Gateway QR',
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8)),
+                              ),
                             ),
                           ],
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.qr_code_scanner_rounded, size: 14, color: kTextSub),
+                              SizedBox(width: 4),
+                              Text(
+                                'Supports Google Pay, PhonePe, Paytm, etc.',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: kTextSub),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 1.8, valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
+                                ),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Listening for payment...',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kTextSub),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: _isCheckingPayment ? null : () => _verifyPaymentStatus(silent: false),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryPl,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: kPrimary),
+                                    ),
+                                    child: Text(
+                                      _isCheckingPayment ? 'Checking...' : 'Check Status',
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kPrimary),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     value: _paymentConfirmed,

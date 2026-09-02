@@ -137,6 +137,10 @@ class ApiEndpoints {
       '/delivery-partner/orders/run/$runId/address/$addressId/deliver';
   static String getPaymentQr(String runId, String addressId) =>
       '/delivery-partner/orders/run/$runId/address/$addressId/payment-qr';
+  static String checkPaymentStatus(String runId, String addressId, {String? qrId}) {
+    final base = '/delivery-partner/orders/run/$runId/address/$addressId/payment-status';
+    return qrId != null && qrId.isNotEmpty ? '$base?qr_id=${Uri.encodeComponent(qrId)}' : base;
+  }
   static String handoverRun(String runId) => '/delivery-partner/orders/run/$runId/handover';
   static const String updateOrderStatus = '/delivery-partner/orders';
   static const String supportTickets = '/support-tickets';
