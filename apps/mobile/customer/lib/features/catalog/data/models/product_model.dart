@@ -116,9 +116,12 @@ class ProductVariant {
         double.tryParse(json['subscription_price']?.toString() ?? '') ??
         double.tryParse(json['subscriptionPrice']?.toString() ?? '');
 
+    final vName = json['variant_name']?.toString() ?? json['variantName']?.toString();
     return ProductVariant(
       id: json['id']?.toString() ?? json['variant_id']?.toString() ?? '',
-      label: json['label']?.toString() ?? json['variant_name']?.toString() ?? 'Standard',
+      label: (vName != null && vName.trim().isNotEmpty && vName.toLowerCase() != 'standard')
+          ? vName.trim()
+          : (json['label']?.toString() ?? json['variant_name']?.toString() ?? 'Standard'),
       unitValue:
           json['unit_value']?.toString() ?? json['unitValue']?.toString(),
       unitType: json['unit_type']?.toString() ?? json['unitType']?.toString(),
@@ -141,6 +144,8 @@ class ProductVariant {
 
 class Product {
   final String id, name, vendor, unit, category, emoji, badge;
+  final String? variantName;
+  final String? productName;
   final String? categoryId;
   final String? productId;
   final String? unitValue;
@@ -162,6 +167,8 @@ class Product {
   const Product({
     required this.id,
     required this.name,
+    this.variantName,
+    this.productName,
     required this.vendor,
     required this.unit,
     this.unitValue,
@@ -193,22 +200,17 @@ class Product {
     this.images = const [],
   });
 
-  /// Returns the product name without redundant unit/quantity suffixes (e.g. " - 0.5KG", " - 1L", " - 200g")
+  /// Returns the variant name at all places
   String get displayName {
+    if (variantName != null && variantName!.trim().isNotEmpty) {
+      return variantName!.trim();
+    }
     final raw = name.trim();
-    if (raw.isEmpty) return 'Product';
-
-    final cleaned = raw
-        .replaceAll(
-          RegExp(
-            r'(\s*[-–—]\s*|\s*[\(\[\{]\s*|\s+)(\d+(\.\d+)?\s*(kg|g|gm|gms|gram|grams|l|ltr|ltrs|liter|liters|litre|litres|ml|mls|pack|pcs|pieces|pc|unit|units|bottle|bottles|box|boxes))\s*[\)\]\}]?\s*$',
-            caseSensitive: false,
-          ),
-          '',
-        )
-        .trim();
-
-    return cleaned.isNotEmpty ? cleaned : raw;
+    if (raw.isNotEmpty) return raw;
+    if (productName != null && productName!.trim().isNotEmpty) {
+      return productName!.trim();
+    }
+    return 'Product';
   }
 
   String get formattedUnit {
@@ -333,9 +335,20 @@ class Product {
         double.tryParse(json['subscription_price']?.toString() ?? '') ??
         double.tryParse(json['subscriptionPrice']?.toString() ?? '');
 
+    final variantNameRaw = json['variant_name']?.toString() ?? json['variantName']?.toString();
+    final nameRaw = json['name']?.toString();
+    final productNameRaw = json['product_name']?.toString() ?? json['productName']?.toString();
+    final resolvedName = (variantNameRaw != null && variantNameRaw.trim().isNotEmpty)
+        ? variantNameRaw.trim()
+        : ((nameRaw != null && nameRaw.trim().isNotEmpty)
+            ? nameRaw.trim()
+            : (productNameRaw ?? 'Product'));
+
     return Product(
       id: json['id']?.toString() ?? json['variant_id']?.toString() ?? json['product_id']?.toString() ?? '',
-      name: json['name']?.toString() ?? json['product_name']?.toString() ?? json['variant_name']?.toString() ?? '',
+      name: resolvedName,
+      variantName: variantNameRaw,
+      productName: productNameRaw,
       vendor: json['vendor']?.toString() ?? 'F2H',
       unit: json['unit']?.toString() ?? '',
       unitValue:

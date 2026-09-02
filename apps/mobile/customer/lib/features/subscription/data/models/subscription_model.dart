@@ -442,16 +442,10 @@ class SubscriptionItemModel {
 
   String get displayName {
     final v = variantName.trim();
-    final p = productName.trim();
-    if (v.isNotEmpty &&
-        v.toLowerCase() != 'standard' &&
-        v.toLowerCase() != 'unit' &&
-        !v.contains('_') &&
-        !p.toLowerCase().contains(v.toLowerCase()) &&
-        v.toLowerCase() != p.toLowerCase()) {
-      return '$productName ($v)';
+    if (v.isNotEmpty && v.toLowerCase() != 'standard') {
+      return v;
     }
-    return productName;
+    return productName.trim().isNotEmpty ? productName.trim() : 'Product';
   }
 
   int get totalDailyQty => defaultMQty + defaultEQty;

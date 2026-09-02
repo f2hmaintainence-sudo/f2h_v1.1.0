@@ -1,8 +1,7 @@
-import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { CatalogTableService } from './table.service';
 import { DeveloperService } from '../../../../../shared/logger/Developer.service';
 import { DataService } from '../../../../../shared/database/Data.service';
-import { DatabaseService } from '../../../../../shared/database/Database.service';
 
 @Injectable()
 export class CatalogService {
@@ -10,7 +9,6 @@ export class CatalogService {
     private readonly catalogTableService: CatalogTableService,
     private readonly developer: DeveloperService,
     private readonly dataService: DataService,
-    private readonly db: DatabaseService,
   ) { }
 
   // ═══════════════════════════════════════════════════════════════
@@ -43,22 +41,6 @@ export class CatalogService {
 
   async softDeleteProduct(id: string, adminId: string) {
     try {
-      // Guard: reject if active (non-deleted) variants still exist for this product
-      const variantRows = await this.db.query<{ count: string }>(
-        `SELECT COUNT(*) AS count
-           FROM product_variants pv
-           JOIN products p ON p.product_id = pv.product_id
-          WHERE p.id = $1
-            AND pv.deleted_at IS NULL`,
-        [Number(id)],
-      );
-      const variantCount = parseInt(variantRows?.[0]?.count ?? '0', 10);
-      if (variantCount > 0) {
-        throw new BadRequestException(
-          `Cannot delete this product — ${variantCount} active variant(s) still exist. Please delete or remove all variants first.`,
-        );
-      }
-
       const result = await this.dataService.query('products', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -83,7 +65,7 @@ export class CatalogService {
         message: 'Product deleted successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException || error instanceof BadRequestException) {
+      if (error instanceof InternalServerErrorException) {
         throw error;
       }
       this.developer.error('softDeleteProduct error', { error, id });
@@ -127,22 +109,6 @@ export class CatalogService {
 
   async softDeleteCategory(id: string, adminId: string) {
     try {
-      // Guard: reject if active (non-deleted) products still belong to this category
-      const productRows = await this.db.query<{ count: string }>(
-        `SELECT COUNT(*) AS count
-           FROM products p
-           JOIN categories c ON c.category_id = p.category_id
-          WHERE c.id = $1
-            AND p.deleted_at IS NULL`,
-        [Number(id)],
-      );
-      const productCount = parseInt(productRows?.[0]?.count ?? '0', 10);
-      if (productCount > 0) {
-        throw new BadRequestException(
-          `Cannot delete this category — ${productCount} active product(s) still belong to it. Please delete or reassign all products first.`,
-        );
-      }
-
       const result = await this.dataService.query('categories', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -167,7 +133,7 @@ export class CatalogService {
         message: 'Category deleted successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException || error instanceof BadRequestException) {
+      if (error instanceof InternalServerErrorException) {
         throw error;
       }
       this.developer.error('softDeleteCategory error', { error, id });

@@ -33,11 +33,12 @@ class SubscriptionItem {
   });
 
   factory SubscriptionItem.fromJson(Map<String, dynamic> json) {
+    final vName = json['variant_name']?.toString() ?? json['variantName']?.toString() ?? '';
+    final pName = json['product_name']?.toString() ?? json['productName']?.toString() ?? 'Product';
+    final resolvedName = (vName.isNotEmpty && vName.toLowerCase() != 'standard') ? vName : pName;
+
     return SubscriptionItem(
-      id:
-          json['subscription_item_id']?.toString() ??
-          json['id']?.toString() ??
-          '',
+      id: json['subscription_item_id']?.toString() ?? json['id']?.toString() ?? '',
       subscriptionId: json['subscription_id']?.toString() ?? '',
       productVariantId: json['product_variant_id']?.toString() ?? '',
       defaultMQty:
@@ -49,9 +50,9 @@ class SubscriptionItem {
       status: (json['status']?.toString() ?? 'active').toLowerCase() == 'paused'
           ? 'active'
           : (json['status']?.toString() ?? 'active'),
-      variantName: json['variant_name']?.toString() ?? '',
+      variantName: vName,
       sku: json['sku']?.toString() ?? '',
-      productName: json['product_name']?.toString() ?? 'Product',
+      productName: resolvedName,
       productId: json['product_id']?.toString() ?? '',
       imageUrl: json['image_url']?.toString() ??
           json['image_path']?.toString() ??

@@ -333,7 +333,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                     children: [
                       // Product name
                       Text(
-                        p.displayName,
+                        (_selectedVariant.label.isNotEmpty && _selectedVariant.label.toLowerCase() != 'standard')
+                            ? _selectedVariant.label
+                            : p.displayName,
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,

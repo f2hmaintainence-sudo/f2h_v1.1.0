@@ -28,11 +28,15 @@ class OrderItem {
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
+    final vName = json['variant_name']?.toString() ?? json['variantName']?.toString() ?? '';
+    final pName = json['product_name']?.toString() ?? json['productName']?.toString() ?? 'Product';
+    final resolvedName = (vName.isNotEmpty && vName.toLowerCase() != 'standard') ? vName : pName;
+
     return OrderItem(
       variantId: json['variant_id']?.toString() ?? '',
       productId: json['product_id']?.toString() ?? '', // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
-      productName: (json['product_name']?.toString() ?? 'Product').toTitleCase(),
-      variantName: json['variant_name']?.toString() ?? '',
+      productName: resolvedName.toTitleCase(),
+      variantName: vName,
       quantity: (double.tryParse(json['quantity']?.toString() ?? '1',) ?? 1.0).toInt(),
       unitPrice: double.tryParse(json['unit_price']?.toString() ?? '0.0') ?? 0.0,
       finalPrice: double.tryParse(json['final_price']?.toString() ?? '0.0') ?? 0.0,
@@ -117,15 +121,13 @@ class Order {
       if (items.length == 1) {
         final vName = items[0].variantName.trim();
         final pNameRaw = items[0].productName.trim();
-        final isRedundant = vName.isEmpty ||
-            vName.toLowerCase() == 'standard' ||
-            vName.toLowerCase() == 'unit' ||
-            vName.contains('_') ||
-            pNameRaw.toLowerCase().contains(vName.toLowerCase());
-        final variantSuffix = !isRedundant ? ' ($vName)' : '';
-        pName = '$pNameRaw$variantSuffix × ${items[0].quantity}';
+        final nameToShow = (vName.isNotEmpty && vName.toLowerCase() != 'standard') ? vName : pNameRaw;
+        pName = '$nameToShow × ${items[0].quantity}';
       } else {
-        pName = '${items[0].productName} & ${items.length - 1} more items';
+        final firstItemName = (items[0].variantName.trim().isNotEmpty && items[0].variantName.trim().toLowerCase() != 'standard')
+            ? items[0].variantName.trim()
+            : items[0].productName.trim();
+        pName = '$firstItemName & ${items.length - 1} more items';
       }
     }
 

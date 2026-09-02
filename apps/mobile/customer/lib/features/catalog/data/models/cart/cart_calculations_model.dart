@@ -66,11 +66,17 @@ class CartItemModel extends CartItemEntity {
 
     final priceVal = double.tryParse(json['price']?.toString() ?? '0') ?? 0.0;
 
+    final vName = json['variant_name']?.toString() ?? json['variantName']?.toString();
+    final pName = json['name']?.toString() ?? json['product_name']?.toString() ?? 'Product';
+    final resolvedName = (vName != null && vName.trim().isNotEmpty && vName.toLowerCase() != 'standard')
+        ? vName.trim()
+        : pName;
+
     return CartItemModel(
       productId: json['product_id'] as String,
       variantId: json['product_variant_id'] as String,
-      productName: json['name'] as String? ?? 'Product',
-      variantName: json['sku'] as String? ?? 'Unit',
+      productName: resolvedName,
+      variantName: vName ?? json['sku'] as String? ?? 'Unit',
       unitPrice: priceVal,
       purchaseType: purchaseType,
       quantity: qty,

@@ -76,7 +76,7 @@ export class CustomerOrderController {
              oi.is_free,
              pv.name    AS variant_name,
              pv.sku,
-             p.name     AS product_name,
+             COALESCE(NULLIF(pv.name, ''), p.name) AS product_name,
              p.product_id,
              pi.storage_key AS image_path
            FROM order_items oi
@@ -178,7 +178,7 @@ export class CustomerOrderController {
            si.status          AS si_status,
            pv.name            AS variant_name,
            pv.sku,
-           p.name             AS product_name,
+           COALESCE(NULLIF(pv.name, ''), p.name) AS product_name,
            p.product_id
          FROM subscriptions s
          LEFT JOIN subscription_items si ON si.subscription_id = s.subscription_id
@@ -216,6 +216,7 @@ export class CustomerOrderController {
           });
         }
         if (row.si_id) {
+          const vName = row.variant_name || row.product_name || 'Product';
           subsMap.get(subIdKey).items.push({
             id: row.si_id,
             subscription_id: subIdKey,
@@ -223,9 +224,9 @@ export class CustomerOrderController {
             unit_price: row.si_unit_price,
             final_price: row.si_final_price,
             status: row.si_status,
-            variant_name: row.variant_name ?? '',
+            variant_name: vName,
             sku: row.sku ?? '',
-            product_name: row.product_name ?? 'Product',
+            product_name: vName,
             product_id: row.product_id,
           });
         }
@@ -495,7 +496,7 @@ export class CustomerOrderController {
            oi.is_free,
            pv.name    AS variant_name,
            pv.sku,
-           p.name     AS product_name,
+           COALESCE(NULLIF(pv.name, ''), p.name) AS product_name,
            p.product_id,
            pi.storage_key AS image_path
          FROM order_items oi

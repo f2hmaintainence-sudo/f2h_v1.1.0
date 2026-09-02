@@ -113,12 +113,6 @@ export class CatalogTableService {
         });
       }
 
-      // Exclude soft-deleted products
-      conditions.push({
-        column: 'products.deleted_at',
-        operator: 'IS',
-        value: null,
-      });
 
       const reqSet: ReqSet = {
         key: 'products',
@@ -232,12 +226,6 @@ export class CatalogTableService {
         });
       }
 
-      // Exclude soft-deleted variants
-      conditions.push({
-        column: 'product_variants.deleted_at',
-        operator: 'IS',
-        value: null,
-      });
 
       const reqSet: ReqSet = {
         key: 'product_variants',

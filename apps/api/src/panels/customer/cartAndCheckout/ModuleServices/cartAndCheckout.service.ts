@@ -189,11 +189,14 @@ export class CartService {
 
       itemsSubtotal += this.calculateItemSubtotal(item, product);
 
+      const variantName = product?.name || product?.variant_name || product?.product_name || 'Product';
       formattedItems.push({
         user_id: userId,
         cart_data: {
           ...item,
-          name: product?.product_name || product?.name || 'Product',
+          name: variantName,
+          variant_name: variantName,
+          product_name: variantName,
           sku: product?.sku,
           price: product?.price,
           unit_value: product?.unit_value,
@@ -1164,8 +1167,9 @@ export class CartService {
               SELECT json_agg(
                 json_build_object(
                   'id', oi.id,
-                  'product_name', COALESCE(p.name, oi.product_name, 'Fresh Item'),
-                  'variant_name', pv.name,
+                  'product_name', COALESCE(pv.name, p.name, oi.product_name, 'Fresh Item'),
+                  'variant_name', COALESCE(pv.name, p.name, 'Unit'),
+                  'name', COALESCE(pv.name, p.name, oi.product_name, 'Fresh Item'),
                   'quantity', oi.quantity,
                   'unit_price', oi.unit_price,
                   'discount_amount', oi.discount_amount,

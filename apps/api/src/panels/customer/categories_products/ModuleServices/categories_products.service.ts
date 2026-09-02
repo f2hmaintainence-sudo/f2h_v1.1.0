@@ -264,6 +264,7 @@ export class CategoriesProductsService {
           pv.variant_id,
           pv.product_id,
           pv.name AS variant_name,
+          COALESCE(NULLIF(pv.name, ''), p.name) AS name,
           pv.price,
           pv.original_price,
           pv.discount,
@@ -330,8 +331,12 @@ export class CategoriesProductsService {
           ? variantImages
           : (primaryImage ? [primaryImage] : []);
 
+        const resolvedName = item.variant_name || item.name || item.product_name || 'Product';
+
         return {
           ...item,
+          name: resolvedName,
+          variant_name: resolvedName,
           image_path: primaryImage,
           variant_images: allImages,
           images: allImages,
@@ -381,6 +386,7 @@ export class CategoriesProductsService {
           pv.variant_id,
           pv.product_id,
           pv.name AS variant_name,
+          COALESCE(NULLIF(pv.name, ''), p.name) AS name,
           pv.price,
           pv.original_price,
           pv.discount,
@@ -448,8 +454,12 @@ export class CategoriesProductsService {
           ? variantImages
           : (primaryImage ? [primaryImage] : []);
 
+        const resolvedName = item.variant_name || item.name || item.product_name || 'Product';
+
         return {
           ...item,
+          name: resolvedName,
+          variant_name: resolvedName,
           image_path: primaryImage,
           variant_images: allImages,
           images: allImages,
