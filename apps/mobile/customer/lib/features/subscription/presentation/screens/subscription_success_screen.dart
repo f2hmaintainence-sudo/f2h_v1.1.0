@@ -116,7 +116,13 @@ class _SubscriptionSuccessScreenState extends State<SubscriptionSuccessScreen>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${widget.productName} (${widget.variantLabel}) has been subscribed successfully.',
+                      widget.variantLabel.trim().isNotEmpty &&
+                              widget.variantLabel.trim().toLowerCase() != 'standard' &&
+                              widget.variantLabel.trim().toLowerCase() != 'unit' &&
+                              !widget.variantLabel.contains('_') &&
+                              !widget.productName.toLowerCase().contains(widget.variantLabel.toLowerCase())
+                          ? '${widget.productName} (${widget.variantLabel}) has been subscribed successfully.'
+                          : '${widget.productName} has been subscribed successfully.',
                       style: const TextStyle(
                         fontSize: 13,
                         color: kTextSub,

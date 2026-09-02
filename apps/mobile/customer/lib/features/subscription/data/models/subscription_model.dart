@@ -441,10 +441,15 @@ class SubscriptionItemModel {
   }
 
   String get displayName {
-    if (variantName.isNotEmpty &&
-        variantName.toLowerCase() != 'standard' &&
-        variantName.toLowerCase().trim() != productName.toLowerCase().trim()) {
-      return '$productName ($variantName)';
+    final v = variantName.trim();
+    final p = productName.trim();
+    if (v.isNotEmpty &&
+        v.toLowerCase() != 'standard' &&
+        v.toLowerCase() != 'unit' &&
+        !v.contains('_') &&
+        !p.toLowerCase().contains(v.toLowerCase()) &&
+        v.toLowerCase() != p.toLowerCase()) {
+      return '$productName ($v)';
     }
     return productName;
   }
