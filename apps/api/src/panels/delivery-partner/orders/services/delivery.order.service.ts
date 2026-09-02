@@ -2157,6 +2157,8 @@ export class DeliveryOrderService {
     let qrId: string | null = null;
     let provider = 'upi_standard';
 
+    let qrImageBase64: string | null = null;
+
     // 1. Try Razorpay dynamic single-use QR Code
     if (configs?.[0]?.is_active) {
       try {
@@ -2171,17 +2173,34 @@ export class DeliveryOrderService {
             customer_id: firstOrder.customer_id,
           },
         });
-        if (rzpQr && (rzpQr.image_url || rzpQr.qr_data || rzpQr.id)) {
+        if (rzpQr && (rzpQr.image_url || rzpQr.id)) {
           qrId = rzpQr.id;
           qrImageUrl = rzpQr.image_url || null;
           provider = 'razorpay';
+
+          if (rzpQr.image_url) {
+            try {
+              const imgRes = await fetch(rzpQr.image_url, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                signal: AbortSignal.timeout(6000),
+              });
+              if (imgRes.ok) {
+                const buffer = Buffer.from(await imgRes.arrayBuffer());
+                qrImageBase64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+              }
+            } catch (imgErr: any) {
+              this.developer.error('Error fetching QR image bytes from rzp.io', {
+                error: imgErr?.message,
+              });
+            }
+          }
         }
       } catch (err: any) {
         this.developer.error('Razorpay QR code generation failed, using standard UPI fallback', { error: err?.message });
       }
     }
 
-    // Always produce a standard compliant upi://pay URI so PhonePe, GPay, Paytm open the native payment screen directly
+    // Standard compliant fallback upi://pay URI
     const directUpiString = `upi://pay?pa=${merchantVpa}&pn=${encodeURIComponent(companyName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`Order_${firstOrder.order_id}`)}&tr=${encodeURIComponent(firstOrder.order_id)}`;
     upiString = directUpiString;
 
@@ -2193,6 +2212,7 @@ export class DeliveryOrderService {
       status: true,
       data: {
         qr_image_url: qrImageUrl,
+        qr_image_base64: qrImageBase64,
         qr_id: qrId,
         upi_string: upiString,
         amount,

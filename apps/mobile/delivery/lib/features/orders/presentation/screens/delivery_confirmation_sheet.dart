@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -954,21 +955,39 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                             padding: const EdgeInsets.all(6),
                             child: _ScannerAnimationWrapper(
                               child: Center(
-                                child: QrImageView(
-                                  data: (_paymentQrData?['upi_string'] as String?)?.isNotEmpty == true
-                                      ? (_paymentQrData!['upi_string'] as String)
-                                      : 'upi://pay?pa=f2hfresh@ybl&pn=F2H%20Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}',
-                                  version: QrVersions.auto,
-                                  size: 124.0,
-                                  backgroundColor: Colors.white,
-                                  padding: const EdgeInsets.all(2),
-                                  errorStateBuilder: (cxt, err) {
-                                    return const Center(
-                                      child: Text(
-                                        'Error rendering QR',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(fontSize: 10, color: Colors.red),
-                                      ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final qrBase64 = _paymentQrData?['qr_image_base64'] as String?;
+                                    if (qrBase64 != null && qrBase64.startsWith('data:image')) {
+                                      try {
+                                        final base64String = qrBase64.split(',').last;
+                                        final bytes = base64Decode(base64String);
+                                        return Image.memory(
+                                          bytes,
+                                          width: 124,
+                                          height: 124,
+                                          fit: BoxFit.contain,
+                                        );
+                                      } catch (_) {}
+                                    }
+
+                                    return QrImageView(
+                                      data: (_paymentQrData?['upi_string'] as String?)?.isNotEmpty == true
+                                          ? (_paymentQrData!['upi_string'] as String)
+                                          : 'upi://pay?pa=f2hfresh@ybl&pn=F2H%20Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}',
+                                      version: QrVersions.auto,
+                                      size: 124.0,
+                                      backgroundColor: Colors.white,
+                                      padding: const EdgeInsets.all(2),
+                                      errorStateBuilder: (cxt, err) {
+                                        return const Center(
+                                          child: Text(
+                                            'Error rendering QR',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(fontSize: 10, color: Colors.red),
+                                          ),
+                                        );
+                                      },
                                     );
                                   },
                                 ),
