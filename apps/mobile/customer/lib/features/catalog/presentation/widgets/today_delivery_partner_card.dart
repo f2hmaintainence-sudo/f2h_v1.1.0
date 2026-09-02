@@ -203,24 +203,37 @@ class TodayDeliveryPartnerCard extends StatelessWidget {
                       ],
                     ),
                     child: Center(
-                      child: partner.profilePhoto != null && partner.profilePhoto!.isNotEmpty
+                      child: partner.profilePhoto != null &&
+                              partner.profilePhoto!.trim().isNotEmpty &&
+                              partner.profilePhoto != 'null' &&
+                              !partner.profilePhoto!.endsWith('/null')
                           ? ClipOval(
                               child: Image.network(
                                 partner.profilePhoto!,
                                 width: 44,
                                 height: 44,
                                 fit: BoxFit.cover,
-                                errorBuilder: (ctx, err, stack) => const Icon(
-                                  Icons.two_wheeler_rounded,
-                                  color: Colors.white,
-                                  size: 22,
+                                errorBuilder: (ctx, err, stack) => Text(
+                                  partner.partnerName.trim().isNotEmpty
+                                      ? partner.partnerName.trim()[0].toUpperCase()
+                                      : 'P',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             )
-                          : const Icon(
-                              Icons.two_wheeler_rounded,
-                              color: Colors.white,
-                              size: 22,
+                          : Text(
+                              partner.partnerName.trim().isNotEmpty
+                                  ? partner.partnerName.trim()[0].toUpperCase()
+                                  : 'P',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
                             ),
                     ),
                   ),

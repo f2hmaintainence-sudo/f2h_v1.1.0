@@ -118,10 +118,10 @@ export default function ProductsPage() {
             </div>
           </div>
           <Link
-            href="/admin/warehouse/intake"
+            href="/admin/warehouse/stock-movements"
             className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl transition-all shadow-xs shrink-0 self-start md:self-auto"
           >
-            <WarehouseIcon size={14} /> Go to Warehouse Intake <ArrowRight size={14} />
+            <WarehouseIcon size={14} /> Go to Warehouse Stock Movements <ArrowRight size={14} />
           </Link>
         </div>
       ) : activeTab === "products" ? (
@@ -157,11 +157,10 @@ export default function ProductsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("categories")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "categories"
-              ? "bg-[#16a34a] text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "categories"
+            ? "bg-[#16a34a] text-white shadow-sm"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
+            }`}
         >
           <FolderTree size={15} />
           Categories
@@ -170,11 +169,10 @@ export default function ProductsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("products")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "products"
-              ? "bg-[#16a34a] text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "products"
+            ? "bg-[#16a34a] text-white shadow-sm"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
+            }`}
         >
           <Package size={15} />
           Products Catalog
@@ -183,11 +181,10 @@ export default function ProductsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("variants")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "variants"
-              ? "bg-[#16a34a] text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "variants"
+            ? "bg-[#16a34a] text-white shadow-sm"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60"
+            }`}
         >
           <Tag size={15} />
           Product Variants

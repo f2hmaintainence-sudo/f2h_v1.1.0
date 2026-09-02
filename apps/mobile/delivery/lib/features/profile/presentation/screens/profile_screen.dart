@@ -408,20 +408,37 @@ class ProfileScreen extends StatelessWidget {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(32),
-                              child: photoUrl != null && photoUrl.isNotEmpty
+                              child: photoUrl != null &&
+                                      photoUrl.trim().isNotEmpty &&
+                                      photoUrl != 'null' &&
+                                      !photoUrl.endsWith('/null')
                                   ? Image.network(
                                       photoUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.person_rounded,
-                                        size: 36,
-                                        color: Color(0xFF16A34A),
+                                      errorBuilder: (_, __, ___) => Center(
+                                        child: Text(
+                                          partnerName.trim().isNotEmpty
+                                              ? partnerName.trim()[0].toUpperCase()
+                                              : 'D',
+                                          style: const TextStyle(
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF16A34A),
+                                          ),
+                                        ),
                                       ),
                                     )
-                                  : const Icon(
-                                      Icons.person_rounded,
-                                      size: 36,
-                                      color: Color(0xFF16A34A),
+                                  : Center(
+                                      child: Text(
+                                        partnerName.trim().isNotEmpty
+                                            ? partnerName.trim()[0].toUpperCase()
+                                            : 'D',
+                                        style: const TextStyle(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF16A34A),
+                                        ),
+                                      ),
                                     ),
                             ),
                           ),
