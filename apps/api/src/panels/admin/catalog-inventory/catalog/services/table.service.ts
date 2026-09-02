@@ -85,13 +85,7 @@ export class CatalogTableService {
 
   async getProductsTable(query: any) {
     try {
-      const conditions: any[] = [
-        {
-          column: 'products.deleted_at',
-          operator: 'IS',
-          value: null,
-        },
-      ];
+      const conditions: any[] = [];
 
       // Filter by category
       if (query.category_id) {
@@ -119,6 +113,12 @@ export class CatalogTableService {
         });
       }
 
+      // Exclude soft-deleted products
+      conditions.push({
+        column: 'products.deleted_at',
+        operator: 'IS',
+        value: null,
+      });
 
       const reqSet: ReqSet = {
         key: 'products',
@@ -212,18 +212,7 @@ export class CatalogTableService {
 
   async getProductVariantsTable(query: any) {
     try {
-      const conditions: any[] = [
-        {
-          column: 'product_variants.deleted_at',
-          operator: 'IS',
-          value: null,
-        },
-        {
-          column: 'products.deleted_at',
-          operator: 'IS',
-          value: null,
-        },
-      ];
+      const conditions: any[] = [];
 
       // Filter by product
       if (query.product_id) {
@@ -243,6 +232,12 @@ export class CatalogTableService {
         });
       }
 
+      // Exclude soft-deleted variants
+      conditions.push({
+        column: 'product_variants.deleted_at',
+        operator: 'IS',
+        value: null,
+      });
 
       const reqSet: ReqSet = {
         key: 'product_variants',
@@ -268,14 +263,14 @@ export class CatalogTableService {
         columns: {
           id: ['product_variants.id', true],
           variant_id: ['product_variants.variant_id', true],
-          product_name: ['COALESCE((SELECT name FROM products WHERE (products.product_id = product_variants.product_id OR products.id::text = product_variants.product_id) AND products.deleted_at IS NULL LIMIT 1), products.name) AS product_name', true],
+          product_name: ['products.name AS product_name', true],
           variant_name: ['product_variants.name', true],
           image: ['(SELECT storage_key FROM product_images WHERE product_images.variant_id = product_variants.variant_id AND storage_key IS NOT NULL AND storage_key <> \'\' AND (is_primary = true OR sort_order = 0) ORDER BY is_primary DESC, sort_order ASC, id ASC LIMIT 1) AS image', true],
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],
           subscription_price: ['product_variants.subscription_price', true],
-          is_subscribable: ['COALESCE((SELECT is_subscribable FROM products WHERE (products.product_id = product_variants.product_id OR products.id::text = product_variants.product_id) AND products.deleted_at IS NULL LIMIT 1), products.is_subscribable)', false],
+          is_subscribable: ['products.is_subscribable', false],
           manageable_qty: ['product_variants.manageable_qty', true],
           status: ['product_variants.status', true],
           fulfillment_mode: ['product_variants.fulfillment_mode', true],

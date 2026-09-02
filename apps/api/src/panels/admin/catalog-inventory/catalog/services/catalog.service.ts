@@ -43,44 +43,40 @@ export class CatalogService {
 
   async softDeleteProduct(id: string, adminId: string) {
     try {
-      // 1. Fetch product identifiers (id, product_id, name)
-      const isNumericId = !isNaN(Number(id));
-      const productQuery = isNumericId
-        ? `SELECT id, product_id, name FROM products WHERE id = $1 AND deleted_at IS NULL LIMIT 1;`
-        : `SELECT id, product_id, name FROM products WHERE (product_id = $1 OR id::text = $1) AND deleted_at IS NULL LIMIT 1;`;
-      const productParams = [isNumericId ? Number(id) : id];
-      const productRes = await this.db.query(productQuery, productParams);
-
-      const targetProduct = productRes?.[0];
-      const productIdNum = targetProduct?.id ? String(targetProduct.id) : (isNumericId ? String(id) : null);
-      const productIdStr = targetProduct?.product_id ? String(targetProduct.product_id) : String(id);
-
-      // 2. Check for active (non-deleted) variants linked to this product
-      const variantCheckSql = `
-        SELECT id FROM product_variants 
-        WHERE (${productIdNum ? 'product_id = $1 OR ' : ''}product_id = $2) 
-          AND deleted_at IS NULL 
-        LIMIT 1;
-      `;
-      const variantParams = productIdNum ? [productIdNum, productIdStr] : [productIdStr, productIdStr];
-      const variantRes = await this.db.query(variantCheckSql, variantParams);
-
-      if (variantRes?.length > 0) {
+      // Guard: reject if active (non-deleted) variants still exist for this product
+      const variantRows = await this.db.query<{ count: string }>(
+        `SELECT COUNT(*) AS count
+           FROM product_variants pv
+           JOIN products p ON p.product_id = pv.product_id
+          WHERE p.id = $1
+            AND pv.deleted_at IS NULL`,
+        [Number(id)],
+      );
+      const variantCount = parseInt(variantRows?.[0]?.count ?? '0', 10);
+      if (variantCount > 0) {
         throw new BadRequestException(
-          'Cannot delete product because active product variant(s) exist. Please delete or remove all variants first.'
+          `Cannot delete this product — ${variantCount} active variant(s) still exist. Please delete or remove all variants first.`,
         );
       }
 
-      // 3. Perform soft delete
-      await this.db.query(
-        `UPDATE products 
-            SET deleted_at = NOW(), 
-                updated_by = $2, 
-                updated_at = NOW() 
-          WHERE (id::text = $1 OR product_id = $1) 
-            AND deleted_at IS NULL`,
-        [String(id), adminId],
-      );
+      const result = await this.dataService.query('products', {
+        update: {
+          deleted_at: new Date().toISOString(),
+          updated_by: adminId,
+          updated_at: new Date().toISOString(),
+        },
+        where: [
+          {
+            column: 'id',
+            operator: '=',
+            value: Number(id),
+          },
+        ],
+      });
+
+      if (!result?.status) {
+        throw new InternalServerErrorException('Failed to delete product');
+      }
 
       return {
         status: true,
@@ -97,15 +93,24 @@ export class CatalogService {
 
   async softDeleteVariant(id: string, adminId: string) {
     try {
-      await this.db.query(
-        `UPDATE product_variants 
-            SET deleted_at = NOW(), 
-                updated_by = $2, 
-                updated_at = NOW() 
-          WHERE (id::text = $1 OR variant_id = $1) 
-            AND deleted_at IS NULL`,
-        [String(id), adminId],
-      );
+      const result = await this.dataService.query('product_variants', {
+        update: {
+          deleted_at: new Date().toISOString(),
+          updated_by: adminId,
+          updated_at: new Date().toISOString(),
+        },
+        where: [
+          {
+            column: 'id',
+            operator: '=',
+            value: Number(id),
+          },
+        ],
+      });
+
+      if (!result?.status) {
+        throw new InternalServerErrorException('Failed to delete variant');
+      }
 
       return {
         status: true,
@@ -122,44 +127,40 @@ export class CatalogService {
 
   async softDeleteCategory(id: string, adminId: string) {
     try {
-      // 1. Fetch category identifiers (id, category_id, name)
-      const isNumericId = !isNaN(Number(id));
-      const categoryQuery = isNumericId
-        ? `SELECT id, category_id, name FROM categories WHERE id = $1 AND deleted_at IS NULL LIMIT 1;`
-        : `SELECT id, category_id, name FROM categories WHERE (category_id = $1 OR id::text = $1) AND deleted_at IS NULL LIMIT 1;`;
-      const categoryParams = [isNumericId ? Number(id) : id];
-      const categoryRes = await this.db.query(categoryQuery, categoryParams);
-
-      const targetCategory = categoryRes?.[0];
-      const categoryIdNum = targetCategory?.id ? String(targetCategory.id) : (isNumericId ? String(id) : null);
-      const categoryIdStr = targetCategory?.category_id ? String(targetCategory.category_id) : String(id);
-
-      // 2. Check for active (non-deleted) products linked to this category
-      const productCheckSql = `
-        SELECT id FROM products 
-        WHERE (${categoryIdNum ? 'category_id = $1 OR ' : ''}category_id = $2) 
-          AND deleted_at IS NULL 
-        LIMIT 1;
-      `;
-      const productParams = categoryIdNum ? [categoryIdNum, categoryIdStr] : [categoryIdStr, categoryIdStr];
-      const productRes = await this.db.query(productCheckSql, productParams);
-
-      if (productRes?.length > 0) {
+      // Guard: reject if active (non-deleted) products still belong to this category
+      const productRows = await this.db.query<{ count: string }>(
+        `SELECT COUNT(*) AS count
+           FROM products p
+           JOIN categories c ON c.category_id = p.category_id
+          WHERE c.id = $1
+            AND p.deleted_at IS NULL`,
+        [Number(id)],
+      );
+      const productCount = parseInt(productRows?.[0]?.count ?? '0', 10);
+      if (productCount > 0) {
         throw new BadRequestException(
-          'Cannot delete category because active product(s) exist in this category. Please delete or reassign all products first.'
+          `Cannot delete this category — ${productCount} active product(s) still belong to it. Please delete or reassign all products first.`,
         );
       }
 
-      // 3. Perform soft delete
-      await this.db.query(
-        `UPDATE categories 
-            SET deleted_at = NOW(), 
-                updated_by = $2, 
-                updated_at = NOW() 
-          WHERE (id::text = $1 OR category_id = $1) 
-            AND deleted_at IS NULL`,
-        [String(id), adminId],
-      );
+      const result = await this.dataService.query('categories', {
+        update: {
+          deleted_at: new Date().toISOString(),
+          updated_by: adminId,
+          updated_at: new Date().toISOString(),
+        },
+        where: [
+          {
+            column: 'id',
+            operator: '=',
+            value: Number(id),
+          },
+        ],
+      });
+
+      if (!result?.status) {
+        throw new InternalServerErrorException('Failed to delete category');
+      }
 
       return {
         status: true,
