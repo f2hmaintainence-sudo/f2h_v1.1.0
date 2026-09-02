@@ -838,56 +838,30 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product Image Container with badge
-              Stack(
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x08000000),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
+              // Product Image Container
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x08000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: buildProductImage(
-                      _currentDisplayName,
-                      imageAsset: currentVariantImage,
-                      width: 76,
-                      height: 76,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 4,
-                    left: 4,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
-                      ),
-                      child: Text(
-                        _variant.formattedUnit.isNotEmpty ? _variant.formattedUnit : 'Fresh',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF166534),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: buildProductImage(
+                  _currentDisplayName,
+                  imageAsset: currentVariantImage,
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.cover,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(

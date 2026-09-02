@@ -944,7 +944,7 @@ class _HomeScreenState extends State<HomeScreen>
               height: 56,
               decoration: BoxDecoration(
                 color: isAll
-                    ? const Color(0xFF16653A)
+                    ? const Color(0xFF16A34A)
                     : (isMore
                           ? const Color(0xFFECEFF1)
                           : (bgColor ?? Colors.white)),

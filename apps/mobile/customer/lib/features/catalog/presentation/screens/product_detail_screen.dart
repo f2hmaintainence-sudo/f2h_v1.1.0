@@ -471,15 +471,15 @@ class _SidebarItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   gradient: isAll
                       ? const LinearGradient(
-                          colors: [Color(0xFF047857), Color(0xFF10B981), Color(0xFF34D399)],
+                          colors: [Color(0xFF15803D), Color(0xFF16A34A)],
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
                         )
                       : (isSelected
                           ? const LinearGradient(
                               colors: [
-                                Color(0xFF34D399),
-                                Color(0xFFA7F3D0),
+                                Color(0xFF86EFAC),
+                                Color(0xFFDCFCE7),
                                 Colors.white,
                               ],
                               stops: [0.0, 0.55, 1.0],
@@ -495,16 +495,16 @@ class _SidebarItem extends StatelessWidget {
                     color: isAll
                         ? Colors.white
                         : (isSelected
-                            ? const Color(0xFF10B981)
+                            ? const Color(0xFF16A34A)
                             : const Color(0xFFE2E8F0)),
                     width: isSelected ? 2.2 : 1.2,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: isAll
-                          ? const Color(0xFF047857).withValues(alpha: 0.35)
+                          ? const Color(0xFF16A34A).withValues(alpha: 0.35)
                           : (isSelected
-                              ? const Color(0xFF10B981).withValues(alpha: 0.22)
+                              ? const Color(0xFF16A34A).withValues(alpha: 0.22)
                               : Colors.black.withValues(alpha: 0.04)),
                       blurRadius: isSelected ? 8 : 4,
                       offset: const Offset(0, 3),
@@ -535,7 +535,7 @@ class _SidebarItem extends StatelessWidget {
                                 child: Icon(
                                   Icons.water_drop_rounded,
                                   color: isSelected
-                                      ? const Color(0xFF059669)
+                                      ? const Color(0xFF16A34A)
                                       : const Color(0xFF64748B),
                                   size: 24,
                                 ),
@@ -554,7 +554,7 @@ class _SidebarItem extends StatelessWidget {
                   fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
                   color: isSelected
-                      ? const Color(0xFF059669)
+                      ? const Color(0xFF16A34A)
                       : const Color(0xFF475569),
                   height: 1.18,
                   letterSpacing: isSelected ? -0.1 : 0,
