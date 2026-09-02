@@ -7,6 +7,8 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
+import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 
 class ContainerItemState {
   final String containerId;
@@ -82,12 +84,17 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   bool _paymentConfirmed = false;
   String? _imagePath;
   Uint8List? _imageBytes;
+  Map<String, dynamic>? _paymentQrData;
+  bool _isLoadingQr = false;
 
   final Map<String, ContainerItemState> _containerStates = {};
 
   @override
   void initState() {
     super.initState();
+    if (widget.stop.isCod && widget.stop.codAmount > 0) {
+      _fetchPaymentQr();
+    }
 
     // Populate container items from stop containerBalances
     for (var bal in widget.stop.containerBalances) {
@@ -128,6 +135,27 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     }
 
     _checkLostImage();
+  }
+
+  Future<void> _fetchPaymentQr() async {
+    if (widget.stop.runId == null || widget.stop.addressId.isEmpty) return;
+    setState(() => _isLoadingQr = true);
+    try {
+      final qr = await sl<OrdersRepository>().getPaymentQr(
+        runId: widget.stop.runId!,
+        addressId: widget.stop.addressId,
+      );
+      if (mounted && qr != null) {
+        setState(() {
+          _paymentQrData = qr;
+          _isLoadingQr = false;
+        });
+      } else {
+        if (mounted) setState(() => _isLoadingQr = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingQr = false);
+    }
   }
 
   Future<void> _checkLostImage() async {
@@ -787,31 +815,55 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                             border: Border.all(color: kBorder),
                           ),
                           padding: const EdgeInsets.all(8),
-                          child: _ScannerAnimationWrapper(
-                            child: Image.network(
-                              'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent('upi://pay?pa=f2hfresh@ybl&pn=F2H Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}')}',
-                              fit: BoxFit.contain,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const Center(
+                          child: _isLoadingQr
+                              ? const Center(
                                   child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-                                    ),
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
                                   ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                return CustomPaint(
-                                  painter: _QrCodePainter(),
-                                );
-                              },
+                                )
+                              : _ScannerAnimationWrapper(
+                                  child: Image.network(
+                                    _paymentQrData?['qr_image_url'] as String? ??
+                                        'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent('upi://pay?pa=f2hfresh@ybl&pn=F2H Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}')}',
+                                    fit: BoxFit.contain,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return const Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return CustomPaint(
+                                        painter: _QrCodePainter(),
+                                      );
+                                    },
+                                  ),
+                                ),
+                        ),
+                        if (_paymentQrData?['provider'] == 'razorpay') ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: const Text(
+                              '⚡ Dynamic UPI Gateway QR',
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8)),
                             ),
                           ),
-                        ),
+                        ],
                         const SizedBox(height: 8),
                         const Row(
                           mainAxisAlignment: MainAxisAlignment.center,

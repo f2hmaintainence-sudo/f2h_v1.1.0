@@ -135,6 +135,8 @@ class ApiEndpoints {
   static String startRun(String runId) => '/delivery-partner/orders/run/$runId/start';
   static String markStopDelivered(String runId, String addressId) =>
       '/delivery-partner/orders/run/$runId/address/$addressId/deliver';
+  static String getPaymentQr(String runId, String addressId) =>
+      '/delivery-partner/orders/run/$runId/address/$addressId/payment-qr';
   static String handoverRun(String runId) => '/delivery-partner/orders/run/$runId/handover';
   static const String updateOrderStatus = '/delivery-partner/orders';
   static const String supportTickets = '/support-tickets';

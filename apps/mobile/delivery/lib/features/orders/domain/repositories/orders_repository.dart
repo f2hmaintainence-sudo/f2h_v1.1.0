@@ -45,4 +45,8 @@ abstract class OrdersRepository {
     double? longitude,
   });
   Future<HandoverResult> handoverRun(String runId);
+  Future<Map<String, dynamic>?> getPaymentQr({
+    required String runId,
+    required String addressId,
+  });
 }

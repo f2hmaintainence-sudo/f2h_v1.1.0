@@ -327,6 +327,26 @@ class OrdersRepositoryImpl implements OrdersRepository {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>?> getPaymentQr({
+    required String runId,
+    required String addressId,
+  }) async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.getPaymentQr(runId, addressId),
+      );
+      final data = response.data;
+      if (data != null && data['status'] == true && data['data'] != null) {
+        return Map<String, dynamic>.from(data['data']);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting payment QR: $e');
+      return null;
+    }
+  }
+
   Exception _handleDioError(dynamic e, String defaultMessage) {
     if (e is DioException) {
       final serverMessage = apiErrorMessage(e, '');

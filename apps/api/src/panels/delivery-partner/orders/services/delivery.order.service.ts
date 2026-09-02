@@ -10,6 +10,7 @@ import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { FirstOrderDetectorService } from '../../../customer/referral/services/first-order-detector.service';
 import { ReferralRewardEngineService } from '../../../customer/referral/services/referral-reward-engine.service';
 import { isDispatchHandedOver } from '../dispatch-status';
+import { RazorpayService } from '../../../../shared/payments/razorpay.service';
 
 @Injectable()
 export class DeliveryOrderService {
@@ -19,6 +20,7 @@ export class DeliveryOrderService {
     private readonly developer: DeveloperService,
     private readonly firstOrderDetector: FirstOrderDetectorService,
     private readonly referralRewardEngine: ReferralRewardEngineService,
+    private readonly razorpayService: RazorpayService,
   ) { }
 
   cleanDeliveryImagePath(imageUrl: string | null | undefined): string | null {
@@ -2092,6 +2094,115 @@ export class DeliveryOrderService {
     };
   }
 
+  async getPaymentQrForStop(userId: string, runId: string, addressId: string) {
+    const boy = await this.resolveDeliveryPartner(userId);
+    const run = await this.findDeliveryRunByIdAndBoy(runId, boy);
+    const runIds = this.getRunIdentifiers(run);
+
+    const orders = await this.db.query<{
+      order_id: string;
+      customer_id: string;
+      customer_name: string | null;
+      status: string;
+      total_amount: number | string;
+      payment_mode: string | null;
+      payment_status: string | null;
+    }>(
+      `SELECT order_id, customer_id, customer_name, status, total_amount, payment_mode, payment_status
+       FROM orders
+       WHERE delivery_run_id = ANY($1) AND address_id = $2`,
+      [runIds, addressId],
+    );
+
+    if (!orders?.length) {
+      throw new NotFoundException('No orders found for this stop');
+    }
+
+    const unpaidOrders = orders.filter(
+      (o) =>
+        (o.payment_mode === 'cod' || o.payment_mode === 'cash' || o.payment_status === 'pending') &&
+        o.status !== 'cancelled' &&
+        o.status !== 'failed',
+    );
+
+    const amount = unpaidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    if (amount <= 0) {
+      return {
+        status: false,
+        message: 'No COD payment pending for this stop',
+        data: null,
+      };
+    }
+
+    const orderIds = unpaidOrders.map((o) => o.order_id);
+    const firstOrder = unpaidOrders[0];
+
+    // Read config from api_integrations_config
+    const configs = await this.db.query(
+      `SELECT is_active, config_data
+       FROM api_integrations_config
+       WHERE category = 'payment-gateway'
+         AND (config_key = 'razorpay' OR LOWER(provider) = 'razorpay')
+         AND deleted_at IS NULL
+       ORDER BY is_active DESC, updated_at DESC
+       LIMIT 1`,
+    );
+
+    const configData = configs?.[0]?.config_data || {};
+    const companyName = configData.company_name || 'F2H Fresh';
+    const merchantVpa = configData.upi_id || configData.merchant_vpa || 'f2hfresh@ybl';
+
+    let qrImageUrl: string | null = null;
+    let upiString: string | null = null;
+    let qrId: string | null = null;
+    let provider = 'upi_standard';
+
+    // 1. Try Razorpay dynamic single-use QR Code
+    if (configs?.[0]?.is_active) {
+      try {
+        const rzpQr = await this.razorpayService.createQrCode({
+          amount,
+          name: companyName,
+          description: `Order ${orderIds.join(', ')}`,
+          notes: {
+            run_id: runId,
+            address_id: addressId,
+            order_id: firstOrder.order_id,
+            customer_id: firstOrder.customer_id,
+          },
+        });
+        if (rzpQr && (rzpQr.image_url || rzpQr.qr_data)) {
+          qrId = rzpQr.id;
+          qrImageUrl = rzpQr.image_url;
+          upiString = rzpQr.qr_data || null;
+          provider = 'razorpay';
+        }
+      } catch (err: any) {
+        this.developer.error('Razorpay QR code generation failed, using standard UPI fallback', { error: err?.message });
+      }
+    }
+
+    // 2. Standard UPI Fallback if dynamic gateway QR not available
+    if (!qrImageUrl) {
+      upiString = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(companyName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`Order_${firstOrder.order_id}`)}`;
+      qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiString)}`;
+    }
+
+    return {
+      status: true,
+      data: {
+        qr_image_url: qrImageUrl,
+        qr_id: qrId,
+        upi_string: upiString,
+        amount,
+        currency: 'INR',
+        company_name: companyName,
+        order_ids: orderIds,
+        provider,
+      },
+    };
+  }
+
   private async handleCodDeliveryPaymentAndBill(
     client: { query: (sql: string, params?: any[]) => Promise<any> },
     order: { order_id: string; customer_id: string; total_amount: number | string; payment_mode?: string; scheduled_date?: string },
@@ -2103,20 +2214,22 @@ export class DeliveryOrderService {
     const isUpi = method.includes('upi') || method.includes('qr');
     const paymentMethod = isUpi ? 'upi' : (method === 'cod' || method === 'cash' ? 'cash' : method);
 
-    // 1. Record collection in payment_transactions if not already existing
-    const existingTxn = await client.query(
-      `SELECT 1 FROM payment_transactions WHERE reference_id = $1 AND purpose = 'order' AND status = 'paid' LIMIT 1`,
-      [order.order_id],
-    );
-    if (!existingTxn?.rows?.length && !existingTxn?.length) {
-      const txnId = `TXN_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`.toUpperCase();
-      await client.query(
-        `INSERT INTO payment_transactions (
-          transaction_id, customer_id, purpose, reference_id,
-          provider, method, amount, currency, status, paid_at, created_at, updated_at
-        ) VALUES ($1, $2, 'order', $3, $4, $4, $5, 'INR', 'paid', NOW(), NOW(), NOW())`,
-        [txnId, order.customer_id, order.order_id, paymentMethod, cashAmount],
+    // 1. Record in payment_transactions table ONLY for online / UPI transactions
+    if (isUpi) {
+      const existingTxn = await client.query(
+        `SELECT 1 FROM payment_transactions WHERE reference_id = $1 AND purpose = 'order' AND status = 'paid' LIMIT 1`,
+        [order.order_id],
       );
+      if (!existingTxn?.rows?.length && !existingTxn?.length) {
+        const txnId = `TXN_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`.toUpperCase();
+        await client.query(
+          `INSERT INTO payment_transactions (
+            transaction_id, customer_id, purpose, reference_id,
+            provider, method, amount, currency, status, paid_at, created_at, updated_at
+          ) VALUES ($1, $2, 'order', $3, 'razorpay', 'upi', $4, 'INR', 'paid', NOW(), NOW(), NOW())`,
+          [txnId, order.customer_id, order.order_id, cashAmount],
+        );
+      }
     }
 
     // 2. Settle or create customer_bills and customer_bill_items
@@ -2154,7 +2267,9 @@ export class DeliveryOrderService {
           order.order_id,
           paymentMethod,
           cashAmount,
-          `Pay on Delivery (${paymentMethod.toUpperCase()}) - Collected on delivery by ${boyFullName}`,
+          isUpi
+            ? `Pay on Delivery (UPI QR) - Collected on delivery by ${boyFullName}`
+            : `Cash on Delivery - Collected on delivery by ${boyFullName}`,
         ],
       );
 

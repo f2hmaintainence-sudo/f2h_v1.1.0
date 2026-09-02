@@ -346,6 +346,39 @@ export class RazorpayService {
     );
   }
 
+  /**
+   * Generates a dynamic single-use UPI QR code for an order/delivery amount.
+   * @param params.amount Amount in rupees
+   */
+  async createQrCode(params: {
+    amount: number;
+    name?: string;
+    description?: string;
+    notes?: Record<string, any>;
+  }): Promise<{
+    id: string;
+    image_url: string;
+    qr_data?: string;
+    payment_amount: number;
+    status: string;
+  }> {
+    const config = await this.getActiveConfig();
+    const amountInPaise = Math.round(Number(params.amount) * 100);
+    if (!Number.isFinite(amountInPaise) || amountInPaise <= 0) {
+      throw new BadRequestException('Invalid payment amount for QR code');
+    }
+
+    return this.request<any>('POST', '/payments/qr_codes', {
+      type: 'upi_qr',
+      name: (params.name || config.companyName || 'F2H Fresh').slice(0, 40),
+      usage: 'single_use',
+      fixed_amount: true,
+      payment_amount: amountInPaise,
+      description: (params.description || 'Payment for Order').slice(0, 255),
+      notes: params.notes || {},
+    });
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   //  Signature verification
   // ──────────────────────────────────────────────────────────────────────────
