@@ -571,6 +571,99 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         ),
       );
     }
+
+    // 3. Walking / Non-road transition marker and distance badge for active stop
+    if (_optimizedRoute != null && _optimizedRoute!.isRoadGeometry) {
+      final activePts = _optimizedRoute!.activeLegPoints;
+      final targetStop = _resolveDestination(groupedStops);
+      if (activePts.isNotEmpty && targetStop != null && targetStop.addressLat.isFinite && targetStop.addressLng.isFinite) {
+        final roadEndPos = activePts.last;
+        final stopPos = LatLng(targetStop.addressLat, targetStop.addressLng);
+        final walkDistM = sl<LocationService>().haversineDistanceKm(
+          roadEndPos.latitude,
+          roadEndPos.longitude,
+          stopPos.latitude,
+          stopPos.longitude,
+        ) * 1000;
+
+        if (walkDistM >= 8.0) {
+          // Road-End / Walking transition circle
+          markers.add(
+            Marker(
+              point: roadEndPos,
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF0284C7), width: 2.5),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 5,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.directions_walk_rounded,
+                    color: Color(0xFF0284C7),
+                    size: 15,
+                  ),
+                ),
+              ),
+            ),
+          );
+
+          // Walking distance badge on the non-road path
+          final midLat = (roadEndPos.latitude + stopPos.latitude) / 2;
+          final midLng = (roadEndPos.longitude + stopPos.longitude) / 2;
+          markers.add(
+            Marker(
+              point: LatLng(midLat, midLng),
+              width: 96,
+              height: 24,
+              alignment: Alignment.center,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white, width: 1.2),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1.5),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.directions_walk_rounded, color: Colors.white, size: 12),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${walkDistM.round()}m walk',
+                      style: GoogleFonts.roboto(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+      }
+    }
+
     return markers;
   }
 
@@ -971,6 +1064,109 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     strokeJoin: StrokeJoin.round,
                   ),
                 );
+              }
+
+              // 3. Walking / Non-Road Connector to Target Stop Doorstep / Pin
+              final targetStop = _resolveDestination(effectiveStops);
+              if (targetStop != null && targetStop.addressLat.isFinite && targetStop.addressLng.isFinite) {
+                final stopPos = LatLng(targetStop.addressLat, targetStop.addressLng);
+                final roadEndPos = activePts.isNotEmpty ? activePts.last : (fullPts.isNotEmpty ? fullPts.last : null);
+
+                if (roadEndPos != null) {
+                  final walkDistanceKm = sl<LocationService>().haversineDistanceKm(
+                    roadEndPos.latitude,
+                    roadEndPos.longitude,
+                    stopPos.latitude,
+                    stopPos.longitude,
+                  );
+                  final walkDistanceM = walkDistanceKm * 1000;
+
+                  if (walkDistanceM >= 5.0) {
+                    final walkingPts = [roadEndPos, stopPos];
+
+                    // Soft outer glow for walking non-road path
+                    polylines.add(
+                      Polyline(
+                        points: walkingPts,
+                        strokeWidth: 8.0,
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                        strokeCap: StrokeCap.round,
+                        strokeJoin: StrokeJoin.round,
+                      ),
+                    );
+                    // Primary dashed walking line
+                    polylines.add(
+                      Polyline(
+                        points: walkingPts,
+                        strokeWidth: 4.5,
+                        color: const Color(0xFF0284C7),
+                        pattern: StrokePattern.dashed(segments: const [6, 5]),
+                        strokeCap: StrokeCap.round,
+                        strokeJoin: StrokeJoin.round,
+                      ),
+                    );
+                  }
+                }
+
+                // Off-road rider start connector
+                if (_currentPosition != null && activePts.isNotEmpty) {
+                  final roadStartPos = activePts.first;
+                  final startWalkKm = sl<LocationService>().haversineDistanceKm(
+                    _currentPosition!.latitude,
+                    _currentPosition!.longitude,
+                    roadStartPos.latitude,
+                    roadStartPos.longitude,
+                  );
+                  final startWalkM = startWalkKm * 1000;
+                  if (startWalkM >= 10.0) {
+                    polylines.add(
+                      Polyline(
+                        points: [_currentPosition!, roadStartPos],
+                        strokeWidth: 4.0,
+                        color: const Color(0xFF64748B),
+                        pattern: StrokePattern.dashed(segments: const [5, 5]),
+                        strokeCap: StrokeCap.round,
+                        strokeJoin: StrokeJoin.round,
+                      ),
+                    );
+                  }
+                }
+              }
+
+              // 4. Non-road walking connectors for subsequent pending stops
+              for (final stop in pendingStops) {
+                if (targetStop != null && stop.addressId == targetStop.addressId) continue;
+                if (!stop.addressLat.isFinite || !stop.addressLng.isFinite) continue;
+                final sPos = LatLng(stop.addressLat, stop.addressLng);
+
+                if (fullPts.isNotEmpty) {
+                  LatLng? closestPt;
+                  double minD = double.infinity;
+                  for (final pt in fullPts) {
+                    final d = sl<LocationService>().haversineDistanceKm(
+                      pt.latitude,
+                      pt.longitude,
+                      sPos.latitude,
+                      sPos.longitude,
+                    ) * 1000;
+                    if (d < minD) {
+                      minD = d;
+                      closestPt = pt;
+                    }
+                  }
+                  if (closestPt != null && minD >= 8.0 && minD < 500.0) {
+                    polylines.add(
+                      Polyline(
+                        points: [closestPt, sPos],
+                        strokeWidth: 3.5,
+                        color: const Color(0xFF94A3B8),
+                        pattern: StrokePattern.dashed(segments: const [5, 5]),
+                        strokeCap: StrokeCap.round,
+                        strokeJoin: StrokeJoin.round,
+                      ),
+                    );
+                  }
+                }
               }
             }
           }
@@ -1651,9 +1847,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                             color: const Color(0xFF0F172A),
                           ),
                         ),
-                        Text(
-                          'To Stop #${activeStop.stop}',
-                          style: GoogleFonts.roboto(fontSize: 9.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                        Builder(
+                          builder: (context) {
+                            double walkM = 0;
+                            if (route.isRoadGeometry && route.activeLegPoints.isNotEmpty && activeStop.addressLat.isFinite && activeStop.addressLng.isFinite) {
+                              final endP = route.activeLegPoints.last;
+                              walkM = sl<LocationService>().haversineDistanceKm(
+                                endP.latitude,
+                                endP.longitude,
+                                activeStop.addressLat,
+                                activeStop.addressLng,
+                              ) * 1000;
+                            }
+                            return Text(
+                              walkM >= 10.0
+                                  ? 'To Stop #${activeStop.stop} (+${walkM.round()}m walk)'
+                                  : 'To Stop #${activeStop.stop}',
+                              style: GoogleFonts.roboto(fontSize: 9.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                            );
+                          },
                         ),
                       ],
                     ),
