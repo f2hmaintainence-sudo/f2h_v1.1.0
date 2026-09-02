@@ -115,10 +115,15 @@ class Order {
     String pName = 'Order';
     if (items.isNotEmpty) {
       if (items.length == 1) {
-        final variantSuffix = items[0].variantName.isNotEmpty && items[0].variantName.toLowerCase() != 'standard'
-            ? ' (${items[0].variantName})'
-            : '';
-        pName = '${items[0].productName}$variantSuffix × ${items[0].quantity}';
+        final vName = items[0].variantName.trim();
+        final pNameRaw = items[0].productName.trim();
+        final isRedundant = vName.isEmpty ||
+            vName.toLowerCase() == 'standard' ||
+            vName.toLowerCase() == 'unit' ||
+            vName.contains('_') ||
+            pNameRaw.toLowerCase().contains(vName.toLowerCase());
+        final variantSuffix = !isRedundant ? ' ($vName)' : '';
+        pName = '$pNameRaw$variantSuffix × ${items[0].quantity}';
       } else {
         pName = '${items[0].productName} & ${items.length - 1} more items';
       }
