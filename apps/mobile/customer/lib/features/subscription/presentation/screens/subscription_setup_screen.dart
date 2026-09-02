@@ -836,88 +836,183 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         children: [
           // ── Product Info Header ──────────────────────────
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: buildProductImage(
-                  _currentDisplayName,
-                  imageAsset: currentVariantImage,
-                  width: 68,
-                  height: 68,
-                  fit: BoxFit.cover,
-                ),
+              // Product Image Container with badge
+              Stack(
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x08000000),
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: buildProductImage(
+                      _currentDisplayName,
+                      imageAsset: currentVariantImage,
+                      width: 76,
+                      height: 76,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 4,
+                    left: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.92),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                      ),
+                      child: Text(
+                        _variant.formattedUnit.isNotEmpty ? _variant.formattedUnit : 'Fresh',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF166534),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Title
                     Text(
                       _currentDisplayName,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF0F172A),
-                        height: 1.2,
+                        letterSpacing: -0.2,
+                        height: 1.25,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      p.vendor.isNotEmpty ? p.vendor : 'Farm Fresh',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF64748B),
-                      ),
+                    const SizedBox(height: 5),
+
+                    // Vendor & Quality Tag
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.verified_rounded,
+                                size: 11,
+                                color: Color(0xFF16A34A),
+                              ),
+                              const SizedBox(width: 3.5),
+                              Text(
+                                p.vendor.isNotEmpty ? p.vendor : 'F2H Direct',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Daily Fresh',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
+
+                    // Pricing Row
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Text(
-                          '₹${_subscriptionUnitPrice.toStringAsFixed(0)}/unit',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: const Color(0xFF16A34A),
+                        // Subscription Price
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: '₹${_subscriptionUnitPrice.toStringAsFixed(0)}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFF15803D),
+                                ),
+                              ),
+                              TextSpan(
+                                text: ' /unit',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         if (_variant.originalPrice > _subscriptionUnitPrice) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
                           Text(
                             'MRP ₹${_variant.originalPrice.toStringAsFixed(0)}',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.w600,
                               color: const Color(0xFF94A3B8),
                               decoration: TextDecoration.lineThrough,
                             ),
                           ),
                           if (_variant.discountPercent > 0) ...[
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
+                                horizontal: 6.5,
+                                vertical: 2.5,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFDCFCE7),
                                 borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF86EFAC), width: 0.9),
                               ),
                               child: Text(
                                 '${_variant.discountPercent}% OFF',
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 9.5,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                   color: const Color(0xFF15803D),
                                 ),
