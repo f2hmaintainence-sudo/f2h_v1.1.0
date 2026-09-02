@@ -113,6 +113,13 @@ export class CatalogTableService {
         });
       }
 
+      // Exclude deleted
+      conditions.push({
+        column: 'products.deleted_at',
+        operator: 'IS',
+        value: null,
+      });
+
 
       const reqSet: ReqSet = {
         key: 'products',
@@ -225,6 +232,13 @@ export class CatalogTableService {
           value: query.is_active === 'true' ? 'active' : 'false',
         });
       }
+
+      // Exclude deleted
+      conditions.push({
+        column: 'product_variants.deleted_at',
+        operator: 'IS',
+        value: null,
+      });
 
 
       const reqSet: ReqSet = {

@@ -1275,31 +1275,39 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── SECTION A: Current Order Container Quantity (Editable) ──
+                        // ── SECTION A: Current Order Container Quantity (Display Only) ──
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
+                            const Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Current Order Containers',
                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
                                 ),
-                                const SizedBox(height: 2),
+                                SizedBox(height: 2),
                                 Text(
-                                  'Delivering today (modify if adjusted)',
+                                  'Delivering today with this order',
                                   style: TextStyle(fontSize: 10.5, color: kTextSub),
                                 ),
                               ],
                             ),
-                            _buildMiniStepper(
-                              value: state.deliveringToday,
-                              color: kPrimary,
-                              onDec: state.deliveringToday > 0
-                                  ? () => setState(() => state.deliveringToday--)
-                                  : null,
-                              onInc: () => setState(() => state.deliveringToday++),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Text(
+                                '${state.deliveringToday}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: kPrimary,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -1307,39 +1315,39 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                         const Divider(height: 1, color: kBorderLt),
                         const SizedBox(height: 14),
 
-                        // ── SECTION B: Customer Held Balance (Editable) ──
+                        // ── SECTION B: Customer Held Balance (Display Only) ──
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
+                            const Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Customer Held Containers',
                                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
                                 ),
-                                const SizedBox(height: 2),
+                                SizedBox(height: 2),
                                 Text(
                                   'Containers currently held with customer',
                                   style: TextStyle(fontSize: 10.5, color: kTextSub),
                                 ),
                               ],
                             ),
-                            _buildMiniStepper(
-                              value: state.customerBalance,
-                              color: Colors.orange.shade800,
-                              onDec: state.customerBalance > 0
-                                  ? () => setState(() {
-                                        state.customerBalance--;
-                                        if (state.returned > (state.customerBalance - state.damaged - state.lost)) {
-                                          state.returned = (state.customerBalance - state.damaged - state.lost).clamp(0, 999);
-                                        }
-                                      })
-                                  : null,
-                              onInc: () => setState(() {
-                                    state.customerBalance++;
-                                    state.returned = (state.customerBalance - state.damaged - state.lost).clamp(0, 999);
-                                  }),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF7ED),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFFFEDD5)),
+                              ),
+                              child: Text(
+                                '${state.customerBalance}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: Colors.orange.shade800,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -1798,47 +1806,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     );
   }
 
-  Widget _buildMiniStepper({
-    required int value,
-    required Color color,
-    required VoidCallback? onDec,
-    required VoidCallback? onInc,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: kBgDeep,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorder),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: onDec,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              child: Icon(Icons.remove_rounded, size: 18, color: onDec != null ? color : kMuted),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              '$value',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: color),
-            ),
-          ),
-          GestureDetector(
-            onTap: onInc,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              child: Icon(Icons.add_rounded, size: 18, color: onInc != null ? color : kMuted),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildCompactCounter({
     required String label,
