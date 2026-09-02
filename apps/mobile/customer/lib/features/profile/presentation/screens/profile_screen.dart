@@ -51,6 +51,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (state.status == CustomerSessionStatus.initial ||
             state.status == CustomerSessionStatus.failure) {
           context.read<CustomerSessionCubit>().bootstrap();
+        } else {
+          context.read<CustomerSessionCubit>().refreshSilently();
         }
       }
     });

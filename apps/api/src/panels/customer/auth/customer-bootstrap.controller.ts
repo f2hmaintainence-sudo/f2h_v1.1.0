@@ -150,12 +150,22 @@ export class CustomerBootstrapController {
     const user = req.user as any;
     const userId = user?.user_id;
     const email = user?.email;
+
+    // 1. Resolve customer profile
     const profile = await this.resolveCustomer(userId, email);
     const customerId = profile?.customer_id || userId;
 
-    let addressesResult: any[] = [];
-    try {
-      addressesResult = await this.db.query(
+    // 2. Fetch all dependent datasets concurrently in parallel
+    const [
+      addressesResult,
+      subscriptionSummary,
+      branchesResult,
+      firebaseConfig,
+      deliveryRulesRes,
+      slotTimingsRes,
+      todayPartnersData,
+    ] = await Promise.all([
+      this.db.query(
         `SELECT ca.*,
                 b.branch_name,
                 b.is_active AS branch_is_active
@@ -166,23 +176,34 @@ export class CustomerBootstrapController {
            AND b.is_active = true
          ORDER BY ca.is_default DESC, ca.id ASC`,
         [customerId],
-      );
-    } catch {
-      const fallback = await this.Data.query('customer_addresses', {
-        where: [
-          { column: 'customer_id', operator: '=', value: customerId },
-          { column: 'status', operator: '=', value: true },
-        ],
-      });
-      addressesResult = fallback?.data || [];
-    }
-    const subscriptionSummary = await this.getSubscriptionSummary(customerId);
+      ).catch(async () => {
+        const fallback = await this.Data.query('customer_addresses', {
+          where: [
+            { column: 'customer_id', operator: '=', value: customerId },
+            { column: 'status', operator: '=', value: true },
+          ],
+        });
+        return fallback?.data || [];
+      }),
 
-    const branchesResult = await this.Data.query('branches', {
-      where: [{ column: 'is_active', operator: '=', value: true }],
-    });
+      this.getSubscriptionSummary(customerId),
 
-    const firebaseConfig = await this.loadFirebaseClientConfig('firebase:customer');
+      this.Data.query('branches', {
+        where: [{ column: 'is_active', operator: '=', value: true }],
+      }),
+
+      this.loadFirebaseClientConfig('firebase:customer'),
+
+      this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' LIMIT 1`,
+      ).catch(() => null),
+
+      this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+      ).catch(() => null),
+
+      this.getTodayDeliveryPartners(customerId),
+    ]);
 
     let deliveryRules: any = {
       base_delivery_fee: 0.0,
@@ -192,20 +213,13 @@ export class CustomerBootstrapController {
       taxes_and_handling_fee: 0.0,
       display_notes: 'Free delivery on all orders.',
     };
-    try {
-      const deliveryRulesRes = await this.db.query(
-        `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' LIMIT 1`,
-      );
-      if (deliveryRulesRes?.[0]?.config_data) {
-        deliveryRules = {
-          ...deliveryRulesRes[0].config_data,
-          base_delivery_fee: 0.0,
-          taxes_and_handling_fee: 0.0,
-          free_delivery_threshold: 0.0,
-        };
-      }
-    } catch (err) {
-      this.Developer.error('[CustomerBootstrapController] Failed to load delivery_rules', err);
+    if (deliveryRulesRes?.[0]?.config_data) {
+      deliveryRules = {
+        ...deliveryRulesRes[0].config_data,
+        base_delivery_fee: 0.0,
+        taxes_and_handling_fee: 0.0,
+        free_delivery_threshold: 0.0,
+      };
     }
 
     let slotTimings: any = {
@@ -216,21 +230,12 @@ export class CustomerBootstrapController {
       morning_cutoff_time: '20:00',
       evening_cutoff_time: '15:00',
     };
-    try {
-      const slotTimingsRes = await this.db.query(
-        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' LIMIT 1`,
-      );
-      if (slotTimingsRes?.[0]?.config_data) {
-        slotTimings = {
-          ...slotTimings,
-          ...slotTimingsRes[0].config_data,
-        };
-      }
-    } catch (err) {
-      this.Developer.error('[CustomerBootstrapController] Failed to load slot_timings', err);
+    if (slotTimingsRes?.[0]?.config_data) {
+      slotTimings = {
+        ...slotTimings,
+        ...slotTimingsRes[0].config_data,
+      };
     }
-
-    const todayPartnersData = await this.getTodayDeliveryPartners(customerId);
 
     const addressesList = Array.isArray(addressesResult) ? addressesResult : ((addressesResult as any)?.data || []);
     const normalizedAddresses = addressesList
@@ -613,37 +618,40 @@ export class CustomerBootstrapController {
       }
 
       try {
-        const deliveredCheck = await this.Data.query('orders', {
-          select: ['order_id'],
-          where: [
-            { column: 'customer_id', operator: '=', value: customer.customer_id || userId },
-            { column: 'status', operator: 'IN', value: ['delivered', 'completed'] },
-          ],
-          limit: 1,
-        });
-        const hasDeliveredOrder = (deliveredCheck?.data?.length || 0) > 0;
-        const isUnlocked = Boolean(customer.first_order_completed || hasDeliveredOrder);
-
-        if (isUnlocked) {
+        if (customer.first_order_completed) {
           customer.referral_code = customer.customer_id || userId;
           customer.referral_status = 'active';
-          customer.first_order_completed = true;
         } else {
-          customer.referral_code = null;
-          customer.referral_status = 'locked';
-          customer.first_order_completed = false;
+          const deliveredCheck = await this.Data.query('orders', {
+            select: ['order_id'],
+            where: [
+              { column: 'customer_id', operator: '=', value: customer.customer_id || userId },
+              { column: 'status', operator: 'IN', value: ['delivered', 'completed'] },
+            ],
+            limit: 1,
+          });
+          const hasDeliveredOrder = (deliveredCheck?.data?.length || 0) > 0;
+          if (hasDeliveredOrder) {
+            customer.referral_code = customer.customer_id || userId;
+            customer.referral_status = 'active';
+            customer.first_order_completed = true;
+
+            const updatePayload = await this.filterValidFields('customers', {
+              first_order_completed: true,
+              updated_at: new Date(),
+            });
+
+            await this.Data.update(
+              'customers',
+              updatePayload,
+              [{ column: 'customer_id', operator: '=', value: customer.customer_id || userId }],
+            );
+          } else {
+            customer.referral_code = null;
+            customer.referral_status = 'locked';
+            customer.first_order_completed = false;
+          }
         }
-
-        const updatePayload = await this.filterValidFields('customers', {
-          first_order_completed: customer.first_order_completed,
-          updated_at: new Date(),
-        });
-
-        await this.Data.update(
-          'customers',
-          updatePayload,
-          [{ column: 'customer_id', operator: '=', value: customer.customer_id || userId }],
-        );
       } catch (err) {
         this.Developer.error('[CustomerBootstrapController] Failed to auto-assign referral_code', err);
       }

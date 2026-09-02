@@ -18,7 +18,13 @@ class CustomerSessionCubit extends Cubit<CustomerSessionState> {
   }) : super(const CustomerSessionState.initial());
 
   Future<void> bootstrap() async {
-    emit(state.copyWith(status: CustomerSessionStatus.loading));
+    // 1. Instantly read and emit cached session if available for 0ms load
+    final cached = await cache.read();
+    if (cached != null) {
+      emit(cached);
+    } else if (state.status == CustomerSessionStatus.initial) {
+      emit(state.copyWith(status: CustomerSessionStatus.loading));
+    }
 
     try {
       final session = await bootstrapApi.fetch().timeout(
@@ -36,17 +42,12 @@ class CustomerSessionCubit extends Cubit<CustomerSessionState> {
         return;
       }
 
-      final cached = await cache.read();
-      if (cached != null) {
-        emit(cached);
-        unawaited(_retryBootstrapSilently());
-        return;
+      if (cached == null && state.profile == null) {
+        emit(state.copyWith(
+          status: CustomerSessionStatus.failure,
+          error: extractErrorMessage(e),
+        ));
       }
-
-      emit(state.copyWith(
-        status: CustomerSessionStatus.failure,
-        error: extractErrorMessage(e),
-      ));
     }
   }
 

@@ -113,6 +113,12 @@ class CustomerSessionCache {
       'route_id': profile.routeId,
       'branch_id': profile.branchId,
       'customer_status': profile.status,
+      'is_postpaid_enabled': profile.isPostpaidEnabled,
+      'postpaid_credit_limit': profile.postpaidCreditLimit,
+      'subscription_number': profile.subscriptionNumber,
+      'referral_code': profile.referralCode,
+      'referral_status': profile.referralStatus,
+      'first_order_completed': profile.firstOrderCompleted,
     };
   }
 }
