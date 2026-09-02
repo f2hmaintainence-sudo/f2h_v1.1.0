@@ -74,6 +74,7 @@ export default function TableComponents({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteRow, setDeleteRow] = useState<RowData | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const refreshTable = useCallback(() => {
     setTableKey((prev) => prev + 1);
@@ -132,6 +133,7 @@ export default function TableComponents({
 
     try {
         setDeleteLoading(true);
+        setDeleteError(null);
 
         const result = await apiClient.delete<any>(api.delete(deleteId));
 
@@ -142,11 +144,14 @@ export default function TableComponents({
         setDeleteOpen(false);
         setDeleteId(null);
         setDeleteRow(null);
+        setDeleteError(null);
 
         showSuccessToast(result.data?.message || 'Record deleted successfully');
         refreshTable();
     } catch (error: any) {
-        showErrorToast(error.message || 'Unable to delete record');
+        const errorMsg = error.message || 'Unable to delete record';
+        setDeleteError(errorMsg);
+        showErrorToast(errorMsg);
     } finally {
         setDeleteLoading(false);
     }
@@ -204,6 +209,7 @@ export default function TableComponents({
         case 'delete':
             setDeleteId(id);
             setDeleteRow(row);
+            setDeleteError(null);
             setDeleteOpen(true);
         break;
       }
@@ -238,6 +244,7 @@ export default function TableComponents({
         if (targetId) {
           setDeleteId(targetId);
           setDeleteRow(row || {});
+          setDeleteError(null);
           setDeleteOpen(true);
         }
       }
@@ -314,6 +321,7 @@ export default function TableComponents({
         <DeleteConfirmModal
           isOpen={deleteOpen}
           loading={deleteLoading}
+          error={deleteError}
           title={`Delete ${title || ''}?`}
           message={`Are you sure you want to delete this ${title || 'item'}? This action cannot be undone.`}
           itemName={
@@ -327,6 +335,7 @@ export default function TableComponents({
             setDeleteOpen(false);
             setDeleteId(null);
             setDeleteRow(null);
+            setDeleteError(null);
           }}
           onConfirm={handleDeleteConfirm}
         />
@@ -461,6 +470,7 @@ export default function TableComponents({
       <DeleteConfirmModal
         isOpen={deleteOpen}
         loading={deleteLoading}
+        error={deleteError}
         title={`Delete ${title}?`}
         message={`Are you sure you want to delete this ${title}? This action cannot be undone.`}
         itemName={
@@ -474,6 +484,7 @@ export default function TableComponents({
           setDeleteOpen(false);
           setDeleteId(null);
           setDeleteRow(null);
+          setDeleteError(null);
         }}
         onConfirm={handleDeleteConfirm}
       />

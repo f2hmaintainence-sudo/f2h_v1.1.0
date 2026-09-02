@@ -148,7 +148,6 @@ export class CatalogTableService {
           is_out_of_stock: ['products.is_out_of_stock AS is_out_of_stock', false],
           is_active: ['products.is_active AS is_active', false],
           category_name: ['categories.name AS category_name', false],
-          variant_count: ['(SELECT COUNT(*)::int FROM product_variants WHERE (product_variants.product_id = products.product_id OR product_variants.product_id = products.id::text) AND product_variants.deleted_at IS NULL) AS variant_count', false],
           created_at: ['products.created_at', true],
         },
         joins: [
@@ -389,8 +388,7 @@ export class CatalogTableService {
           active: ['categories.is_active AS active', true],
 
           is_active: ['categories.is_active AS is_active', false],
-          product_count: ['(SELECT COUNT(*)::int FROM products WHERE (products.category_id = categories.category_id OR products.category_id = categories.id::text) AND products.deleted_at IS NULL) AS product_count', false],
-          sub_category_count: ['(SELECT COUNT(*)::int FROM categories sub WHERE (sub.parent_id = categories.category_id OR sub.parent_id = categories.id::text) AND sub.deleted_at IS NULL) AS sub_category_count', false],
+
           created_at: ['categories.created_at', true],
         },
 
