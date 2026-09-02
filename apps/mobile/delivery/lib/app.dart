@@ -305,8 +305,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _i = widget.initialIndex;
     WidgetsBinding.instance.addObserver(this);
 
-    // Kick off the initial session load via BLoC
-    // (LoadSessionEvent is already dispatched in F2HApp's BlocProvider)
+    // Kick off the session load via BLoC
+    context.read<DeliverySessionBloc>().add(LoadSessionEvent());
 
     // Listen to tab navigation requests (still on MockDataService.tabNavigationNotifier
     // as it's a UI-only navigation bus, not session data)

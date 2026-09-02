@@ -100,6 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _getCurrentLocation();
     _loadUnreadNotifications();
+    context.read<DeliverySessionBloc>().add(LoadSessionEvent());
     _locationUpdateTimer = Timer.periodic(const Duration(seconds: 30), (_) => _getCurrentLocation());
   }
 

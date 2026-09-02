@@ -10,6 +10,7 @@ import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_delivery/auth/presentation/screens/signup_screen.dart';
 import 'package:f2h_delivery/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_delivery/auth/presentation/widgets/forgot_password_sheet.dart';
+import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -65,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
+          context.read<DeliverySessionBloc>().add(LoadSessionEvent());
           SharedPreferences.getInstance().then((prefs) {
             prefs.setBool('has_completed_onboarding', true);
           });
