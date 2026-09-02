@@ -290,15 +290,6 @@ export class DataService {
       const aliasTable = match && match[2] ? match[2] : baseTable;
       const cleanTable = baseTable.includes('.') ? baseTable.split('.').pop()! : baseTable;
 
-      const baseWhere: any[] = [];
-      if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
-        baseWhere.push({
-          column: `${aliasTable}.deleted_at`,
-          operator: 'IS',
-          value: null,
-        });
-      }
-
       if (isCount) {
         sql = `SELECT COUNT(*) AS count FROM ${table}`;
       } else {
@@ -325,14 +316,23 @@ export class DataService {
         bindings,
       ));
 
-      const finalWhere = [...baseWhere, ...(params.where ?? [])];
-      ({ sql, bindings } = applyWhere(sql, finalWhere, table, bindings));
+      ({ sql, bindings } = applyWhere(sql, params.where ?? [], table, bindings));
       ({ sql, bindings } = applySubqueryWhere(
         sql,
         params.subquery ?? null,
         table,
         bindings,
       ));
+
+      // ── SOFT-DELETE GUARD (raw SQL — cannot be dropped by condition pipeline) ──
+      // Always append directly to the SQL string so no encoding/condition-builder
+      // path can silently swallow it.
+      if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
+        const deletedAtCol = `"${aliasTable}"."deleted_at"`;
+        sql = /\bWHERE\b/i.test(sql)
+          ? `${sql} AND ${deletedAtCol} IS NULL`
+          : `${sql} WHERE ${deletedAtCol} IS NULL`;
+      }
 
       if (hasGroupBy) {
         ({ sql, bindings } = applyGroupBy(
@@ -508,15 +508,7 @@ export class DataService {
       const aliasTable = match && match[2] ? match[2] : baseTable;
       const cleanTable = baseTable.includes('.') ? baseTable.split('.').pop()! : baseTable;
 
-      // base WHERE conditions (DO NOT WRITE SQL YET)
-      const baseWhere: any[] = [];
-      if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
-        baseWhere.push({
-          column: `${aliasTable}.deleted_at`,
-          operator: 'IS',
-          value: null,
-        });
-      }
+      // Soft-delete guard applied as raw SQL below (see SOFT-DELETE GUARD section)
 
       // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       // SELECT + FROM
@@ -560,9 +552,7 @@ export class DataService {
       // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       // WHERE (base + user conditions)
       // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      const finalWhere = [...baseWhere, ...(params.where ?? [])];
-      // WHERE
-      ({ sql, bindings } = applyWhere(sql, finalWhere, table, bindings));
+      ({ sql, bindings } = applyWhere(sql, params.where ?? [], table, bindings));
       // RAW SUBQUERY WHERE (optional)
       ({ sql, bindings } = applySubqueryWhere(
         sql,
@@ -570,6 +560,14 @@ export class DataService {
         table,
         bindings,
       ));
+
+      // SOFT-DELETE GUARD (raw SQL - bypasses condition pipeline entirely)
+      if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
+        const deletedAtColQ = `"${aliasTable}"."deleted_at"`;
+        sql = /\bWHERE\b/i.test(sql)
+          ? `${sql} AND ${deletedAtColQ} IS NULL`
+          : `${sql} WHERE ${deletedAtColQ} IS NULL`;
+      }
       // GROUP BY (optional)
       if (hasGroupBy) {
         ({ sql, bindings } = applyGroupBy(

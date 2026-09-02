@@ -113,13 +113,6 @@ export class CatalogTableService {
         });
       }
 
-      // Exclude soft-deleted products
-      conditions.push({
-        column: 'products.deleted_at',
-        operator: 'IS',
-        value: null,
-      });
-
 
       const reqSet: ReqSet = {
         key: 'products',
@@ -232,13 +225,6 @@ export class CatalogTableService {
           value: query.is_active === 'true' ? 'active' : 'false',
         });
       }
-
-      // Exclude soft-deleted product variants
-      conditions.push({
-        column: 'product_variants.deleted_at',
-        operator: 'IS',
-        value: null,
-      });
 
 
       const reqSet: ReqSet = {
@@ -514,13 +500,7 @@ export class CatalogTableService {
           created_at: ['product_banner.created_at', true],
         },
         joins: [],
-        conditions: [
-          {
-            column: 'product_banner.deleted_at',
-            operator: 'IS',
-            value: null,
-          },
-        ],
+        conditions: [],
         custom: [
           {
             type: 'compute',
