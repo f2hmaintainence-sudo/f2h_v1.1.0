@@ -72,24 +72,15 @@ export class CatalogService {
       }
 
       // 3. Perform soft delete
-      const result = await this.dataService.query('products', {
-        update: {
-          deleted_at: new Date().toISOString(),
-          updated_by: adminId,
-          updated_at: new Date().toISOString(),
-        },
-        where: [
-          {
-            column: isNumericId ? 'id' : 'product_id',
-            operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-        ],
-      });
-
-      if (!result?.status) {
-        throw new InternalServerErrorException('Failed to delete product');
-      }
+      await this.db.query(
+        `UPDATE products 
+            SET deleted_at = NOW(), 
+                updated_by = $2, 
+                updated_at = NOW() 
+          WHERE (id::text = $1 OR product_id = $1) 
+            AND deleted_at IS NULL`,
+        [String(id), adminId],
+      );
 
       return {
         status: true,
@@ -106,24 +97,15 @@ export class CatalogService {
 
   async softDeleteVariant(id: string, adminId: string) {
     try {
-      const result = await this.dataService.query('product_variants', {
-        update: {
-          deleted_at: new Date().toISOString(),
-          updated_by: adminId,
-          updated_at: new Date().toISOString(),
-        },
-        where: [
-          {
-            column: 'id',
-            operator: '=',
-            value: Number(id),
-          },
-        ],
-      });
-
-      if (!result?.status) {
-        throw new InternalServerErrorException('Failed to delete variant');
-      }
+      await this.db.query(
+        `UPDATE product_variants 
+            SET deleted_at = NOW(), 
+                updated_by = $2, 
+                updated_at = NOW() 
+          WHERE (id::text = $1 OR variant_id = $1) 
+            AND deleted_at IS NULL`,
+        [String(id), adminId],
+      );
 
       return {
         status: true,
@@ -169,24 +151,15 @@ export class CatalogService {
       }
 
       // 3. Perform soft delete
-      const result = await this.dataService.query('categories', {
-        update: {
-          deleted_at: new Date().toISOString(),
-          updated_by: adminId,
-          updated_at: new Date().toISOString(),
-        },
-        where: [
-          {
-            column: isNumericId ? 'id' : 'category_id',
-            operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-        ],
-      });
-
-      if (!result?.status) {
-        throw new InternalServerErrorException('Failed to delete category');
-      }
+      await this.db.query(
+        `UPDATE categories 
+            SET deleted_at = NOW(), 
+                updated_by = $2, 
+                updated_at = NOW() 
+          WHERE (id::text = $1 OR category_id = $1) 
+            AND deleted_at IS NULL`,
+        [String(id), adminId],
+      );
 
       return {
         status: true,
