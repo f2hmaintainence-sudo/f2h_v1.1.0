@@ -2242,7 +2242,7 @@ export class DeliveryOrderService {
       };
     }
 
-    // 1. If Razorpay dynamic QR was generated, query Razorpay live payments for this QR
+    // 1. Query Razorpay live payments for this dynamic QR code
     if (qrId && qrId.startsWith('qr_')) {
       try {
         const paymentsRes = await this.razorpayService.fetchQrPayments(qrId);
@@ -2285,31 +2285,7 @@ export class DeliveryOrderService {
       }
     }
 
-    // 2. Check local database payment_transactions table
-    const orderIds = orders.map((o) => o.order_id);
-    const dbTxns = await this.db.query(
-      `SELECT transaction_id, amount, method, paid_at
-       FROM payment_transactions
-       WHERE reference_id = ANY($1) AND purpose = 'order' AND status = 'paid'
-       LIMIT 1`,
-      [orderIds],
-    );
-
-    if (dbTxns?.length) {
-      const txn = dbTxns[0];
-      return {
-        status: true,
-        is_paid: true,
-        payment: {
-          payment_id: txn.transaction_id,
-          amount: Number(txn.amount || 0),
-          currency: 'INR',
-          method: txn.method || 'upi',
-          paid_at: txn.paid_at,
-        },
-      };
-    }
-
+    // If no dynamic QR was used or no live payment found on Razorpay for this QR
     return {
       status: true,
       is_paid: false,
