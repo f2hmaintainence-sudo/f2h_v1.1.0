@@ -580,14 +580,21 @@ class _CardAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (product.isOutOfStock) {
-      return const _ActionShell(
-        color: _stockGrey,
-        child: Text(
-          'Out of Stock',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: kTextSub,
+      return Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFFCA5A5), width: 1.0),
+        ),
+        child: const Center(
+          child: Text(
+            'Out of Stock',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFDC2626),
+            ),
           ),
         ),
       );

@@ -1080,27 +1080,27 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
           if (widget.p.isOutOfStock) {
             return widget.isBrowse
                 ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F5),
+                      color: const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE0E0E0), width: 1.0),
+                      border: Border.all(color: const Color(0xFFFCA5A5), width: 1.0),
                     ),
                     child: const Text(
                       'OUT',
-                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w900, color: Color(0xFF9E9E9E)),
+                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
                     ),
                   )
                 : Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F5),
+                      color: const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFE0E0E0), width: 1.0),
+                      border: Border.all(color: const Color(0xFFFCA5A5), width: 1.0),
                     ),
                     child: const Text(
                       'OUT OF STOCK',
-                      style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Color(0xFF9E9E9E)),
+                      style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
                     ),
                   );
           }
