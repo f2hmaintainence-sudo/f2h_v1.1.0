@@ -343,7 +343,7 @@ export class BranchConfigService {
       // 5. Global SKUs and system stats
       const totalWarehouses = (allWarehouses || []).length || 1;
       const totalStockVariants = await this.db.query(`
-        SELECT COUNT(*)::int AS count FROM product_variants WHERE status = 'active' OR deleted_at IS NULL
+        SELECT COUNT(*)::int AS count FROM product_variants WHERE (status = 'active' OR status IS NULL) AND deleted_at IS NULL
       `).then(res => res[0]?.count || 150).catch(() => 150);
 
       const totalGlobalActiveDrivers = (allPartners || []).filter((p: any) => p.is_active).length;

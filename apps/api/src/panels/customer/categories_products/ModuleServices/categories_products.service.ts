@@ -209,9 +209,11 @@ export class CategoriesProductsService {
         )
         JOIN product_variants pv ON pv.product_id = p.product_id
         WHERE c.is_active = true
+          AND c.deleted_at IS NULL
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL
           AND (pv.status = 'active' OR pv.status IS NULL)
+          AND pv.deleted_at IS NULL
         ORDER BY c.name ASC
       `;
       const rows = await this.db.query(query);
@@ -316,8 +318,10 @@ export class CategoriesProductsService {
           GROUP BY product_variant_id
         ) sb ON sb.product_variant_id = pv.variant_id
         WHERE (pv.status = 'active' OR pv.status IS NULL)
+          AND pv.deleted_at IS NULL
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL
+          AND (c.deleted_at IS NULL OR c.category_id IS NULL)
       `;
       const rows = await this.db.query(query);
 
@@ -438,8 +442,10 @@ export class CategoriesProductsService {
           GROUP BY product_variant_id
         ) sb ON sb.product_variant_id = pv.variant_id
         WHERE (pv.status = 'active' OR pv.status IS NULL)
+          AND pv.deleted_at IS NULL
           AND (p.is_active = true OR p.is_active IS NULL)
           AND p.deleted_at IS NULL
+          AND (c.deleted_at IS NULL OR c.category_id IS NULL)
           AND (p.category_id = $1 OR c.category_id = $1 OR c.name = $1 OR LOWER(c.name) = LOWER($1) OR c.slug = $1 OR LOWER(c.slug) = LOWER($1))
       `;
       const rows = await this.db.query(query, [categoryId]);
@@ -487,7 +493,7 @@ export class CategoriesProductsService {
 
       // If passed parameter is a variant_id, resolve its parent product_id
       const variantRows = await this.db.query(
-        `SELECT product_id FROM product_variants WHERE variant_id = $1 LIMIT 1`,
+        `SELECT product_id FROM product_variants WHERE variant_id = $1 AND deleted_at IS NULL LIMIT 1`,
         [productIdOrVariantId],
       );
       if (variantRows && variantRows.length > 0 && variantRows[0].product_id) {
@@ -496,7 +502,7 @@ export class CategoriesProductsService {
 
       // Fetch all variant_ids for this product so we capture reviews attached to product or any of its variants
       const allVariantRows = await this.db.query(
-        `SELECT variant_id FROM product_variants WHERE product_id = $1`,
+        `SELECT variant_id FROM product_variants WHERE product_id = $1 AND deleted_at IS NULL`,
         [targetProductId],
       );
       const allReferenceIds = Array.from(

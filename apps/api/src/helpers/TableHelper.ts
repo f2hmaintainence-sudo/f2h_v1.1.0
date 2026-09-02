@@ -174,6 +174,12 @@ export class TableHelper {
       columnMap[key] = stripAlias(columnName);
     }
 
+    // Always include table.deleted_at in the SELECT list so client-side and post-processors
+    // have access to deleted_at property
+    if (!AVOID_DELETED_AT.includes(table) && !select.some((s) => s.includes('deleted_at'))) {
+      select.push(`${table}.deleted_at`);
+    }
+
     const hasDeletedAtCondition = (set.conditions ?? []).some(
       (c) =>
         c.column === `${table}.deleted_at` ||
@@ -400,7 +406,7 @@ export class TableHelper {
       // This cuts wait time from (count1 + count2) to max(count1, count2).
       const totalParams = {
         select: { count: '*' },
-        where: [...(set.conditions ?? [])],
+        where: conditions,
         joins: set.joins ?? [],
         orderBy: null, // COUNT queries must NOT have ORDER BY in PostgreSQL
         groupBy: set.groupBy ?? null,

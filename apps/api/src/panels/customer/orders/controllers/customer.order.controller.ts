@@ -815,7 +815,7 @@ export class CustomerOrderController {
     let productId = body.product_id;
     if (productId) {
       const vRes = await this.db.query(
-        `SELECT product_id FROM product_variants WHERE variant_id = $1 LIMIT 1`,
+        `SELECT product_id FROM product_variants WHERE variant_id = $1 AND deleted_at IS NULL LIMIT 1`,
         [productId],
       );
       if (vRes && vRes.length > 0 && vRes[0].product_id) {
@@ -827,7 +827,7 @@ export class CustomerOrderController {
         const [rows]: any = await conn.query(
           `SELECT pv.product_id 
            FROM order_items oi
-           JOIN product_variants pv ON pv.variant_id = oi.variant_id
+           JOIN product_variants pv ON pv.variant_id = oi.variant_id AND pv.deleted_at IS NULL
            WHERE oi.order_id = $1 
            LIMIT 1`,
           [orderId],

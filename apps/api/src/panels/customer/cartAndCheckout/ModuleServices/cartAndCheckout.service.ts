@@ -84,7 +84,7 @@ export class CartService {
     const productsByVariantId: Record<string, any> = {};
     if (variantIds.length > 0) {
       const queryResult = await this.db.query(
-        `SELECT variant_id, price FROM product_variants WHERE variant_id = ANY($1)`,
+        `SELECT variant_id, price FROM product_variants WHERE variant_id = ANY($1) AND deleted_at IS NULL`,
         [variantIds],
       );
       for (const row of queryResult || []) {
@@ -176,7 +176,7 @@ export class CartService {
             ORDER BY pi2.is_primary DESC NULLS LAST, pi2.sort_order ASC NULLS LAST
             LIMIT 1
           ) pi ON true
-         WHERE pv.variant_id = ANY($1) AND pv.status = 'active'`,
+         WHERE pv.variant_id = ANY($1) AND (pv.status = 'active' OR pv.status IS NULL) AND pv.deleted_at IS NULL AND (p.deleted_at IS NULL OR p.product_id IS NULL)`,
         [variantIds],
       );
       for (const row of queryResult || []) {
@@ -598,7 +598,7 @@ export class CartService {
           `SELECT pv.variant_id, pv.price, pv.original_price, p.name AS product_name
              FROM product_variants pv
              LEFT JOIN products p ON pv.product_id = p.product_id
-            WHERE pv.variant_id = ANY($1)`,
+            WHERE pv.variant_id = ANY($1) AND pv.deleted_at IS NULL`,
           [variantIds],
         )
       : [];
@@ -1253,7 +1253,7 @@ export class CartService {
             `SELECT pv.variant_id, pv.price, pv.original_price, p.name AS product_name
                FROM product_variants pv
                LEFT JOIN products p ON pv.product_id = p.product_id
-              WHERE pv.variant_id = ANY($1)`,
+              WHERE pv.variant_id = ANY($1) AND pv.deleted_at IS NULL`,
             [variantIds],
           )
         : [];

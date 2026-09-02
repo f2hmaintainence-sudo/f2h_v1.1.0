@@ -149,6 +149,7 @@ export class CatalogTableService {
           is_active: ['products.is_active AS is_active', false],
           category_name: ['categories.name AS category_name', false],
           created_at: ['products.created_at', true],
+          deleted_at: ['products.deleted_at', false],
         },
         joins: [
           {
@@ -262,6 +263,7 @@ export class CatalogTableService {
           manageable_qty: ['product_variants.manageable_qty', true],
           status: ['product_variants.status', true],
           fulfillment_mode: ['product_variants.fulfillment_mode', true],
+          deleted_at: ['product_variants.deleted_at', false],
         },
         joins: [
           {
@@ -388,6 +390,8 @@ export class CatalogTableService {
           active: ['categories.is_active AS active', true],
 
           is_active: ['categories.is_active AS is_active', false],
+
+          deleted_at: ['categories.deleted_at', false],
 
           created_at: ['categories.created_at', true],
         },
