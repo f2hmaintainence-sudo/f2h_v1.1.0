@@ -945,55 +945,59 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                           ),
                           const SizedBox(height: 12),
                           Container(
-                            width: 170,
-                            height: 210,
+                            width: 190,
+                            height: 190,
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: kBorder),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: kBorder, width: 1.5),
                             ),
-                            padding: const EdgeInsets.all(4),
-                            child: _ScannerAnimationWrapper(
-                              child: Center(
-                                child: Builder(
-                                  builder: (context) {
-                                    final qrBase64 = _paymentQrData?['qr_image_base64'] as String?;
-                                    if (qrBase64 != null && qrBase64.startsWith('data:image')) {
-                                      try {
-                                        final base64String = qrBase64.split(',').last;
-                                        final bytes = base64Decode(base64String);
-                                        return ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: Image.memory(
-                                            bytes,
-                                            width: 160,
-                                            height: 200,
-                                            fit: BoxFit.contain,
+                            padding: const EdgeInsets.all(8),
+                            child: Center(
+                              child: Builder(
+                                builder: (context) {
+                                  final qrBase64 = _paymentQrData?['qr_image_base64'] as String?;
+                                  if (qrBase64 != null && qrBase64.startsWith('data:image')) {
+                                    try {
+                                      final base64String = qrBase64.split(',').last;
+                                      final bytes = base64Decode(base64String);
+                                      return ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: SizedBox(
+                                          width: 174,
+                                          height: 174,
+                                          child: FittedBox(
+                                            fit: BoxFit.cover,
+                                            alignment: const Alignment(0, -0.06),
+                                            child: Image.memory(
+                                              bytes,
+                                              width: 174,
+                                            ),
                                           ),
-                                        );
-                                      } catch (_) {}
-                                    }
+                                        ),
+                                      );
+                                    } catch (_) {}
+                                  }
 
-                                    return QrImageView(
-                                      data: (_paymentQrData?['upi_string'] as String?)?.isNotEmpty == true
-                                          ? (_paymentQrData!['upi_string'] as String)
-                                          : 'upi://pay?pa=f2hfresh@ybl&pn=F2H%20Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}',
-                                      version: QrVersions.auto,
-                                      size: 150.0,
-                                      backgroundColor: Colors.white,
-                                      padding: const EdgeInsets.all(2),
-                                      errorStateBuilder: (cxt, err) {
-                                        return const Center(
-                                          child: Text(
-                                            'Error rendering QR',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(fontSize: 10, color: Colors.red),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
+                                  return QrImageView(
+                                    data: (_paymentQrData?['upi_string'] as String?)?.isNotEmpty == true
+                                        ? (_paymentQrData!['upi_string'] as String)
+                                        : 'upi://pay?pa=f2hfresh@ybl&pn=F2H%20Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}',
+                                    version: QrVersions.auto,
+                                    size: 174.0,
+                                    backgroundColor: Colors.white,
+                                    padding: const EdgeInsets.all(2),
+                                    errorStateBuilder: (cxt, err) {
+                                      return const Center(
+                                        child: Text(
+                                          'Error rendering QR',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(fontSize: 10, color: Colors.red),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
                               ),
                             ),
                           ),
