@@ -288,9 +288,7 @@ class AppShellState extends State<AppShell> {
     setState(() {
       _showNav = true;
       _i = index;
-      _isTransitioning = true;
     });
-    _pageController.jumpToPage(index);
     if (index == 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -298,13 +296,6 @@ class AppShellState extends State<AppShell> {
         }
       });
     }
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        setState(() {
-          _isTransitioning = false;
-        });
-      }
-    });
   }
 
   String? consumePendingCategory() {
@@ -325,13 +316,6 @@ class AppShellState extends State<AppShell> {
     return res;
   }
 
-  List<Widget> get _screens => [
-    HomeScreen(isNavVisible: _showNav),
-    BrowseScreen(isNavVisible: _showNav),
-    const SubsScreen(),
-    const ProfileScreen(),
-  ];
-
   static const _tabs = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Shop'),
@@ -342,16 +326,9 @@ class AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _i);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) VersionChecker.checkUpdates(context);
     });
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
   }
 
   @override
@@ -382,17 +359,14 @@ class AppShellState extends State<AppShell> {
         }
         return false;
       },
-      child: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (index) {
-          AppShell.activeTab = index;
-          setState(() {
-            _i = index;
-            _showNav = true;
-          });
-        },
-        children: _screens,
+      child: IndexedStack(
+        index: _i,
+        children: [
+          HomeScreen(isNavVisible: _showNav),
+          BrowseScreen(isNavVisible: _showNav),
+          const SubsScreen(),
+          const ProfileScreen(),
+        ],
       ),
     ),
     bottomNavigationBar: AnimatedSlide(
@@ -408,13 +382,6 @@ class AppShellState extends State<AppShell> {
           setState(() {
             _showNav = true;
             _i = i;
-            _isTransitioning = true;
-          });
-          _pageController.jumpToPage(i);
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) {
-              setState(() => _isTransitioning = false);
-            }
           });
         },
       ),

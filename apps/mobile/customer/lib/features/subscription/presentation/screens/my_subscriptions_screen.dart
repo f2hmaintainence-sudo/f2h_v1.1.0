@@ -32,7 +32,11 @@ class SubsScreen extends StatefulWidget {
   State<SubsScreen> createState() => _SubsScreenState();
 }
 
-class _SubsScreenState extends State<SubsScreen> {
+class _SubsScreenState extends State<SubsScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late List<Subscription> _subscriptions;
   DateTime? vacationStart;
   DateTime? vacationEnd;
@@ -959,6 +963,7 @@ class _SubsScreenState extends State<SubsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final authState = context.watch<AuthBloc>().state;
     final sessionState = context.watch<CustomerSessionCubit>().state;
     final isLoggedIn = authState is Authenticated || sessionState.profile != null;

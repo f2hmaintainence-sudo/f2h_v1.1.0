@@ -35,7 +35,11 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   static const Color _marketGold = Color(0xFFFFC857);
   static const Color _marketOrange = Color(0xFFE76F24);
   static const Color _inkGreen = Color(0xFF10291F);
@@ -996,6 +1000,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final authState = context.watch<AuthBloc>().state;
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {

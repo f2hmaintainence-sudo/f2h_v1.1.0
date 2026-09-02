@@ -39,7 +39,11 @@ class BrowseScreen extends StatefulWidget {
   State<BrowseScreen> createState() => _BrowseState();
 }
 
-class _BrowseState extends State<BrowseScreen> {
+class _BrowseState extends State<BrowseScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late String _cat;
   String _searchQuery = '';
   String? _targetProductId;
@@ -162,6 +166,7 @@ class _BrowseState extends State<BrowseScreen> {
       });
     }
 
+    super.build(context);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildSearchBar(),
