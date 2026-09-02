@@ -2171,10 +2171,10 @@ export class DeliveryOrderService {
             customer_id: firstOrder.customer_id,
           },
         });
-        if (rzpQr && (rzpQr.image_url || rzpQr.qr_data)) {
+        if (rzpQr && (rzpQr.image_url || rzpQr.qr_data || rzpQr.id)) {
           qrId = rzpQr.id;
-          qrImageUrl = rzpQr.image_url;
-          upiString = rzpQr.qr_data || null;
+          qrImageUrl = rzpQr.image_url || null;
+          upiString = rzpQr.qr_data || rzpQr.image_url || null;
           provider = 'razorpay';
         }
       } catch (err: any) {
@@ -2182,9 +2182,12 @@ export class DeliveryOrderService {
       }
     }
 
-    // 2. Standard UPI Fallback if dynamic gateway QR not available
+    // 2. Standard UPI Fallback if dynamic gateway QR not available or for direct UPI string
+    const directUpiString = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(companyName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`Order_${firstOrder.order_id}`)}`;
+    if (!upiString) {
+      upiString = directUpiString;
+    }
     if (!qrImageUrl) {
-      upiString = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(companyName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`Order_${firstOrder.order_id}`)}`;
       qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiString)}`;
     }
 

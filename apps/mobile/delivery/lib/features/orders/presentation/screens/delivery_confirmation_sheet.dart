@@ -9,6 +9,7 @@ import 'package:f2h_delivery/features/delivery_session/presentation/bloc/deliver
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class ContainerItemState {
   final String containerId;
@@ -950,40 +951,29 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: kBorder),
                             ),
-                            padding: const EdgeInsets.all(8),
-                            child: _isLoadingQr
-                                ? const Center(
-                                    child: SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
-                                    ),
-                                  )
-                                : _ScannerAnimationWrapper(
-                                    child: Image.network(
-                                      _paymentQrData?['qr_image_url'] as String? ??
-                                          'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent('upi://pay?pa=f2hfresh@ybl&pn=F2H Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}')}',
-                                      fit: BoxFit.contain,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return CustomPaint(
-                                          painter: _QrCodePainter(),
-                                        );
-                                      },
-                                    ),
-                                  ),
+                            padding: const EdgeInsets.all(6),
+                            child: _ScannerAnimationWrapper(
+                              child: Center(
+                                child: QrImageView(
+                                  data: (_paymentQrData?['upi_string'] as String?)?.isNotEmpty == true
+                                      ? (_paymentQrData!['upi_string'] as String)
+                                      : 'upi://pay?pa=f2hfresh@ybl&pn=F2H%20Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}',
+                                  version: QrVersions.auto,
+                                  size: 124.0,
+                                  backgroundColor: Colors.white,
+                                  padding: const EdgeInsets.all(2),
+                                  errorStateBuilder: (cxt, err) {
+                                    return const Center(
+                                      child: Text(
+                                        'Error rendering QR',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(fontSize: 10, color: Colors.red),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
                           ),
                           if (_paymentQrData?['provider'] == 'razorpay') ...[
                             const SizedBox(height: 6),
@@ -1380,48 +1370,56 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                   // Quick Presets
                                   Row(
                                     children: [
-                                      GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            state.returned = state.customerBalance > 0
-                                                ? state.customerBalance
-                                                : state.deliveringToday;
-                                            state.damaged = 0;
-                                            state.lost = 0;
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.teal.shade300),
-                                          ),
-                                          child: const Text(
-                                            'Collect All',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.teal),
+                                      Material(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              state.returned = state.customerBalance > 0
+                                                  ? state.customerBalance
+                                                  : (state.deliveringToday > 0 ? state.deliveringToday : 1);
+                                              state.damaged = 0;
+                                              state.lost = 0;
+                                            });
+                                          },
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.teal.shade400, width: 1.2),
+                                            ),
+                                            child: const Text(
+                                              'Collect All',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.teal),
+                                            ),
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            state.returned = 0;
-                                            state.damaged = 0;
-                                            state.lost = 0;
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: kBorder),
-                                          ),
-                                          child: const Text(
-                                            'None',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kTextSub),
+                                      const SizedBox(width: 8),
+                                      Material(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              state.returned = 0;
+                                              state.damaged = 0;
+                                              state.lost = 0;
+                                            });
+                                          },
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: kBorder, width: 1.2),
+                                            ),
+                                            child: const Text(
+                                              'None',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kTextSub),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -1814,51 +1812,70 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     required VoidCallback? onInc,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
         color: value > 0 ? color.withValues(alpha: 0.08) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: value > 0 ? color.withValues(alpha: 0.4) : kBorder),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value > 0 ? color.withValues(alpha: 0.45) : kBorder,
+          width: 1.2,
+        ),
       ),
       child: Column(
         children: [
           Text(
             label,
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
               color: value > 0 ? color : kTextSub,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              GestureDetector(
-                onTap: onDec,
-                child: Icon(
-                  Icons.remove_circle_rounded,
-                  size: 20,
-                  color: onDec != null ? color : kMuted,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onDec,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.remove_circle_rounded,
+                      size: 28,
+                      color: onDec != null ? color : const Color(0xFFCBD5E1),
+                    ),
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+              Container(
+                constraints: const BoxConstraints(minWidth: 36),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
                   '$value',
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: value > 0 ? color : kText,
                   ),
                 ),
               ),
-              GestureDetector(
-                onTap: onInc,
-                child: Icon(
-                  Icons.add_circle_rounded,
-                  size: 20,
-                  color: onInc != null ? color : kMuted,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onInc,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.add_circle_rounded,
+                      size: 28,
+                      color: onInc != null ? color : const Color(0xFFCBD5E1),
+                    ),
+                  ),
                 ),
               ),
             ],
