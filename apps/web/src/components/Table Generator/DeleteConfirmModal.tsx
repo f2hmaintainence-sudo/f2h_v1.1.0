@@ -44,7 +44,7 @@ export default function DeleteConfirmModal({
 
           {/* Optional item name */}
           {itemName && (
-            <p className="mt-3 text-sm font-semibold text-gray-900 break-all">
+            <p className="mt-3 text-base font-semibold text-gray-800 bg-gray-100/80 border border-gray-200/80 py-2 px-4 rounded-xl inline-block break-all max-w-full shadow-sm">
               {itemName}
             </p>
           )}

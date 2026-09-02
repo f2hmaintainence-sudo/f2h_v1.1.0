@@ -1460,10 +1460,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 );
               },
             ),
-            if (_isLoading)
-              const Positioned.fill(
-                child: CowLoadingOverlay(message: 'Placing your order...'),
-              ),
           ],
         ),
       ),
