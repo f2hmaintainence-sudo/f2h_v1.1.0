@@ -89,10 +89,12 @@ class DeliverySessionBloc
 
     bool profileFailed = false;
     dynamic profileError;
+    String? profilePhotoUrl = current.profilePhotoUrl;
     if (profileRes is ProfileModel) {
       driverName = profileRes.fullName;
       isOnline = profileRes.isOnline;
       isVerified = profileRes.isVerified;
+      profilePhotoUrl = profileRes.profilePhotoUrl;
       accountStatus = profileRes.accountStatus ?? (profileRes.isActive ? 'active' : 'inactive');
       if (profileRes.vehicleType.isNotEmpty) {
         vehicleType = profileRes.vehicleType;
@@ -152,6 +154,7 @@ class DeliverySessionBloc
       isVerified: isVerified,
       accountStatus: accountStatus,
       vehicleType: vehicleType,
+      profilePhotoUrl: profilePhotoUrl,
       currentRun: currentRun,
       orders: orders,
     );

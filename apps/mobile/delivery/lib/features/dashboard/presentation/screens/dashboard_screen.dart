@@ -468,6 +468,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 driverName: session.driverName,
                 isOnline: session.isOnline,
                 vehicleType: session.vehicleType,
+                avatarUrl: session.profilePhotoUrl,
                 unreadCount: _unreadNotificationsCount,
                 onToggleOnline: _handleOnlineToggle,
                 onNotifications: () async {

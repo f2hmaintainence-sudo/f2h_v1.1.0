@@ -25,9 +25,17 @@ class F2hHeroHeader extends StatelessWidget {
     this.vehicleType,
   });
 
+  String _formatName(String name) {
+    final clean = name.trim();
+    if (clean.isEmpty) return 'Partner';
+    final first = clean.split(' ').first;
+    if (first.isEmpty) return 'Partner';
+    return first[0].toUpperCase() + (first.length > 1 ? first.substring(1).toLowerCase() : '');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final firstName = driverName.trim().split(' ').first;
+    final firstName = _formatName(driverName);
     final topInset = MediaQuery.of(context).padding.top;
 
     return Stack(

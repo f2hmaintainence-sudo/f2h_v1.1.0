@@ -21,9 +21,9 @@ class DeliverySessionLoaded extends DeliverySessionState {
   final bool isSosActive;
   final String vehicleType;
 
-  // ── Run / Orders ─────────────────────────────────────────────────────────────
   final DeliveryRun? currentRun;
   final List<DeliveryOrderModel> orders;
+  final String? profilePhotoUrl;
 
   DeliverySessionLoaded({
     required this.driverName,
@@ -32,6 +32,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
     required this.accountStatus,
     required this.isSosActive,
     this.vehicleType = 'bike',
+    this.profilePhotoUrl,
     required this.currentRun,
     required this.orders,
   });
@@ -166,6 +167,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
     String? accountStatus,
     bool? isSosActive,
     String? vehicleType,
+    String? profilePhotoUrl,
     DeliveryRun? currentRun,
     List<DeliveryOrderModel>? orders,
     bool clearRun = false,
@@ -177,6 +179,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
       accountStatus: accountStatus ?? this.accountStatus,
       isSosActive: isSosActive ?? this.isSosActive,
       vehicleType: vehicleType ?? this.vehicleType,
+      profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
       currentRun: clearRun ? null : (currentRun ?? this.currentRun),
       orders: orders ?? this.orders,
     );
