@@ -7,6 +7,9 @@ import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/core/utils/app_snackbar.dart';
 import 'package:f2h_delivery/core/utils/stop_status_helper.dart';
+import 'package:f2h_delivery/core/auth/token_storage.dart';
+import 'package:f2h_delivery/core/api/dio_client.dart';
+import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/orders_screen.dart';
@@ -373,21 +376,90 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         if (sessionState is DeliverySessionError) {
+          final isAuthError = sessionState.message.toLowerCase().contains('token') ||
+              sessionState.message.toLowerCase().contains('unauthor') ||
+              sessionState.message.toLowerCase().contains('expired') ||
+              sessionState.message.toLowerCase().contains('logged out') ||
+              sessionState.message.toLowerCase().contains('login');
+
           return Scaffold(
             backgroundColor: const Color(0xFFF8FAFC),
             body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline_rounded, color: kDanger, size: 48),
-                  const SizedBox(height: 12),
-                  Text(sessionState.message, style: const TextStyle(color: kTextSub)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => context.read<DeliverySessionBloc>().add(LoadSessionEvent()),
-                    child: const Text('Retry'),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isAuthError ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isAuthError ? Icons.lock_clock_outlined : Icons.error_outline_rounded,
+                        color: isAuthError ? kDanger : const Color(0xFF64748B),
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      isAuthError ? 'Session Expired' : 'Unable to Load Dashboard',
+                      style: GoogleFonts.roboto(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isAuthError
+                          ? 'Your session has expired or is invalid. Please log in again to continue.'
+                          : sessionState.message,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (isAuthError)
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () async {
+                          await TokenStorage.clear();
+                          try {
+                            await sl<DioClient>().clearSession();
+                          } catch (_) {}
+                          if (context.mounted) {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              (route) => false,
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.login_rounded),
+                        label: const Text('Log In Again', style: TextStyle(fontWeight: FontWeight.bold)),
+                      )
+                    else
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () => context.read<DeliverySessionBloc>().add(LoadSessionEvent()),
+                        child: const Text('Retry'),
+                      ),
+                  ],
+                ),
               ),
             ),
           );
