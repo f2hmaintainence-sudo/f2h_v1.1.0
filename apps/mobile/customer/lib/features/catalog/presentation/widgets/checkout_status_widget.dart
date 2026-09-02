@@ -8,6 +8,7 @@ class CheckoutStatusWidget extends StatelessWidget {
   final String? orderId;
   final String? errorMessage;
   final VoidCallback onDone;
+  final VoidCallback? onClose;
 
   const CheckoutStatusWidget({
     super.key,
@@ -17,6 +18,7 @@ class CheckoutStatusWidget extends StatelessWidget {
     this.orderId,
     this.errorMessage,
     required this.onDone,
+    this.onClose,
   });
 
   @override
@@ -62,7 +64,7 @@ class CheckoutStatusWidget extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.close, color: kText),
-            onPressed: onDone,
+            onPressed: onClose ?? onDone,
           ),
         ],
       ),

@@ -529,6 +529,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       }
       return CheckoutStatusWidget(
+        onClose: () {
+          if (!mounted) return;
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        },
         onDone: () {
           if (!mounted) return;
           if (_placedStatus == 'success' &&
@@ -545,7 +549,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             );
           } else {
-            Navigator.pop(context);
+            Navigator.of(context).popUntil((route) => route.isFirst);
           }
         },
         status: _placedStatus,
