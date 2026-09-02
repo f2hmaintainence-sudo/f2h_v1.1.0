@@ -31,8 +31,9 @@ export interface UnavailableVariant {
  *  - `stock_balances.is_out_of_stock` is a plain nullable boolean on this
  *    database, not a generated column, and is left NULL on rows that have run
  *    down to zero. It cannot be trusted on its own; `available_quantity <= 0`
- *    is the load-bearing term. `products.is_out_of_stock` is a separate manual
- *    admin override and is honoured on top.
+ *    is the load-bearing term. `products.is_out_of_stock` controls whether
+ *    out-of-stock visibility is enforced: when true, zero-stock items show as
+ *    out-of-stock; when false, items remain available even at zero stock.
  */
 @Injectable()
 export class StockAvailabilityService {
@@ -90,9 +91,12 @@ export class StockAvailabilityService {
               ((pv.status = 'active' OR pv.status IS NULL)
                 AND (p.is_active = true OR p.is_active IS NULL)
                 AND p.deleted_at IS NULL) AS is_listable,
-              (COALESCE(p.is_out_of_stock, false)
-                OR COALESCE(sb.is_out_of_stock, false)
-                OR COALESCE(sb.available_quantity, 0) <= 0) AS is_out_of_stock
+              CASE
+                WHEN COALESCE(p.is_out_of_stock, false) = true THEN
+                  (COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0)
+                ELSE
+                  false
+              END AS is_out_of_stock
          FROM product_variants pv
          LEFT JOIN products p ON pv.product_id = p.product_id
          LEFT JOIN sb ON sb.product_variant_id = pv.variant_id
@@ -149,6 +153,7 @@ export class StockAvailabilityService {
       variant_name: string | null;
       product_name: string | null;
       available_quantity: number | string | null;
+      enforce_stock: boolean | null;
       is_listable: boolean | null;
       is_out_of_stock: boolean | null;
     }>(
@@ -165,12 +170,16 @@ export class StockAvailabilityService {
               pv.name AS variant_name,
               p.name  AS product_name,
               COALESCE(sb.available_quantity, 0) AS available_quantity,
+              COALESCE(p.is_out_of_stock, false) AS enforce_stock,
               ((pv.status = 'active' OR pv.status IS NULL)
                 AND (p.is_active = true OR p.is_active IS NULL)
                 AND p.deleted_at IS NULL) AS is_listable,
-              (COALESCE(p.is_out_of_stock, false)
-                OR COALESCE(sb.is_out_of_stock, false)
-                OR COALESCE(sb.available_quantity, 0) <= 0) AS is_out_of_stock
+              CASE
+                WHEN COALESCE(p.is_out_of_stock, false) = true THEN
+                  (COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0)
+                ELSE
+                  false
+              END AS is_out_of_stock
          FROM product_variants pv
          LEFT JOIN products p ON pv.product_id = p.product_id
          LEFT JOIN sb ON sb.product_variant_id = pv.variant_id
@@ -188,7 +197,7 @@ export class StockAvailabilityService {
         throw new BadRequestException(`"${name}" is currently out of stock`);
       }
       const available = Number(row.available_quantity || 0);
-      if (item.quantity > available) {
+      if (row.enforce_stock === true && item.quantity > available) {
         throw new BadRequestException(
           `Only ${available} unit(s) of "${name}" available in stock (requested ${item.quantity})`,
         );

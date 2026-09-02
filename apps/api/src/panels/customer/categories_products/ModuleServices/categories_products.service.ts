@@ -275,7 +275,12 @@ export class CategoriesProductsService {
           p.highlights,
           p.ingredients,
           p.legal_info,
-          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0) AS is_out_of_stock,
+          CASE
+            WHEN COALESCE(p.is_out_of_stock, false) = true THEN
+              (COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0)
+            ELSE
+              false
+          END AS is_out_of_stock,
           COALESCE(sb.available_quantity, 0) AS available_quantity,
           sb.low_stock_threshold,
           p.is_subscribable,
@@ -387,7 +392,12 @@ export class CategoriesProductsService {
           p.highlights,
           p.ingredients,
           p.legal_info,
-          (COALESCE(p.is_out_of_stock, false) OR COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0) AS is_out_of_stock,
+          CASE
+            WHEN COALESCE(p.is_out_of_stock, false) = true THEN
+              (COALESCE(sb.is_out_of_stock, false) OR COALESCE(sb.available_quantity, 0) <= 0)
+            ELSE
+              false
+          END AS is_out_of_stock,
           COALESCE(sb.available_quantity, 0) AS available_quantity,
           sb.low_stock_threshold,
           p.is_subscribable,
