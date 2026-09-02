@@ -45,7 +45,7 @@ class F2hHeroHeader extends StatelessWidget {
           child: Image.asset(
             'assets/home_bg.png',
             fit: BoxFit.cover,
-            alignment: const Alignment(0.75, 0.0),
+            alignment: Alignment.topCenter,
             errorBuilder: (_, __, ___) => Container(color: const Color(0xFFE8F5E9)),
           ),
         ),
@@ -56,33 +56,13 @@ class F2hHeroHeader extends StatelessWidget {
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xE6F8FAFC),
+                  Color(0xEEF8FAFC),
                   Color(0x80F8FAFC),
                   Colors.transparent,
                 ],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                stops: [0.0, 0.55, 1.0],
-              ),
-            ),
-          ),
-        ),
-
-        // Bottom gradient for seamless transition to dashboard
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: 35,
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  Color(0xFFF8FAFC),
-                ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
+                stops: [0.0, 0.45, 1.0],
               ),
             ),
           ),
@@ -90,7 +70,7 @@ class F2hHeroHeader extends StatelessWidget {
 
         // ── FOREGROUND: greeting, bell, avatar, online pill ──
         Padding(
-          padding: EdgeInsets.fromLTRB(16, topInset + 10, 16, 28),
+          padding: EdgeInsets.fromLTRB(16, topInset + 10, 16, 120),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,

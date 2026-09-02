@@ -139,12 +139,10 @@ class DeliverySessionBloc
     }
 
     if (state is! DeliverySessionLoaded) {
-      if (profileFailed && ordersFailed) {
-        throw Exception("Could not connect to server. Please check your internet connection.");
-      } else if (profileFailed) {
-        throw profileError is Exception ? profileError : Exception(profileError?.toString() ?? "Failed to load profile.");
-      } else if (ordersFailed) {
-        throw ordersError is Exception ? ordersError : Exception(ordersError?.toString() ?? "Failed to load orders.");
+      if (profileFailed) {
+        throw profileError is Exception
+            ? profileError
+            : Exception(profileError?.toString() ?? "Could not connect to server. Please check your internet connection.");
       }
     }
 
