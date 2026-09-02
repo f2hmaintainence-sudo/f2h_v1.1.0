@@ -945,14 +945,14 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                           ),
                           const SizedBox(height: 12),
                           Container(
-                            width: 140,
-                            height: 140,
+                            width: 170,
+                            height: 210,
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: kBorder),
                             ),
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(4),
                             child: _ScannerAnimationWrapper(
                               child: Center(
                                 child: Builder(
@@ -962,11 +962,14 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       try {
                                         final base64String = qrBase64.split(',').last;
                                         final bytes = base64Decode(base64String);
-                                        return Image.memory(
-                                          bytes,
-                                          width: 124,
-                                          height: 124,
-                                          fit: BoxFit.contain,
+                                        return ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.memory(
+                                            bytes,
+                                            width: 160,
+                                            height: 200,
+                                            fit: BoxFit.contain,
+                                          ),
                                         );
                                       } catch (_) {}
                                     }
@@ -976,7 +979,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                           ? (_paymentQrData!['upi_string'] as String)
                                           : 'upi://pay?pa=f2hfresh@ybl&pn=F2H%20Fresh&am=${widget.stop.codAmount.round()}&cu=INR&tn=Order_${widget.stop.orders.isNotEmpty ? widget.stop.orders.first.orderId : ""}',
                                       version: QrVersions.auto,
-                                      size: 124.0,
+                                      size: 150.0,
                                       backgroundColor: Colors.white,
                                       padding: const EdgeInsets.all(2),
                                       errorStateBuilder: (cxt, err) {

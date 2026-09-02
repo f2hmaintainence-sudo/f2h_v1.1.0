@@ -1781,6 +1781,7 @@ export function applyJoins(
     const onBindings: any[] = [];
 
     if (join.on?.length) {
+
       const qualifiedOn = qualifyJoinOn(join.on, table, joinTable);
 
       const onResult = buildDynamicJoinOnClause(qualifiedOn, joinTable);
