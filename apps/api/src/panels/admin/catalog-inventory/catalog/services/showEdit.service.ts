@@ -23,21 +23,17 @@ export class CatalogShowEditService {
       // FETCH PRODUCT
       // =====================================================
 
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
       const result = await this.dataService.query('products', {
         select: ['products.*'],
+
         where: [
           {
-            column: isNumericId ? 'products.id' : 'products.product_id',
+            column: 'products.id',
             operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-          {
-            column: 'products.deleted_at',
-            operator: 'IS',
-            value: null,
+            value: Number(id),
           },
         ],
+
         limit: 1,
       });
 
@@ -166,20 +162,11 @@ export class CatalogShowEditService {
 
   async getVariantEditForm(id: string): Promise<FormResponse> {
     try {
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
       const result = await this.dataService.query('product_variants', {
         select: ['product_variants.*'],
         where: [
-          {
-            column: isNumericId ? 'product_variants.id' : 'product_variants.variant_id',
-            operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-          {
-            column: 'product_variants.deleted_at',
-            operator: 'IS',
-            value: null,
-          },
+          // id is SERIAL (integer)
+          { column: 'product_variants.id', operator: '=', value: Number(id) },
         ],
         limit: 1,
       });
@@ -293,21 +280,9 @@ export class CatalogShowEditService {
   async getCategoryEditForm(id: string): Promise<FormResponse> {
     try {
       // 1. Fetch existing record
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
       const result = await this.dataService.query('categories', {
         select: ['categories.*'],
-        where: [
-          {
-            column: isNumericId ? 'categories.id' : 'categories.category_id',
-            operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-          {
-            column: 'categories.deleted_at',
-            operator: 'IS',
-            value: null,
-          },
-        ],
+        where: [{ column: 'categories.id', operator: '=', value: id }],
         limit: 1,
       });
 

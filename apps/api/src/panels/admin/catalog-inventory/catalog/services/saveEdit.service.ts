@@ -234,26 +234,14 @@ export class CatalogSaveEditService {
         }
       }
 
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
       const productResult = await this.dataService.query('products', {
-        select: ['id', 'product_id', 'name'],
-        where: [
-          {
-            column: isNumericId ? 'id' : 'product_id',
-            operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-          {
-            column: 'deleted_at',
-            operator: 'IS',
-            value: null,
-          },
-        ],
+        select: ['product_id', 'name'],
+        where: [{ column: 'id', operator: '=', value: Number(id) }],
         limit: 1,
       });
       const product = productResult?.data?.[0];
 
-      if (!product?.id) {
+      if (!product?.product_id) {
         this.developer.error("Product not found");
         throw new BadRequestException('Product not found');
       }
@@ -301,9 +289,9 @@ export class CatalogSaveEditService {
       if (Object.keys(updateData).length > 0) {
         updateData.updated_at = new Date().toISOString();
         const result = await this.dataService.query('products', {
-        update: updateData,
-        where: [{ column: 'id', operator: '=', value: product.id }],
-      });
+          update: updateData,
+          where: [{ column: 'id', operator: '=', value: Number(id) }],
+        });
         if (!result?.status) {
           throw new InternalServerErrorException('Database update failed');
         }
@@ -451,21 +439,9 @@ export class CatalogSaveEditService {
       }
 
       // Fetch existing variant for reference
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
       const existingVariantResult = await this.dataService.query('product_variants', {
-        select: ['id', 'product_id', 'variant_id', 'name'],
-        where: [
-          {
-            column: isNumericId ? 'id' : 'variant_id',
-            operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-          {
-            column: 'deleted_at',
-            operator: 'IS',
-            value: null,
-          },
-        ],
+        select: ['product_id', 'variant_id', 'name'],
+        where: [{ column: 'id', operator: '=', value: Number(id) }],
         limit: 1,
       });
 
@@ -736,30 +712,6 @@ export class CatalogSaveEditService {
 
   async saveCategory(id: string, body: any, adminId: string) {
     try {
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
-      const existingCategoryResult = await this.dataService.query('categories', {
-        select: ['id', 'category_id', 'name'],
-        where: [
-          {
-            column: isNumericId ? 'id' : 'category_id',
-            operator: '=',
-            value: isNumericId ? Number(id) : id,
-          },
-          {
-            column: 'deleted_at',
-            operator: 'IS',
-            value: null,
-          },
-        ],
-        limit: 1,
-      });
-
-      if (!existingCategoryResult?.data?.length) {
-        throw new BadRequestException('Category not found');
-      }
-
-      const existingCategory = existingCategoryResult.data[0];
-
       if (!body || typeof body !== 'object') body = {};
       if (body.sort_order !== undefined) {
         if (body.sort_order === '' || body.sort_order === null || body.sort_order === 'null' || body.sort_order === 'undefined') {
@@ -790,8 +742,7 @@ export class CatalogSaveEditService {
           select: ['id'],
           where: [
             { column: 'slug', operator: '=', value: String(body.slug).trim() },
-            { column: 'id', operator: '!=', value: existingCategory.id },
-            { column: 'deleted_at', operator: 'IS', value: null },
+            { column: 'id', operator: '!=', value: Number(id) },
           ],
           limit: 1,
         });
@@ -852,7 +803,7 @@ export class CatalogSaveEditService {
       updateData.updated_at = new Date().toISOString();
       const result = await this.dataService.query('categories', {
         update: updateData,
-        where: [{ column: 'id', operator: '=', value: existingCategory.id }],
+        where: [{ column: 'id', operator: '=', value: Number(id) }],
       });
       if (!result?.status) {
         throw new InternalServerErrorException('Database update failed');

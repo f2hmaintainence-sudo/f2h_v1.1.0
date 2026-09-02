@@ -44,29 +44,25 @@ export class CatalogService {
   async softDeleteProduct(id: string, adminId: string) {
     try {
       // 1. Fetch product identifiers (id, product_id, name)
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
+      const isNumericId = !isNaN(Number(id));
       const productQuery = isNumericId
-        ? `SELECT id, product_id, name FROM products WHERE (id = $1 OR product_id = $2 OR id::text = $2) AND deleted_at IS NULL LIMIT 1;`
+        ? `SELECT id, product_id, name FROM products WHERE id = $1 AND deleted_at IS NULL LIMIT 1;`
         : `SELECT id, product_id, name FROM products WHERE (product_id = $1 OR id::text = $1) AND deleted_at IS NULL LIMIT 1;`;
-      const productParams = isNumericId ? [Number(id), String(id)] : [String(id)];
+      const productParams = [isNumericId ? Number(id) : id];
       const productRes = await this.db.query(productQuery, productParams);
 
       const targetProduct = productRes?.[0];
-      if (!targetProduct) {
-        throw new BadRequestException('Product not found or already deleted');
-      }
-
-      const productIdNum = String(targetProduct.id);
-      const productIdStr = targetProduct.product_id ? String(targetProduct.product_id) : String(id);
+      const productIdNum = targetProduct?.id ? String(targetProduct.id) : (isNumericId ? String(id) : null);
+      const productIdStr = targetProduct?.product_id ? String(targetProduct.product_id) : String(id);
 
       // 2. Check for active (non-deleted) variants linked to this product
       const variantCheckSql = `
         SELECT id FROM product_variants 
-        WHERE (product_id = $1 OR product_id = $2) 
+        WHERE (${productIdNum ? 'product_id = $1 OR ' : ''}product_id = $2) 
           AND deleted_at IS NULL 
         LIMIT 1;
       `;
-      const variantParams = [productIdNum, productIdStr];
+      const variantParams = productIdNum ? [productIdNum, productIdStr] : [productIdStr, productIdStr];
       const variantRes = await this.db.query(variantCheckSql, variantParams);
 
       if (variantRes?.length > 0) {
@@ -75,7 +71,7 @@ export class CatalogService {
         );
       }
 
-      // 3. Perform soft delete by primary key `id`
+      // 3. Perform soft delete
       const result = await this.dataService.query('products', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -84,9 +80,9 @@ export class CatalogService {
         },
         where: [
           {
-            column: 'id',
+            column: isNumericId ? 'id' : 'product_id',
             operator: '=',
-            value: targetProduct.id,
+            value: isNumericId ? Number(id) : id,
           },
         ],
       });
@@ -110,20 +106,6 @@ export class CatalogService {
 
   async softDeleteVariant(id: string, adminId: string) {
     try {
-      // 1. Fetch variant identifier by integer id or string variant_id
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
-      const variantQuery = isNumericId
-        ? `SELECT id, variant_id, name FROM product_variants WHERE (id = $1 OR variant_id = $2 OR id::text = $2) AND deleted_at IS NULL LIMIT 1;`
-        : `SELECT id, variant_id, name FROM product_variants WHERE (variant_id = $1 OR id::text = $1) AND deleted_at IS NULL LIMIT 1;`;
-      const variantParams = isNumericId ? [Number(id), String(id)] : [String(id)];
-      const variantRes = await this.db.query(variantQuery, variantParams);
-
-      const targetVariant = variantRes?.[0];
-      if (!targetVariant) {
-        throw new BadRequestException('Product variant not found or already deleted');
-      }
-
-      // 2. Perform soft delete by primary key `id`
       const result = await this.dataService.query('product_variants', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -134,7 +116,7 @@ export class CatalogService {
           {
             column: 'id',
             operator: '=',
-            value: targetVariant.id,
+            value: Number(id),
           },
         ],
       });
@@ -148,7 +130,7 @@ export class CatalogService {
         message: 'Variant deleted successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException || error instanceof BadRequestException) {
+      if (error instanceof InternalServerErrorException) {
         throw error;
       }
       this.developer.error('softDeleteVariant error', { error, id });
@@ -159,29 +141,25 @@ export class CatalogService {
   async softDeleteCategory(id: string, adminId: string) {
     try {
       // 1. Fetch category identifiers (id, category_id, name)
-      const isNumericId = !isNaN(Number(id)) && String(Number(id)) === String(id).trim();
+      const isNumericId = !isNaN(Number(id));
       const categoryQuery = isNumericId
-        ? `SELECT id, category_id, name FROM categories WHERE (id = $1 OR category_id = $2 OR id::text = $2) AND deleted_at IS NULL LIMIT 1;`
+        ? `SELECT id, category_id, name FROM categories WHERE id = $1 AND deleted_at IS NULL LIMIT 1;`
         : `SELECT id, category_id, name FROM categories WHERE (category_id = $1 OR id::text = $1) AND deleted_at IS NULL LIMIT 1;`;
-      const categoryParams = isNumericId ? [Number(id), String(id)] : [String(id)];
+      const categoryParams = [isNumericId ? Number(id) : id];
       const categoryRes = await this.db.query(categoryQuery, categoryParams);
 
       const targetCategory = categoryRes?.[0];
-      if (!targetCategory) {
-        throw new BadRequestException('Category not found or already deleted');
-      }
-
-      const categoryIdNum = String(targetCategory.id);
-      const categoryIdStr = targetCategory.category_id ? String(targetCategory.category_id) : String(id);
+      const categoryIdNum = targetCategory?.id ? String(targetCategory.id) : (isNumericId ? String(id) : null);
+      const categoryIdStr = targetCategory?.category_id ? String(targetCategory.category_id) : String(id);
 
       // 2. Check for active (non-deleted) products linked to this category
       const productCheckSql = `
         SELECT id FROM products 
-        WHERE (category_id = $1 OR category_id = $2) 
+        WHERE (${categoryIdNum ? 'category_id = $1 OR ' : ''}category_id = $2) 
           AND deleted_at IS NULL 
         LIMIT 1;
       `;
-      const productParams = [categoryIdNum, categoryIdStr];
+      const productParams = categoryIdNum ? [categoryIdNum, categoryIdStr] : [categoryIdStr, categoryIdStr];
       const productRes = await this.db.query(productCheckSql, productParams);
 
       if (productRes?.length > 0) {
@@ -190,7 +168,7 @@ export class CatalogService {
         );
       }
 
-      // 3. Perform soft delete by primary key `id`
+      // 3. Perform soft delete
       const result = await this.dataService.query('categories', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -199,9 +177,9 @@ export class CatalogService {
         },
         where: [
           {
-            column: 'id',
+            column: isNumericId ? 'id' : 'category_id',
             operator: '=',
-            value: targetCategory.id,
+            value: isNumericId ? Number(id) : id,
           },
         ],
       });

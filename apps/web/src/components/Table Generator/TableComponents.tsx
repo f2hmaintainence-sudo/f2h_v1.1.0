@@ -80,51 +80,6 @@ export default function TableComponents({
     setTableKey((prev) => prev + 1);
   }, []);
 
-  const getItemDisplayName = useCallback(
-    (row: RowData | null, fallbackId: string | null): string | undefined => {
-      if (!row) return fallbackId || undefined;
-
-      const variantName = row.variant_name || row.variantName;
-      const productName = row.product_name || row.productName;
-
-      if (variantName && productName) {
-        return `${productName} (${variantName})`;
-      }
-      if (variantName) {
-        return String(variantName);
-      }
-
-      const nameCandidates = [
-        row.name,
-        row.title,
-        row.product_name,
-        row.productName,
-        row.category_name,
-        row.categoryName,
-        row.branch_name,
-        row.branchName,
-        row.customer_name,
-        row.customerName,
-        row.label,
-        row.code,
-        row.sku,
-      ];
-
-      for (const cand of nameCandidates) {
-        if (cand !== undefined && cand !== null && String(cand).trim() !== '') {
-          return String(cand);
-        }
-      }
-
-      if (row.unit_value && row.unit_type) {
-        return `${row.unit_value} ${row.unit_type}`;
-      }
-
-      return fallbackId || undefined;
-    },
-    []
-  );
-
   const api = useMemo(() => {
     if (!apiBase && !endpoints.table) {
       throw new Error(
@@ -369,7 +324,13 @@ export default function TableComponents({
           error={deleteError}
           title={`Delete ${title || ''}?`}
           message={`Are you sure you want to delete this ${title || 'item'}? This action cannot be undone.`}
-          itemName={getItemDisplayName(deleteRow, deleteId)}
+          itemName={
+            deleteRow?.name ||
+            deleteRow?.title ||
+            deleteRow?.code ||
+            deleteId ||
+            undefined
+          }
           onClose={() => {
             setDeleteOpen(false);
             setDeleteId(null);
@@ -512,7 +473,13 @@ export default function TableComponents({
         error={deleteError}
         title={`Delete ${title}?`}
         message={`Are you sure you want to delete this ${title}? This action cannot be undone.`}
-        itemName={getItemDisplayName(deleteRow, deleteId)}
+        itemName={
+          deleteRow?.name ||
+          deleteRow?.title ||
+          deleteRow?.code ||
+          deleteId ||
+          undefined
+        }
         onClose={() => {
           setDeleteOpen(false);
           setDeleteId(null);

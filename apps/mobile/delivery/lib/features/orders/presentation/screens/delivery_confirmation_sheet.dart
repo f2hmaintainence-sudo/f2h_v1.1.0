@@ -1383,7 +1383,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       GestureDetector(
                                         onTap: () {
                                           setState(() {
-                                            state.returned = state.customerBalance;
+                                            state.returned = state.customerBalance > 0
+                                                ? state.customerBalance
+                                                : state.deliveringToday;
                                             state.damaged = 0;
                                             state.lost = 0;
                                           });
@@ -1441,9 +1443,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                       onDec: state.returned > 0
                                           ? () => setState(() => state.returned--)
                                           : null,
-                                      onInc: (state.returned + state.damaged + state.lost) < state.customerBalance
-                                          ? () => setState(() => state.returned++)
-                                          : null,
+                                      onInc: () => setState(() => state.returned++),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -1462,9 +1462,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                                                 }
                                               })
                                           : null,
-                                      onInc: (state.returned + state.damaged + state.lost) < state.customerBalance
-                                          ? () => setState(() => state.lost++)
-                                          : null,
+                                      onInc: () => setState(() => state.lost++),
                                     ),
                                   ),
                                 ],
