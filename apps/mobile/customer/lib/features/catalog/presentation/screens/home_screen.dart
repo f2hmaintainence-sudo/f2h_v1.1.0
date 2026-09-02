@@ -2141,11 +2141,25 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
                 color: const Color(0xFFF8FAFC),
                 child: Padding(
                   padding: const EdgeInsets.all(6.0),
-                  child: buildProductImage(
-                    p.name,
-                    imageAsset: p.imageAsset,
-                    fit: BoxFit.contain,
-                  ),
+                  child: p.isOutOfStock
+                      ? ColorFiltered(
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            0.2126, 0.7152, 0.0722, 0, 0,
+                            0.2126, 0.7152, 0.0722, 0, 0,
+                            0.2126, 0.7152, 0.0722, 0, 0,
+                            0,      0,      0,      0.65, 0,
+                          ]),
+                          child: buildProductImage(
+                            p.name,
+                            imageAsset: p.imageAsset,
+                            fit: BoxFit.contain,
+                          ),
+                        )
+                      : buildProductImage(
+                          p.name,
+                          imageAsset: p.imageAsset,
+                          fit: BoxFit.contain,
+                        ),
                 ),
               ),
               const SizedBox(height: 6),
@@ -2250,16 +2264,16 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: const Color(0xFFFEF2F2),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFEF4444), width: 0.9),
+                          border: Border.all(color: const Color(0xFFFCA5A5), width: 0.9),
                         ),
                         child: const Text(
                           'OUT OF STOCK',
                           style: TextStyle(
                             fontSize: 7.5,
                             fontWeight: FontWeight.w900,
-                            color: Color(0xFFEF4444),
+                            color: Color(0xFFDC2626),
                             letterSpacing: 0.2,
                           ),
                         ),
@@ -2374,19 +2388,8 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
     ),
   );
 
-  if (p.isOutOfStock) {
-    return ColorFiltered(
-      colorFilter: const ColorFilter.matrix(<double>[
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0,      0,      0,      1, 0,
-      ]),
-      child: cardWidget,
-    );
+    return cardWidget;
   }
-  return cardWidget;
-}
 
 // ══════════════════════════════════════════════════════════
 //  PER-CATEGORY PRODUCT GROUPS WITH INLINE BANNERS

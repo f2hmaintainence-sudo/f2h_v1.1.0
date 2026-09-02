@@ -16,10 +16,22 @@ import 'package:f2h_customer/core/widgets/hot_toast.dart';
 
 // ── Product image widget ─────────────────────────────────
 Widget _productImage(Product p, {BoxFit fit = BoxFit.cover, double padding = 0.0}) {
-  return Padding(
+  Widget img = Padding(
     padding: EdgeInsets.all(padding),
     child: buildProductImage(p.name, imageAsset: p.imageAsset, fit: fit),
   );
+  if (p.isOutOfStock) {
+    img = ColorFiltered(
+      colorFilter: const ColorFilter.matrix(<double>[
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0,      0,      0,      0.65, 0,
+      ]),
+      child: img,
+    );
+  }
+  return img;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -518,18 +530,6 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
         ],
       ),
     );
-
-    if (p.isOutOfStock) {
-      content = ColorFiltered(
-        colorFilter: const ColorFilter.matrix(<double>[
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0,      0,      0,      1, 0,
-        ]),
-        child: content,
-      );
-    }
 
     return content;
   }
