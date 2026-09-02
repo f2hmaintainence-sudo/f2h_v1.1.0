@@ -121,11 +121,15 @@ export default function TableComponents({
     const url = new URL(api.table, window.location.origin);
 
     filters.forEach((filter) => {
-        url.searchParams.append('filters', filter);
+      url.searchParams.append('filters', filter);
     });
 
+    if (!url.searchParams.has('deleted_at')) {
+      url.searchParams.set('deleted_at', 'null');
+    }
+
     return url.pathname + url.search;
-   }, [api.table, filters]);
+  }, [api.table, filters]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteId) return;
@@ -389,7 +393,7 @@ export default function TableComponents({
       {viewMode === 'card' ? (
         <SkeletonCard
           key={tableKey}
-          apiEndpoint={api.table}
+          apiEndpoint={tableEndpoint}
           onAction={handleAction}
           initialPageSize={12}
         />

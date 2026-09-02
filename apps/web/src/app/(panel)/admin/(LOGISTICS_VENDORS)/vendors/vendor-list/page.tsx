@@ -2,11 +2,8 @@
 
 import TableComponents from '@/components/Table Generator/TableComponents';
 
-export default function ProductsPage() {
+export default function VendorListPage() {
   return (
-
-   
-
     <TableComponents
       title="Vendor List"
       endpoints={{

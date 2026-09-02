@@ -78,7 +78,11 @@ export default function SkeletonCard({
       const result = await res.json();
 
       if (result.status || result.data) {
-        setData(result.data || []);
+        const rawData = Array.isArray(result.data) ? result.data : [];
+        const cleanData = rawData.filter(
+          (row: Record<string, any>) => row.deleted_at === null || row.deleted_at === undefined || row.deleted_at === ''
+        );
+        setData(cleanData);
         // Normalize columns for FilterModal
         const normalizedCols = (result.columns || []).map((c: any) => ({
           ...c,
@@ -87,7 +91,7 @@ export default function SkeletonCard({
           orderable: c.orderable !== false,
         }));
         setColumns(normalizedCols);
-        setTotal(result.recordsFiltered || result.recordsTotal || 0);
+        setTotal(result.recordsFiltered || result.recordsTotal || cleanData.length);
       }
     } catch (error) {
       console.error('Failed to fetch card data:', error);

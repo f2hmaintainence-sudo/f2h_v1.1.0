@@ -553,14 +553,19 @@ export default function SkeletonTable({
       // result is null when request was aborted (stale request cancelled)
       if (!result || !mountedRef.current) return;
 
+      const rawData = Array.isArray(result.data) ? result.data : [];
+      const cleanData = rawData.filter(
+        (row: Record<string, any>) => row.deleted_at === null || row.deleted_at === undefined || row.deleted_at === ''
+      );
+
       setState(prev => ({
         ...prev,
         loading: false,
         error: null,
-        data: Array.isArray(result.data) ? result.data : [],
+        data: cleanData,
         columns: Array.isArray(result.columns) ? result.columns : prev.columns,
-        recordsTotal: result.recordsTotal ?? 0,
-        recordsFiltered: result.recordsFiltered ?? 0,
+        recordsTotal: result.recordsTotal ?? cleanData.length,
+        recordsFiltered: result.recordsFiltered ?? cleanData.length,
         filters,
       }));
 
