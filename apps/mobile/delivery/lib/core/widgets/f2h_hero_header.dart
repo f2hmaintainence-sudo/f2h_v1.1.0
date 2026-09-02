@@ -199,6 +199,11 @@ class F2hHeroHeader extends StatelessWidget {
 
   Widget _buildAvatar(String firstName) {
     final initial = firstName.isNotEmpty ? firstName[0].toUpperCase() : 'D';
+    final hasImage = avatarUrl != null &&
+        avatarUrl!.trim().isNotEmpty &&
+        avatarUrl != 'null' &&
+        !avatarUrl!.endsWith('/null');
+
     return Material(
       color: Colors.transparent,
       shape: const CircleBorder(),
@@ -207,22 +212,41 @@ class F2hHeroHeader extends StatelessWidget {
       child: InkWell(
         onTap: onProfile,
         customBorder: const CircleBorder(),
-        child: CircleAvatar(
-          radius: 19,
-          backgroundColor: const Color(0xFF059669),
-          backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
-              ? NetworkImage(avatarUrl!)
-              : null,
-          child: avatarUrl == null || avatarUrl!.isEmpty
-              ? Text(
-                  initial,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: const BoxDecoration(
+            color: Color(0xFF059669),
+            shape: BoxShape.circle,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: hasImage
+              ? Image.network(
+                  avatarUrl!,
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
                   ),
                 )
-              : null,
+              : Center(
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
         ),
       ),
     );

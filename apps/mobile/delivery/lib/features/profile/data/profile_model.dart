@@ -78,16 +78,16 @@ class ProfileModel {
   static String? _imageUrl(dynamic value) {
     if (value == null) return null;
 
-    final path = value.toString();
-    if (path.isEmpty) return null;
+    final path = value.toString().trim();
+    if (path.isEmpty || path == 'null') return null;
 
     // Already a full URL
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
 
-    // Relative path from backend
-    return '${ApiEndpoints.baseUrl}/$path';
+    final clean = path.startsWith('/') ? path.substring(1) : path;
+    return '${ApiEndpoints.host}/$clean';
   }
 
   factory ProfileModel.empty() {
@@ -116,11 +116,11 @@ class ProfileModel {
       bankName: json['bank_name']?.toString(),
       bankIfsc: json['bank_ifsc']?.toString(),
       accountHolderName: json['account_holder_name']?.toString(),
-      isVerified: json['is_verified'] == true || json['is_verified'] == 1 || json['is_verified'] == 'true',
-      isActive: json['is_active'] == 1 || json['is_active'] == true || json['is_active']?.toString().toLowerCase() == 'true',
-      isOnline: json['is_online'] == 1 || json['is_online'] == true || json['is_online']?.toString().toLowerCase() == 'true',
+      isVerified: json['is_verified'] == true || json['is_verified']?.toString() == '1',
+      isActive: json['is_active'] == true || json['is_active']?.toString() == '1',
+      isOnline: json['is_online'] == true || json['is_online']?.toString() == '1',
       accountStatus: json['account_status']?.toString(),
-      joinedDate: json['joined_date']?.toString(),
+      joinedDate: json['joined_date']?.toString() ?? json['created_at']?.toString(),
       sectorIndex: json['sector_index'] != null ? int.tryParse(json['sector_index'].toString()) : null,
       branchName: json['branch_name']?.toString(),
       branchId: json['branch_id']?.toString(),
@@ -130,7 +130,7 @@ class ProfileModel {
       residentialAddress: json['residential_address']?.toString(),
       emergencyContact: json['emergency_contact']?.toString(),
       emergencyContactNumber: json['emergency_contact_number']?.toString(),
-      profilePhotoUrl: _imageUrl(json['profile_photo_url']),
+      profilePhotoUrl: _imageUrl(json['profile_photo_url'] ?? json['profile_image_url']),
       idProofUrl: _imageUrl(json['id_proof_url']),
       aadhaarUrl: _imageUrl(json['aadhaar_url']),
       averageRating: json['average_rating'] != null ? double.tryParse(json['average_rating'].toString()) : null,
