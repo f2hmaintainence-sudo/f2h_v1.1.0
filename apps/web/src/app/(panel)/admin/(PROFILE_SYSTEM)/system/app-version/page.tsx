@@ -66,7 +66,8 @@ export default function AppVersionControlPage() {
     setError(null);
     try {
       const res = await api.get<any>("/admin/system/version-control");
-      const rows: AppConfig[] = res?.data ?? [];
+      const raw = res?.data?.data ?? res?.data;
+      const rows: AppConfig[] = Array.isArray(raw) ? raw : [];
       setConfigs(rows);
       setDrafts(Object.fromEntries(rows.map((r) => [r.platform, { ...r }])));
     } catch (e: any) {
@@ -172,130 +173,136 @@ export default function AppVersionControlPage() {
       )}
 
       <div className="space-y-5">
-        {configs.map((config) => {
-          const draft = drafts[config.platform] ?? config;
-          const isSaving = savingPlatform === config.platform;
-          // The gate only blocks when force update is on AND a build can fall
-          // below the minimum, so the warning has to reflect both together.
-          const willBlock =
-            draft.force_update && compareVersions(draft.min_version, "0.0.0+0") > 0;
+        {configs.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
+            No app version configurations found.
+          </div>
+        ) : (
+          configs.map((config) => {
+            const draft = drafts[config.platform] ?? config;
+            const isSaving = savingPlatform === config.platform;
+            // The gate only blocks when force update is on AND a build can fall
+            // below the minimum, so the warning has to reflect both together.
+            const willBlock =
+              draft.force_update && compareVersions(draft.min_version, "0.0.0+0") > 0;
 
-          return (
-            <section
-              key={config.platform}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-900">
-                  {PLATFORM_LABEL[config.platform] ?? config.platform}
-                </h2>
-                <code className="rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-500">
-                  {config.platform}
-                </code>
-              </div>
+            return (
+              <section
+                key={config.platform}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {PLATFORM_LABEL[config.platform] ?? config.platform}
+                  </h2>
+                  <code className="rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-500">
+                    {config.platform}
+                  </code>
+                </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                    Latest version
-                  </span>
-                  <input
-                    value={draft.latest_version}
-                    onChange={(e) => patch(config.platform, "latest_version", e.target.value)}
-                    placeholder="1.0.8+21"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  />
-                  <span className="mt-1 block text-[11px] text-slate-400">
-                    The newest build on the store. Older builds see an optional update prompt.
-                  </span>
-                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      Latest version
+                    </span>
+                    <input
+                      value={draft.latest_version}
+                      onChange={(e) => patch(config.platform, "latest_version", e.target.value)}
+                      placeholder="1.0.8+21"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    />
+                    <span className="mt-1 block text-[11px] text-slate-400">
+                      The newest build on the store. Older builds see an optional update prompt.
+                    </span>
+                  </label>
 
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                    Minimum supported version
-                  </span>
-                  <input
-                    value={draft.min_version}
-                    onChange={(e) => patch(config.platform, "min_version", e.target.value)}
-                    placeholder="1.0.8+21"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  />
-                  <span className="mt-1 block text-[11px] text-slate-400">
-                    Anything below this is blocked when force update is on.
-                  </span>
-                </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      Minimum supported version
+                    </span>
+                    <input
+                      value={draft.min_version}
+                      onChange={(e) => patch(config.platform, "min_version", e.target.value)}
+                      placeholder="1.0.8+21"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    />
+                    <span className="mt-1 block text-[11px] text-slate-400">
+                      Anything below this is blocked when force update is on.
+                    </span>
+                  </label>
 
-                <label className="block sm:col-span-2">
-                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                    Store URL
-                  </span>
-                  <input
-                    value={draft.store_url}
-                    onChange={(e) => patch(config.platform, "store_url", e.target.value)}
-                    placeholder="https://play.google.com/store/apps/details?id=com.f2h.customer"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  />
-                </label>
+                  <label className="block sm:col-span-2">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      Store URL
+                    </span>
+                    <input
+                      value={draft.store_url}
+                      onChange={(e) => patch(config.platform, "store_url", e.target.value)}
+                      placeholder="https://play.google.com/store/apps/details?id=com.f2h.customer"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    />
+                  </label>
 
-                <label className="block sm:col-span-2">
-                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                    Update message
-                  </span>
-                  <textarea
-                    value={draft.update_message ?? ""}
-                    onChange={(e) => patch(config.platform, "update_message", e.target.value)}
-                    rows={3}
-                    className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
-                  />
-                </label>
-              </div>
+                  <label className="block sm:col-span-2">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      Update message
+                    </span>
+                    <textarea
+                      value={draft.update_message ?? ""}
+                      onChange={(e) => patch(config.platform, "update_message", e.target.value)}
+                      rows={3}
+                      className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    />
+                  </label>
+                </div>
 
-              <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-4 py-3">
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={draft.force_update}
-                    onChange={(e) => patch(config.platform, "force_update", e.target.checked)}
-                    className="h-4 w-4 accent-emerald-600"
-                  />
-                  <span className="text-sm font-semibold text-slate-800">Force update</span>
-                </label>
-                <span className="text-[11px] text-slate-500">
-                  Last updated{" "}
-                  {config.updated_at ? new Date(config.updated_at).toLocaleString("en-IN") : "—"}
-                </span>
-              </div>
-
-              {willBlock && (
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Force update is on. Every install below{" "}
-                    <strong>{draft.min_version}</strong> will be locked out of the app until the
-                    customer updates from the store. Make sure that build is actually live on the
-                    store first.
+                <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-4 py-3">
+                  <label className="flex cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={draft.force_update}
+                      onChange={(e) => patch(config.platform, "force_update", e.target.checked)}
+                      className="h-4 w-4 accent-emerald-600"
+                    />
+                    <span className="text-sm font-semibold text-slate-800">Force update</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500">
+                    Last updated{" "}
+                    {config.updated_at ? new Date(config.updated_at).toLocaleString("en-IN") : "—"}
                   </span>
                 </div>
-              )}
 
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => void save(config.platform)}
-                  className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Save
-                </button>
-              </div>
-            </section>
-          );
-        })}
+                {willBlock && (
+                  <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      Force update is on. Every install below{" "}
+                      <strong>{draft.min_version}</strong> will be locked out of the app until the
+                      customer updates from the store. Make sure that build is actually live on the
+                      store first.
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => void save(config.platform)}
+                    className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Save
+                  </button>
+                </div>
+              </section>
+            );
+          })
+        )}
       </div>
     </div>
   );
