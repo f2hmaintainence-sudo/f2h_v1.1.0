@@ -37,18 +37,7 @@ export class InventoryTableService {
 
   async getInventoryTable(query: any) {
     try {
-      const conditions: any[] = [
-        {
-          column: 'product_variants.deleted_at',
-          operator: 'IS',
-          value: null,
-        },
-        {
-          column: 'products.deleted_at',
-          operator: 'IS',
-          value: null,
-        },
-      ];
+      const conditions: any[] = [];
 
       if (query.warehouse_id) {
         conditions.push({

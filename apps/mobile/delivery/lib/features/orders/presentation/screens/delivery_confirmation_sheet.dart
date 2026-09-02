@@ -160,14 +160,34 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         addressId: widget.stop.addressId,
       );
       if (mounted && qr != null) {
+        final isAlreadyPaid = qr['is_already_paid'] == true ||
+            qr['is_paid'] == true ||
+            (qr['data'] is Map && (qr['data']['is_already_paid'] == true || qr['data']['is_paid'] == true));
+
+        if (isAlreadyPaid) {
+          final p = (qr['payment'] ?? (qr['data'] is Map ? qr['data']['payment'] : null)) as Map<String, dynamic>?;
+          setState(() {
+            _paymentReceivedOnline = true;
+            _paymentConfirmed = true;
+            _paymentTxnId = p?['payment_id']?.toString() ?? 'VERIFIED';
+            _paymentMethodDetail = p?['vpa'] != null ? 'UPI (${p!['vpa']})' : (p?['method']?.toString() ?? 'UPI');
+            _paymentQrData = qr['data'] is Map ? qr['data'] : qr;
+            _isLoadingQr = false;
+          });
+          _paymentPollTimer?.cancel();
+          return;
+        }
+
         setState(() {
-          _paymentQrData = qr;
+          _paymentQrData = qr['data'] is Map ? qr['data'] : qr;
           _isLoadingQr = false;
         });
         _startPaymentPolling();
+        _verifyPaymentStatus(silent: true);
       } else {
         if (mounted) setState(() => _isLoadingQr = false);
         _startPaymentPolling();
+        _verifyPaymentStatus(silent: true);
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingQr = false);
@@ -199,14 +219,14 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         addressId: widget.stop.addressId,
         qrId: qrId,
       );
-      if (mounted && res != null && res['is_paid'] == true) {
+      if (mounted && res != null && (res['is_paid'] == true || res['is_already_paid'] == true)) {
         _paymentPollTimer?.cancel();
         final p = res['payment'] as Map<String, dynamic>?;
         setState(() {
           _paymentReceivedOnline = true;
           _paymentConfirmed = true;
           _paymentTxnId = p?['payment_id']?.toString() ?? 'VERIFIED';
-          _paymentMethodDetail = p?['vpa'] != null ? 'UPI (${p!['vpa']})' : 'UPI';
+          _paymentMethodDetail = p?['vpa'] != null ? 'UPI (${p!['vpa']})' : (p?['method']?.toString() ?? 'UPI');
           _isCheckingPayment = false;
         });
       } else {

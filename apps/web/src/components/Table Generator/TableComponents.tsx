@@ -46,31 +46,6 @@ type Props = {
   modalsOnly?: boolean;
 };
 
-function getItemName(row: RowData | null, fallbackId: string | null): string | undefined {
-  if (!row) return fallbackId || undefined;
-
-  const productName = row.product_name || row.product;
-  const variantName = row.variant_name || row.variant;
-
-  if (productName && variantName) {
-    return `${productName} (${variantName})`;
-  }
-  if (variantName) return variantName;
-  if (productName) return productName;
-  if (row.name) return row.name;
-  if (row.title) return row.title;
-  if (row.code) return row.code;
-  if (row.category_name) return row.category_name;
-  if (row.branch_name) return row.branch_name;
-  if (row.warehouse_name) return row.warehouse_name;
-  if (row.manager_name) return row.manager_name;
-  if (row.variant_id) return row.variant_id;
-  if (row.product_id) return row.product_id;
-  if (row.category_id) return row.category_id;
-
-  return fallbackId || undefined;
-}
-
 export default function TableComponents({
   title,
   apiBase,
@@ -340,8 +315,14 @@ export default function TableComponents({
           isOpen={deleteOpen}
           loading={deleteLoading}
           title={`Delete ${title || ''}?`}
-          message={`Are you sure you want to delete this ${title ? title.toLowerCase().replace(/s$/i, '') : 'item'}? This action cannot be undone.`}
-          itemName={getItemName(deleteRow, deleteId)}
+          message={`Are you sure you want to delete this ${title || 'item'}? This action cannot be undone.`}
+          itemName={
+            deleteRow?.name ||
+            deleteRow?.title ||
+            deleteRow?.code ||
+            deleteId ||
+            undefined
+          }
           onClose={() => {
             setDeleteOpen(false);
             setDeleteId(null);
@@ -481,8 +462,14 @@ export default function TableComponents({
         isOpen={deleteOpen}
         loading={deleteLoading}
         title={`Delete ${title}?`}
-        message={`Are you sure you want to delete this ${title ? title.toLowerCase().replace(/s$/i, '') : 'item'}? This action cannot be undone.`}
-        itemName={getItemName(deleteRow, deleteId)}
+        message={`Are you sure you want to delete this ${title}? This action cannot be undone.`}
+        itemName={
+          deleteRow?.name ||
+          deleteRow?.title ||
+          deleteRow?.code ||
+          deleteId ||
+          undefined
+        }
         onClose={() => {
           setDeleteOpen(false);
           setDeleteId(null);

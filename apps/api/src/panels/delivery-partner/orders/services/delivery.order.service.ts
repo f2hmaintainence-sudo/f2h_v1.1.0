@@ -2118,6 +2118,55 @@ export class DeliveryOrderService {
       throw new NotFoundException('No orders found for this stop');
     }
 
+    const allOrderIds = orders.map((o) => o.order_id);
+
+    // Check if these orders are ALREADY paid (e.g. customer paid online, partner reopened stop)
+    const paidTxns = await this.db.query<{
+      transaction_id: string;
+      amount: number | string;
+      method: string;
+      provider: string;
+      paid_at: Date;
+    }>(
+      `SELECT transaction_id, amount, method, provider, paid_at
+       FROM payment_transactions
+       WHERE reference_id = ANY($1) AND purpose = 'order' AND status = 'paid'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [allOrderIds],
+    );
+
+    const isAllOrdersPaid = orders.every(
+      (o) => (o.payment_status || '').toLowerCase() === 'paid',
+    );
+
+    if (paidTxns?.length || isAllOrdersPaid) {
+      const txn = paidTxns?.[0];
+      return {
+        status: true,
+        is_already_paid: true,
+        is_paid: true,
+        message: 'Order payment is already completed',
+        data: {
+          is_already_paid: true,
+          is_paid: true,
+          payment: txn
+            ? {
+                payment_id: txn.transaction_id,
+                amount: Number(txn.amount || 0),
+                method: txn.method || 'upi',
+                provider: txn.provider,
+                paid_at: txn.paid_at,
+              }
+            : null,
+          amount: 0,
+          currency: 'INR',
+          order_ids: allOrderIds,
+          provider: txn?.provider || 'razorpay',
+        },
+      };
+    }
+
     const unpaidOrders = orders.filter(
       (o) =>
         (o.payment_mode === 'cod' || o.payment_mode === 'cash' || o.payment_status === 'pending') &&
@@ -2128,9 +2177,16 @@ export class DeliveryOrderService {
     const amount = unpaidOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
     if (amount <= 0) {
       return {
-        status: false,
+        status: true,
+        is_already_paid: true,
+        is_paid: true,
         message: 'No COD payment pending for this stop',
-        data: null,
+        data: {
+          is_already_paid: true,
+          is_paid: true,
+          amount: 0,
+          order_ids: allOrderIds,
+        },
       };
     }
 
@@ -2288,6 +2344,7 @@ export class DeliveryOrderService {
           return {
             status: true,
             is_paid: true,
+            is_already_paid: true,
             payment: {
               payment_id: successfulPayment.id,
               amount: paidAmount,
@@ -2304,6 +2361,43 @@ export class DeliveryOrderService {
           qrId,
         });
       }
+    }
+
+    // 2. Check if this stop's orders were already settled/paid previously (e.g. if delivery partner refreshed or went back)
+    const orderIds = orders.map((o) => o.order_id);
+    const paidTxns = await this.db.query<{
+      transaction_id: string;
+      amount: number | string;
+      method: string;
+      provider: string;
+      paid_at: Date;
+    }>(
+      `SELECT transaction_id, amount, method, provider, paid_at
+       FROM payment_transactions
+       WHERE reference_id = ANY($1) AND purpose = 'order' AND status = 'paid'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [orderIds],
+    );
+
+    const isAllOrdersPaid = orders.every(
+      (o) => (o.payment_status || '').toLowerCase() === 'paid',
+    );
+
+    if (paidTxns?.length || isAllOrdersPaid) {
+      const txn = paidTxns?.[0];
+      return {
+        status: true,
+        is_paid: true,
+        is_already_paid: true,
+        payment: {
+          payment_id: txn?.transaction_id || 'PAID',
+          amount: Number(txn?.amount || orders[0]?.total_amount || 0),
+          currency: 'INR',
+          method: txn?.method || 'upi',
+          paid_at: txn?.paid_at,
+        },
+      };
     }
 
     // If no dynamic QR was used or no live payment found on Razorpay for this QR
