@@ -170,7 +170,11 @@ class CatalogRepositoryImpl implements CatalogRepository {
       if (products.any((p) => p.id == variantId)) continue; // Avoid duplicate product cards
 
       final productId = item['product_id']?.toString() ?? variantId;
-      final variantName = item['variant_name']?.toString() ?? item['product_name']?.toString() ?? 'Variant';
+      final rawProdName = item['product_name']?.toString()?.trim() ?? '';
+      final rawVarName = item['variant_name']?.toString()?.trim() ?? '';
+      final variantName = rawProdName.isNotEmpty
+          ? rawProdName
+          : (rawVarName.isNotEmpty ? rawVarName : 'Variant');
       final unitValue = item['unit_value']?.toString() ?? '';
       final unitType = item['unit_type']?.toString() ?? '';
 

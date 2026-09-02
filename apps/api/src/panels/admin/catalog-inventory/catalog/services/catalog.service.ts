@@ -1,7 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { CatalogTableService } from './table.service';
 import { DeveloperService } from '../../../../../shared/logger/Developer.service';
 import { DataService } from '../../../../../shared/database/Data.service';
+import { DatabaseService } from '../../../../../shared/database/Database.service';
 
 @Injectable()
 export class CatalogService {
@@ -9,6 +10,7 @@ export class CatalogService {
     private readonly catalogTableService: CatalogTableService,
     private readonly developer: DeveloperService,
     private readonly dataService: DataService,
+    private readonly db: DatabaseService,
   ) { }
 
   // ═══════════════════════════════════════════════════════════════
@@ -41,6 +43,35 @@ export class CatalogService {
 
   async softDeleteProduct(id: string, adminId: string) {
     try {
+      // 1. Fetch product identifiers (id, product_id, name)
+      const isNumericId = !isNaN(Number(id));
+      const productQuery = isNumericId
+        ? `SELECT id, product_id, name FROM products WHERE id = $1 AND deleted_at IS NULL LIMIT 1;`
+        : `SELECT id, product_id, name FROM products WHERE (product_id = $1 OR id::text = $1) AND deleted_at IS NULL LIMIT 1;`;
+      const productParams = [isNumericId ? Number(id) : id];
+      const productRes = await this.db.query(productQuery, productParams);
+
+      const targetProduct = productRes?.[0];
+      const productIdNum = targetProduct?.id ? String(targetProduct.id) : (isNumericId ? String(id) : null);
+      const productIdStr = targetProduct?.product_id ? String(targetProduct.product_id) : String(id);
+
+      // 2. Check for active (non-deleted) variants linked to this product
+      const variantCheckSql = `
+        SELECT id FROM product_variants 
+        WHERE (${productIdNum ? 'product_id = $1 OR ' : ''}product_id = $2) 
+          AND deleted_at IS NULL 
+        LIMIT 1;
+      `;
+      const variantParams = productIdNum ? [productIdNum, productIdStr] : [productIdStr, productIdStr];
+      const variantRes = await this.db.query(variantCheckSql, variantParams);
+
+      if (variantRes?.length > 0) {
+        throw new BadRequestException(
+          'Cannot delete product because active product variant(s) exist. Please delete or remove all variants first.'
+        );
+      }
+
+      // 3. Perform soft delete
       const result = await this.dataService.query('products', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -49,9 +80,9 @@ export class CatalogService {
         },
         where: [
           {
-            column: 'id',
+            column: isNumericId ? 'id' : 'product_id',
             operator: '=',
-            value: Number(id),
+            value: isNumericId ? Number(id) : id,
           },
         ],
       });
@@ -65,7 +96,7 @@ export class CatalogService {
         message: 'Product deleted successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException) {
+      if (error instanceof InternalServerErrorException || error instanceof BadRequestException) {
         throw error;
       }
       this.developer.error('softDeleteProduct error', { error, id });
@@ -109,6 +140,35 @@ export class CatalogService {
 
   async softDeleteCategory(id: string, adminId: string) {
     try {
+      // 1. Fetch category identifiers (id, category_id, name)
+      const isNumericId = !isNaN(Number(id));
+      const categoryQuery = isNumericId
+        ? `SELECT id, category_id, name FROM categories WHERE id = $1 AND deleted_at IS NULL LIMIT 1;`
+        : `SELECT id, category_id, name FROM categories WHERE (category_id = $1 OR id::text = $1) AND deleted_at IS NULL LIMIT 1;`;
+      const categoryParams = [isNumericId ? Number(id) : id];
+      const categoryRes = await this.db.query(categoryQuery, categoryParams);
+
+      const targetCategory = categoryRes?.[0];
+      const categoryIdNum = targetCategory?.id ? String(targetCategory.id) : (isNumericId ? String(id) : null);
+      const categoryIdStr = targetCategory?.category_id ? String(targetCategory.category_id) : String(id);
+
+      // 2. Check for active (non-deleted) products linked to this category
+      const productCheckSql = `
+        SELECT id FROM products 
+        WHERE (${categoryIdNum ? 'category_id = $1 OR ' : ''}category_id = $2) 
+          AND deleted_at IS NULL 
+        LIMIT 1;
+      `;
+      const productParams = categoryIdNum ? [categoryIdNum, categoryIdStr] : [categoryIdStr, categoryIdStr];
+      const productRes = await this.db.query(productCheckSql, productParams);
+
+      if (productRes?.length > 0) {
+        throw new BadRequestException(
+          'Cannot delete category because active product(s) exist in this category. Please delete or reassign all products first.'
+        );
+      }
+
+      // 3. Perform soft delete
       const result = await this.dataService.query('categories', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -117,9 +177,9 @@ export class CatalogService {
         },
         where: [
           {
-            column: 'id',
+            column: isNumericId ? 'id' : 'category_id',
             operator: '=',
-            value: Number(id),
+            value: isNumericId ? Number(id) : id,
           },
         ],
       });
@@ -133,7 +193,7 @@ export class CatalogService {
         message: 'Category deleted successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException) {
+      if (error instanceof InternalServerErrorException || error instanceof BadRequestException) {
         throw error;
       }
       this.developer.error('softDeleteCategory error', { error, id });

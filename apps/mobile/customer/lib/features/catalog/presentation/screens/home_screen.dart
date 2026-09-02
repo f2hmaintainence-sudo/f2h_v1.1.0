@@ -2169,7 +2169,7 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      p.name,
+                      p.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

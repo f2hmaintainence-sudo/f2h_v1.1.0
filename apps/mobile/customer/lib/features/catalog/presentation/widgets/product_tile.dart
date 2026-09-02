@@ -120,7 +120,7 @@ class _PurchaseOptionsSheetState extends State<_PurchaseOptionsSheet> {
   /// follow the selection rather than the card that opened the sheet.
   String get _selectedName =>
       _selected.id == widget.product.id || _selected.label.trim().isEmpty
-          ? widget.product.name
+          ? widget.product.displayName
           : _selected.label;
 
   @override
@@ -742,7 +742,7 @@ class ProductCardV extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  p.name,
+                                  p.displayName,
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
@@ -912,7 +912,7 @@ class ProductCardV extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(p.name,
+                          Text(p.displayName,
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kText, letterSpacing: -0.2),
                               maxLines: 2, overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),

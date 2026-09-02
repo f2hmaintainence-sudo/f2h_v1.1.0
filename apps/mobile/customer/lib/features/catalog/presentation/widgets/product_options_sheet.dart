@@ -106,7 +106,7 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.product.name,
+                          widget.product.displayName,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,

@@ -333,7 +333,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                     children: [
                       // Product name
                       Text(
-                        p.name,
+                        p.displayName,
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,

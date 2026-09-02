@@ -193,6 +193,24 @@ class Product {
     this.images = const [],
   });
 
+  /// Returns the product name without redundant unit/quantity suffixes (e.g. " - 0.5KG", " - 1L", " - 200g")
+  String get displayName {
+    final raw = name.trim();
+    if (raw.isEmpty) return 'Product';
+
+    final cleaned = raw
+        .replaceAll(
+          RegExp(
+            r'(\s*[-–—]\s*|\s*[\(\[\{]\s*|\s+)(\d+(\.\d+)?\s*(kg|g|gm|gms|gram|grams|l|ltr|ltrs|liter|liters|litre|litres|ml|mls|pack|pcs|pieces|pc|unit|units|bottle|bottles|box|boxes))\s*[\)\]\}]?\s*$',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
+
+    return cleaned.isNotEmpty ? cleaned : raw;
+  }
+
   String get formattedUnit {
     if (unitValue != null && unitType != null && unitValue!.toString().trim().isNotEmpty && unitType!.toString().trim().isNotEmpty) {
       final doubleVal = double.tryParse(unitValue!);
