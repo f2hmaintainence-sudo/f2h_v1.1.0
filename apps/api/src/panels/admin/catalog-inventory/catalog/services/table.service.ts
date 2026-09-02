@@ -85,7 +85,13 @@ export class CatalogTableService {
 
   async getProductsTable(query: any) {
     try {
-      const conditions: any[] = [];
+      const conditions: any[] = [
+        {
+          column: 'products.deleted_at',
+          operator: 'IS',
+          value: null,
+        },
+      ];
 
       // Filter by category
       if (query.category_id) {
@@ -206,7 +212,18 @@ export class CatalogTableService {
 
   async getProductVariantsTable(query: any) {
     try {
-      const conditions: any[] = [];
+      const conditions: any[] = [
+        {
+          column: 'product_variants.deleted_at',
+          operator: 'IS',
+          value: null,
+        },
+        {
+          column: 'products.deleted_at',
+          operator: 'IS',
+          value: null,
+        },
+      ];
 
       // Filter by product
       if (query.product_id) {
