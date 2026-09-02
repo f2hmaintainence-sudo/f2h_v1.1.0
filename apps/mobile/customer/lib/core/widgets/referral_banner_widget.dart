@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import 'package:f2h_customer/core/widgets/invite_code_copied_dialog.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
@@ -192,13 +193,7 @@ class ReferralBannerWidget extends StatelessWidget {
                       GestureDetector(
                         onTap: () async {
                           if (isUnlocked) {
-                            Clipboard.setData(ClipboardData(text: displayCode));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Copied referral code "$displayCode" to clipboard! 📋'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            InviteCodeCopiedDialog.show(context, displayCode);
                           } else {
                             // Allow customer to share app referral link at any stage
                             const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';

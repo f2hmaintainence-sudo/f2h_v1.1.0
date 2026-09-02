@@ -5,6 +5,7 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:f2h_customer/core/widgets/invite_code_copied_dialog.dart';
 import 'referral_faq_screen.dart';
 import 'referral_terms_screen.dart';
 
@@ -215,10 +216,12 @@ class _ReferralScreenState extends State<ReferralScreen>
   }
 
   void _copyToClipboard(String text, String toastMsg) {
-    final copyText = _isLocked ? _playStoreUrl : text;
-    final message = _isLocked ? 'Play Store app link copied to clipboard! 📋' : toastMsg;
-    Clipboard.setData(ClipboardData(text: copyText));
-    F2HToast.success(context, message);
+    if (_isLocked) {
+      Clipboard.setData(const ClipboardData(text: _playStoreUrl));
+      F2HToast.success(context, 'Play Store app link copied to clipboard! 📋');
+    } else {
+      InviteCodeCopiedDialog.show(context, text);
+    }
   }
 
   // ── REWARD SUCCESS MODAL ──────────────────────────────────

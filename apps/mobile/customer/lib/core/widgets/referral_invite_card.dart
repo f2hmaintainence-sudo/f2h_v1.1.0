@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/core/session/customer_session_state.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:f2h_customer/core/widgets/invite_code_copied_dialog.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 
 /// Refer-and-earn card shown on Home and Profile.
@@ -428,8 +429,7 @@ class ReferralInviteCard extends StatelessWidget {
   // ── Actions ────────────────────────────────────────────────────────────
 
   static void _copyCode(BuildContext context, String code) {
-    Clipboard.setData(ClipboardData(text: code));
-    F2HToast.success(context, 'Invite code $code copied!');
+    InviteCodeCopiedDialog.show(context, code);
   }
 
   static Future<void> _shareCode(BuildContext context, String code) async {
