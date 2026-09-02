@@ -13,7 +13,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { DataService } from '../shared/database/Data.service';
+import { DataService, AVOID_DELETED_AT } from '../shared/database/Data.service';
 import { DeveloperService } from '../shared/logger/Developer.service';
 
 // ─── Type Definitions ────────────────────────────────────────────
@@ -174,10 +174,25 @@ export class TableHelper {
       columnMap[key] = stripAlias(columnName);
     }
 
+    const hasDeletedAtCondition = (set.conditions ?? []).some(
+      (c) =>
+        c.column === `${table}.deleted_at` ||
+        c.column === 'deleted_at' ||
+        c.column?.endsWith('.deleted_at'),
+    );
+    const conditions = [...(set.conditions ?? [])];
+    if (!hasDeletedAtCondition && !AVOID_DELETED_AT.includes(table)) {
+      conditions.push({
+        column: `${table}.deleted_at`,
+        operator: 'IS',
+        value: null,
+      });
+    }
+
     // ── Base query params (no filters yet) ─────────────────────
     const params: Record<string, any> = {
       select: select.length ? select : ['*'],
-      where: [...(set.conditions ?? [])],
+      where: conditions,
       joins: set.joins ?? [],
       orderBy: set.orderBy ?? null,
       groupBy: set.groupBy ?? null,

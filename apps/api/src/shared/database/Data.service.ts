@@ -285,10 +285,15 @@ export class DataService {
       const select = params.select ?? ['*'];
       const isCount = typeof select === 'object' && 'count' in select;
 
+      const match = table.trim().match(/^([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)(?:\s+(?:[Aa][Ss]\s+)?([a-zA-Z_][\w$]*))?$/);
+      const baseTable = match ? match[1] : table.trim();
+      const aliasTable = match && match[2] ? match[2] : baseTable;
+      const cleanTable = baseTable.includes('.') ? baseTable.split('.').pop()! : baseTable;
+
       const baseWhere: any[] = [];
-      if (!includeDeleted && !AVOID_DELETED_AT.includes(table)) {
+      if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
         baseWhere.push({
-          column: `${table}.deleted_at`,
+          column: `${aliasTable}.deleted_at`,
           operator: 'IS',
           value: null,
         });
@@ -498,11 +503,16 @@ export class DataService {
       let usedTables = [table];
       const select = params.select ?? ['*'];
       const isCount = typeof select === 'object' && 'count' in select;
+      const match = table.trim().match(/^([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)(?:\s+(?:[Aa][Ss]\s+)?([a-zA-Z_][\w$]*))?$/);
+      const baseTable = match ? match[1] : table.trim();
+      const aliasTable = match && match[2] ? match[2] : baseTable;
+      const cleanTable = baseTable.includes('.') ? baseTable.split('.').pop()! : baseTable;
+
       // base WHERE conditions (DO NOT WRITE SQL YET)
       const baseWhere: any[] = [];
-      if (!includeDeleted && !AVOID_DELETED_AT.includes(table)) {
+      if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
         baseWhere.push({
-          column: `${table}.deleted_at`,
+          column: `${aliasTable}.deleted_at`,
           operator: 'IS',
           value: null,
         });
