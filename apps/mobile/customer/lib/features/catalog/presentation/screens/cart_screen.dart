@@ -679,13 +679,21 @@ class _CartScreenState extends State<CartScreen> {
         final price = getEffectivePrice(item);
         final qty = getItemQuantity(item);
         final itemAmount = price * qty;
-        final description = '₹${price.toStringAsFixed(0)} × $qty';
+        final p = getProductById(
+          item.variantId,
+          name: item.productName,
+          variantName: item.variantName,
+          price: price,
+          imageAsset: item.imageAsset,
+        );
+        final unitStr = p.unit.trim().isNotEmpty ? '${p.unit}  ·  ' : '';
+        final description = '$unitStr₹${price.toStringAsFixed(0)} × $qty';
 
         subtotal += itemAmount;
 
         itemRows.add(
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6.0),
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -696,20 +704,21 @@ class _CartScreenState extends State<CartScreen> {
                       Text(
                         item.productName,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: kText,
+                          letterSpacing: -0.2,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         description,
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 12.5,
                           color: kTextSub,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -718,7 +727,7 @@ class _CartScreenState extends State<CartScreen> {
                 Text(
                   '₹${itemAmount.toStringAsFixed(0)}',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 15,
                     fontWeight: FontWeight.w800,
                     color: kText,
                   ),
@@ -737,7 +746,7 @@ class _CartScreenState extends State<CartScreen> {
           const Text(
             'Order Summary',
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: kText,
               letterSpacing: -0.2,
@@ -750,7 +759,7 @@ class _CartScreenState extends State<CartScreen> {
               child: Text(
                 'No items selected',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontStyle: FontStyle.italic,
                   color: kTextSub,
                 ),
@@ -763,7 +772,7 @@ class _CartScreenState extends State<CartScreen> {
             label: 'Item Total',
             value: '₹${subtotal.toStringAsFixed(0)}',
             isBold: true,
-            fontSize: 14,
+            fontSize: 15.5,
             valueColor: kPrimary,
           ),
         ],
