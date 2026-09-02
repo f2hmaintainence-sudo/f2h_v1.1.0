@@ -14,6 +14,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import '../../../../core/widgets/hot_toast.dart';
 import '../../../../core/widgets/custom_date_picker.dart';
@@ -829,81 +830,100 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             : p.imageAsset);
 
     return _SectionCard(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Product Info Header ──────────────────────────
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+                ),
+                clipBehavior: Clip.antiAlias,
                 child: buildProductImage(
                   _currentDisplayName,
                   imageAsset: currentVariantImage,
-                  width: 60,
-                  height: 60,
+                  width: 68,
+                  height: 68,
                   fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _currentDisplayName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: kText,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      p.vendor.isNotEmpty ? p.vendor : 'Farm Fresh',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      p.vendor,
-                      style: const TextStyle(fontSize: 11, color: kTextSub),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 6,
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
                           '₹${_subscriptionUnitPrice.toStringAsFixed(0)}/unit',
-                          style: const TextStyle(
-                            fontSize: 13,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
                             fontWeight: FontWeight.w900,
-                            color: kPrimary,
+                            color: const Color(0xFF16A34A),
                           ),
                         ),
                         if (_variant.originalPrice > _subscriptionUnitPrice) ...[
+                          const SizedBox(width: 6),
                           Text(
                             'MRP ₹${_variant.originalPrice.toStringAsFixed(0)}',
-                            style: const TextStyle(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: kMuted,
+                              color: const Color(0xFF94A3B8),
                               decoration: TextDecoration.lineThrough,
                             ),
                           ),
-                          if (_variant.discountPercent > 0)
+                          if (_variant.discountPercent > 0) ...[
+                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1.5,
+                                horizontal: 6,
+                                vertical: 2,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFDCFCE7),
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 '${_variant.discountPercent}% OFF',
-                                style: const TextStyle(
+                                style: GoogleFonts.plusJakartaSans(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF166534),
+                                  color: const Color(0xFF15803D),
                                 ),
                               ),
                             ),
+                          ],
                         ],
                       ],
                     ),
@@ -914,85 +934,136 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           ),
 
           if (vars.length > 1) ...[
+            const SizedBox(height: 14),
+            Container(height: 1, color: const Color(0xFFF1F5F9)),
             const SizedBox(height: 12),
-            const Text(
-              'SELECT VARIANT',
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w900,
-                color: kTextSub,
-                letterSpacing: 0.8,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'SELECT PACK SIZE / VARIANT',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF64748B),
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                Text(
+                  '${vars.length} options',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Wrap(
-              spacing: 8,
-              runSpacing: 6,
+              spacing: 10,
+              runSpacing: 10,
               children: vars.map((v) {
                 final isSel = v.id == _variant.id;
                 final subPrice = v.subscriptionPrice ?? v.price;
                 final isGone = v.isOutOfStock;
+                final variantTitle = (v.formattedUnit.isNotEmpty && v.formattedUnit != 'Standard')
+                    ? v.formattedUnit
+                    : v.label;
+
                 return GestureDetector(
-                  onTap: () => setState(() => _variant = v),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _variant = v);
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
+                      horizontal: 14,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: isSel ? (isGone ? kMuted : kPrimary) : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
+                      color: isSel
+                          ? const Color(0xFFF0FDF4)
+                          : (isGone ? const Color(0xFFF8FAFC) : Colors.white),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSel
-                            ? (isGone ? kMuted : kPrimary)
-                            : const Color(0xFFE0E0E0),
-                        width: isSel ? 1.5 : 1.0,
+                            ? const Color(0xFF16A34A)
+                            : (isGone ? const Color(0xFFE2E8F0) : const Color(0xFFCBD5E1)),
+                        width: isSel ? 1.8 : 1.0,
                       ),
+                      boxShadow: isSel
+                          ? [
+                              const BoxShadow(
+                                color: Color(0x1A16A34A),
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          v.label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: isSel
-                                ? Colors.white
-                                : (isGone ? kTextSub : kText),
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              variantTitle,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
+                                color: isGone
+                                    ? const Color(0xFF94A3B8)
+                                    : (isSel ? const Color(0xFF14532D) : const Color(0xFF1E293B)),
+                              ),
+                            ),
+                            if (isSel) ...[
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: Color(0xFF16A34A),
+                                size: 14,
+                              ),
+                            ],
+                          ],
                         ),
-                        if (isGone)
+                        if (isGone) ...[
+                          const SizedBox(height: 2),
                           Text(
                             'OUT OF STOCK',
-                            style: TextStyle(
-                              fontSize: 8,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 8.5,
                               fontWeight: FontWeight.w900,
-                              color: isSel
-                                  ? Colors.white
-                                  : const Color(0xFFD32F2F),
+                              color: const Color(0xFFDC2626),
+                              letterSpacing: 0.2,
                             ),
                           ),
-                        const SizedBox(height: 2),
+                        ],
+                        const SizedBox(height: 3),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               '₹${subPrice.toStringAsFixed(0)}/unit',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                                color: isSel ? Colors.white : kPrimary,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                                color: isGone
+                                    ? const Color(0xFF94A3B8)
+                                    : (isSel ? const Color(0xFF15803D) : const Color(0xFF16A34A)),
                               ),
                             ),
                             if (v.originalPrice > subPrice) ...[
                               const SizedBox(width: 4),
                               Text(
                                 '₹${v.originalPrice.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w500,
-                                  color: isSel ? Colors.white60 : kMuted,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF94A3B8),
                                   decoration: TextDecoration.lineThrough,
                                 ),
                               ),
