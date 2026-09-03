@@ -12,6 +12,7 @@
 //
 // ============================================================================
 
+import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
@@ -20,6 +21,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/auth/token_storage.dart';
+import 'package:f2h_delivery/core/api/interceptors/integrity_interceptor.dart';
+import 'package:f2h_delivery/core/security/play_integrity_service.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
@@ -31,6 +34,10 @@ class DioClient {
 
   late final Dio _dio;
   late CookieJar _cookieJar;
+
+  /// Shared Play Integrity service. One instance per app so the native
+  /// token provider is warmed up once and reused for its whole lifetime.
+  final PlayIntegrityService playIntegrity = PlayIntegrityService();
 
   Future<void> init() async {
     _cookieJar = kIsWeb
@@ -62,6 +69,21 @@ class DioClient {
         onError:   _onError,
       ),
     );
+
+    // Play Integrity: added last so it sees the rewritten absolute path. It is
+    // a no-op for every route outside IntegrityProtectedRoutes, which is every
+    // dashboard, run listing and summary screen the partner reads all day.
+    _dio.interceptors.add(
+      IntegrityInterceptor(
+        service: playIntegrity,
+        dioProvider: () => _dio,
+      ),
+    );
+
+    // Warm up the native token provider in the background. Deliberately not
+    // awaited: a slow Play Services handshake must not delay app start, and a
+    // failure here only means the first protected request warms up instead.
+    unawaited(playIntegrity.warmUp());
   }
 
   Future<void> _onRequest(

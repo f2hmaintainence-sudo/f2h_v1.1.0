@@ -200,8 +200,13 @@ export class CatalogController {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SOFT DELETION ENDPOINTS
+  // SOFT DELETION ENDPOINTS & PRE-DELETE CHECKS
   // ═══════════════════════════════════════════════════════════════
+
+  @Get('/product/:id/delete-check')
+  async checkProductCanDelete(@Param('id') id: string) {
+    return this.catalogService.checkProductCanDelete(id);
+  }
 
   @Delete('/product/:id/delete')
   async softDeleteProduct(@Param('id') id: string, @Req() req: any) {
@@ -213,6 +218,11 @@ export class CatalogController {
   async softDeleteVariant(@Param('id') id: string, @Req() req: any) {
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
     return this.catalogService.softDeleteVariant(id, adminId);
+  }
+
+  @Get('/categories/:id/delete-check')
+  async checkCategoryCanDelete(@Param('id') id: string) {
+    return this.catalogService.checkCategoryCanDelete(id);
   }
 
   @Delete('/categories/:id/delete')

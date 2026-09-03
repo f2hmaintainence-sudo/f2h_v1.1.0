@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
+import 'package:f2h_delivery/core/security/play_integrity_service.dart';
 import 'package:f2h_delivery/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:f2h_delivery/auth/data/datasources/auth_local_datasource.dart';
 import 'package:f2h_delivery/auth/data/repositories/auth_repository_impl.dart';
@@ -36,6 +37,9 @@ Future<void> init() async {
   final dioClient = DioClient();
   await dioClient.init();
   sl.registerLazySingleton(() => dioClient);
+  // The same instance the DioClient interceptor uses, so anything that
+  // needs to check or re-warm Play Integrity shares one native provider.
+  sl.registerLazySingleton<PlayIntegrityService>(() => dioClient.playIntegrity);
 
   final configRepo = ConfigRepository(dioClient: dioClient);
   await configRepo.hydrateLocalConfig();

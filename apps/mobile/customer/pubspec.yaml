@@ -48,6 +48,9 @@ dependencies:
   http: ^1.6.0
   cached_network_image: ^3.4.1
   dio: ^5.9.2
+  # Promoted from a transitive dependency: PlayIntegrityService hashes
+  # method|path|nonce into the Play Integrity request hash.
+  crypto: ^3.0.6
   dio_cookie_manager: ^3.4.0
   cookie_jar: ^4.0.9
   flutter_bloc: ^9.1.1

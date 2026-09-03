@@ -74,6 +74,12 @@ export default function TableComponents({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteRow, setDeleteRow] = useState<RowData | null>(null);
+  const [deleteChecking, setDeleteChecking] = useState(false);
+  const [deleteCheckData, setDeleteCheckData] = useState<{
+    canDelete?: boolean;
+    message?: string;
+    items?: Array<{ id: string | number; identifier?: string; name: string; extra?: string }>;
+  } | null>(null);
 
   const refreshTable = useCallback(() => {
     setTableKey((prev) => prev + 1);
@@ -114,6 +120,9 @@ export default function TableComponents({
       delete:
         endpoints.delete ||
         ((id: string) => `${apiBase}/${id}/delete`),
+
+      deleteCheck:
+        ((id: string) => `${apiBase}/${id}/delete-check`),
     };
   }, [apiBase, endpoints]);
 
@@ -189,6 +198,34 @@ export default function TableComponents({
     [identifierKey]
   );
 
+  const triggerDeleteModal = useCallback(
+    (id: string, row: RowData) => {
+      setDeleteId(id);
+      setDeleteRow(row);
+      setDeleteCheckData(null);
+      setDeleteOpen(true);
+
+      const checkUrl = api.deleteCheck(id);
+      if (checkUrl) {
+        setDeleteChecking(true);
+        apiClient
+          .get<any>(checkUrl)
+          .then((res) => {
+            if (res.data?.status && res.data?.canDelete !== undefined) {
+              setDeleteCheckData(res.data);
+            }
+          })
+          .catch(() => {
+            // Ignore 404 for tables that don't have delete-check endpoint
+          })
+          .finally(() => {
+            setDeleteChecking(false);
+          });
+      }
+    },
+    [api],
+  );
+
   const handleAction = useCallback(
     async (type: string, row: RowData) => {
       const id = getRowIdentifier(row);
@@ -206,13 +243,11 @@ export default function TableComponents({
           setEditOpen(true);
           break;
         case 'delete':
-            setDeleteId(id);
-            setDeleteRow(row);
-            setDeleteOpen(true);
-        break;
+          triggerDeleteModal(id, row);
+          break;
       }
     },
-    [getRowIdentifier],
+    [getRowIdentifier, triggerDeleteModal],
   );
 
   useEffect(() => {
@@ -240,9 +275,7 @@ export default function TableComponents({
         }
       } else if (type === 'delete') {
         if (targetId) {
-          setDeleteId(targetId);
-          setDeleteRow(row || {});
-          setDeleteOpen(true);
+          triggerDeleteModal(targetId, row || {});
         }
       }
     };
@@ -465,10 +498,20 @@ export default function TableComponents({
       <DeleteConfirmModal
         isOpen={deleteOpen}
         loading={deleteLoading}
-        title={`Delete ${title}?`}
-        message={`Are you sure you want to delete this ${title}? This action cannot be undone.`}
+        isChecking={deleteChecking}
+        canDelete={deleteCheckData?.canDelete}
+        blockingMessage={deleteCheckData?.message}
+        blockingItems={deleteCheckData?.items}
+        title={deleteCheckData?.canDelete === false ? `Cannot Delete ${title}` : `Delete ${title}?`}
+        message={
+          deleteCheckData?.canDelete === false
+            ? deleteCheckData.message
+            : `Are you sure you want to delete this ${title}? This action cannot be undone.`
+        }
         itemName={
           deleteRow?.name ||
+          deleteRow?.variant_name ||
+          deleteRow?.product_name ||
           deleteRow?.title ||
           deleteRow?.code ||
           deleteId ||
@@ -478,6 +521,7 @@ export default function TableComponents({
           setDeleteOpen(false);
           setDeleteId(null);
           setDeleteRow(null);
+          setDeleteCheckData(null);
         }}
         onConfirm={handleDeleteConfirm}
       />
