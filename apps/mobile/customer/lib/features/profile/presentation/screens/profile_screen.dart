@@ -24,6 +24,7 @@ import 'package:f2h_customer/features/profile/presentation/screens/contact_us_sc
 import 'package:f2h_customer/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/zone_expansion_screen.dart';
 
 // ----------------------------------------------------------
 //  PROFILE SCREEN - Premium farm-market design
@@ -1603,6 +1604,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                         child: Column(
                           children: [
+                            _menuItem(
+                              Icons.radar_rounded,
+                              'Request Zone Coverage',
+                              const Color(0xFFFEF3C7),
+                              const Color(0xFFD97706),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ZoneExpansionScreen(),
+                                ),
+                              ),
+                            ),
+                            _divider(),
                             _menuItem(
                               Icons.support_agent_rounded,
                               'Contact & Grievance Support',

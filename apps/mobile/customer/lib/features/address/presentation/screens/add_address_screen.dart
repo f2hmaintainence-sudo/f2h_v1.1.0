@@ -13,6 +13,7 @@ import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/core/config/app_config.dart';
@@ -1066,6 +1067,248 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     }
   }
 
+  void _openZoneExpansionRequestDialog() {
+    final descController = TextEditingController();
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            Future<void> submitRequest() async {
+              setSheetState(() => isSubmitting = true);
+              try {
+                final payload = {
+                  'latitude': selectedLat,
+                  'longitude': selectedLng,
+                  'address_label': _formattedAddress.isNotEmpty
+                      ? _formattedAddress
+                      : 'Lat: ${selectedLat.toStringAsFixed(5)}, Lng: ${selectedLng.toStringAsFixed(5)}',
+                  'description': descController.text.trim().isNotEmpty
+                      ? descController.text.trim()
+                      : null,
+                };
+
+                final dioClient = sl<DioClient>();
+                final res = await dioClient.dio.post(
+                  ApiEndpoints.zoneExpansionRequest,
+                  data: payload,
+                );
+
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  if (mounted) {
+                    F2HToast.success(
+                      context,
+                      res.data?['message'] ??
+                          'Zone expansion request submitted! Our operations team will evaluate expansion to your area.',
+                    );
+                  }
+                }
+              } catch (e) {
+                setSheetState(() => isSubmitting = false);
+                if (ctx.mounted) {
+                  F2HToast.error(ctx, extractErrorMessage(e));
+                }
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.radar_rounded,
+                              color: Color(0xFFD97706),
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Request Zone Expansion',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: kText,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'We are expanding! Request delivery to this location.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: kTextSub,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Pinned location card
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: kBgDeep,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.pin_drop_rounded, size: 16, color: kPrimary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'PINNED LOCATION (${selectedLat.toStringAsFixed(4)}, ${selectedLng.toStringAsFixed(4)})',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: kTextSub,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _formattedAddress.isNotEmpty
+                                  ? _formattedAddress
+                                  : 'Selected map pin coordinates',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: kText,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Remarks / Society Details (Optional)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: kTextSub,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: kSurface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: TextField(
+                          controller: descController,
+                          maxLines: 2,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: kText,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'e.g. 50+ residents interested in daily fresh milk delivery',
+                            hintStyle: TextStyle(color: kMuted, fontSize: 12),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: isSubmitting ? null : submitRequest,
+                          icon: isSubmitting
+                              ? const SizedBox.shrink()
+                              : const Icon(Icons.send_rounded, size: 18),
+                          label: isSubmitting
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'SUBMIT ZONE REQUEST',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.existing != null;
@@ -1645,43 +1888,75 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: ElevatedButton(
-                  onPressed: (isSaving || !_isLocationAllowed()) ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!_isLocationAllowed()) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          onPressed: _openZoneExpansionRequestDialog,
+                          icon: const Icon(Icons.radar_rounded, size: 18, color: Color(0xFFD97706)),
+                          label: const Text(
+                            'REQUEST ZONE EXPANSION HERE',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: Color(0xFFB45309),
+                            ),
                           ),
-                        )
-                      : !_isLocationAllowed()
-                      ? const Text(
-                          'LOCATION OUTSIDE SERVICE AREA',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            fontSize: 13,
-                          ),
-                        )
-                      : Text(
-                          isEdit ? 'SAVE CHANGES' : 'SAVE ADDRESS',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                            fontSize: 13,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFEF3C7),
+                            side: const BorderSide(color: Color(0xFFF59E0B), width: 1.4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    ElevatedButton(
+                      onPressed: (isSaving || !_isLocationAllowed()) ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : !_isLocationAllowed()
+                          ? const Text(
+                              'LOCATION OUTSIDE SERVICE AREA',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                                fontSize: 13,
+                              ),
+                            )
+                          : Text(
+                              isEdit ? 'SAVE CHANGES' : 'SAVE ADDRESS',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                                fontSize: 13,
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -2312,6 +2587,33 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         ],
                       ),
                     ),
+                    if (!isDeliverable) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          onPressed: _openZoneExpansionRequestDialog,
+                          icon: const Icon(Icons.radar_rounded, size: 18, color: Color(0xFFD97706)),
+                          label: const Text(
+                            'REQUEST SERVICE AT THIS PINNED LOCATION',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.4,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFEF3C7),
+                            side: const BorderSide(color: Color(0xFFF59E0B), width: 1.4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
 
                     // Lock & Proceed Button
