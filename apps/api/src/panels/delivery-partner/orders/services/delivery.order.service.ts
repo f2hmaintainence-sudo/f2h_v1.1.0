@@ -895,16 +895,18 @@ export class DeliveryOrderService {
           COALESCE(ca.landmark, '') AS customer_landmark,
           COALESCE(ca.latitude, 0.0) AS address_lat,
           COALESCE(ca.longitude, 0.0) AS address_lng,
-          o.run_sequence AS sequence_number
+          COALESCE(dra.sequence_no, o.run_sequence) AS sequence_number
        FROM orders o
        JOIN users cu ON cu.user_id = o.customer_id
        LEFT JOIN customer_addresses ca
          ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
+       LEFT JOIN delivery_run_addresses dra
+         ON (dra.run_id = o.delivery_run_id AND dra.address_id = o.address_id)
         WHERE (o.delivery_partner_id = $1 OR o.delivery_run_id = ANY($5))
           AND o.status = ANY($3)
           AND o.scheduled_date = $2::date
           AND o.delivery_slot = $4
-        ORDER BY o.run_sequence ASC NULLS LAST,
+        ORDER BY COALESCE(dra.sequence_no, o.run_sequence) ASC NULLS LAST,
                  o.created_at ASC`,
       [String(boy.user_id), targetDate, orderStatuses, targetSlot, runIds],
     );
