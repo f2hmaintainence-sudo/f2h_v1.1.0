@@ -14,26 +14,25 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 if (!admin.apps.length) {
-  const serviceAccountPath = path.join(
-    process.cwd(),
-    'src/shared/secrets/firebasepushnotification.json',
-  );
-  const distServiceAccountPath = path.join(
-    process.cwd(),
-    'dist/shared/secrets/firebasepushnotification.json',
-  );
+  const possiblePaths = [
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
+    path.join(process.cwd(), 'apps/api/src/shared/secrets/firebasepushnotification.json'),
+    path.join(process.cwd(), 'src/shared/secrets/firebasepushnotification.json'),
+    path.join(process.cwd(), 'dist/shared/secrets/firebasepushnotification.json'),
+    path.join(process.cwd(), 'apps/api/dist/shared/secrets/firebasepushnotification.json'),
+  ].filter((p): p is string => Boolean(p && p.trim()));
 
-  let finalPath = serviceAccountPath;
-  if (fs.existsSync(distServiceAccountPath)) {
-    finalPath = distServiceAccountPath;
-  }
-
-  if (fs.existsSync(finalPath)) {
-    admin.initializeApp({
-      credential: admin.credential.cert(finalPath),
-    });
-  } else {
-    console.error('CRITICAL: Firebase service account key not found!');
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert(p),
+        });
+        break;
+      } catch (err) {
+        console.warn('Failed to initialize Firebase from path:', p, err);
+      }
+    }
   }
 }
 
@@ -41,7 +40,14 @@ if (!admin.apps.length) {
 export class AppService {
   private readonly logger = new Logger(AppService.name);
 
-  private readonly messaging = admin.messaging();
+  private get messaging() {
+    if (!admin.apps.length) return null;
+    try {
+      return admin.messaging();
+    } catch {
+      return null;
+    }
+  }
 
   constructor(
     private readonly developerService: DeveloperService,
@@ -110,6 +116,12 @@ export class AppService {
     if (!tokens || tokens.length === 0)
       return { success: false, error: 'No tokens provided' };
 
+    const messaging = this.messaging;
+    if (!messaging) {
+      this.logger.warn('Firebase Admin SDK is not initialized. Skipping push notification.');
+      return { success: false, error: 'Firebase not initialized' };
+    }
+
     const message = {
       notification: { title, body },
       data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
@@ -123,7 +135,7 @@ export class AppService {
       tokens: tokens,
     };
     try {
-      const response = await admin.messaging().sendEachForMulticast(message);
+      const response = await messaging.sendEachForMulticast(message);
       if (response.failureCount > 0) {
         response.responses.forEach((resp, idx) => {
           if (!resp.success) {
