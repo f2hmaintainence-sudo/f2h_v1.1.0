@@ -208,7 +208,7 @@ export class CatalogShowAddService {
       { name: 'ingredients', label: 'Ingredients', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Product ingredients', validation: { maxLength: 2000 }, },
       { name: 'legal_info', label: 'Legal Information', type: 'textarea', required: false, width: 'half', group: 'Content & Media', placeholder: 'Legal disclaimers and information', validation: { maxLength: 2000 }, },
       { name: 'is_subscribable', label: 'Subscribable', type: 'toggle', required: false, width: 'third', group: 'Permissions', defaultValue: false, },
-      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'third', group: 'Permissions', defaultValue: false, },
+      { name: 'is_out_of_stock', label: 'Out of Stock', type: 'toggle', required: false, width: 'third', group: 'Permissions', defaultValue: true, },
       { name: 'is_active', label: 'Active', type: 'toggle', required: false, width: 'third', group: 'Permissions', defaultValue: true, },
     ];
   }

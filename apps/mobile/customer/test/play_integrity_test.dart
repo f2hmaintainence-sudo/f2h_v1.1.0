@@ -83,6 +83,17 @@ void main() {
 
   tearDown(() => native.uninstall());
 
+  // These assertions describe a build with NO Play Integrity configuration:
+  // a debug run, a local build, an F-Droid-style sideload, or CI. When the
+  // suite is run WITH --dart-define=F2H_CLOUD_PROJECT_NUMBER, the enabled
+  // behaviour is covered by play_integrity_enabled_test.dart instead.
+  final unconfigured = const String.fromEnvironment(
+    'F2H_CLOUD_PROJECT_NUMBER',
+    defaultValue: '',
+  ).isEmpty;
+  const configuredSkip =
+      'covered by play_integrity_enabled_test.dart when F2H_CLOUD_PROJECT_NUMBER is set';
+
   // ── The canonical hash must match the NestJS implementation exactly ──────
   group('request hash', () {
     test('is sha256 of METHOD|path|nonce', () {
@@ -126,11 +137,9 @@ void main() {
 
   // ── Graceful degradation: never crash, never block ──────────────────────
   group('availability', () {
-    test('is disabled on a host/test build with no cloud project number', () {
-      // F2H_CLOUD_PROJECT_NUMBER is not defined in the test environment, and
-      // the host platform is not Android, so the whole path short-circuits.
-      expect(service.isEnabled, isFalse);
+    test('is disabled on a build with no cloud project number', () {
       expect(service.isConfigured, isFalse);
+      expect(service.isEnabled, isFalse);
     });
 
     test('warmUp resolves false instead of throwing when disabled', () async {
@@ -160,7 +169,7 @@ void main() {
       );
       expect(native.calls, isEmpty);
     });
-  });
+  }, skip: unconfigured ? false : configuredSkip);
 
   // ── The route allowlist ──────────────────────────────────────────────────
   group('protected routes', () {
@@ -242,7 +251,7 @@ void main() {
       final headers = seen.single.headers;
       expect(headers.containsKey(IntegrityInterceptor.tokenHeader), isFalse);
       expect(headers[IntegrityInterceptor.unavailableHeader], isNotNull);
-    });
+    }, skip: unconfigured ? false : configuredSkip);
   });
 }
 

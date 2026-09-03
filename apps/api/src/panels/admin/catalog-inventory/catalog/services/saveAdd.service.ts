@@ -181,7 +181,7 @@ export class CatalogSaveAddService {
         is_subscribable: false,
         is_one_time: true,
         is_returnable: false,
-        is_out_of_stock: false,
+        is_out_of_stock: true,
         gst_percentage: 0,
         unit_type: 'piece',
       };
@@ -350,7 +350,7 @@ export class CatalogSaveAddService {
         insertData.sku = insertData.product_id; // Or generate a new one, but product_id is fine and unique. Let's use generateId('SKU', 10) for clarity
         insertData.sku = generateId('SKU', 10);
       }
-      insertData.is_out_of_stock = insertData.is_out_of_stock ?? false;
+      insertData.is_out_of_stock = insertData.is_out_of_stock ?? true;
       insertData.created_by = String(adminId);
       insertData.updated_by = String(adminId);
 
