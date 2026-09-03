@@ -40,7 +40,7 @@ class AppConfig {
   // frame — an empty client id here made the first Google sign-in of a fresh
   // install fail with 'Google did not return a sign-in token'.
   static String googleServerClientId =
-      '842214638527-0hdom5v6ab9aum1jrn86treomqqhmm7m.apps.googleusercontent.com';
+      '842214638527-l1fj6ut97ct6gif1rljm1c63h3k31i6r.apps.googleusercontent.com';
   static String googleMapsApiKey = 'AIzaSyDPzNGpuT5QHHdCmlKAogNkDJj1e34urbs';
 
   /// Raster tiles are fetched through the F2H proxy rather than from the

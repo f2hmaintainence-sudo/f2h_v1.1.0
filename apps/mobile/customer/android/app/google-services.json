@@ -12,7 +12,28 @@
           "package_name": "com.f2h.customer"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "842214638527-55evejppqcb817c43av6383096j41ctr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.f2h.customer",
+            "certificate_hash": "38ed9163dfa5e11ec8943e294991a8ef6b0561a3"
+          }
+        },
+        {
+          "client_id": "842214638527-6ee4l287rvbgai6rjufdfu3t6v0tcs03.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.f2h.customer",
+            "certificate_hash": "0825abb9143a7a7a6a238166badad84cfd8c03e1"
+          }
+        },
+        {
+          "client_id": "842214638527-l1fj6ut97ct6gif1rljm1c63h3k31i6r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAM1WRkJSfx4PTbuIkl4w4A09mCSH777js"
@@ -20,7 +41,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "842214638527-0hdom5v6ab9aum1jrn86treomqqhmm7m.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "842214638527-kdqkno564i19tpbr4348i0jjddd7he0f.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.f2h.delivery"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +64,28 @@
           "package_name": "com.f2h.delivery"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "842214638527-c42iu170m36gqsvt9tdrds45gsjf9539.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.f2h.delivery",
+            "certificate_hash": "38ed9163dfa5e11ec8943e294991a8ef6b0561a3"
+          }
+        },
+        {
+          "client_id": "842214638527-of331fhsqotu29ssdts974590dqd501u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.f2h.delivery",
+            "certificate_hash": "0825abb9143a7a7a6a238166badad84cfd8c03e1"
+          }
+        },
+        {
+          "client_id": "842214638527-l1fj6ut97ct6gif1rljm1c63h3k31i6r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAM1WRkJSfx4PTbuIkl4w4A09mCSH777js"
@@ -39,7 +93,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "842214638527-0hdom5v6ab9aum1jrn86treomqqhmm7m.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "842214638527-kdqkno564i19tpbr4348i0jjddd7he0f.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.f2h.delivery"
+              }
+            }
+          ]
         }
       }
     }
