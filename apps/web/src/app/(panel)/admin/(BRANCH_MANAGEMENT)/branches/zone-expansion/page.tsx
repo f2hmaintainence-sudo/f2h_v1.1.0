@@ -111,13 +111,13 @@ interface Insights {
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }: { status: string }) => {
   const cfg: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-    pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-800 border border-amber-200', icon: <Clock size={11} /> },
-    noted: { label: 'Noted', cls: 'bg-emerald-100 text-emerald-800 border border-emerald-200', icon: <CheckCircle size={11} /> },
-    rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-800 border border-red-200', icon: <XCircle size={11} /> },
+    pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border border-amber-200/80', icon: <Clock size={11} /> },
+    noted: { label: 'Noted', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80', icon: <CheckCircle size={11} /> },
+    rejected: { label: 'Rejected', cls: 'bg-rose-50 text-rose-700 border border-rose-200/80', icon: <XCircle size={11} /> },
   };
   const c = cfg[status] ?? cfg.pending;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${c.cls}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${c.cls}`}>
       {c.icon} {c.label}
     </span>
   );
@@ -237,70 +237,70 @@ export default function ZoneExpansionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* ── Header ── */}
-      <div className="bg-gray-900 border-b border-gray-800 px-6 py-5">
+      <div className="bg-white border-b border-slate-200 px-6 py-5 shadow-xs">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/20 rounded-xl">
-              <Radio size={22} className="text-amber-400" />
+            <div className="p-2.5 bg-amber-50 border border-amber-200/60 rounded-xl">
+              <Radio size={22} className="text-amber-600" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">Zone Expansion Requests</h1>
-              <p className="text-sm text-gray-400">Customers requesting delivery coverage beyond current radius</p>
+              <h1 className="text-xl font-bold text-slate-900">Zone Expansion Requests</h1>
+              <p className="text-sm text-slate-500">Customers requesting delivery coverage beyond current radius</p>
             </div>
           </div>
           {/* Filters */}
           <div className="flex items-center gap-3 flex-wrap">
             {/* Branch filter */}
             <div className="relative">
-              <Building size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Building size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <select
                 value={selectedBranchId}
                 onChange={e => setSelectedBranchId(e.target.value)}
-                className="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg pl-8 pr-8 py-2 appearance-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-sm font-medium rounded-xl pl-8 pr-8 py-2 appearance-none focus:ring-2 focus:ring-amber-500 focus:border-transparent shadow-xs transition-colors"
               >
                 <option value="">All Branches</option>
                 {branches.map(b => (
                   <option key={b.branch_id} value={b.branch_id}>{b.branch_name}</option>
                 ))}
               </select>
-              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
             {/* Status filter */}
             <div className="relative">
-              <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                className="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg pl-8 pr-8 py-2 appearance-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-sm font-medium rounded-xl pl-8 pr-8 py-2 appearance-none focus:ring-2 focus:ring-amber-500 focus:border-transparent shadow-xs transition-colors"
               >
                 <option value="">All Status</option>
                 <option value="pending">Pending</option>
                 <option value="noted">Noted</option>
                 <option value="rejected">Rejected</option>
               </select>
-              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
         </div>
 
         {/* ── Tabs ── */}
-        <div className="flex gap-1 mt-5">
+        <div className="flex gap-1.5 mt-5 p-1 bg-slate-100 rounded-xl w-fit border border-slate-200/80">
           {(['map', 'list', 'insights'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
                 tab === t
-                  ? 'bg-amber-500 text-gray-900'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 font-medium'
               }`}
             >
               {t === 'map' && <MapPin size={15} />}
               {t === 'list' && <List size={15} />}
               {t === 'insights' && <BarChart3 size={15} />}
-              {t.charAt(0).toUpperCase() + t.slice(1)} {t === 'map' ? 'View' : t === 'list' ? '' : ''}
+              {t.charAt(0).toUpperCase() + t.slice(1)} {t === 'map' ? 'View' : ''}
             </button>
           ))}
         </div>
@@ -333,27 +333,27 @@ export default function ZoneExpansionPage() {
                         <Circle
                           center={{ lat, lng }}
                           radius={radiusKm * 1000}
-                          strokeColor="#22c55e"
+                          strokeColor="#16a34a"
                           strokeOpacity={0.85}
                           strokeWeight={2.5}
                           fillColor="#22c55e"
-                          fillOpacity={0.09}
+                          fillOpacity={0.12}
                         />
                       ) : (
                         <Polygon
                           paths={buildShapePath(lat, lng, radiusKm, shape)}
-                          strokeColor="#22c55e"
+                          strokeColor="#16a34a"
                           strokeOpacity={0.85}
                           strokeWeight={2.5}
                           fillColor="#22c55e"
-                          fillOpacity={0.09}
+                          fillOpacity={0.12}
                         />
                       )}
                       <AdvancedMarker
                         position={{ lat, lng }}
                         title={`${branch.branch_name} (${shape})`}
                       >
-                        <div className="bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg border border-emerald-400 whitespace-nowrap">
+                        <div className="bg-emerald-600 text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-md border border-emerald-400 whitespace-nowrap">
                           🏪 {branch.branch_name}
                         </div>
                       </AdvancedMarker>
@@ -380,63 +380,63 @@ export default function ZoneExpansionPage() {
               </Map>
             </APIProvider>
           ) : (
-            <div className="flex items-center justify-center h-full bg-gray-900">
-              <p className="text-gray-400">Google Maps API key not configured</p>
+            <div className="flex items-center justify-center h-full bg-slate-100">
+              <p className="text-slate-500 font-medium">Google Maps API key not configured</p>
             </div>
           )}
 
           {/* ── Map Legend ── */}
-          <div className="absolute top-4 right-4 bg-gray-900/95 border border-gray-700 rounded-xl p-4 text-xs space-y-2 shadow-xl">
-            <p className="text-gray-300 font-semibold text-sm mb-3">Legend</p>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full border-2 border-emerald-400 bg-emerald-600/20" />
-              <span className="text-gray-300">Branch Delivery Zone</span>
+          <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-4 text-xs space-y-2.5 shadow-lg text-slate-800">
+            <p className="text-slate-900 font-bold text-sm mb-2">Legend</p>
+            <div className="flex items-center gap-2.5">
+              <div className="w-4 h-4 rounded-md border-2 border-emerald-600 bg-emerald-500/20" />
+              <span className="text-slate-700 font-medium">Branch Delivery Zone (Original Shape)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-amber-500" />
-              <span className="text-gray-300">Pending Request</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-4 h-4 rounded-full bg-amber-500 shadow-xs" />
+              <span className="text-slate-700 font-medium">Pending Request</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-emerald-500" />
-              <span className="text-gray-300">Noted</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-4 h-4 rounded-full bg-emerald-500 shadow-xs" />
+              <span className="text-slate-700 font-medium">Noted for Expansion</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-red-500" />
-              <span className="text-gray-300">Rejected</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-4 h-4 rounded-full bg-rose-500 shadow-xs" />
+              <span className="text-slate-700 font-medium">Rejected</span>
             </div>
-            <hr className="border-gray-700 mt-1" />
-            <p className="text-gray-400">{pins.length} request pins shown</p>
+            <hr className="border-slate-200 mt-1" />
+            <p className="text-slate-500 font-medium">{pins.length} request pins shown</p>
           </div>
 
           {/* ── Pin Detail Panel ── */}
           {selectedPin && (
-            <div className="absolute bottom-4 left-4 w-80 bg-gray-900 border border-gray-700 rounded-2xl p-5 shadow-2xl">
+            <div className="absolute bottom-4 left-4 w-84 bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-5 shadow-2xl text-slate-900">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="font-semibold text-white">
-                    {[selectedPin.first_name, selectedPin.last_name].filter(Boolean).join(' ') || 'Unknown'}
+                  <h3 className="font-bold text-slate-900 text-base">
+                    {[selectedPin.first_name, selectedPin.last_name].filter(Boolean).join(' ') || 'Unknown Customer'}
                   </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
                     {selectedPin.branch_name} · {Number(selectedPin.distance_km).toFixed(1)} km from center
                   </p>
                 </div>
-                <button onClick={() => setSelectedPin(null)} className="text-gray-500 hover:text-white transition-colors">✕</button>
+                <button onClick={() => setSelectedPin(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1">✕</button>
               </div>
 
               <StatusBadge status={selectedPin.status} />
 
               {selectedPin.address_label && (
-                <p className="text-sm text-gray-300 mt-3 bg-gray-800 rounded-lg p-2">
-                  <MapPin size={12} className="inline mr-1 text-amber-400" />
+                <p className="text-xs text-slate-700 mt-3 bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 leading-relaxed font-medium">
+                  <MapPin size={12} className="inline mr-1 text-amber-500" />
                   {selectedPin.address_label}
                 </p>
               )}
               {selectedPin.description && (
-                <p className="text-xs text-gray-400 mt-2 italic">"{selectedPin.description}"</p>
+                <p className="text-xs text-slate-500 mt-2 italic font-normal">"{selectedPin.description}"</p>
               )}
               {selectedPin.phone && (
-                <p className="text-xs text-gray-400 mt-2">
-                  <Phone size={11} className="inline mr-1" />{selectedPin.phone}
+                <p className="text-xs text-slate-600 mt-2 font-medium">
+                  <Phone size={11} className="inline mr-1 text-slate-400" />{selectedPin.phone}
                 </p>
               )}
 
@@ -445,7 +445,7 @@ export default function ZoneExpansionPage() {
                   <button
                     onClick={() => updateStatus(selectedPin.request_id, 'noted')}
                     disabled={updatingId === selectedPin.request_id}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-xl transition-colors shadow-xs"
                   >
                     <CheckCircle size={12} className="inline mr-1" />Mark Noted
                   </button>
@@ -454,7 +454,7 @@ export default function ZoneExpansionPage() {
                   <button
                     onClick={() => updateStatus(selectedPin.request_id, 'rejected')}
                     disabled={updatingId === selectedPin.request_id}
-                    className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+                    className="flex-1 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-xl transition-colors shadow-xs"
                   >
                     <XCircle size={12} className="inline mr-1" />Reject
                   </button>
@@ -469,87 +469,87 @@ export default function ZoneExpansionPage() {
       {tab === 'list' && (
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-gray-400">{pagination.total} requests found</p>
+            <p className="text-sm font-semibold text-slate-600">{pagination.total} requests found</p>
             <button
               onClick={() => fetchRequests(pagination.page)}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg transition-colors"
+              className="flex items-center gap-2 text-sm text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl transition-colors shadow-xs font-medium"
             >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+              <RefreshCw size={13} className={loading ? 'animate-spin text-amber-500' : 'text-slate-500'} /> Refresh
             </button>
           </div>
 
           {loading ? (
             <div className="flex justify-center py-20">
-              <Loader2 size={28} className="animate-spin text-amber-400" />
+              <Loader2 size={28} className="animate-spin text-amber-500" />
             </div>
           ) : requests.length === 0 ? (
-            <div className="text-center py-20 text-gray-500">
-              <Radio size={40} className="mx-auto mb-4 opacity-30" />
-              <p className="font-medium">No zone expansion requests found</p>
+            <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-200 shadow-xs">
+              <Radio size={40} className="mx-auto mb-3 opacity-30 text-slate-400" />
+              <p className="font-semibold text-slate-600">No zone expansion requests found</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto rounded-xl border border-gray-800">
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-xs">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-900 border-b border-gray-800">
+                    <tr className="bg-slate-50/80 border-b border-slate-200">
                       {['Customer', 'Contact', 'Branch', 'Distance', 'Location', 'Description', 'Status', 'Date', 'Actions'].map(h => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                        <th key={h} className="px-4 py-3.5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800">
+                  <tbody className="divide-y divide-slate-100">
                     {requests.map(r => (
-                      <tr key={r.request_id} className="bg-gray-900/50 hover:bg-gray-800/50 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center">
-                              <User size={13} className="text-amber-400" />
+                      <tr key={r.request_id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200/60 flex items-center justify-center">
+                              <User size={14} className="text-amber-600" />
                             </div>
                             <div>
-                              <p className="font-medium text-white text-xs">
+                              <p className="font-semibold text-slate-900 text-xs">
                                 {[r.first_name, r.last_name].filter(Boolean).join(' ') || '—'}
                               </p>
-                              <p className="text-gray-500 text-xs">{r.customer_id}</p>
+                              <p className="text-slate-400 text-xs font-mono">{r.customer_id}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-300 text-xs whitespace-nowrap">
-                          {r.phone ? <span><Phone size={10} className="inline mr-1 text-gray-500" />{r.phone}</span> : '—'}
+                        <td className="px-4 py-3.5 text-slate-700 text-xs whitespace-nowrap font-medium">
+                          {r.phone ? <span><Phone size={11} className="inline mr-1 text-slate-400" />{r.phone}</span> : '—'}
                         </td>
-                        <td className="px-4 py-3 text-gray-300 text-xs whitespace-nowrap">
-                          <span className="flex items-center gap-1">
-                            <Building size={11} className="text-gray-500" />
+                        <td className="px-4 py-3.5 text-slate-800 text-xs whitespace-nowrap font-semibold">
+                          <span className="flex items-center gap-1.5">
+                            <Building size={12} className="text-slate-400" />
                             {r.branch_name || '—'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="bg-blue-900/40 text-blue-300 text-xs px-2 py-0.5 rounded-full font-mono">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className="bg-blue-50 text-blue-700 border border-blue-200/70 text-xs font-bold px-2.5 py-0.5 rounded-full font-mono">
                             {r.distance_km ? `${Number(r.distance_km).toFixed(1)} km` : '—'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-300 text-xs max-w-[180px] truncate">
+                        <td className="px-4 py-3.5 text-slate-700 text-xs max-w-[200px] truncate font-medium">
                           {r.address_label || `${Number(r.latitude).toFixed(4)}, ${Number(r.longitude).toFixed(4)}`}
                         </td>
-                        <td className="px-4 py-3 text-gray-400 text-xs max-w-[150px] truncate italic">
+                        <td className="px-4 py-3.5 text-slate-500 text-xs max-w-[150px] truncate italic">
                           {r.description || '—'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
                           <StatusBadge status={r.status} />
                         </td>
-                        <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                        <td className="px-4 py-3.5 text-slate-500 text-xs whitespace-nowrap font-medium">
                           {new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="flex gap-1.5">
                             {r.status !== 'noted' && (
                               <button
                                 onClick={() => updateStatus(r.request_id, 'noted')}
                                 disabled={updatingId === r.request_id}
                                 title="Mark as Noted"
-                                className="p-1.5 bg-emerald-900/50 hover:bg-emerald-700 disabled:opacity-50 text-emerald-400 rounded-lg transition-colors"
+                                className="p-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 disabled:opacity-50 text-emerald-700 rounded-lg transition-colors"
                               >
                                 <CheckCircle size={13} />
                               </button>
@@ -559,7 +559,7 @@ export default function ZoneExpansionPage() {
                                 onClick={() => updateStatus(r.request_id, 'pending')}
                                 disabled={updatingId === r.request_id}
                                 title="Reset to Pending"
-                                className="p-1.5 bg-amber-900/50 hover:bg-amber-700 disabled:opacity-50 text-amber-400 rounded-lg transition-colors"
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 disabled:opacity-50 text-amber-700 rounded-lg transition-colors"
                               >
                                 <Clock size={13} />
                               </button>
@@ -569,7 +569,7 @@ export default function ZoneExpansionPage() {
                                 onClick={() => updateStatus(r.request_id, 'rejected')}
                                 disabled={updatingId === r.request_id}
                                 title="Reject"
-                                className="p-1.5 bg-red-900/50 hover:bg-red-700 disabled:opacity-50 text-red-400 rounded-lg transition-colors"
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 disabled:opacity-50 text-rose-700 rounded-lg transition-colors"
                               >
                                 <XCircle size={13} />
                               </button>
@@ -585,21 +585,21 @@ export default function ZoneExpansionPage() {
               {/* Pagination */}
               {pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4 text-sm">
-                  <p className="text-gray-400">
+                  <p className="text-slate-500 font-medium">
                     Page {pagination.page} of {pagination.totalPages} · {pagination.total} total
                   </p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => fetchRequests(pagination.page - 1)}
                       disabled={pagination.page <= 1}
-                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 rounded-lg transition-colors"
+                      className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 disabled:opacity-40 rounded-xl transition-colors shadow-xs font-medium text-slate-700"
                     >
                       ← Prev
                     </button>
                     <button
                       onClick={() => fetchRequests(pagination.page + 1)}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 rounded-lg transition-colors"
+                      className="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 disabled:opacity-40 rounded-xl transition-colors shadow-xs font-medium text-slate-700"
                     >
                       Next →
                     </button>
@@ -616,56 +616,56 @@ export default function ZoneExpansionPage() {
         <div className="p-6 space-y-6">
           {!insights ? (
             <div className="flex justify-center py-20">
-              <Loader2 size={28} className="animate-spin text-amber-400" />
+              <Loader2 size={28} className="animate-spin text-amber-500" />
             </div>
           ) : (
             <>
               {/* Summary Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: 'Total Requests', value: insights.summary.total, color: 'from-blue-600 to-blue-700', icon: Radio },
-                  { label: 'Pending', value: insights.summary.pending, color: 'from-amber-600 to-amber-700', icon: Clock },
-                  { label: 'Noted', value: insights.summary.noted, color: 'from-emerald-600 to-emerald-700', icon: CheckCircle },
-                  { label: 'Rejected', value: insights.summary.rejected, color: 'from-red-600 to-red-700', icon: XCircle },
+                  { label: 'Total Requests', value: insights.summary.total, bg: 'from-blue-50 to-blue-100/60', border: 'border-blue-200/80', text: 'text-blue-900', labelText: 'text-blue-700', icon: Radio },
+                  { label: 'Pending', value: insights.summary.pending, bg: 'from-amber-50 to-amber-100/60', border: 'border-amber-200/80', text: 'text-amber-900', labelText: 'text-amber-700', icon: Clock },
+                  { label: 'Noted for Expansion', value: insights.summary.noted, bg: 'from-emerald-50 to-emerald-100/60', border: 'border-emerald-200/80', text: 'text-emerald-900', labelText: 'text-emerald-700', icon: CheckCircle },
+                  { label: 'Rejected', value: insights.summary.rejected, bg: 'from-rose-50 to-rose-100/60', border: 'border-rose-200/80', text: 'text-rose-900', labelText: 'text-rose-700', icon: XCircle },
                 ].map(card => (
-                  <div key={card.label} className={`bg-gradient-to-br ${card.color} rounded-2xl p-5 shadow-lg`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-white/80 text-sm font-medium">{card.label}</p>
-                      <card.icon size={18} className="text-white/60" />
+                  <div key={card.label} className={`bg-gradient-to-br ${card.bg} border ${card.border} rounded-2xl p-5 shadow-xs`}>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className={`${card.labelText} text-xs font-bold uppercase tracking-wider`}>{card.label}</p>
+                      <card.icon size={18} className={card.labelText} />
                     </div>
-                    <p className="text-4xl font-bold text-white">{card.value}</p>
+                    <p className={`text-3xl font-extrabold ${card.text}`}>{card.value}</p>
                   </div>
                 ))}
               </div>
 
               {/* Top Branches Table */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                 <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp size={17} className="text-amber-400" />
-                  <h2 className="text-white font-semibold">Top Branches by Request Volume</h2>
+                  <TrendingUp size={18} className="text-amber-500" />
+                  <h2 className="text-slate-900 font-bold text-base">Top Branches by Request Volume</h2>
                 </div>
                 {insights.topBranches.length === 0 ? (
-                  <p className="text-gray-500 text-sm text-center py-6">No data yet</p>
+                  <p className="text-slate-400 text-sm text-center py-6 font-medium">No data yet</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {insights.topBranches.map((b, i) => {
                       const pct = insights.topBranches[0].request_count
                         ? Math.round((b.request_count / insights.topBranches[0].request_count) * 100)
                         : 0;
                       return (
                         <div key={b.branch_id || i}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-300 font-medium">
+                          <div className="flex justify-between text-sm mb-1.5">
+                            <span className="text-slate-800 font-semibold">
                               {i + 1}. {b.branch_name || 'Unknown Branch'}
                             </span>
-                            <div className="flex gap-3 text-xs text-gray-400">
+                            <div className="flex gap-3 text-xs text-slate-500 font-medium">
                               <span>{b.request_count} total</span>
-                              <span className="text-amber-400">{b.pending_count} pending</span>
+                              <span className="text-amber-700 font-bold">{b.pending_count} pending</span>
                             </div>
                           </div>
-                          <div className="w-full bg-gray-800 rounded-full h-2">
+                          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                             <div
-                              className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+                              className="bg-amber-500 h-2.5 rounded-full transition-all duration-500"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
@@ -677,26 +677,26 @@ export default function ZoneExpansionPage() {
               </div>
 
               {/* 30-Day Trend */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
                 <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 size={17} className="text-amber-400" />
-                  <h2 className="text-white font-semibold">Last 30 Days — Daily Requests</h2>
+                  <BarChart3 size={18} className="text-amber-500" />
+                  <h2 className="text-slate-900 font-bold text-base">Last 30 Days — Daily Requests</h2>
                 </div>
                 {insights.recentTrend.length === 0 ? (
-                  <p className="text-gray-500 text-sm text-center py-6">No requests in the last 30 days</p>
+                  <p className="text-slate-400 text-sm text-center py-6 font-medium">No requests in the last 30 days</p>
                 ) : (
-                  <div className="flex items-end gap-1 h-28">
+                  <div className="flex items-end gap-1.5 h-32 pt-4">
                     {(() => {
                       const maxVal = Math.max(...insights.recentTrend.map(d => d.count), 1);
                       return insights.recentTrend.map((d, i) => (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative h-full justify-end">
                           <div
-                            className="w-full bg-amber-500 rounded-t hover:bg-amber-400 transition-colors cursor-pointer"
-                            style={{ height: `${Math.max(4, (d.count / maxVal) * 100)}%` }}
+                            className="w-full bg-amber-500 rounded-t hover:bg-amber-600 transition-colors cursor-pointer"
+                            style={{ height: `${Math.max(6, (d.count / maxVal) * 100)}%` }}
                             title={`${d.day}: ${d.count} requests`}
                           />
                           {/* tooltip on hover */}
-                          <div className="hidden group-hover:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg z-10">
+                          <div className="hidden group-hover:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap shadow-md z-10 font-medium">
                             {new Date(d.day).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}: {d.count}
                           </div>
                         </div>
@@ -712,7 +712,7 @@ export default function ZoneExpansionPage() {
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-medium animate-in slide-in-from-bottom-4 z-50">
+        <div className="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-medium animate-in slide-in-from-bottom-4 z-50">
           {toast}
         </div>
       )}

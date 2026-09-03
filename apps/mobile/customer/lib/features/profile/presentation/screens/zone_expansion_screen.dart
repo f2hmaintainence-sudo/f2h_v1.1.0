@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/core/di/injection.dart';
 
 // ══════════════════════════════════════════════════════════════════
 //  ZONE EXPANSION REQUESTS SCREEN — Customer Profile Screen Option
@@ -45,333 +49,17 @@ class _ZoneExpansionScreenState extends State<ZoneExpansionScreen> {
     }
   }
 
-  void _openNewRequestSheet() {
-    final latController = TextEditingController();
-    final lngController = TextEditingController();
-    final addressController = TextEditingController();
-    final descController = TextEditingController();
-    bool isDetectingLocation = false;
-    bool isSubmitting = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (sheetContext, setSheetState) {
-            Future<void> detectCurrentLocation() async {
-              setSheetState(() => isDetectingLocation = true);
-              try {
-                LocationPermission permission = await Geolocator.checkPermission();
-                if (permission == LocationPermission.denied) {
-                  permission = await Geolocator.requestPermission();
-                }
-                if (permission == LocationPermission.denied ||
-                    permission == LocationPermission.deniedForever) {
-                  if (ctx.mounted) {
-                    F2HToast.error(ctx, 'Location permission is required to detect GPS coordinates');
-                  }
-                  setSheetState(() => isDetectingLocation = false);
-                  return;
-                }
-
-                final pos = await Geolocator.getCurrentPosition(
-                  locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-                );
-                latController.text = pos.latitude.toStringAsFixed(6);
-                lngController.text = pos.longitude.toStringAsFixed(6);
-                if (addressController.text.trim().isEmpty) {
-                  addressController.text = 'Current GPS Location (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
-                }
-                setSheetState(() => isDetectingLocation = false);
-              } catch (err) {
-                setSheetState(() => isDetectingLocation = false);
-                if (ctx.mounted) {
-                  F2HToast.error(ctx, 'Could not fetch current GPS location');
-                }
-              }
-            }
-
-            Future<void> submit() async {
-              final lat = double.tryParse(latController.text.trim());
-              final lng = double.tryParse(lngController.text.trim());
-
-              if (lat == null || lng == null) {
-                F2HToast.error(ctx, 'Please provide valid latitude and longitude');
-                return;
-              }
-
-              setSheetState(() => isSubmitting = true);
-              try {
-                final payload = {
-                  'latitude': lat,
-                  'longitude': lng,
-                  'address_label': addressController.text.trim().isNotEmpty ? addressController.text.trim() : null,
-                  'description': descController.text.trim().isNotEmpty ? descController.text.trim() : null,
-                };
-
-                final res = await _dioClient.dio.post(
-                  ApiEndpoints.zoneExpansionRequest,
-                  data: payload,
-                );
-
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  if (mounted) {
-                    F2HToast.success(
-                      context,
-                      res.data?['message'] ?? 'Zone expansion request submitted successfully!',
-                    );
-                    _fetchRequests();
-                  }
-                }
-              } catch (e) {
-                setSheetState(() => isSubmitting = false);
-                if (ctx.mounted) {
-                  F2HToast.error(ctx, extractErrorMessage(e));
-                }
-              }
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-              ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                ),
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 44,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF3C7),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.radar_rounded,
-                              color: Color(0xFFD97706),
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Request Delivery Expansion',
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w900,
-                                    color: kText,
-                                  ),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Request delivery to your area',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: kTextSub,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // GPS Quick Button
-                      InkWell(
-                        onTap: isDetectingLocation ? null : detectCurrentLocation,
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: kBgDeep,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: kBorder),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.my_location_rounded,
-                                color: isDetectingLocation ? kMuted : kPrimary,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  isDetectingLocation
-                                      ? 'Detecting current GPS location...'
-                                      : 'Use Current GPS Location',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDetectingLocation ? kMuted : kPrimaryMid,
-                                  ),
-                                ),
-                              ),
-                              if (isDetectingLocation)
-                                const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Coordinates Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildInput(
-                              label: 'Latitude',
-                              controller: latController,
-                              hint: 'e.g. 12.9716',
-                              keyboard: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildInput(
-                              label: 'Longitude',
-                              controller: lngController,
-                              hint: 'e.g. 77.5946',
-                              keyboard: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Address / Area
-                      _buildInput(
-                        label: 'Area / Landmark / Address',
-                        controller: addressController,
-                        hint: 'e.g. Apartment Name, Road, Pincode',
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Description
-                      _buildInput(
-                        label: 'Additional Remarks (Optional)',
-                        controller: descController,
-                        hint: 'e.g. We have 50+ families looking for fresh organic milk daily',
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 22),
-
-                      // Submit Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: isSubmitting ? null : submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: isSubmitting
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'SUBMIT ZONE REQUEST',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.6,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+  Future<void> _openMapPicker() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ZoneRequestMapPickerScreen(),
+      ),
     );
-  }
 
-  Widget _buildInput({
-    required String label,
-    required TextEditingController controller,
-    required String hint,
-    TextInputType keyboard = TextInputType.text,
-    int maxLines = 1,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: kTextSub,
-            letterSpacing: 0.3,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: kSurface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder),
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboard,
-            maxLines: maxLines,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kText),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(color: kMuted, fontSize: 12),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            ),
-          ),
-        ),
-      ],
-    );
+    if (result == true && mounted) {
+      _fetchRequests();
+    }
   }
 
   @override
@@ -397,11 +85,11 @@ class _ZoneExpansionScreenState extends State<ZoneExpansionScreen> {
         centerTitle: true,
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openNewRequestSheet,
+        onPressed: _openMapPicker,
         backgroundColor: kPrimary,
-        icon: const Icon(Icons.add_location_alt_rounded, color: Colors.white, size: 20),
+        icon: const Icon(Icons.map_rounded, color: Colors.white, size: 20),
         label: const Text(
-          'Request Area',
+          'Pin Location on Map',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
@@ -463,7 +151,7 @@ class _ZoneExpansionScreenState extends State<ZoneExpansionScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Looking for delivery in an area outside our current delivery radius?\nRequest coverage and our operations team will evaluate expansion to your location!',
+              'Looking for delivery in an area outside our current delivery radius?\nPin your location on the map and our team will evaluate expansion to your area!',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -473,16 +161,16 @@ class _ZoneExpansionScreenState extends State<ZoneExpansionScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _openNewRequestSheet,
-              icon: const Icon(Icons.add_location_alt_rounded, size: 18),
+              onPressed: _openMapPicker,
+              icon: const Icon(Icons.pin_drop_rounded, size: 18),
               label: const Text(
-                'Request Coverage for My Area',
+                'Pin Location on Map',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 0,
               ),
@@ -634,6 +322,457 @@ class _ZoneExpansionScreenState extends State<ZoneExpansionScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  INTERACTIVE MAP PIN PICKER SCREEN — Replaces Lat/Long input
+// ══════════════════════════════════════════════════════════════════
+
+class ZoneRequestMapPickerScreen extends StatefulWidget {
+  const ZoneRequestMapPickerScreen({super.key});
+
+  @override
+  State<ZoneRequestMapPickerScreen> createState() => _ZoneRequestMapPickerScreenState();
+}
+
+class _ZoneRequestMapPickerScreenState extends State<ZoneRequestMapPickerScreen> {
+  final MapController _mapController = MapController();
+  final TextEditingController _descController = TextEditingController();
+
+  LatLng _currentLocation = const LatLng(12.9716, 77.5946); // Bangalore fallback
+  String _addressLabel = 'Moving map pin...';
+  bool _isGeocoding = false;
+  bool _isSubmitting = false;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _initCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        );
+        final newPoint = LatLng(pos.latitude, pos.longitude);
+        if (mounted) {
+          setState(() {
+            _currentLocation = newPoint;
+          });
+          _mapController.move(newPoint, 16.5);
+          _reverseGeocode(newPoint.latitude, newPoint.longitude);
+        }
+        return;
+      }
+    } catch (_) {}
+    _reverseGeocode(_currentLocation.latitude, _currentLocation.longitude);
+  }
+
+  Future<void> _moveToCurrentGPS() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          F2HToast.error(context, 'Location permission is required to detect GPS');
+        }
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      final pt = LatLng(pos.latitude, pos.longitude);
+      _mapController.move(pt, 16.5);
+      setState(() => _currentLocation = pt);
+      _reverseGeocode(pt.latitude, pt.longitude);
+    } catch (e) {
+      if (mounted) {
+        F2HToast.error(context, 'Could not fetch current GPS location');
+      }
+    }
+  }
+
+  Future<void> _reverseGeocode(double lat, double lng) async {
+    if (!mounted) return;
+    setState(() => _isGeocoding = true);
+
+    try {
+      final dio = sl<DioClient>().dio;
+      final response = await dio.get(
+        '/map/geocode',
+        queryParameters: {'lat': lat, 'lng': lng},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['status'] == 'OK' && data['results'] != null && (data['results'] as List).isNotEmpty) {
+          final formatted = data['results'][0]['formatted_address']?.toString();
+          if (formatted != null && mounted) {
+            setState(() {
+              _addressLabel = formatted;
+              _isGeocoding = false;
+            });
+            return;
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _addressLabel = 'Location near ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
+        _isGeocoding = false;
+      });
+    }
+  }
+
+  Future<void> _submitRequest() async {
+    setState(() => _isSubmitting = true);
+    try {
+      final payload = {
+        'latitude': _currentLocation.latitude,
+        'longitude': _currentLocation.longitude,
+        'address_label': _addressLabel.isNotEmpty ? _addressLabel : null,
+        'description': _descController.text.trim().isNotEmpty ? _descController.text.trim() : null,
+      };
+
+      final dio = sl<DioClient>().dio;
+      final res = await dio.post(
+        ApiEndpoints.zoneExpansionRequest,
+        data: payload,
+      );
+
+      if (mounted) {
+        Navigator.pop(context, true);
+        F2HToast.success(
+          context,
+          res.data?['message'] ?? 'Zone expansion request submitted! Our team will evaluate coverage for this area.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        F2HToast.error(context, extractErrorMessage(e));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kBg,
+      appBar: AppBar(
+        backgroundColor: kSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: kText, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Pin Location on Map',
+          style: TextStyle(
+            color: kText,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: Stack(
+        children: [
+          // ── FlutterMap ──
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentLocation,
+              initialZoom: 16.5,
+              minZoom: 4.0,
+              maxZoom: 19.5,
+              onPositionChanged: (position, hasGesture) {
+                if (hasGesture) {
+                  _currentLocation = position.center;
+                  _debounce?.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 500), () {
+                    _reverseGeocode(_currentLocation.latitude, _currentLocation.longitude);
+                  });
+                }
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
+                userAgentPackageName: 'com.f2h.customer',
+                maxZoom: 20,
+              ),
+            ],
+          ),
+
+          // ── Center Pin Marker (Fixed in center) ──
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 38),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.pin_drop_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                  Container(
+                    width: 4,
+                    height: 8,
+                    color: const Color(0xFFB45309),
+                  ),
+                  Container(
+                    width: 10,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Floating GPS Button ──
+          Positioned(
+            top: 16,
+            right: 16,
+            child: FloatingActionButton.small(
+              heroTag: 'gps_locate_btn',
+              onPressed: _moveToCurrentGPS,
+              backgroundColor: Colors.white,
+              foregroundColor: kPrimary,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.my_location_rounded, size: 20),
+            ),
+          ),
+
+          // ── Hint pill ──
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.pan_tool_alt_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 6),
+                  Text(
+                    'Drag map to position pin',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Bottom Confirmation Card ──
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.radar_rounded, color: Color(0xFFD97706), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Request Zone Coverage',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                ),
+                              ),
+                              Text(
+                                'Pin location where you want delivery',
+                                style: TextStyle(fontSize: 11, color: kTextSub),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Address Display
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: kBgDeep,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: kBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded, color: kPrimary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _isGeocoding
+                                ? const Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Resolving address...',
+                                        style: TextStyle(fontSize: 12, color: kTextSub),
+                                      ),
+                                    ],
+                                  )
+                                : Text(
+                                    _addressLabel,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: kText,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Remarks field
+                    Container(
+                      decoration: BoxDecoration(
+                        color: kSurface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: kBorder),
+                      ),
+                      child: TextField(
+                        controller: _descController,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kText),
+                        decoration: const InputDecoration(
+                          hintText: 'Remarks / Society Name (e.g. 50+ flats in community)',
+                          hintStyle: TextStyle(color: kMuted, fontSize: 11),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Submit Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submitRequest,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text(
+                                'SUBMIT ZONE REQUEST',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
