@@ -347,7 +347,6 @@ export class AuthService {
     const phone = body.phone ? body.phone.trim() : null;
     const roleId = (body.role || 'CUSTOMER').toUpperCase();
 
-    this.developer.debug('register', body);
     if (!email && !phone) {
       throw new BadRequestException('Email and phone is required');
     }
@@ -447,7 +446,7 @@ export class AuthService {
       if (existingUser) {
         // Update placeholder user created during OTP verification
         const incomingFcmToken = body.fcm_token || (body as any).fcmToken;
-        this.developer.debug('userUpdatePayload', { ...body, password: '[REDACTED]' });
+
         const userUpdatePayload: any = {
           email,
           user_name: userName,

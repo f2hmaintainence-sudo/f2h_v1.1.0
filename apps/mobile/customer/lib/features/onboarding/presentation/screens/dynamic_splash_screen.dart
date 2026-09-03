@@ -152,26 +152,14 @@ class _DynamicSplashScreenState extends State<DynamicSplashScreen>
                   children: [
                     const Spacer(flex: 2),
 
-                    // 1. Center Brand Logo from Assets
+                    // 1. Center Brand Logo from Assets (Highlighted, no border, no shadow)
                     Container(
-                      width: 120,
-                      height: 120,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
+                      width: 140,
+                      height: 140,
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFDCFCE7),
-                          width: 2.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF16A34A).withValues(alpha: 0.16),
-                            blurRadius: 32,
-                            spreadRadius: 4,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
                       ),
                       child: ClipOval(
                         child: Image.asset(

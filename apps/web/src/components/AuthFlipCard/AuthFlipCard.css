@@ -632,8 +632,7 @@ body {
 }
 
 .f2h-logo-img {
-  height: 46px;
-  filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.35));
+  height: 52px;
   animation: orb-breathe 4s ease-in-out infinite;
 }
 

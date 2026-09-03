@@ -236,20 +236,13 @@ class _HeroBrand extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
+            width: 86,
+            height: 86,
+            decoration: const BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: kPrimaryMid.withValues(alpha: 0.14),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
             ),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(6),
             child: const _BrandMark(),
           ),
           const SizedBox(height: 10),
