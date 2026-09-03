@@ -130,17 +130,6 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
-          // Show loading dialog
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-              ),
-            ),
-          );
-
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
             newStatus: status,
@@ -154,26 +143,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
             containerDeliveries: containerDeliveries,
-            onSuccess: () {
-              if (mounted) {
-                Navigator.pop(context); // pop loading dialog
-                DeliveryResultDialog.show(
-                  context,
-                  stop: stop,
-                  status: status,
-                  emptyBottlesCollected: emptyBottles,
-                  paymentMode: paymentMode,
-                  onNext: () {
-                    if (status == 'delivered') {
-                      MockDataService().tabNavigationNotifier.value = 2;
-                    }
-                  },
-                );
-              }
-            },
             onError: (errorMsg) {
               if (mounted) {
-                Navigator.pop(context); // pop loading dialog
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(errorMsg),

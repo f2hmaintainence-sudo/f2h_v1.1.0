@@ -111,23 +111,13 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
 
     // Populate container items from stop containerBalances
     for (var bal in widget.stop.containerBalances) {
-      final isGlass = bal.name.toLowerCase().contains('bottle') ||
-          bal.containerId == 'PKG_GLASS_BOTTLE' ||
-          bal.containerId == 'CONT-001';
-      final exp = bal.expected > 0
-          ? bal.expected
-          : (isGlass ? widget.stop.emptyBottlesExpected : 0);
-      final withCust = bal.balance > 0
-          ? bal.balance
-          : (isGlass ? widget.stop.bottlesWithCustomer : 0);
-
       _containerStates[bal.containerId] = ContainerItemState(
         containerId: bal.containerId,
         name: bal.name.isNotEmpty ? bal.name : 'Glass Bottle',
-        deliveringToday: exp,
-        customerBalance: withCust,
-        isCollecting: withCust > 0,
-        returned: withCust > 0 ? withCust : 0,
+        deliveringToday: bal.expected,
+        customerBalance: bal.balance,
+        isCollecting: bal.balance > 0,
+        returned: bal.balance > 0 ? bal.balance : 0,
       );
     }
 
@@ -413,8 +403,8 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       containerDeliveries,
     );
 
-    // Show success animation briefly then pop sheet safely
-    Timer(const Duration(milliseconds: 1500), () {
+    // Show success animation for 3 seconds then pop drawer safely
+    Timer(const Duration(seconds: 3), () {
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
@@ -1293,13 +1283,17 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
+                            color: state.deliveringToday > 0 ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                            border: Border.all(color: state.deliveringToday > 0 ? const Color(0xFFA7F3D0) : const Color(0xFFCBD5E1)),
                           ),
                           child: Text(
-                            'Delivering: ${state.deliveringToday}',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.teal),
+                            state.deliveringToday > 0 ? 'Delivering: ${state.deliveringToday}' : 'Return Only',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: state.deliveringToday > 0 ? Colors.teal : kTextSub,
+                            ),
                           ),
                         ),
                       ],
@@ -1311,45 +1305,47 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── SECTION A: Current Order Container Quantity (Display Only) ──
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Current Order Containers',
-                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Delivering today with this order',
-                                  style: TextStyle(fontSize: 10.5, color: kTextSub),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                        if (state.deliveringToday > 0) ...[
+                          // ── SECTION A: Current Order Container Quantity (Display Only) ──
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Current Order Containers',
+                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: kText),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Delivering today with this order',
+                                    style: TextStyle(fontSize: 10.5, color: kTextSub),
+                                  ),
+                                ],
                               ),
-                              child: Text(
-                                '${state.deliveringToday}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                  color: kPrimary,
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Text(
+                                  '${state.deliveringToday}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    color: kPrimary,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        const Divider(height: 1, color: kBorderLt),
-                        const SizedBox(height: 14),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          const Divider(height: 1, color: kBorderLt),
+                          const SizedBox(height: 14),
+                        ],
 
                         // ── SECTION B: Customer Held Balance (Display Only) ──
                         Row(

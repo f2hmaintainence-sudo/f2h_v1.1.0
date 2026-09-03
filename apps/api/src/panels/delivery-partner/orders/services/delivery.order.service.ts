@@ -207,12 +207,14 @@ export class DeliveryOrderService {
       const ordId = String(o.order_id);
       const custId = String(o.customer_id);
 
-      // Aggregate all container lists for this specific order/customer
+      // Include all containers: both those expected in this order AND all containers the customer currently holds
+      const orderExpectedCids = Object.keys(expectedContainersMap[ordId] || {});
+      const customerHeldCids = Object.keys(balancesMap[custId] || {}).filter(
+        cid => (balancesMap[custId]?.[cid]?.balance || 0) > 0,
+      );
+
+      const allCids = new Set([...orderExpectedCids, ...customerHeldCids]);
       const containersToCollect: any[] = [];
-      const allCids = new Set([
-        ...Object.keys(expectedContainersMap[ordId] || {}),
-        ...Object.keys(balancesMap[custId] || {}),
-      ]);
 
       for (const cid of allCids) {
         const name = expectedContainersMap[ordId]?.[cid]?.name || balancesMap[custId]?.[cid]?.name || 'Container';
@@ -230,6 +232,12 @@ export class DeliveryOrderService {
           max_collectable: expected + balance,
           collected,
         });
+      }
+
+      // Total bottles currently with customer across all types
+      let totalBottlesWithCustomer = 0;
+      for (const cid of Object.keys(balancesMap[custId] || {})) {
+        totalBottlesWithCustomer += (balancesMap[custId]?.[cid]?.balance || 0);
       }
 
       return {
@@ -271,7 +279,7 @@ export class DeliveryOrderService {
         updated_at: o.updated_at,
         empty_bottles_expected: expectedBottlesByOrder[ordId] || 0,
         empty_bottles_collected: collectedBottlesByOrder[ordId] || 0,
-        bottles_with_customer: bottlesWithCustomerByCustomer[custId] || 0,
+        bottles_with_customer: totalBottlesWithCustomer,
         containers_to_collect: containersToCollect,
         container_balances: containersToCollect,
         products: itemsByOrder[ordId] || [],
@@ -542,9 +550,13 @@ export class DeliveryOrderService {
 
     const maxAllowed = currentBalance + orderExpected;
     if (total > maxAllowed) {
-      throw new BadRequestException(
-        `Cannot collect ${total} containers. Customer only has ${currentBalance} outstanding containers (plus ${orderExpected} delivered in this order).`
-      );
+      // Customer returned more containers than currently tracked in DB.
+      // Automatically credit the surplus to issued_quantity so customer balance does not go negative
+      // and delivery is NEVER blocked with an error.
+      const surplus = total - maxAllowed;
+      await this.applyBalanceDelta(executor, params.customerId, params.containerId, {
+        issued: surplus,
+      });
     }
 
     // 1. Update customer running balance

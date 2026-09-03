@@ -256,14 +256,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => const Center(
-              child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(kPrimary)),
-            ),
-          );
-
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
             newStatus: status,
@@ -277,21 +269,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
             containerDeliveries: containerDeliveries,
-            onSuccess: () {
-              if (mounted) {
-                Navigator.pop(context); // pop loading dialog
-                DeliveryResultDialog.show(
-                  context,
-                  stop: stop,
-                  status: status,
-                  emptyBottlesCollected: emptyBottles,
-                  paymentMode: paymentMode,
-                );
-              }
-            },
             onError: (errorMsg) {
               if (mounted) {
-                Navigator.pop(context); // pop loading dialog
                 AppSnackBar.error(context, errorMsg);
               }
             },

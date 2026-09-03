@@ -873,12 +873,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           containerReturns,
           containerDeliveries,
         ) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => const Center(child: CircularProgressIndicator(color: kPrimary)),
-          );
-
           final orderId = stop.orders.isNotEmpty ? stop.orders.first.orderId : stop.stop.toString();
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
@@ -893,21 +887,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
             containerDeliveries: containerDeliveries,
-            onSuccess: () {
-              if (mounted) {
-                Navigator.pop(context); // pop loading dialog
-                DeliveryResultDialog.show(
-                  context,
-                  stop: stop,
-                  status: status,
-                  emptyBottlesCollected: emptyBottles,
-                  paymentMode: paymentMode,
-                );
-              }
-            },
             onError: (errorMsg) {
               if (mounted) {
-                Navigator.pop(context); // pop loading dialog
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(errorMsg),
