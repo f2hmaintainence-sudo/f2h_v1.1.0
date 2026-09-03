@@ -858,6 +858,91 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ],
             ],
           ),
+          if (_currentStop.containerBalances.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: kBorderLt),
+            const SizedBox(height: 12),
+            ..._currentStop.containerBalances.map((cb) {
+              final isDelivering = cb.expected > 0;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kBgDeep,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: kBorderLt),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isDelivering ? kPrimaryPl : const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.inventory_2_rounded,
+                        size: 14,
+                        color: isDelivering ? kPrimary : kTextSub,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cb.name,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: kText,
+                            ),
+                          ),
+                          Text(
+                            'ID: ${cb.containerId}',
+                            style: const TextStyle(fontSize: 10, color: kTextSub),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: isDelivering ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isDelivering ? const Color(0xFFA7F3D0) : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: Text(
+                            isDelivering ? 'Delivering: ${cb.expected}' : 'Return Only',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: isDelivering ? Colors.teal : kTextSub,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'With Customer: ${cb.balance}${isDone && cb.collected > 0 ? " · Collected: ${cb.collected}" : ""}',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: cb.balance > 0 ? Colors.orange.shade800 : kTextSub,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
           if (!isDone) ...[
             const SizedBox(height: 12),
             Container(
