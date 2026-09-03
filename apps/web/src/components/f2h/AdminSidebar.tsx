@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardCheck, Receipt, TicketPercent, RotateCcw, ArrowLeftRight, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag, Globe, UserPlus, Sliders, Smartphone } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, Receipt, TicketPercent, RotateCcw, ArrowLeftRight, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag, Globe, UserPlus, Sliders, Smartphone, Radio } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 const adminNav = [
@@ -87,6 +87,7 @@ const adminNav = [
           { name: "Branches", href: "/admin/branches/branch-config", icon: Building },
           { name: "Partner Allocation", href: "/admin/branches/partners", icon: UserCheck },
           { name: "Branch Analytics", href: "/admin/branches/analytics", icon: BarChart },
+          { name: "Zone Requests", href: "/admin/branches/zone-expansion", icon: Radio },
         ]
       },
     ],

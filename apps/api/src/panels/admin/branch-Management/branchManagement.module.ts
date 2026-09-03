@@ -25,6 +25,9 @@ import { BranchConfigService } from './branch-config.service';
 import { BranchCoverageOverlapService } from './services/branch-coverage-overlap.service';
 import { RedisModule } from 'src/shared/redis/redis.module';
 import { DeliveryManagementModule } from '../delivery/delivery.module';
+import { ZoneExpansionService } from './services/zone-expansion.service';
+import { ZoneExpansionAdminController } from './controllers/zone-expansion-admin.controller';
+import { ZoneExpansionCustomerController } from './controllers/zone-expansion-customer.controller';
 
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 
@@ -40,6 +43,8 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
     DeliveryRunsAdminController,
     StaffsrController,
     BranchConfigController,
+    ZoneExpansionAdminController,
+    ZoneExpansionCustomerController,
     // NOTE: BranchBoundariesController removed — it was a duplicate of BranchController on api/branch
   ],
   providers: [
@@ -58,6 +63,7 @@ import { PushNotificationService } from 'src/shared/pushNotifications/pushNotifi
     DeliveryProofService,
     BranchConfigService,
     BranchCoverageOverlapService,
+    ZoneExpansionService,
     DeveloperService,
     IdGeneratorService,
     PushNotificationService,
