@@ -1190,27 +1190,6 @@ class _CartScreenState extends State<CartScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () async {
-                  final chosen = await AddressSelectorDrawer.show(context);
-                  if (chosen != null && context.mounted) {
-                    await context.read<CustomerSessionCubit>().refreshSilently();
-                  }
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: !isServiceable ? const Color(0xFFDC2626) : kPrimary,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  visualDensity: VisualDensity.compact,
-                ),
-                child: Text(
-                  !isServiceable ? 'Change' : 'Change',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
             ],
           ),
           if (!isServiceable) ...[
