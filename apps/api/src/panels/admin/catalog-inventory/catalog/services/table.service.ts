@@ -379,9 +379,9 @@ export class CatalogTableService {
 
           name: ['categories.name', true],
 
-          slug: ['categories.slug', true],
+          slug: ['categories.slug', false],
 
-          description: ['categories.description', true],
+          description: ['categories.description', false],
 
           parent_id: ['categories.parent_id', true],
 

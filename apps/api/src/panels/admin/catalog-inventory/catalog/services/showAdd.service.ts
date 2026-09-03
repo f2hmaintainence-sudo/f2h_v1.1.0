@@ -247,9 +247,8 @@ export class CatalogShowAddService {
     return [
       { name: 'name', label: 'Category Name', type: 'text', required: true, width: 'half', group: 'Identity', placeholder: 'Enter category name', validation: { minLength: 2, maxLength: 100 }, },
       { name: 'parent_id', label: 'Parent Category', type: 'select', required: false, width: 'half', group: 'Identity', options: parentOptions, },
-      { name: 'description', label: 'Description', type: 'textarea', required: false, width: 'full', group: 'Additional Info', placeholder: 'Enter category description', validation: { maxLength: 1000 }, },
-      { name: 'image_url', label: 'Category Image URL (Mandatory - Min 1)', type: 'text', required: false, width: 'half', group: 'Additional Info', placeholder: 'https://images.unsplash.com/... or /uploads/...', validation: { maxLength: 1000 }, },
-      { name: 'image', label: 'Or Upload Category Image', type: 'file', required: false, width: 'half', group: 'Additional Info', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800 },
+      { name: 'image_url', label: 'Category Image URL (Mandatory - Min 1)', type: 'text', required: false, width: 'half', group: 'Media', placeholder: 'https://images.unsplash.com/... or /uploads/...', validation: { maxLength: 1000 }, },
+      { name: 'image', label: 'Or Upload Category Image', type: 'file', required: false, width: 'half', group: 'Media', accept: 'image/png,image/jpeg,image/webp', crop: true, aspectRatio: 1, cropWidth: 800, cropHeight: 800 },
       { name: 'sort_order', label: 'Sort Order', type: 'number', required: false, width: 'half', group: 'Configuration', defaultValue: 0, placeholder: '0', validation: { min: 0, max: 9999 }, },
       { name: 'is_active', label: 'Active', type: 'toggle', required: false, width: 'half', group: 'Configuration', defaultValue: true, },
     ];
