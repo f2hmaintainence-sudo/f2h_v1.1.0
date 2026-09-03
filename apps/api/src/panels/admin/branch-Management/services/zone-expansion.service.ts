@@ -2,6 +2,7 @@
 // F2H Fresh
 // File        : zone-expansion.service.ts
 // Description : Zone Expansion Request Service — Customer submit + Admin queries
+//               Customer identity always resolved via JOIN users, never stored locally.
 // ============================================================================
 
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
@@ -29,15 +30,14 @@ export class ZoneExpansionService {
       longitude: number;
       address_label?: string;
       description?: string;
-      customer_name?: string;
     },
   ) {
     try {
-      const { latitude, longitude, address_label, description, customer_name } = body;
+      const { latitude, longitude, address_label, description } = body;
 
       // Find nearest branch and compute distance
       const branchRows = await this.db.query(
-        `SELECT branch_id, branch_name, lat, lng, delivery_radius_km
+        `SELECT branch_id, lat, lng, delivery_radius_km
          FROM branches
          WHERE deleted_at IS NULL AND lat IS NOT NULL AND lng IS NOT NULL`,
         [],
@@ -74,14 +74,13 @@ export class ZoneExpansionService {
         await this.db.query(
           `UPDATE zone_expansion_requests
            SET latitude = $1, longitude = $2, address_label = $3,
-               description = $4, customer_name = $5, distance_km = $6,
+               description = $4, distance_km = $5,
                status = 'pending', updated_at = now()
-           WHERE request_id = $7`,
+           WHERE request_id = $6`,
           [
             latitude, longitude,
             address_label ?? null,
             description ?? null,
-            customer_name ?? null,
             distanceKm,
             existing[0].request_id,
           ],
@@ -97,12 +96,12 @@ export class ZoneExpansionService {
       const requestId = this.idGenerator.generateId('ZER', 8);
       await this.db.query(
         `INSERT INTO zone_expansion_requests
-           (request_id, customer_id, branch_id, customer_name,
+           (request_id, customer_id, branch_id,
             latitude, longitude, address_label, description,
             status, distance_km)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)`,
         [
-          requestId, customerId, branchId, customer_name ?? null,
+          requestId, customerId, branchId,
           latitude, longitude,
           address_label ?? null,
           description ?? null,
@@ -122,7 +121,7 @@ export class ZoneExpansionService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // CUSTOMER: Get own requests
+  // CUSTOMER: Get own requests (with branch info via JOIN)
   // ─────────────────────────────────────────────────────────────────────────
   async getCustomerRequests(customerId: string) {
     try {
@@ -131,7 +130,7 @@ export class ZoneExpansionService {
            zer.request_id, zer.latitude, zer.longitude,
            zer.address_label, zer.description, zer.status,
            zer.distance_km, zer.created_at, zer.updated_at,
-           b.branch_name
+           b.branch_name, b.city AS branch_city
          FROM zone_expansion_requests zer
          LEFT JOIN branches b ON b.branch_id = zer.branch_id
          WHERE zer.customer_id = $1 AND zer.deleted_at IS NULL
@@ -147,6 +146,7 @@ export class ZoneExpansionService {
 
   // ─────────────────────────────────────────────────────────────────────────
   // ADMIN: List requests with filters (branchId, status, page, limit)
+  //        Customer identity from JOIN users
   // ─────────────────────────────────────────────────────────────────────────
   async getAdminRequests(filters: {
     branchId?: string;
@@ -184,7 +184,7 @@ export class ZoneExpansionService {
 
       const rows = await this.db.query(
         `SELECT
-           zer.request_id, zer.customer_id, zer.customer_name,
+           zer.request_id, zer.customer_id,
            zer.latitude, zer.longitude, zer.address_label,
            zer.description, zer.status, zer.distance_km,
            zer.created_at, zer.updated_at,
@@ -269,7 +269,7 @@ export class ZoneExpansionService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // ADMIN: Map pins — lat/lng for all requests (optionally filtered by branch)
+  // ADMIN: Map pins — customer info via JOIN users
   // ─────────────────────────────────────────────────────────────────────────
   async getMapPins(branchId?: string) {
     try {
@@ -285,7 +285,7 @@ export class ZoneExpansionService {
         `SELECT
            zer.request_id, zer.latitude, zer.longitude,
            zer.address_label, zer.status, zer.distance_km,
-           zer.customer_name, zer.created_at,
+           zer.created_at,
            u.first_name, u.last_name, u.phone,
            b.branch_name
          FROM zone_expansion_requests zer

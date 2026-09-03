@@ -30,7 +30,6 @@ interface Branch {
 interface ZoneRequest {
   request_id: string;
   customer_id: string;
-  customer_name: string;
   first_name: string;
   last_name: string;
   phone: string;
@@ -341,7 +340,7 @@ export default function ZoneExpansionPage() {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-white">
-                    {selectedPin.customer_name || [selectedPin.first_name, selectedPin.last_name].filter(Boolean).join(' ') || 'Unknown'}
+                    {[selectedPin.first_name, selectedPin.last_name].filter(Boolean).join(' ') || 'Unknown'}
                   </h3>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {selectedPin.branch_name} · {Number(selectedPin.distance_km).toFixed(1)} km from center
@@ -437,7 +436,7 @@ export default function ZoneExpansionPage() {
                             </div>
                             <div>
                               <p className="font-medium text-white text-xs">
-                                {r.customer_name || [r.first_name, r.last_name].filter(Boolean).join(' ') || '—'}
+                                {[r.first_name, r.last_name].filter(Boolean).join(' ') || '—'}
                               </p>
                               <p className="text-gray-500 text-xs">{r.customer_id}</p>
                             </div>
