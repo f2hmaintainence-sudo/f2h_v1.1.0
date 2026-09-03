@@ -5,6 +5,8 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { RoleResolverService } from './auth/role-resolver.service';
 import { CsrfGuard } from './csrf/csrf.guard';
+import { PlayIntegrityGuard } from './shared/play-integrity/play-integrity.guard';
+import { PlayIntegrityModule } from './shared/play-integrity/play-integrity.module';
 import { AuthModule } from './auth/auth.module';
 import { UserHelperModule } from './helpers/UserHelper.module'
 import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
@@ -103,6 +105,7 @@ import { SystemConfigModule } from './developer/system-config/system-config.modu
     QueueModule,
 
     FieldEncryptionModule,
+    PlayIntegrityModule,
     AuthModule,
     AdminAuthModule,
     CustomerAuthModule,
@@ -191,6 +194,13 @@ import { SystemConfigModule } from './developer/system-config/system-config.modu
     {
       provide: APP_GUARD,
       useClass: CsrfGuard,
+    },
+    // Play Integrity runs after authentication and RBAC so an unauthenticated or
+    // under-privileged caller still gets 401/403. It is an additional layer, not a
+    // replacement: a route without @RequireIntegrity() is untouched by it.
+    {
+      provide: APP_GUARD,
+      useClass: PlayIntegrityGuard,
     },
     {
       provide: APP_GUARD,

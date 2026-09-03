@@ -46,6 +46,19 @@ export const envValidationSchema = Joi.object({
   FAST2SMS_ROUTE: Joi.string().allow(''),
   ENCRYPTION_SECRET: Joi.string().min(32).required(),
   DATA_ENCRYPTION_KEY: Joi.string().min(32).optional(),
+
+  // Google Play Integrity. Off by default so a checkout of this repo, a debug
+  // build, or a local API boots without any Google credential at all. Nothing
+  // here is a secret: the service-account credential is resolved separately,
+  // from `api_integrations_config` or a server-side path/JSON.
+  PLAY_INTEGRITY_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  PLAY_INTEGRITY_ENFORCE: Joi.boolean().truthy('true').falsy('false').default(true),
+  PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER: Joi.string().allow('').default(''),
+  PLAY_INTEGRITY_CUSTOMER_PACKAGE: Joi.string().default('com.f2h.customer'),
+  PLAY_INTEGRITY_DELIVERY_PACKAGE: Joi.string().default('com.f2h.delivery'),
+  PLAY_INTEGRITY_SERVICE_ACCOUNT_JSON: Joi.string().allow('').optional(),
+  PLAY_INTEGRITY_SERVICE_ACCOUNT_PATH: Joi.string().allow('').optional(),
+  PLAY_INTEGRITY_MAX_TOKEN_AGE_SECONDS: Joi.number().min(30).max(3600).default(300),
 })
   // Unknown keys are common in a shared .env; only the declared ones are validated.
   .unknown(true)
@@ -53,6 +66,17 @@ export const envValidationSchema = Joi.object({
     if (value.NODE_ENV === 'production' && !String(value.CORS_ORIGINS || '').trim()) {
       return helpers.error('any.custom', {
         message: 'CORS_ORIGINS must list the allowed browser origins in production',
+      });
+    }
+    // Turning integrity on without the Cloud project number would silently verify
+    // against the wrong Google project, so it fails at boot instead.
+    if (
+      value.PLAY_INTEGRITY_ENABLED === true &&
+      !String(value.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER || '').trim()
+    ) {
+      return helpers.error('any.custom', {
+        message:
+          'PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER is required when PLAY_INTEGRITY_ENABLED is true',
       });
     }
     return value;

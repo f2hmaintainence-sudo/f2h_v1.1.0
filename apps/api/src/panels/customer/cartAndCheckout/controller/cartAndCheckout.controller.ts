@@ -3,6 +3,7 @@ import { CartDto, CheckOutDto } from '../dto/cart.dto';
 import { CartService } from '../ModuleServices/cartAndCheckout.service';
 import { Request } from 'express';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { RequireIntegrity } from 'src/shared/play-integrity/decorators/require-integrity.decorator';
 
 @Controller({ path: 'customer', version: '1' })
 export class CartController {
@@ -24,6 +25,7 @@ export class CartController {
     return this.cartService.getCartItems((req.user as any)?.user_id);
   }
 
+  @RequireIntegrity('customer')
   @Post('/checkout/payment')
   async checkoutPayment(@Req() req: Request, @Body() body: CheckOutDto) {
     body.customer_id = (req.user as any)?.user_id;
@@ -48,6 +50,7 @@ export class CartController {
   }
 
   @Public()
+  @RequireIntegrity('customer')
   @Post('/coupon/validate')
   async validateCoupon(@Req() req: Request, @Body() body: { coupon_code: string; subtotal?: number }) {
     const customerId = this.extractCustomerId(req);

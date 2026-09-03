@@ -15,6 +15,7 @@ import {
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
+import { RequireIntegrity } from 'src/shared/play-integrity/decorators/require-integrity.decorator';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { DatabaseService } from '../../../../shared/database/Database.service';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -33,6 +34,7 @@ export class DeliveryOrderController {
     private readonly db: DatabaseService,
   ) { }
 
+  @RequireIntegrity('delivery')
   @Post(':orderId/upload-proof')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -114,6 +116,7 @@ export class DeliveryOrderController {
     return this.service.getTodayRun(userId, dateParam, status);
   }
 
+  @RequireIntegrity('delivery')
   @Post('run/:runId/start')
   @HttpCode(HttpStatus.OK)
   async startTodayRun(@Request() req: any, @Param('runId') runId: string) {
@@ -142,6 +145,7 @@ export class DeliveryOrderController {
     return this.service.checkPaymentStatusForStop(userId, runId, addressId, qrId);
   }
 
+  @RequireIntegrity('delivery')
   @Patch('run/:runId/address/:addressId/deliver')
   @HttpCode(HttpStatus.OK)
   async markStopDelivered(
@@ -154,6 +158,7 @@ export class DeliveryOrderController {
     return this.service.markStopDelivered(userId, runId, addressId, body);
   }
 
+  @RequireIntegrity('delivery')
   @Post('run/:runId/handover')
   @HttpCode(HttpStatus.OK)
   async handoverRun(@Request() req: any, @Param('runId') runId: string) {
@@ -161,6 +166,7 @@ export class DeliveryOrderController {
     return this.service.handoverRun(userId, runId);
   }
 
+  @RequireIntegrity('delivery')
   @Post('mark-out-for-delivery')
   @HttpCode(HttpStatus.OK)
   async markOrdersOutForDelivery(@Request() req: any) {
@@ -168,6 +174,7 @@ export class DeliveryOrderController {
     return this.service.markOrdersOutForDelivery(userId);
   }
 
+  @RequireIntegrity('delivery')
   @Patch(':orderId/status')
   @HttpCode(HttpStatus.OK)
   async updateOrderStatus(
@@ -185,6 +192,7 @@ export class DeliveryOrderController {
     return this.service.getPickupItems(userId, dateParam);
   }
 
+  @RequireIntegrity('delivery')
   @Post('pickup-items/confirm')
   @HttpCode(HttpStatus.OK)
   async confirmPickup(

@@ -12,6 +12,7 @@ import { DataService } from 'src/shared/database/Data.service';
 import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
+import { RequireIntegrity } from 'src/shared/play-integrity/decorators/require-integrity.decorator';
 
 @Controller({ path: '/customer/wallet', version: '1' })
 export class WalletController {
@@ -22,6 +23,7 @@ export class WalletController {
     private readonly developer: DeveloperService,
   ) {}
 
+  @RequireIntegrity('customer')
   @Post('topup')
   async walletTopup(@Req() req: Request, @Body() body: WalletTopupDto) {
     const userId = (req.user as any)?.user_id;

@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CatalogTableService } from './table.service';
 import { DeveloperService } from '../../../../../shared/logger/Developer.service';
 import { DataService } from '../../../../../shared/database/Data.service';
@@ -41,6 +46,45 @@ export class CatalogService {
 
   async softDeleteProduct(id: string, adminId: string) {
     try {
+      // 1. Fetch product to get product_id, numeric id, and name
+      const productRes = await this.dataService.query('products', {
+        select: ['id', 'product_id', 'name'],
+        where: [
+          isNaN(Number(id))
+            ? { column: 'product_id', operator: '=', value: id }
+            : { column: 'id', operator: '=', value: Number(id) },
+        ],
+      });
+
+      const product = productRes?.data?.[0];
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
+      // 2. Check if active/non-deleted variants exist for this product
+      const targetProductIds = Array.from(
+        new Set([product.product_id, String(product.id), id].filter(Boolean)),
+      );
+
+      const variantsRes = await this.dataService.query('product_variants', {
+        select: { count: '*' },
+        where: [
+          {
+            column: 'product_id',
+            operator: 'IN',
+            value: targetProductIds,
+          },
+        ],
+      });
+
+      const activeVariantsCount = Number(variantsRes?.data?.[0]?.count ?? 0);
+      if (activeVariantsCount > 0) {
+        throw new BadRequestException(
+          `Cannot delete product "${product.name || product.product_id}": There are ${activeVariantsCount} active variant(s) associated with this product. Please delete all variants first.`,
+        );
+      }
+
+      // 3. Perform soft-delete
       const result = await this.dataService.query('products', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -51,7 +95,7 @@ export class CatalogService {
           {
             column: 'id',
             operator: '=',
-            value: Number(id),
+            value: Number(product.id),
           },
         ],
       });
@@ -65,7 +109,11 @@ export class CatalogService {
         message: 'Product deleted successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof InternalServerErrorException
+      ) {
         throw error;
       }
       this.developer.error('softDeleteProduct error', { error, id });
@@ -82,11 +130,9 @@ export class CatalogService {
           updated_at: new Date().toISOString(),
         },
         where: [
-          {
-            column: 'id',
-            operator: '=',
-            value: Number(id),
-          },
+          isNaN(Number(id))
+            ? { column: 'variant_id', operator: '=', value: id }
+            : { column: 'id', operator: '=', value: Number(id) },
         ],
       });
 
@@ -109,6 +155,69 @@ export class CatalogService {
 
   async softDeleteCategory(id: string, adminId: string) {
     try {
+      // 1. Fetch category to get category_id, name, slug, numeric id
+      const catRes = await this.dataService.query('categories', {
+        select: ['id', 'category_id', 'name', 'slug'],
+        where: [
+          isNaN(Number(id))
+            ? { column: 'category_id', operator: '=', value: id }
+            : { column: 'id', operator: '=', value: Number(id) },
+        ],
+      });
+
+      const category = catRes?.data?.[0];
+      if (!category) {
+        throw new NotFoundException('Category not found');
+      }
+
+      // 2. Check if active/non-deleted products exist for this category
+      const targetCategoryIds = Array.from(
+        new Set(
+          [category.category_id, String(category.id), category.name, category.slug, id].filter(Boolean),
+        ),
+      );
+
+      const productsRes = await this.dataService.query('products', {
+        select: { count: '*' },
+        where: [
+          {
+            column: 'category_id',
+            operator: 'IN',
+            value: targetCategoryIds,
+          },
+        ],
+      });
+
+      const activeProductsCount = Number(productsRes?.data?.[0]?.count ?? 0);
+      if (activeProductsCount > 0) {
+        throw new BadRequestException(
+          `Cannot delete category "${category.name || category.category_id}": There are ${activeProductsCount} active product(s) associated with this category. Please delete or reassign all products first.`,
+        );
+      }
+
+      // 3. Check if active sub-categories exist under this category
+      const subCatIds = Array.from(
+        new Set([category.category_id, String(category.id), id].filter(Boolean)),
+      );
+      const subCatRes = await this.dataService.query('categories', {
+        select: { count: '*' },
+        where: [
+          {
+            column: 'parent_id',
+            operator: 'IN',
+            value: subCatIds,
+          },
+        ],
+      });
+
+      const subCatCount = Number(subCatRes?.data?.[0]?.count ?? 0);
+      if (subCatCount > 0) {
+        throw new BadRequestException(
+          `Cannot delete category "${category.name || category.category_id}": There are ${subCatCount} active sub-category(ies) under this category. Please delete or reassign sub-categories first.`,
+        );
+      }
+
+      // 4. Perform soft-delete
       const result = await this.dataService.query('categories', {
         update: {
           deleted_at: new Date().toISOString(),
@@ -119,7 +228,7 @@ export class CatalogService {
           {
             column: 'id',
             operator: '=',
-            value: Number(id),
+            value: Number(category.id),
           },
         ],
       });
@@ -133,7 +242,11 @@ export class CatalogService {
         message: 'Category deleted successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof InternalServerErrorException
+      ) {
         throw error;
       }
       this.developer.error('softDeleteCategory error', { error, id });

@@ -14,6 +14,7 @@ import type { Request } from 'express';
 import { Public } from 'src/auth/decorators/public.decorator';
 import { IReferralService } from './interfaces/referral.service.interface';
 import { CreateReferralDto } from './dto/create-referral.dto';
+import { RequireIntegrity } from 'src/shared/play-integrity/decorators/require-integrity.decorator';
 
 @Controller('customer/referrals')
 export class ReferralController {
@@ -82,6 +83,7 @@ export class ReferralController {
     return this.referralService.getReferralDashboard(userId);
   }
 
+  @RequireIntegrity('customer')
   @Post('add')
   @UseGuards(AuthGuard('jwt'))
   async addReferral(@Req() req: Request, @Body() dto: CreateReferralDto) {

@@ -75,4 +75,8 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Official Google Play Integrity API. Provides StandardIntegrityManager,
+    // used by PlayIntegrityPlugin.kt. No credential ships with it — the token
+    // it produces is only decryptable by the F2H API's service account.
+    implementation("com.google.android.play:integrity:1.5.0")
 }

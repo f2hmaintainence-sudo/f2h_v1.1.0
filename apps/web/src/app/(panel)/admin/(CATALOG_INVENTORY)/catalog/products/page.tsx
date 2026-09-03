@@ -98,8 +98,60 @@ export default function ProductsPage() {
         </button>
       </div>
 
-      {/* Lifecycle Guidance Banner for Product & Variant Stocking */}
-      {activeTab === "variants" ? (
+      {/* Lifecycle Guidance Banner for Category, Product & Variant Stocking */}
+      {activeTab === "categories" ? (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl text-xs shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <FolderTree size={18} />
+            </div>
+            <div>
+              <div className="font-bold text-slate-800 flex items-center gap-2">
+                <span>Catalog Structure: Categories ➔ Master Products</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-200/80 text-emerald-900 text-[10px] font-extrabold uppercase">
+                  Stage 1 of 3
+                </span>
+              </div>
+              <p className="text-slate-600 mt-0.5 leading-relaxed">
+                Categories define your store hierarchy and navigation. Create categories first so master products can be assigned to them.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("products")}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white font-bold rounded-xl transition-all shadow-xs shrink-0 self-start md:self-auto cursor-pointer"
+          >
+            <Package size={14} /> Create Products <ChevronRight size={14} />
+          </button>
+        </div>
+      ) : activeTab === "products" ? (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gradient-to-r from-slate-50 via-emerald-50/40 to-slate-50 border border-slate-200/80 rounded-2xl text-xs shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-700 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <Package size={18} />
+            </div>
+            <div>
+              <div className="font-bold text-slate-800 flex items-center gap-2">
+                <span>Catalog Lifecycle: Master Product ➔ Define Variants</span>
+                <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-800 text-[10px] font-extrabold uppercase">
+                  Stage 2 of 3
+                </span>
+              </div>
+              <p className="text-slate-600 mt-0.5 leading-relaxed">
+                Master products group your items under categories. Once created, define <strong>Variants</strong> (e.g. 500ml, 1L, 250g) to configure pricing and stock.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("variants")}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-all shadow-xs shrink-0 self-start md:self-auto cursor-pointer"
+          >
+            <Tag size={14} /> Manage Variants <ChevronRight size={14} />
+          </button>
+        </div>
+      ) : activeTab === "variants" ? (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl text-xs shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
@@ -109,7 +161,7 @@ export default function ProductsPage() {
               <div className="font-bold text-slate-800 flex items-center gap-2">
                 <span>Inventory Lifecycle: Variant ➔ Warehouse Stock</span>
                 <span className="px-2 py-0.5 rounded-md bg-emerald-200/80 text-emerald-900 text-[10px] font-extrabold uppercase">
-                  Stage 2 of 3
+                  Stage 3 of 3
                 </span>
               </div>
               <p className="text-slate-600 mt-0.5 leading-relaxed">
@@ -123,32 +175,6 @@ export default function ProductsPage() {
           >
             <WarehouseIcon size={14} /> Go to Warehouse Stock Movements <ArrowRight size={14} />
           </Link>
-        </div>
-      ) : activeTab === "products" ? (
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gradient-to-r from-slate-50 via-emerald-50/40 to-slate-50 border border-slate-200/80 rounded-2xl text-xs shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-700 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
-              <Package size={18} />
-            </div>
-            <div>
-              <div className="font-bold text-slate-800 flex items-center gap-2">
-                <span>Catalog Lifecycle: Master Product ➔ Define Variants</span>
-                <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-800 text-[10px] font-extrabold uppercase">
-                  Stage 1 of 3
-                </span>
-              </div>
-              <p className="text-slate-600 mt-0.5 leading-relaxed">
-                Master products group your items. Once created, define <strong>Variants</strong> (e.g. 500ml, 1L, 250g) to configure pricing and stock.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setActiveTab("variants")}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-all shadow-xs shrink-0 self-start md:self-auto cursor-pointer"
-          >
-            <Tag size={14} /> Manage Variants <ChevronRight size={14} />
-          </button>
         </div>
       ) : null}
 

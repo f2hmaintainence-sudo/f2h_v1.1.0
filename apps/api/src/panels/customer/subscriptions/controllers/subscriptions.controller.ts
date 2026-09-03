@@ -17,6 +17,7 @@ import { Public } from 'src/auth/decorators/public.decorator';
 import { SubscriptionsService } from '../ModuleServices/subscriptions.service';
 import { CreateSubscriptionDto } from '../dto/subscription.dto';
 import { Request } from 'express';
+import { RequireIntegrity } from 'src/shared/play-integrity/decorators/require-integrity.decorator';
 
 @Controller({ path: 'customer/subscriptions', version: '1' })
 export class SubscriptionsController {
@@ -31,6 +32,7 @@ export class SubscriptionsController {
   // }
 
   @Public()
+  @RequireIntegrity('customer')
   @Post('checkout')
   async checkout(@Req() req: Request, @Body() body: CreateSubscriptionDto) {
     try {
@@ -95,6 +97,7 @@ export class SubscriptionsController {
   }
 
   @Public()
+  @RequireIntegrity('customer')
   @Post(':id/pause')
   async pauseSubscription(
     @Param('id') id: string,
@@ -104,6 +107,7 @@ export class SubscriptionsController {
   }
 
   @Public()
+  @RequireIntegrity('customer')
   @Post(':id/resume')
   async resumeSubscription(
     @Param('id') id: string,
@@ -113,6 +117,7 @@ export class SubscriptionsController {
   }
 
   @Public()
+  @RequireIntegrity('customer')
   @Post(':id/cancel')
   async cancelSubscription(
     @Param('id') id: string,

@@ -9,7 +9,7 @@
 // ============================================================================
 
 'use client';
-
+1
 import { getApiBaseUrl } from '@/lib/api-config';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -1822,11 +1822,10 @@ export default function SkeletonForm({
               return (
                 <label
                   key={`${opt.value}-${idx}`}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                    isChecked
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${isChecked
                       ? 'bg-emerald-50 text-[#16a34a] border-emerald-300 shadow-xs'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <input
                     type="radio"

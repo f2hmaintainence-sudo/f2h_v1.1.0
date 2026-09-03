@@ -23,6 +23,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { RequireIntegrity } from 'src/shared/play-integrity/decorators/require-integrity.decorator';
 import { CustomerPaymentService } from './payment.service';
 import {
   CreatePaymentOrderDto,
@@ -47,12 +48,14 @@ export class CustomerPaymentController {
   }
 
   // ── Razorpay order lifecycle ──
+  @RequireIntegrity('customer')
   @Post('create-order')
   @UseGuards(AuthGuard('jwt'))
   async createOrder(@Req() req: Request, @Body() body: CreatePaymentOrderDto) {
     return this.paymentService.createOrder(resolveUserId(req), body);
   }
 
+  @RequireIntegrity('customer')
   @Post('verify')
   @UseGuards(AuthGuard('jwt'))
   async verifyPayment(@Req() req: Request, @Body() body: VerifyPaymentDto) {
@@ -75,6 +78,7 @@ export class CustomerPaymentController {
     return this.paymentService.getUnpaidBills(resolveUserId(req));
   }
 
+  @RequireIntegrity('customer')
   @Post('pay-wallet')
   @UseGuards(AuthGuard('jwt'))
   async payBillFromWallet(
@@ -88,6 +92,7 @@ export class CustomerPaymentController {
   }
 
   // ── Legacy aliases kept so older app builds keep working ──
+  @RequireIntegrity('customer')
   @Post('pay-online-init')
   @UseGuards(AuthGuard('jwt'))
   async payBillOnlineInit(@Req() req: Request, @Body() body: any) {
@@ -97,6 +102,7 @@ export class CustomerPaymentController {
     });
   }
 
+  @RequireIntegrity('customer')
   @Post('verify-online')
   @UseGuards(AuthGuard('jwt'))
   async verifyBillOnlinePayment(

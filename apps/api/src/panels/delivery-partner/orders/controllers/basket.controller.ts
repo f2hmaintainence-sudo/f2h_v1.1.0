@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { RequireIntegrity } from 'src/shared/play-integrity/decorators/require-integrity.decorator';
 import { JwtAuthGuard } from '../../../../auth/jwt-auth.guard';
 import { BasketService } from '../services/basket.service';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
@@ -31,6 +32,7 @@ export class BasketController {
     return this.basketService.getBasketSummary(userId, runId);
   }
 
+  @RequireIntegrity('delivery')
   @Post('reconcile')
   @HttpCode(HttpStatus.OK)
   async reconcileBasket(@Request() req: any, @Body() body: any) {
@@ -39,6 +41,7 @@ export class BasketController {
     return this.basketService.reconcileBasket(basketId, userId, body.notes);
   }
 
+  @RequireIntegrity('delivery')
   @Post('products/return-hub')
   @HttpCode(HttpStatus.OK)
   async returnProductsToHub(@Request() req: any, @Body() body: any) {
@@ -52,6 +55,7 @@ export class BasketController {
     return this.basketService.getContainerSummary(userId, runId);
   }
 
+  @RequireIntegrity('delivery')
   @Post('containers/submit-hub')
   @HttpCode(HttpStatus.OK)
   async submitContainersToHub(@Request() req: any, @Body() body: any) {
@@ -59,6 +63,7 @@ export class BasketController {
     return this.basketService.submitAllContainersToHub(userId, body);
   }
 
+  @RequireIntegrity('delivery')
   @Post('containers/submit-all')
   @HttpCode(HttpStatus.OK)
   async submitAllContainers(@Request() req: any, @Body() body: any) {
