@@ -234,7 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showConfirmation(BuildContext context, GroupedStop stop, {DeliverySessionLoaded? session}) {
+  void _showConfirmation(BuildContext context, GroupedStop stop, {DeliverySessionLoaded? session}) async {
     final sessionState = session ?? (context.read<DeliverySessionBloc>().state is DeliverySessionLoaded ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded : null);
     if (sessionState != null && !sessionState.isPickupConfirmed) {
       showPickupRequiredDialog(
