@@ -150,8 +150,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       return;
     }
 
-    if (!mounted) return;
-    showModalBottomSheet(
+    Map<String, dynamic>? confirmedResult;
+
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -160,6 +161,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (_currentStop.orders.isEmpty) return;
           final orderId = _currentStop.orders.first.orderId;
+
+          confirmedResult = {
+            'status': status,
+            'emptyBottles': emptyBottles,
+            'paymentMode': paymentMode,
+          };
 
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
@@ -175,25 +182,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             containerReturns: containerReturns,
             containerDeliveries: containerDeliveries,
           ));
-          if (mounted && Navigator.canPop(context)) {
-            Navigator.pop(context); // Pop order detail screen if still open
-          }
-
-          DeliveryResultDialog.show(
-            context,
-            stop: _currentStop,
-            status: status,
-            emptyBottlesCollected: emptyBottles,
-            paymentMode: paymentMode,
-            onNext: () {
-              if (status == 'delivered') {
-                MockDataService().tabNavigationNotifier.value = 2; // Switch to Map tab
-              }
-            },
-          );
         },
       ),
     );
+
+    if (confirmedResult != null && mounted) {
+      DeliveryResultDialog.show(
+        context,
+        stop: _currentStop,
+        status: confirmedResult!['status'] as String,
+        emptyBottlesCollected: confirmedResult!['emptyBottles'] as int? ?? 0,
+        paymentMode: confirmedResult!['paymentMode'] as String?,
+        onNext: () {
+          if (confirmedResult!['status'] == 'delivered') {
+            MockDataService().tabNavigationNotifier.value = 2; // Switch to Map tab
+          }
+        },
+      );
+    }
   }
 
   @override

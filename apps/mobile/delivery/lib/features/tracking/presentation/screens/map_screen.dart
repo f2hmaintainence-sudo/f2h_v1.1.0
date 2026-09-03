@@ -854,7 +854,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     if (!context.mounted) return;
 
-    showModalBottomSheet(
+    Map<String, dynamic>? confirmedResult;
+
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -873,6 +875,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           containerReturns,
           containerDeliveries,
         ) {
+          confirmedResult = {
+            'status': status,
+            'emptyBottles': emptyBottles,
+            'paymentMode': paymentMode,
+          };
+
           final orderId = stop.orders.isNotEmpty ? stop.orders.first.orderId : stop.stop.toString();
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
@@ -903,6 +911,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         },
       ),
     );
+
+    if (confirmedResult != null && mounted) {
+      DeliveryResultDialog.show(
+        context,
+        stop: stop,
+        status: confirmedResult!['status'] as String,
+        emptyBottlesCollected: confirmedResult!['emptyBottles'] as int? ?? 0,
+        paymentMode: confirmedResult!['paymentMode'] as String?,
+      );
+    }
   }
 
   @override

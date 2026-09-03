@@ -246,7 +246,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    showModalBottomSheet(
+    Map<String, dynamic>? confirmedResult;
+
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -255,6 +257,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
+
+          confirmedResult = {
+            'status': status,
+            'emptyBottles': emptyBottles,
+            'paymentMode': paymentMode,
+          };
 
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
@@ -278,6 +286,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
       ),
     );
+
+    if (confirmedResult != null && mounted) {
+      DeliveryResultDialog.show(
+        context,
+        stop: stop,
+        status: confirmedResult!['status'] as String,
+        emptyBottlesCollected: confirmedResult!['emptyBottles'] as int? ?? 0,
+        paymentMode: confirmedResult!['paymentMode'] as String?,
+      );
+    }
   }
 
   IconData _getVehicleIcon(String? type) {

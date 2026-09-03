@@ -119,8 +119,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       print('[DEBUG] Rider is $dist km away from stop.');
     }
 
-    if (!mounted) return;
-    showModalBottomSheet(
+    Map<String, dynamic>? confirmedResult;
+
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -129,6 +130,12 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
+
+          confirmedResult = {
+            'status': status,
+            'emptyBottles': emptyBottles,
+            'paymentMode': paymentMode,
+          };
 
           context.read<DeliverySessionBloc>().add(UpdateStopStatusEvent(
             orderId: orderId,
@@ -159,6 +166,21 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         },
       ),
     );
+
+    if (confirmedResult != null && mounted) {
+      DeliveryResultDialog.show(
+        context,
+        stop: stop,
+        status: confirmedResult!['status'] as String,
+        emptyBottlesCollected: confirmedResult!['emptyBottles'] as int? ?? 0,
+        paymentMode: confirmedResult!['paymentMode'] as String?,
+        onNext: () {
+          if (confirmedResult!['status'] == 'delivered') {
+            MockDataService().tabNavigationNotifier.value = 2;
+          }
+        },
+      );
+    }
   }
 
   void _callPhone(String phone) async {
