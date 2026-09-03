@@ -1688,7 +1688,7 @@ class _HomeSkeletonCardState extends State<_HomeSkeletonCard>
   }
 }
 
-class InfiniteAutoScrollList extends StatefulWidget {
+class InfiniteAutoScrollList extends StatelessWidget {
   final List<Widget> items;
   final double height;
   final double itemWidth;
@@ -1709,96 +1709,21 @@ class InfiniteAutoScrollList extends StatefulWidget {
   });
 
   @override
-  State<InfiniteAutoScrollList> createState() => _InfiniteAutoScrollListState();
-}
-
-class _InfiniteAutoScrollListState extends State<InfiniteAutoScrollList> {
-  late final ScrollController _scrollController;
-  Timer? _timer;
-  bool _userInteracting = false;
-  Timer? _resumeTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    final initialOffset = 1000 * widget.itemWidth;
-    _scrollController = ScrollController(initialScrollOffset: initialOffset);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startAutoScroll();
-    });
-  }
-
-  void _startAutoScroll() {
-    _timer?.cancel();
-    _timer = Timer.periodic(widget.autoScrollInterval, (timer) {
-      if (!mounted || _userInteracting || !_scrollController.hasClients) return;
-      final currentOffset = _scrollController.offset;
-
-      double targetOffset;
-      if (widget.animateClockwise) {
-        targetOffset = currentOffset + widget.itemWidth;
-      } else {
-        targetOffset = currentOffset - widget.itemWidth;
-
-        // Prevent hitting 0 by seamlessly jumping forward by a multiple of the item set length
-        if (targetOffset < widget.itemWidth * 5) {
-          final loopWidth = widget.items.length * widget.itemWidth;
-          final jumpOffset = currentOffset + (loopWidth * 100);
-          _scrollController.jumpTo(jumpOffset);
-          targetOffset = jumpOffset - widget.itemWidth;
-        }
-      }
-
-      _scrollController.animateTo(
-        targetOffset,
-        duration: widget.scrollDuration,
-        curve: Curves.easeInOut,
-      );
-    });
-  }
-
-  void _onInteraction() {
-    _userInteracting = true;
-    _timer?.cancel();
-    _resumeTimer?.cancel();
-    _resumeTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _userInteracting = false;
-        });
-        _startAutoScroll();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _resumeTimer?.cancel();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.items.isEmpty) return const SizedBox.shrink();
-    return Listener(
-      onPointerDown: (_) => _onInteraction(),
-      child: SizedBox(
-        height: widget.height,
-        child: ListView.builder(
-          controller: _scrollController,
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          padding: widget.padding,
-          itemBuilder: (context, index) {
-            final actualIndex = index % widget.items.length;
-            return SizedBox(
-              width: widget.itemWidth,
-              child: widget.items[actualIndex],
-            );
-          },
-        ),
+    if (items.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: height,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: padding ?? const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          return SizedBox(
+            width: itemWidth,
+            child: items[index],
+          );
+        },
       ),
     );
   }
