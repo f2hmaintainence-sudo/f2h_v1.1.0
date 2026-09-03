@@ -146,6 +146,7 @@ export class ZoneController {
           'branches.lat',
           'branches.lng',
           'branches.delivery_radius_km',
+          'branches.hex_shape',
         ],
         where: whereClause,
       });

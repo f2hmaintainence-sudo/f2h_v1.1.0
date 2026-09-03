@@ -14,8 +14,64 @@ import {
   Map,
   AdvancedMarker,
   Circle,
+  Polygon,
 } from '@vis.gl/react-google-maps';
 import { useClientConfig } from '@/lib/client-config';
+
+// ─── Geometry Helpers for Original Branch Shape ──────────────────────────────
+const EARTH_RADIUS_KM = 6371;
+const RECTANGLE_CORNER_BEARING_DEGREES = Math.atan2(2, 1) * (180 / Math.PI);
+
+function destinationPoint(
+  lat: number,
+  lng: number,
+  distanceKm: number,
+  bearingDegrees: number,
+): google.maps.LatLngLiteral {
+  const angularDistance = distanceKm / EARTH_RADIUS_KM;
+  const bearing = bearingDegrees * (Math.PI / 180);
+  const latitude = lat * (Math.PI / 180);
+  const longitude = lng * (Math.PI / 180);
+
+  const destinationLatitude = Math.asin(
+    Math.sin(latitude) * Math.cos(angularDistance) +
+      Math.cos(latitude) * Math.sin(angularDistance) * Math.cos(bearing),
+  );
+  const destinationLongitude =
+    longitude +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latitude),
+      Math.cos(angularDistance) -
+        Math.sin(latitude) * Math.sin(destinationLatitude),
+    );
+
+  return {
+    lat: destinationLatitude * (180 / Math.PI),
+    lng: (((destinationLongitude * (180 / Math.PI) + 540) % 360) - 180),
+  };
+}
+
+function buildShapePath(
+  lat: number,
+  lng: number,
+  radiusKm: number,
+  shape: string,
+): google.maps.LatLngLiteral[] {
+  const normalized = shape.toLowerCase();
+  const bearings =
+    normalized === 'square'
+      ? [45, 135, 225, 315]
+      : normalized === 'rectangle'
+        ? [
+            RECTANGLE_CORNER_BEARING_DEGREES,
+            180 - RECTANGLE_CORNER_BEARING_DEGREES,
+            180 + RECTANGLE_CORNER_BEARING_DEGREES,
+            360 - RECTANGLE_CORNER_BEARING_DEGREES,
+          ]
+        : [0, 60, 120, 180, 240, 300]; // default hexagon
+
+  return bearings.map((bearing) => destinationPoint(lat, lng, radiusKm, bearing));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Branch {
@@ -25,6 +81,7 @@ interface Branch {
   lng: number;
   delivery_radius_km: number;
   city?: string;
+  hex_shape?: 'hexagon' | 'circle' | 'square' | 'rectangle' | string;
 }
 
 interface ZoneRequest {
@@ -262,30 +319,47 @@ export default function ZoneExpansionPage() {
                 disableDefaultUI={false}
                 style={{ width: '100%', height: '100%' }}
               >
-                {/* Branch delivery radius circles */}
-                {displayedBranches.map(branch => (
-                  branch.lat && branch.lng ? (
+                {/* Branch delivery coverage (original shape from branches table: hexagon, circle, square, rectangle) */}
+                {displayedBranches.map(branch => {
+                  if (!branch.lat || !branch.lng) return null;
+                  const shape = (branch.hex_shape || 'hexagon').toLowerCase();
+                  const radiusKm = Number(branch.delivery_radius_km || 5);
+                  const lat = Number(branch.lat);
+                  const lng = Number(branch.lng);
+
+                  return (
                     <React.Fragment key={`branch-${branch.branch_id}`}>
-                      <Circle
-                        center={{ lat: Number(branch.lat), lng: Number(branch.lng) }}
-                        radius={Number(branch.delivery_radius_km) * 1000}
-                        strokeColor="#22c55e"
-                        strokeOpacity={0.8}
-                        strokeWeight={2}
-                        fillColor="#22c55e"
-                        fillOpacity={0.08}
-                      />
+                      {shape === 'circle' ? (
+                        <Circle
+                          center={{ lat, lng }}
+                          radius={radiusKm * 1000}
+                          strokeColor="#22c55e"
+                          strokeOpacity={0.85}
+                          strokeWeight={2.5}
+                          fillColor="#22c55e"
+                          fillOpacity={0.09}
+                        />
+                      ) : (
+                        <Polygon
+                          paths={buildShapePath(lat, lng, radiusKm, shape)}
+                          strokeColor="#22c55e"
+                          strokeOpacity={0.85}
+                          strokeWeight={2.5}
+                          fillColor="#22c55e"
+                          fillOpacity={0.09}
+                        />
+                      )}
                       <AdvancedMarker
-                        position={{ lat: Number(branch.lat), lng: Number(branch.lng) }}
-                        title={branch.branch_name}
+                        position={{ lat, lng }}
+                        title={`${branch.branch_name} (${shape})`}
                       >
                         <div className="bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg border border-emerald-400 whitespace-nowrap">
                           🏪 {branch.branch_name}
                         </div>
                       </AdvancedMarker>
                     </React.Fragment>
-                  ) : null
-                ))}
+                  );
+                })}
 
                 {/* Zone expansion request pins */}
                 {pins.map(pin => (
