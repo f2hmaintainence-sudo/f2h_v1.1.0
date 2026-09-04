@@ -5,10 +5,11 @@ module.exports = {
     {
       name: 'api-f2hfresh',
       cwd: `${MONOREPO}/apps/api`,
-      script: 'npm',
-      args: 'run start:dev',
+      script: 'dist/main.js',
+      exec_mode: 'cluster',
+      instances: 2,
       env: {
-        NODE_ENV: 'development',
+        NODE_ENV: 'production',
         APP_PORT: 5001,
         PORT: 5001,
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
