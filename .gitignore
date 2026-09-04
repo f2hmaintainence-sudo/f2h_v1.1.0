@@ -78,5 +78,8 @@ apps/api/.tile-cache/
 # `firebasepushnotification.json` is a Firebase Admin service-account private key —
 # neither belongs in git. The API reads the service account from the
 # `api_integrations_config` table first and only falls back to these files.
+keys-set
 keys-set/
+keys
+keys/
 apps/api/src/shared/secrets/*.json

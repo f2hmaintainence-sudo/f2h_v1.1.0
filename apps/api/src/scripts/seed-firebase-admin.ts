@@ -25,6 +25,7 @@ dotenv.config();
 
 const DEFAULT_KEY_PATHS = [
   path.join(__dirname, '../shared/secrets/firebasepushnotification.json'),
+  path.join(__dirname, '../../../../keys/firebase-admin-service-account.json'),
   path.join(__dirname, '../../../../keys-set/firebase-admin-service-account.json'),
   path.join(__dirname, '../../../../keys-set/customer.json'),
 ];
