@@ -25,7 +25,8 @@ dotenv.config();
 
 const DEFAULT_KEY_PATHS = [
   path.join(__dirname, '../shared/secrets/firebasepushnotification.json'),
-  path.join(__dirname, '../../../../keys-set/f2hfresh-65beb-firebase-adminsdk-fbsvc-732ac6da2d.json'),
+  path.join(__dirname, '../../../../keys-set/firebase-admin-service-account.json'),
+  path.join(__dirname, '../../../../keys-set/customer.json'),
 ];
 
 /** Fields the Admin SDK's `credential.cert()` refuses to work without. */
