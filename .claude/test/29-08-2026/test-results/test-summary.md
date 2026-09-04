@@ -184,6 +184,8 @@ Three underlying weaknesses explain the great majority of the 44 defects. They a
 | FU-005 | Referral engine rebuild — correct roles, real columns, ₹100 / ₹75 payout paths |
 | FU-006 | Postpaid billing lifecycle: generation, status vocabulary, outstanding enforcement |
 | FU-007 | Platform hardening: fail-loud data access, timezone alignment, schema-drift prevention |
+| FU-008 | Mobile Base URL Sanitization & API Duplicate Prefix Normalization (ISS-054) [Resolved] |
+| FU-009 | Delivery Partner Onboarding Schema Alignment & Role Escalation (ISS-052, ISS-053) [Resolved] |
 
 ---
 
