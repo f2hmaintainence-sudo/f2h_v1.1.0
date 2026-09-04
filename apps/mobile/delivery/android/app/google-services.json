@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "842214638527-v983krgkm1o45u4gutkubt1ivr5g4lv6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.f2h.customer",
+            "certificate_hash": "8b509a19e51679e3eaa8d90be1df62ea93fe1403"
+          }
+        },
+        {
           "client_id": "842214638527-l1fj6ut97ct6gif1rljm1c63h3k31i6r.apps.googleusercontent.com",
           "client_type": 3
         }
