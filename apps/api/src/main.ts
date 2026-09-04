@@ -45,6 +45,22 @@ async function bootstrap() {
     defaultVersion: '1',
   });
 
+  // ── Normalize duplicate /api or /api/v1 prefixes ───────────────────────────
+  // Resolves duplicate paths sent by production mobile builds (e.g. /api/v1/api/v1/...)
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.url) {
+      req.url = req.url
+        .replace(/^(\/api\/v1)+(?=\/|$|\?)/, '/api/v1')
+        .replace(/^\/api\/api\/v1(?=\/|$|\?)/, '/api/v1');
+    }
+    if ((req as any).originalUrl) {
+      (req as any).originalUrl = (req as any).originalUrl
+        .replace(/^(\/api\/v1)+(?=\/|$|\?)/, '/api/v1')
+        .replace(/^\/api\/api\/v1(?=\/|$|\?)/, '/api/v1');
+    }
+    next();
+  });
+
   // ── Gzip compression (saves 60-80% on JSON responses > 1 KB) ────────────────
   app.use(
     compression({

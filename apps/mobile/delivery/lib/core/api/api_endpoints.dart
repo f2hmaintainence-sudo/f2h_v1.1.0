@@ -34,13 +34,15 @@ class ApiEndpoints {
     return 'http://192.168.1.16:5001';
   }
 
+  /// Root host (scheme + host + port), no trailing slash or /api/v1 path.
   static String get host {
     if (kIsWeb) {
       if (Uri.base.origin.isNotEmpty && !Uri.base.origin.startsWith('null')) {
         return Uri.base.origin;
       }
     }
-    return _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
+    final raw = _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
+    return raw.replaceAll(RegExp(r'/api(/v1)?/?$'), '').replaceAll(RegExp(r'/+$'), '');
   }
 
   static String get apiBaseUrl => '$host/api/v1';

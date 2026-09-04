@@ -105,6 +105,9 @@ class DioClient {
         options.path = '$activeBase$relPath';
       }
     }
+    if (options.path.contains('/api/v1/api/v1')) {
+      options.path = options.path.replaceAll('/api/v1/api/v1', '/api/v1');
+    }
 
     final token = await TokenStorage.getAccessToken();
     if (token != null && token.isNotEmpty) {

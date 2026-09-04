@@ -131,7 +131,7 @@ Originally built and tested under `dev.f2hfresh.com`, all components listed belo
 - [x] **Target API Level:** Updated to Target API Level 36 (Android 16 compatibility maintaining min SDK for Android 11/12).
 - [x] **Release Build Command:**
   ```bash
-  flutter build appbundle --release --dart-define=F2H_API_BASE_URL=https://f2hfresh.com/api/v1
+  flutter build appbundle --release --dart-define=F2H_API_BASE_URL=https://f2hfresh.com
   ```
 
 ---
