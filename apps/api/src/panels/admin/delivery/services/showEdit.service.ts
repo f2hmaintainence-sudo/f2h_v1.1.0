@@ -29,19 +29,23 @@ export class DeliveryShowEditService {
         limit: 1,
       });
 
-      let row = result?.data?.[0];
-      if (!row) {
-        // Fallback matching by id
-        const fallback = await this.dataService.query('delivery_partners', {
-          select: ['delivery_partners.*'],
-          where: [{ column: 'delivery_partners.id', operator: '=', value: id }],
-          limit: 1,
-        });
-        row = fallback?.data?.[0];
-      }
+      const row = result?.data?.[0];
 
       if (!row) {
         throw new BadRequestException('Delivery partner not found');
+      }
+
+      // Fetch user identity fields (full_name, phone, email) from users table
+      const userRes = await this.dataService.query('users', {
+        select: ['first_name', 'last_name', 'phone', 'email', 'user_name'],
+        where: [{ column: 'user_id', operator: '=', value: id }],
+        limit: 1,
+      });
+      const userRow = userRes?.data?.[0];
+      if (userRow) {
+        row.full_name = [userRow.first_name, userRow.last_name].filter(Boolean).join(' ').trim() || userRow.user_name || '';
+        row.phone = userRow.phone || '';
+        row.email = userRow.email || '';
       }
 
       // 2. Fetch branches for dynamic options

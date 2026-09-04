@@ -373,7 +373,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verifyEmailOtp(
     @Body()
-    body: { email?: string; phone?: string; otp: string; purpose?: string },
+    body: { email?: string; phone?: string; otp: string; purpose?: string; role?: string },
     @Req() req: Request,
   ) {
     const ip =
@@ -381,8 +381,10 @@ export class AuthController {
     const purpose =
       (body.purpose as 'registration' | 'forgot_password' | 'email_change') ||
       'registration';
+    const headerRole = (req.headers['x-role'] as string | undefined)?.trim();
+    const role = body.role || headerRole || 'CUSTOMER';
     return this.authService.verifyMobileOtp(
-      { email: body.email, phone: body.phone, otp: body.otp, purpose },
+      { email: body.email, phone: body.phone, otp: body.otp, purpose, role } as any,
       ip,
     );
   }

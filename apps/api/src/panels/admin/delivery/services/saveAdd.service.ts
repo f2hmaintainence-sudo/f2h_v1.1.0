@@ -7,7 +7,9 @@ import { FormHelper } from '../../../../helpers/FormHelper';
 import { DataService } from '../../../../shared/database/Data.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { DeliveryShowAddService } from './showAdd.service';
+import { generateId } from '../../../../helpers/RandomHelper';
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class DeliverySaveAddService {
@@ -31,8 +33,8 @@ export class DeliverySaveAddService {
       }
 
       if (body.phone) {
-        const existing = await this.dataService.query('delivery_partners', {
-          select: ['delivery_partner_id'],
+        const existing = await this.dataService.query('users', {
+          select: ['user_id'],
           where: [
             {
               column: 'phone',
@@ -46,46 +48,93 @@ export class DeliverySaveAddService {
           throw new BadRequestException({
             status: false,
             message: 'Validation failed',
-            errors: { phone: 'Phone number already used by another delivery partner' },
+            errors: { phone: 'Phone number already used by another account' },
           });
         }
       }
 
-      const randomId = crypto.randomUUID ? crypto.randomUUID() : 'db_' + Date.now();
-      const insertData: Record<string, any> = {
-        id: randomId,
-        delivery_partner_id: randomId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      for (const field of fields) {
-        if (body[field.name] !== undefined && body[field.name] !== null && body[field.name] !== '') {
-          let value = body[field.name];
-          if (typeof value === 'string') value = value.trim();
-          if (field.type === 'email' && typeof value === 'string') value = value.toLowerCase();
-          insertData[field.name] = value;
+      if (body.email) {
+        const existingEmail = await this.dataService.query('users', {
+          select: ['user_id'],
+          where: [
+            {
+              column: 'email',
+              operator: '=',
+              value: String(body.email).toLowerCase().trim(),
+            },
+          ],
+          limit: 1,
+        });
+        if (existingEmail?.data?.length) {
+          throw new BadRequestException({
+            status: false,
+            message: 'Validation failed',
+            errors: { email: 'Email address already used by another account' },
+          });
         }
       }
 
-      if (insertData.daily_salary !== undefined) insertData.daily_salary = Number(insertData.daily_salary);
-      if (insertData.max_daily_orders !== undefined) insertData.max_daily_orders = Number(insertData.max_daily_orders);
-      insertData.is_active = body.is_active === true || body.is_active === 'true' || body.is_active === 1 || body.is_active === '1';
-      insertData.is_available = body.is_available === true || body.is_available === 'true' || body.is_available === 1 || body.is_available === '1';
+      const partnerId = generateId('F2H', 9);
+      const nameParts = String(body.full_name || body.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || 'Partner';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      const now = new Date().toISOString();
+      const defaultPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(defaultPassword, 12);
 
-      const result = await this.dataService.insert('delivery_partners', insertData);
-      if (!result.status) {
-        throw new InternalServerErrorException(
-          result.message || 'Database insert failed',
-        );
-      }
+      const dailySalary = body.daily_salary !== undefined && body.daily_salary !== '' ? Number(body.daily_salary) : 0;
+      const maxDailyOrders = body.max_daily_orders !== undefined && body.max_daily_orders !== '' ? Number(body.max_daily_orders) : 50;
+      const isActive = body.is_active === true || body.is_active === 'true' || body.is_active === 1 || body.is_active === '1';
+      const isAvailable = body.is_available === true || body.is_available === 'true' || body.is_available === 1 || body.is_available === '1';
+
+      await this.dataService.executeTransaction(async (tx) => {
+        // 1. Insert into users (single source of truth for identity)
+        await this.dataService.insert('users', {
+          user_id: partnerId,
+          first_name: firstName,
+          last_name: lastName,
+          user_name: [firstName, lastName].filter(Boolean).join(' ').trim(),
+          phone: body.phone ? String(body.phone).trim() : null,
+          email: body.email ? String(body.email).toLowerCase().trim() : null,
+          password: hashedPassword,
+          role_id: 'DELIVERY_PARTNER',
+          account_status: 'active',
+          created_by: adminId,
+          created_at: now,
+          updated_at: now,
+        }, { transaction: tx });
+
+        // 2. Insert into delivery_partners (domain satellite)
+        await this.dataService.insert('delivery_partners', {
+          delivery_partner_id: partnerId,
+          branch_id: body.branch_id || null,
+          daily_salary: dailySalary,
+          max_daily_orders: maxDailyOrders,
+          is_active: isActive,
+          is_available: isAvailable,
+          vehicle_type: 'BIKE',
+          vehicle_number: 'N/A',
+          created_at: now,
+          updated_at: now,
+        }, { transaction: tx });
+
+        // 3. Insert into role_assignments
+        await this.dataService.insert('role_assignments', {
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          user_id: partnerId,
+          role_id: 'DELIVERY_PARTNER',
+          is_active: 1,
+          created_at: now,
+          updated_at: now,
+        }, { transaction: tx });
+      });
 
       await this.dataService.insert('admin_audit_logs', {
         admin_id: adminId,
         action: 'delivery_partner_create',
         target_type: 'delivery_partners',
-        target_id: randomId,
-        details: JSON.stringify({ full_name: insertData.full_name, phone: insertData.phone }),
+        target_id: partnerId,
+        details: JSON.stringify({ full_name: body.full_name, phone: body.phone }),
       });
 
       return {

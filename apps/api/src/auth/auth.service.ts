@@ -464,6 +464,9 @@ export class AuthService {
         if (incomingFcmToken) {
           userUpdatePayload.fcm_token = incomingFcmToken;
         }
+        if (referrerId) {
+          userUpdatePayload.referred_by = referrerId;
+        }
 
         await this.Data.update(
           'users',
@@ -487,6 +490,9 @@ export class AuthService {
         };
         if (incomingFcmToken) {
           userInsertPayload.fcm_token = incomingFcmToken;
+        }
+        if (referrerId) {
+          userInsertPayload.referred_by = referrerId;
         }
 
         const userResult = await this.Data.insert(
@@ -605,33 +611,38 @@ export class AuthService {
           selectedBranchId = branches[0].branch_id;
         }
 
+        // Clean up any placeholder customer record created during preliminary OTP verification
+        try {
+          await this.DataBase.query(
+            `DELETE FROM customers WHERE customer_id = $1`,
+            [userId],
+          );
+        } catch (_) {}
+
         const existingDp = await this.Data.query('delivery_partners', {
           where: [{ column: 'delivery_partner_id', operator: '=', value: userId }],
           limit: 1,
         });
 
         if (existingDp?.data?.length > 0) {
-          // Update only valid delivery_partners columns (no full_name, phone, email)
+          // Update only valid delivery_partners columns (no full_name, phone, email, user_id, referred_by)
           await this.Data.update(
             'delivery_partners',
             {
-              user_id: userId,
               branch_id: selectedBranchId || existingDp.data[0].branch_id || null,
               current_lat: body.latitude !== undefined && body.latitude !== null ? Number(body.latitude) : null,
               current_lng: body.longitude !== undefined && body.longitude !== null ? Number(body.longitude) : null,
-              referred_by: referrerId,
               updated_at: now,
             },
             [{ column: 'delivery_partner_id', operator: '=', value: userId }],
             { transaction },
           );
         } else {
-          // Insert only valid delivery_partners columns (no full_name, phone, email)
+          // Insert only valid delivery_partners columns (no full_name, phone, email, user_id, referred_by)
           await this.Data.insert(
             'delivery_partners',
             {
               delivery_partner_id: userId,
-              user_id: userId,
               branch_id: selectedBranchId || null,
               is_active: false,
               is_verified: false,
@@ -640,7 +651,6 @@ export class AuthService {
               vehicle_number: 'N/A',
               current_lat: body.latitude !== undefined && body.latitude !== null ? Number(body.latitude) : null,
               current_lng: body.longitude !== undefined && body.longitude !== null ? Number(body.longitude) : null,
-              referred_by: referrerId,
               created_at: now,
               updated_at: now,
             },
@@ -956,13 +966,14 @@ export class AuthService {
       const temporaryPassword = crypto.randomBytes(32).toString('hex');
       const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
       const now = new Date();
+      const initialRole = (body as any).role === 'DELIVERY_PARTNER' ? 'DELIVERY_PARTNER' : 'CUSTOMER';
 
       const userInsertData: any = {
         user_id: userId,
         phone: phone || null,
         email: email || null,
         password: hashedPassword,
-        role_id: 'CUSTOMER',
+        role_id: initialRole,
         created_at: now,
         updated_at: now,
       };
@@ -972,23 +983,25 @@ export class AuthService {
 
       await this.Data.insert('users', userInsertData);
 
-      try {
-        const customerInsertData: any = {
-          customer_id: userId,
-          first_order_completed: false,
-          created_at: now,
-          updated_at: now,
-        };
-        await this.Data.insert('customers', customerInsertData);
-      } catch (custErr) {
-        console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
+      if (initialRole === 'CUSTOMER') {
+        try {
+          const customerInsertData: any = {
+            customer_id: userId,
+            first_order_completed: false,
+            created_at: now,
+            updated_at: now,
+          };
+          await this.Data.insert('customers', customerInsertData);
+        } catch (custErr) {
+          console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
+        }
       }
 
       user = {
         user_id: userId,
         phone: phone || null,
         email: email || null,
-        role_id: 'CUSTOMER',
+        role_id: initialRole,
       };
     } else {
       const isSatelliteActive = await this.checkSatelliteIsActive(user.user_id, user.role_id || 'CUSTOMER');
@@ -1681,6 +1694,22 @@ export class AuthService {
 
       user = { user_id: userId, email: email.toLowerCase().trim(), role_id: roleId };
     } else {
+      if (signupRole === ROLE.DELIVERY_PARTNER && user.role_id !== ROLE.DELIVERY_PARTNER) {
+        try {
+          await this.DataBase.query(
+            `UPDATE users SET role_id = $1, updated_at = NOW() WHERE user_id = $2`,
+            [ROLE.DELIVERY_PARTNER, user.user_id],
+          );
+          user.role_id = ROLE.DELIVERY_PARTNER;
+          await this.DataBase.query(
+            `DELETE FROM customers WHERE customer_id = $1`,
+            [user.user_id],
+          );
+        } catch (upgradeErr) {
+          console.error('[AuthService] Failed to upgrade user role to DELIVERY_PARTNER during Google login:', upgradeErr);
+        }
+      }
+
       if (user.role_id === ROLE.DELIVERY_PARTNER || signupRole === ROLE.DELIVERY_PARTNER) {
         try {
           const dpCheck = await this.DataBase.query(
@@ -1703,6 +1732,22 @@ export class AuthService {
               is_online: false,
               vehicle_type: 'BIKE',
               vehicle_number: 'N/A',
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+          }
+
+          // Ensure active role assignment exists
+          const raCheck = await this.DataBase.query(
+            `SELECT id FROM role_assignments WHERE user_id = $1 AND role_id = $2 LIMIT 1`,
+            [user.user_id, ROLE.DELIVERY_PARTNER],
+          );
+          if (!raCheck?.length) {
+            await this.Data.insert('role_assignments', {
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              user_id: user.user_id,
+              role_id: ROLE.DELIVERY_PARTNER,
+              is_active: 1,
               created_at: new Date(),
               updated_at: new Date(),
             });
