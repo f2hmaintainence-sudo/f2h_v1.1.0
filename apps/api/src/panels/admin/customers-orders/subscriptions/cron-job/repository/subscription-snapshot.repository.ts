@@ -173,11 +173,11 @@ export class SubscriptionSnapshotRepository {
         SELECT
           'ORD_' || upper(substr(gen_random_uuid()::text, 1, 12)),
           es.customer_id,
-          COALESCE(es.contact_name, ''),
+          LEFT(COALESCE(es.contact_name, ''), 150),
           'subscription',
           es.subscription_id,
           es.address_id,
-          COALESCE(es.address_line, 'Address not set'),
+          LEFT(COALESCE(es.address_line, 'Address not set'), 150),
           COALESCE(es.contact_mobile, ''),
           es.branch_id,
           $2,
