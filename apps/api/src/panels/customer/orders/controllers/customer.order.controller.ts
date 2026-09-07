@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, UseGuards, Req, BadRequestException, Param,
+import {
+  Body, Controller, Get, Post, UseGuards, Req, BadRequestException, Param,
   Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -396,7 +397,7 @@ export class CustomerOrderController {
             for (const bill of bills) {
               if (bill.items.length === 0) {
                 const matched = (bill.bill_id && billItemsMap.get(bill.bill_id)) ||
-                                (bill.reference_id && billItemsMap.get(bill.reference_id));
+                  (bill.reference_id && billItemsMap.get(bill.reference_id));
                 if (matched && matched.length > 0) {
                   bill.items = matched;
                   bill.item_name = matched.map((i: any) => i.item_name).join(', ');
@@ -631,19 +632,73 @@ export class CustomerOrderController {
       throw new BadRequestException(`Order cannot be cancelled: status is '${order.status}'`);
     }
 
-    // 4. Freeze time check (M_FREEZE / E_FREEZE cron syntax)
-    const mFreezeStr = process.env.M_FREEZE || '0 55 23 * * *';
-    const eFreezeStr = process.env.E_FREEZE || '0 55 11 * * *';
+    // 4. Freeze time check: dynamically fetch Delivery Run Generation Cron Time from system_configurations
+    let slotTimingsConfig: any = null;
+    try {
+      const rows = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+      );
+      if (rows?.[0]?.config_data) {
+        slotTimingsConfig = rows[0].config_data;
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to fetch slot_timings from system_configurations: ${err}`);
+    }
 
-    const parseFreezeTime = (cronStr: string) => {
-      const parts = cronStr.trim().split(/\s+/);
-      const minute = parts.length > 1 ? parseInt(parts[1], 10) : 55;
-      const hour = parts.length > 2 ? parseInt(parts[2], 10) : 23;
-      return { hour, minute };
+    const isEvening = order.delivery_slot?.toLowerCase() === 'evening';
+    const slotConfig = isEvening ? slotTimingsConfig?.evening_slot : slotTimingsConfig?.morning_slot;
+
+    // Delivery Run Generation Cron Time from system_configurations with fallback
+    const fallbackCronTime = isEvening
+      ? (process.env.E_FREEZE || '14:30')
+      : (process.env.M_FREEZE || '20:30');
+    const cronTimeStr = slotConfig?.cron_run_time || fallbackCronTime;
+
+    const parseTimeOrCron = (timeStr?: string, defaultHour = 20, defaultMinute = 30) => {
+      if (!timeStr || typeof timeStr !== 'string') {
+        return { hour: defaultHour, minute: defaultMinute };
+      }
+      const trimmed = timeStr.trim();
+      if (trimmed.includes(':')) {
+        const parts = trimmed.split(':');
+        const hour = parseInt(parts[0], 10);
+        const minute = parseInt(parts[1], 10);
+        return {
+          hour: isNaN(hour) ? defaultHour : hour,
+          minute: isNaN(minute) ? defaultMinute : minute,
+        };
+      }
+      const parts = trimmed.split(/\s+/);
+      if (parts.length >= 6) {
+        const minute = parseInt(parts[1], 10);
+        const hour = parseInt(parts[2], 10);
+        return {
+          hour: isNaN(hour) ? defaultHour : hour,
+          minute: isNaN(minute) ? defaultMinute : minute,
+        };
+      }
+      if (parts.length >= 2) {
+        const minute = parseInt(parts[0], 10);
+        const hour = parseInt(parts[1], 10);
+        return {
+          hour: isNaN(hour) ? defaultHour : hour,
+          minute: isNaN(minute) ? defaultMinute : minute,
+        };
+      }
+      return { hour: defaultHour, minute: defaultMinute };
     };
 
-    const mFreeze = parseFreezeTime(mFreezeStr);
-    const eFreeze = parseFreezeTime(eFreezeStr);
+    const { hour, minute } = parseTimeOrCron(
+      cronTimeStr,
+      isEvening ? 14 : 20,
+      isEvening ? 30 : 30,
+    );
+
+    // Day offset: morning defaults to -1 (previous day D-1), evening defaults to 0 (same day D)
+    const dayOffset = typeof slotConfig?.cron_run_day_offset === 'number'
+      ? slotConfig.cron_run_day_offset
+      : (isEvening ? 0 : -1);
+
     const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
     const dateStr = typeof order.scheduled_date === 'string'
@@ -651,23 +706,7 @@ export class CustomerOrderController {
       : new Date(order.scheduled_date).toISOString().split('T')[0];
     const [y, m, d] = dateStr.split('-').map(Number);
 
-    let freezeLimit: Date;
-    if (order.delivery_slot?.toLowerCase() === 'evening') {
-      freezeLimit = new Date(y, m - 1, d, eFreeze.hour, eFreeze.minute, 0);
-    } else {
-      const prev = new Date(y, m - 1, d - 1);
-      freezeLimit = new Date(prev.getFullYear(), prev.getMonth(), prev.getDate(), mFreeze.hour, mFreeze.minute, 0);
-    }
-
-
-    if (nowIst.getTime() >= freezeLimit.getTime()) {
-      throw new BadRequestException('Order cannot be cancelled — past dispatch freeze time.');
-    }
-
-    // 5. Cancel + wallet refund in a transaction
-    const refundAmount = Number(order.total_amount || 0);
-    const walletBalance = Number(customer.wallet_balance || 0);
-    const newBalance = walletBalance + refundAmount;
+    const freezeLimit = new Date(y, m - 1, d + dayOffset, hour, minute, 0);
 
     if (nowIst.getTime() >= freezeLimit.getTime()) {
       throw new BadRequestException({
@@ -678,6 +717,11 @@ export class CustomerOrderController {
         scheduled_date: order.scheduled_date,
       });
     }
+
+    // 5. Cancel + wallet refund in a transaction
+    const refundAmount = Number(order.total_amount || 0);
+    const walletBalance = Number(customer.wallet_balance || 0);
+    const newBalance = walletBalance + refundAmount;
     return this.data.executeTransaction(async (conn) => {
       await this.data.update(
         'orders',
@@ -750,9 +794,10 @@ export class CustomerOrderController {
       let notifMessage = `Your order #${order.order_id.substring(0, Math.min(order.order_id.length, 12))} has been successfully cancelled.`;
       if ((order.payment_mode === 'wallet' || order.payment_mode === 'upi') && refundAmount > 0) {
         notifMessage += ` A refund of ₹${refundAmount.toFixed(0)} has been credited to your wallet.`;
-      } else if (refundAmount > 0) {
-        notifMessage += ` A refund of ₹${refundAmount.toFixed(0)} is being processed via ${order.payment_mode === 'cod' ? 'Cash' : 'UPI'}.`;
       }
+      // else if (refundAmount > 0) {
+      //   notifMessage += ` A refund of ₹${refundAmount.toFixed(0)} is being processed via ${order.payment_mode === 'cod' ? 'Cash' : 'UPI'}.`;
+      // }
 
       await this.data.insert('notifications', {
         notification_id: notificationId,
