@@ -391,11 +391,10 @@ export default function DeliveryRunsPage() {
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
         <button
           onClick={() => setActiveTab("generate")}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === "generate"
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${activeTab === "generate"
               ? "bg-slate-900 text-white shadow-md shadow-slate-900/10"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-          }`}
+            }`}
         >
           <Zap size={14} className={activeTab === "generate" ? "text-amber-400" : ""} />
           <span>Auto-Generate Delivery Runs</span>
@@ -403,11 +402,10 @@ export default function DeliveryRunsPage() {
 
         <button
           onClick={() => setActiveTab("drag_board")}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === "drag_board"
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${activeTab === "drag_board"
               ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-          }`}
+            }`}
         >
           <ArrowRightLeft size={14} className={activeTab === "drag_board" ? "text-white" : "text-emerald-600"} />
           <span>2-Partner Drag & Drop Board</span>
@@ -418,11 +416,10 @@ export default function DeliveryRunsPage() {
 
         <button
           onClick={() => setActiveTab("manage")}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === "manage"
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${activeTab === "manage"
               ? "bg-slate-900 text-white shadow-md shadow-slate-900/10"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-          }`}
+            }`}
         >
           <Route size={14} className={activeTab === "manage" ? "text-emerald-400" : ""} />
           <span>Address Stops by Run</span>
@@ -524,7 +521,7 @@ export default function DeliveryRunsPage() {
 
                   <div className="space-y-4 flex-1">
                     {/* Date Picker */}
-                    <div>
+                    {/* <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-[11px] font-bold text-slate-600">Target Run Date:</label>
                         <button
@@ -549,7 +546,7 @@ export default function DeliveryRunsPage() {
                         }}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:border-emerald-500 focus:outline-none shadow-2xs"
                       />
-                    </div>
+                    </div> */}
 
                     {/* Branch Picker */}
                     <div>
@@ -583,22 +580,20 @@ export default function DeliveryRunsPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedSlot("morning")}
-                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                            selectedSlot === "morning"
+                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${selectedSlot === "morning"
                               ? "border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20"
                               : "border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-slate-100"
-                          }`}
+                            }`}
                         >
                           Morning
                         </button>
                         <button
                           type="button"
                           onClick={() => setSelectedSlot("evening")}
-                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                            selectedSlot === "evening"
+                          className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${selectedSlot === "evening"
                               ? "border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20"
                               : "border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-slate-100"
-                          }`}
+                            }`}
                         >
                           Evening
                         </button>
@@ -1061,17 +1056,16 @@ export default function DeliveryRunsPage() {
                               {run.delivery_slot}
                             </span>
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                run.status === "completed"
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${run.status === "completed"
                                   ? "bg-emerald-100 text-emerald-800"
                                   : run.status === "in_progress"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : run.status === "partial"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : run.status === "cancelled"
-                                  ? "bg-rose-100 text-rose-800"
-                                  : "bg-slate-100 text-slate-800 border border-slate-200"
-                              }`}
+                                    ? "bg-blue-100 text-blue-800"
+                                    : run.status === "partial"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : run.status === "cancelled"
+                                        ? "bg-rose-100 text-rose-800"
+                                        : "bg-slate-100 text-slate-800 border border-slate-200"
+                                }`}
                             >
                               {run.status}
                             </span>
@@ -1145,15 +1139,14 @@ export default function DeliveryRunsPage() {
                                   <td className="px-2 py-2.5 text-slate-600 max-w-[200px] truncate">{stop.address_line}</td>
                                   <td className="px-2 py-2.5 text-center">
                                     <span
-                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                                        stopStatus === "delivered"
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${stopStatus === "delivered"
                                           ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                                           : stopStatus === "failed"
-                                          ? "bg-rose-100 text-rose-800 border border-rose-200"
-                                          : stopStatus === "in_transit" || stopStatus === "in-transit"
-                                          ? "bg-sky-50 text-sky-800 border border-sky-200"
-                                          : "bg-amber-50 text-amber-800 border border-amber-200"
-                                      }`}
+                                            ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                            : stopStatus === "in_transit" || stopStatus === "in-transit"
+                                              ? "bg-sky-50 text-sky-800 border border-sky-200"
+                                              : "bg-amber-50 text-amber-800 border border-amber-200"
+                                        }`}
                                     >
                                       {stopStatus === "in_transit" || stopStatus === "in-transit" ? "In Transit" : stopStatus}
                                     </span>
@@ -1168,8 +1161,8 @@ export default function DeliveryRunsPage() {
                                         !isTransferable
                                           ? "Only pending or in-transit stops can be swapped or moved"
                                           : ["completed", "cancelled"].includes(run.status)
-                                          ? `Cannot modify ${run.status} run`
-                                          : "Swap or Move this address stop"
+                                            ? `Cannot modify ${run.status} run`
+                                            : "Swap or Move this address stop"
                                       }
                                       className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] transition-colors border border-emerald-200/60 inline-flex items-center gap-1 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                     >

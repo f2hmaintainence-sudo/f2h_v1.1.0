@@ -880,6 +880,26 @@ export class CatalogSaveEditService {
         updateData.image_url = body.image_url.trim();
       }
       if (body.action_type !== undefined) updateData.action_type = body.action_type;
+      if (body.category_id !== undefined) {
+        updateData.category_id = body.category_id && String(body.category_id).trim() !== ''
+          ? String(body.category_id).trim()
+          : null;
+      }
+      if (body.action_value !== undefined) {
+        updateData.action_value = body.action_value && String(body.action_value).trim() !== ''
+          ? String(body.action_value).trim()
+          : null;
+      }
+      const effectiveActionType = body.action_type || existing.data[0]?.action_type;
+      if (effectiveActionType === 'CATEGORY' && updateData.category_id !== undefined) {
+        updateData.action_value = updateData.category_id;
+      }
+      if (body.banner_type !== undefined) {
+        updateData.banner_type = body.banner_type ? String(body.banner_type).trim() : 'home_carousel';
+      }
+      if (body.is_popup !== undefined) {
+        updateData.is_popup = Boolean(body.is_popup);
+      }
       if (body.cta_label !== undefined) updateData.cta_label = body.cta_label.trim();
       if (body.discount_text !== undefined) updateData.discount_text = body.discount_text?.trim() || null;
       if (body.background_color !== undefined) updateData.background_color = body.background_color.trim();

@@ -813,7 +813,7 @@ export default function PromotionsCouponsOffersPage() {
       image_url: cleanUrl,
       banner_image: cleanUrl,
       banner_type: resolvedType,
-      category_id: o.category_id || "",
+      category_id: o.category_id || (o.action_type === "CATEGORY" ? o.action_value || "" : ""),
       is_popup: Boolean(o.is_popup || resolvedType === "popup"),
       action_type: o.action_type || "CATEGORY",
       action_value: o.action_value || "",
@@ -841,9 +841,11 @@ export default function PromotionsCouponsOffersPage() {
         image_url: editOfferForm.image_url.trim() || undefined,
         banner_image: editOfferForm.banner_image || undefined,
         banner_type: editOfferForm.banner_type,
-        category_id: editOfferForm.action_type === "CATEGORY" ? editOfferForm.category_id : editOfferForm.category_id || null,
+        category_id: editOfferForm.category_id?.trim() || null,
         action_type: editOfferForm.action_type,
-        action_value: editOfferForm.action_type === "CATEGORY" ? editOfferForm.category_id : editOfferForm.action_value,
+        action_value: editOfferForm.action_type === "CATEGORY"
+          ? (editOfferForm.category_id?.trim() || null)
+          : (editOfferForm.action_value?.trim() || null),
         is_popup: editOfferForm.is_popup || editOfferForm.banner_type === "popup",
         cta_label: editOfferForm.cta_label.trim() || "Shop Now",
         background_color: editOfferForm.background_color || "#16a34a",
@@ -878,10 +880,12 @@ export default function PromotionsCouponsOffersPage() {
         image_url: offerForm.image_url.trim() || "banner_upload",
         banner_image: offerForm.banner_image || undefined,
         banner_type: offerForm.banner_type,
-        category_id: offerForm.action_type === "CATEGORY" ? offerForm.category_id : offerForm.category_id || null,
+        category_id: offerForm.category_id?.trim() || null,
         is_popup: offerForm.is_popup || offerForm.banner_type === "popup",
         action_type: offerForm.action_type,
-        action_value: offerForm.action_type === "CATEGORY" ? offerForm.category_id : offerForm.action_value,
+        action_value: offerForm.action_type === "CATEGORY"
+          ? (offerForm.category_id?.trim() || null)
+          : (offerForm.action_value?.trim() || null),
         cta_label: offerForm.cta_label.trim() || "Shop Now",
         background_color: offerForm.background_color || "#16a34a",
         display_order: Number(offerForm.display_order) || 0,
