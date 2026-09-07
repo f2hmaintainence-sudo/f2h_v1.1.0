@@ -381,8 +381,13 @@ export default function SubscriptionDetailDrawer({
                     {subItems.map((item, idx) => {
                       const dailyMQty = Number(item.daily_m_quantity || item.m_quantity || 0);
                       const dailyEQty = Number(item.daily_e_quantity || item.e_quantity || 0);
-                      const unitTypeStr = (item.unit_type || 'L').toLowerCase().includes('l') ? 'Liter' : (item.unit_type || 'Unit');
-                      const unitValueStr = item.unit_value ? `${parseFloat(item.unit_value)} ${unitTypeStr}` : '';
+                      const rawUnitType = (item.unit_type || '').trim();
+                      const displayUnitType = ['ltr', 'liter', 'litre'].includes(rawUnitType.toLowerCase())
+                        ? 'L'
+                        : rawUnitType;
+                      const unitValueStr = item.unit_value
+                        ? `${parseFloat(item.unit_value)}${displayUnitType ? ` ${displayUnitType}` : ''}`
+                        : '';
                       const itemTitle = item.variant_name || item.product_name || 'Subscribed Item';
 
                       return (
@@ -421,7 +426,7 @@ export default function SubscriptionDetailDrawer({
                                 <Sun className="w-3.5 h-3.5 text-amber-600" /> Morning Delivery
                               </span>
                               <span className="text-xs font-black text-amber-950 block">
-                                {dailyMQty > 0 ? `${dailyMQty} ${unitTypeStr}${dailyMQty > 1 ? 's' : ''} / day` : 'No morning delivery'}
+                                {dailyMQty > 0 ? `${dailyMQty} ${dailyMQty > 1 ? 'units' : 'unit'} / day` : 'No morning delivery'}
                               </span>
                             </div>
 
@@ -430,7 +435,7 @@ export default function SubscriptionDetailDrawer({
                                 <Moon className="w-3.5 h-3.5 text-indigo-600" /> Evening Delivery
                               </span>
                               <span className="text-xs font-black text-indigo-950 block">
-                                {dailyEQty > 0 ? `${dailyEQty} ${unitTypeStr}${dailyEQty > 1 ? 's' : ''} / day` : 'No evening delivery'}
+                                {dailyEQty > 0 ? `${dailyEQty} ${dailyEQty > 1 ? 'units' : 'unit'} / day` : 'No evening delivery'}
                               </span>
                             </div>
                           </div>
