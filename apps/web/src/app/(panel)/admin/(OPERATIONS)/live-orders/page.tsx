@@ -7,11 +7,17 @@ import {
   ShoppingCart, Package, Truck, CheckCircle2, Clock, AlertTriangle,
   XCircle, RefreshCw, Home, ChevronRight, Eye,
   Zap, Search, UserCheck, Calendar, MapPin, Phone,
-  Building2, Layers, X, AlertCircle, UserPlus, ChevronLeft, FileSpreadsheet, Download
+  Building2, Layers, X, AlertCircle, UserPlus, ChevronLeft, FileSpreadsheet, Download, Camera
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
 import { downloadCSV, downloadExcel, ExportColumn } from "@/lib/exportUtils";
+import {
+  PaymentStatusBadge,
+  DeliveryProofCell,
+  ImagePreviewModal,
+  getDeliveryImageUrl,
+} from "@/app/(panel)/admin/(CUSTOMERS_ORDERS)/orders/components/OrdersTable";
 
 interface OrderItem {
   id?: number;
@@ -35,6 +41,9 @@ interface Order {
   subtotal?: number | string;
   discount_amount?: number | string;
   gst_amount?: number | string;
+  payment_status?: string;
+  payment_mode?: string;
+  delivery_image?: string;
   delivery_slot: string;
   address_line: string;
   contact_number: string;
@@ -120,6 +129,9 @@ const LIVE_ORDER_EXPORT_COLUMNS: ExportColumn<Order>[] = [
   { header: "Assignment", accessor: (order) => order.delivery_partner_id ? "Assigned" : "Unassigned" },
   { header: "Items", accessor: (order) => order.items?.map((item) => `${item.product_name}${item.variant_name ? ` (${item.variant_name})` : ""} x${item.quantity}`).join("; ") },
   { header: "Amount", accessor: (order) => Number(order.total_amount || 0) },
+  { header: "Payment Status", accessor: (order) => order.payment_status || "unpaid" },
+  { header: "Payment Mode", accessor: (order) => order.payment_mode || "—" },
+  { header: "Delivery Proof", accessor: (order) => order.delivery_image ? "Available" : "No" },
   { header: "Status", accessor: (order) => order.status },
   { header: "Source", accessor: (order) => order.order_source },
   { header: "Scheduled Date", accessor: (order) => order.scheduled_date },
@@ -148,6 +160,7 @@ export default function LiveOrdersPage() {
   // Modals
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [assignOrder, setAssignOrder] = useState<Order | null>(null);
+  const [proofPreview, setProofPreview] = useState<{ url: string; title?: string } | null>(null);
   const [partners, setPartners] = useState<DeliveryPartner[]>([]);
   const [selectedPartner, setSelectedPartner] = useState("");
   const [assigning, setAssigning] = useState(false);
@@ -599,6 +612,7 @@ export default function LiveOrdersPage() {
                   <th className="px-3 py-2.5 whitespace-nowrap">Delivery Boy</th>
                   <th className="px-3 py-2.5 whitespace-nowrap">Items</th>
                   <th className="px-3 py-2.5 whitespace-nowrap text-right">Amt</th>
+                  <th className="px-3 py-2.5 whitespace-nowrap text-center">Proof</th>
                   <th className="px-3 py-2.5 whitespace-nowrap">Status</th>
                   <th className="px-3 py-2.5 whitespace-nowrap text-center">Action</th>
                 </tr>
@@ -690,9 +704,24 @@ export default function LiveOrdersPage() {
                         </div>
                       </td>
 
-                      {/* Amount */}
-                      <td className="px-3 py-2.5 align-top text-right">
-                        <span className="font-extrabold text-emerald-700 text-[11px] whitespace-nowrap">{formatMoney(o.total_amount)}</span>
+                      {/* Amount & Payment Status */}
+                      <td className="px-3 py-2.5 align-top text-right whitespace-nowrap">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="font-extrabold text-slate-900 text-[11px] leading-tight">{formatMoney(o.total_amount)}</span>
+                          <PaymentStatusBadge
+                            paymentStatus={o.payment_status}
+                            paymentMode={o.payment_mode}
+                          />
+                        </div>
+                      </td>
+
+                      {/* Proof Photo */}
+                      <td className="px-3 py-2.5 align-top text-center whitespace-nowrap">
+                        <DeliveryProofCell
+                          imageUrl={o.delivery_image}
+                          orderId={o.order_id}
+                          onPreview={(url, title) => setProofPreview({ url, title })}
+                        />
                       </td>
 
                       {/* Status */}
@@ -969,6 +998,38 @@ export default function LiveOrdersPage() {
                 </div>
               </div>
 
+              {/* Delivery Proof Photo */}
+              {detailOrder.delivery_image && (
+                <div className="bg-white rounded-xl border border-slate-200 p-3.5 space-y-2">
+                  <p className="text-[10px] font-black text-slate-700 flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Camera size={12} className="text-emerald-600" /> Proof of Delivery
+                    </span>
+                    <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                      PHOTO VERIFIED
+                    </span>
+                  </p>
+                  <div
+                    onClick={() => {
+                      const url = getDeliveryImageUrl(detailOrder.delivery_image);
+                      if (url) setProofPreview({ url, title: `Delivery Proof — #${detailOrder.order_id}` });
+                    }}
+                    className="group relative cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-slate-100 max-h-48 flex items-center justify-center shadow-xs"
+                    title="Click to expand photo"
+                  >
+                    <img
+                      src={getDeliveryImageUrl(detailOrder.delivery_image)!}
+                      alt="Delivery Proof"
+                      className="w-full max-h-48 object-cover group-hover:scale-105 transition-transform duration-200"
+                      onError={(e) => { (e.currentTarget as HTMLElement).style.display = "none"; }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                      <Eye size={14} /> Click to View Full Photo
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Items */}
               <div>
                 <p className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -1035,6 +1096,15 @@ export default function LiveOrdersPage() {
                           <td colSpan={5} className="px-3 py-2 text-right text-[10px] font-black text-slate-700">Total Amount:</td>
                           <td className="px-3 py-2 text-right font-black text-emerald-700 text-xs">{formatMoney(detailOrder.total_amount)}</td>
                         </tr>
+                        <tr className="bg-emerald-50/50 border-t border-emerald-100/70">
+                          <td colSpan={5} className="px-3 py-1.5 text-right text-[10px] font-bold text-slate-600">Payment Status:</td>
+                          <td className="px-3 py-1.5 text-right">
+                            <PaymentStatusBadge
+                              paymentStatus={detailOrder.payment_status}
+                              paymentMode={detailOrder.payment_mode}
+                            />
+                          </td>
+                        </tr>
                       </tfoot>
                     </table>
                   </div>
@@ -1058,6 +1128,13 @@ export default function LiveOrdersPage() {
           </div>
         </div>
       )}
+
+      <ImagePreviewModal
+        isOpen={Boolean(proofPreview)}
+        imageUrl={proofPreview?.url || null}
+        title={proofPreview?.title}
+        onClose={() => setProofPreview(null)}
+      />
     </div>
   );
 }

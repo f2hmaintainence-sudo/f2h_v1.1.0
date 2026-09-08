@@ -206,6 +206,7 @@ export class OrdersTableService {
           discount_amount: ['orders.discount_amount', true],
           gst_amount: ['orders.gst_amount', true],
           total_amount: ['orders.total_amount', true],
+          delivery_image: ['orders.delivery_image', true],
           created_at: ['orders.created_at', true],
         },
         joins: [

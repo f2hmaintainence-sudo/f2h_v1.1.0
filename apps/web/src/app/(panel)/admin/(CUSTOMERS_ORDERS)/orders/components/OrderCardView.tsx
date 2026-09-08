@@ -29,9 +29,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Camera,
 } from 'lucide-react';
 
-import { PaymentStatusBadge } from './OrdersTable';
+import { PaymentStatusBadge, DeliveryProofCell, ImagePreviewModal } from './OrdersTable';
 
 interface OrderCardViewProps {
   orders: Record<string, any>[];
@@ -152,6 +153,7 @@ export default function OrderCardView({
 }: OrderCardViewProps) {
   // 20-Cards-Per-Page Pagination State
   const [currentPage, setCurrentPage] = useState(1);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title?: string } | null>(null);
   const pageSize = 20;
 
   const totalPages = Math.max(1, Math.ceil(orders.length / pageSize));
@@ -272,7 +274,7 @@ export default function OrderCardView({
                   )}
                 </div>
 
-                {/* Pricing & Item Count */}
+                {/* Pricing & Item Count & Proof */}
                 <div className="flex items-center justify-between pt-1">
                   <div>
                     <span className="text-[11px] font-semibold text-gray-500 block">Total Amount</span>
@@ -286,14 +288,25 @@ export default function OrderCardView({
                       />
                     </div>
                   </div>
-                  {order.items_count && (
-                    <div className="text-right">
-                      <span className="text-[11px] font-semibold text-gray-500 block">Items</span>
-                      <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-md">
-                        {order.items_count} item(s)
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex flex-col items-end gap-1">
+                    {order.delivery_image ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400">Proof:</span>
+                        <DeliveryProofCell
+                          imageUrl={order.delivery_image}
+                          orderId={orderId}
+                          onPreview={(url, title) => setPreviewImage({ url, title })}
+                        />
+                      </div>
+                    ) : order.items_count ? (
+                      <div className="text-right">
+                        <span className="text-[10px] font-semibold text-gray-400 block">Items</span>
+                        <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
+                          {order.items_count} item(s)
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -360,6 +373,13 @@ export default function OrderCardView({
           </button>
         </div>
       </div>
+
+      <ImagePreviewModal
+        isOpen={Boolean(previewImage)}
+        imageUrl={previewImage?.url || null}
+        title={previewImage?.title}
+        onClose={() => setPreviewImage(null)}
+      />
     </div>
   );
 }

@@ -26,9 +26,11 @@ import {
   Repeat,
   ShoppingCart,
   Calendar,
+  Camera,
+  Eye,
 } from 'lucide-react';
 import OrderActionModal, { ModalType, ModalData } from './OrderActionModal';
-import { PaymentStatusBadge } from './OrdersTable';
+import { PaymentStatusBadge, getDeliveryImageUrl, ImagePreviewModal } from './OrdersTable';
 
 export interface OrderItem {
   id: number | string;
@@ -147,6 +149,7 @@ export default function OrderDetailsDrawer({
     type: null,
   });
   const [actionLoading, setActionLoading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title?: string } | null>(null);
 
   if (!order) return null;
 
@@ -230,7 +233,7 @@ export default function OrderDetailsDrawer({
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
 
           {/* Customer & Delivery Information */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* Customer Box */}
             <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -304,6 +307,52 @@ export default function OrderDetailsDrawer({
                   <span className="text-[11px] text-slate-500 font-medium ml-auto">
                     Placed: {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
+                )}
+              </div>
+            </div>
+
+            {/* Delivery Proof Box */}
+            <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2 flex flex-col justify-between">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Camera size={13} className="text-emerald-700" /> Delivery Proof
+                  </span>
+                  {order.delivery_image && (
+                    <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                      PHOTO
+                    </span>
+                  )}
+                </span>
+                {order.delivery_image ? (
+                  <div className="mt-2 space-y-2">
+                    <div
+                      onClick={() => {
+                        const url = getDeliveryImageUrl(order.delivery_image);
+                        if (url) setPreviewImage({ url, title: `Delivery Proof — #${orderId}` });
+                      }}
+                      className="group relative cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-slate-100 h-24 flex items-center justify-center shadow-xs"
+                      title="Click to view full photo"
+                    >
+                      <img
+                        src={getDeliveryImageUrl(order.delivery_image)!}
+                        alt="Delivery Proof"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1">
+                        <Eye size={13} /> View Photo
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                      <CheckCircle2 size={11} /> Proof Uploaded
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-2 py-5 flex flex-col items-center justify-center text-center text-slate-400 bg-slate-50/70 rounded-xl border border-dashed border-slate-200">
+                    <Camera size={18} className="text-slate-300 mb-1 opacity-60" />
+                    <span className="text-[10px] font-medium text-slate-400">No Photo Uploaded</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -514,6 +563,13 @@ export default function OrderDetailsDrawer({
         loading={actionLoading}
         onClose={() => setActionModal({ isOpen: false, type: null })}
         onConfirm={handleConfirmAction}
+      />
+
+      <ImagePreviewModal
+        isOpen={Boolean(previewImage)}
+        imageUrl={previewImage?.url || null}
+        title={previewImage?.title}
+        onClose={() => setPreviewImage(null)}
       />
     </div>
   );

@@ -40,6 +40,7 @@ import {
   UserCheck,
   TrendingDown,
   RefreshCw,
+  Camera,
 } from 'lucide-react';
 import Link from 'next/link';
 import CustomerSpecialPriceModal from '@/components/f2h/CustomerSpecialPriceModal';
@@ -612,7 +613,7 @@ function OrdersTab({ orders }: { orders: any[] }) {
                   <div className="border-t border-gray-100 bg-slate-50/70 p-5 space-y-5 animate-in fade-in duration-200">
                     
                     {/* Delivery Partner & Logistics Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className={`grid grid-cols-1 ${order.delivery_image ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
                       <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs">
                         <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                           <Truck size={14} className="text-emerald-600" /> Delivery Agent / Partner
@@ -664,6 +665,39 @@ function OrdersTab({ orders }: { orders: any[] }) {
                           <p className="text-xs text-gray-400 italic">Standard recyclable packaging</p>
                         )}
                       </div>
+
+                      {/* Delivery Proof */}
+                      {order.delivery_image && (
+                        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <Camera size={14} className="text-emerald-600" /> Delivery Proof
+                              </span>
+                              <span className="text-[9px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                PHOTO
+                              </span>
+                            </p>
+                            <a
+                              href={order.delivery_image.startsWith('http') ? order.delivery_image : (order.delivery_image.startsWith('/') ? order.delivery_image : `/${order.delivery_image}`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group relative block rounded-lg overflow-hidden border border-slate-200 bg-slate-50 h-20"
+                              title="Click to view full photo"
+                            >
+                              <img
+                                src={order.delivery_image.startsWith('http') ? order.delivery_image : (order.delivery_image.startsWith('/') ? order.delivery_image : `/${order.delivery_image}`)}
+                                alt="Delivery Proof"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold gap-1">
+                                <Eye size={12} /> View Full
+                              </div>
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Order Items Table */}

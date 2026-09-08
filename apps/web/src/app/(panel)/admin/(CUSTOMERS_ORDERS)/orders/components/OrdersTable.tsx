@@ -24,6 +24,9 @@ import {
   Bike,
   XCircle,
   AlertCircle,
+  Camera,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -308,6 +311,137 @@ export function PaymentStatusBadge({
   );
 }
 
+// ─── Delivery Image Helpers & Preview ──────────────────────────────────────
+
+export function getDeliveryImageUrl(path?: string | null): string | null {
+  if (!path) return null;
+  const trimmed = String(path).trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined' || trimmed === '—' || trimmed === '-') return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+export function ImagePreviewModal({
+  isOpen,
+  imageUrl,
+  title,
+  onClose,
+}: {
+  isOpen: boolean;
+  imageUrl: string | null;
+  title?: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !imageUrl) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-2xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-b border-emerald-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-200 text-emerald-800 flex items-center justify-center shrink-0 shadow-2xs">
+              <Camera size={16} />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-slate-800 text-sm leading-tight">{title || 'Proof of Delivery Photo'}</h3>
+              <p className="text-[10px] text-slate-500 font-medium">Uploaded by delivery partner on completion</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={imageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors inline-flex items-center gap-1 border border-emerald-200"
+            >
+              Open Original <ExternalLink size={11} />
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="p-4 bg-slate-950 flex items-center justify-center min-h-[300px] max-h-[75vh] overflow-hidden">
+          <img
+            src={imageUrl}
+            alt="Delivery Proof Full"
+            className="max-h-[70vh] w-auto max-w-full object-contain rounded-xl shadow-lg border border-slate-800"
+          />
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+export function DeliveryProofCell({
+  imageUrl,
+  orderId,
+  onPreview,
+}: {
+  imageUrl?: string | null;
+  orderId?: string;
+  onPreview: (url: string, title?: string) => void;
+}) {
+  const url = getDeliveryImageUrl(imageUrl);
+  if (!url) {
+    return <span className="text-[11px] text-slate-300 font-medium select-none">—</span>;
+  }
+
+  return (
+    <div className="inline-flex items-center justify-center">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onPreview(url, `Delivery Proof — #${orderId || ''}`);
+        }}
+        className="group relative block w-9 h-9 rounded-lg overflow-hidden border border-emerald-200 bg-slate-100 hover:border-emerald-500 hover:ring-2 hover:ring-emerald-400/20 hover:shadow-xs transition-all shrink-0 cursor-pointer"
+        title="Click to preview delivery photo"
+      >
+        <img
+          src={url}
+          alt="Delivery Proof"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+          onError={(e) => {
+            (e.currentTarget as HTMLElement).style.display = 'none';
+            if (e.currentTarget.parentElement) {
+              const fallback = e.currentTarget.parentElement.querySelector('.proof-fallback');
+              if (fallback) (fallback as HTMLElement).style.display = 'flex';
+            }
+          }}
+        />
+        <div className="proof-fallback hidden absolute inset-0 bg-emerald-50 items-center justify-center text-emerald-600">
+          <Camera size={14} />
+        </div>
+        <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+          <Eye size={12} />
+        </div>
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Table Component ─────────────────────────────────────────────────
 
 const PAGE_SIZE = 20;
@@ -321,6 +455,7 @@ export default function OrdersTable({
   slotFilter = 'all',
 }: OrdersTableProps) {
   const [rows, setRows]             = useState<Record<string, any>[]>([]);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title?: string } | null>(null);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
   const [totalCount, setTotalCount] = useState(0);
@@ -403,7 +538,7 @@ export default function OrdersTable({
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Order ID', 'Customer', 'Delivery Partner', 'Amount', 'Slot', 'Status Timeline', 'Action'].map((h) => (
+                {['Order ID', 'Customer', 'Delivery Partner', 'Amount', 'Slot', 'Status Timeline', 'Proof', 'Action'].map((h) => (
                   <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500">{h}</th>
                 ))}
               </tr>
@@ -411,7 +546,7 @@ export default function OrdersTable({
             <tbody>
               {Array.from({ length: 10 }).map((_, i) => (
                 <tr key={i} className="border-b border-gray-100">
-                  {[80, 110, 110, 60, 70, 160, 60].map((w, j) => (
+                  {[80, 110, 110, 60, 70, 160, 36, 60].map((w, j) => (
                     <td key={j} className="px-4 py-3.5">
                       <div className="h-3.5 bg-gray-100 rounded animate-pulse" style={{ width: w }} />
                       {j === 3 && <div className="mt-1 h-2.5 bg-gray-100 rounded animate-pulse" style={{ width: 45 }} />}
@@ -477,6 +612,7 @@ export default function OrdersTable({
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Amount</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Slot</th>
               <th className="px-3 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500" style={{ width: 160 }}>Status Timeline</th>
+              <th className="px-3 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 text-center whitespace-nowrap">Proof</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 text-center whitespace-nowrap">Action</th>
             </tr>
           </thead>
@@ -567,6 +703,15 @@ export default function OrdersTable({
                     <StatusBadge status={statusRaw} />
                   </td>
 
+                  {/* Delivery Proof */}
+                  <td className="px-3 py-3 whitespace-nowrap text-center">
+                    <DeliveryProofCell
+                      imageUrl={order.delivery_image}
+                      orderId={orderId}
+                      onPreview={(url, title) => setPreviewImage({ url, title })}
+                    />
+                  </td>
+
                   {/* View */}
                   <td className="px-4 py-3 text-center whitespace-nowrap">
                     <button
@@ -639,6 +784,13 @@ export default function OrdersTable({
           </button>
         </div>
       </div>
+
+      <ImagePreviewModal
+        isOpen={Boolean(previewImage)}
+        imageUrl={previewImage?.url || null}
+        title={previewImage?.title}
+        onClose={() => setPreviewImage(null)}
+      />
     </div>
   );
 }
