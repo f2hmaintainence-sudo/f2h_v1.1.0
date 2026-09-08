@@ -208,6 +208,28 @@ export class OrdersTableService {
           total_amount: ['orders.total_amount', true],
           delivery_image: ['orders.delivery_image', true],
           created_at: ['orders.created_at', true],
+          failed_reason: [
+            `(SELECT dra.failed_reason
+             FROM delivery_run_addresses dra
+             WHERE (
+               dra.order_ids LIKE '%' || orders.order_id || '%'
+               OR (dra.address_id = orders.address_id AND dra.customer_id = orders.customer_id AND dra.delivery_status = 'failed')
+             )
+             AND dra.failed_reason IS NOT NULL AND dra.failed_reason != ''
+             ORDER BY dra.id DESC
+             LIMIT 1) AS failed_reason`,
+            false,
+          ],
+          cancel_reason: [
+            `(SELECT osl.notes
+             FROM order_status_logs osl
+             WHERE osl.order_id = orders.order_id
+             AND osl.status = 'cancelled'
+             AND osl.notes IS NOT NULL AND osl.notes != ''
+             ORDER BY osl.id DESC
+             LIMIT 1) AS cancel_reason`,
+            false,
+          ],
         },
         joins: [
           {
@@ -260,18 +282,36 @@ export class OrdersTableService {
                   ? 'bg-green-100 text-green-800 border border-green-200'
                   : status === 'cancelled'
                     ? 'bg-red-100 text-red-800 border border-red-200'
-                    : status === 'packed' || status === 'out_for_delivery'
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+                    : status === 'failed'
+                      ? 'bg-red-100 text-red-800 border border-red-200'
+                      : status === 'packed' || status === 'out_for_delivery'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                        : 'bg-yellow-100 text-yellow-800 border border-yellow-200';
 
               const label = status
                 .replace(/_/g, ' ')
                 .replace(/\b\w/g, (char) => char.toUpperCase());
 
+              const reason =
+                status === 'failed'
+                  ? String(row.failed_reason || '').trim()
+                  : status === 'cancelled'
+                    ? String(row.cancel_reason || '').trim()
+                    : '';
+
+              const reasonHtml = reason
+                ? `<div class="text-xs text-red-600 mt-1 max-w-[180px] truncate" title="${reason.replace(/"/g, '&quot;')}">
+                     ⚠ ${reason}
+                   </div>`
+                : '';
+
               return `
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${classes}">
-                  ${label}
-                </span>
+                <div>
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${classes}">
+                    ${label}
+                  </span>
+                  ${reasonHtml}
+                </div>
               `;
             },
             renderHtml: true,
