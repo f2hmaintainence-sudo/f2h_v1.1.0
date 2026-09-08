@@ -27,6 +27,7 @@ import {
   Camera,
   ExternalLink,
   X,
+  Calendar,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -80,6 +81,23 @@ function normalizeStatus(raw: unknown): string {
 function formatMoney(value: unknown) {
   const n = Number(value ?? 0);
   return n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+}
+
+function formatScheduledDate(rawDate: unknown): string {
+  if (!rawDate) return '';
+  try {
+    const s = String(rawDate).split('T')[0];
+    const [y, m, d] = s.split('-');
+    if (y && m && d) {
+      const date = new Date(Number(y), Number(m) - 1, Number(d));
+      return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    const dObj = new Date(rawDate as string | number);
+    if (!isNaN(dObj.getTime())) {
+      return dObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+  } catch { /* fallback */ }
+  return String(rawDate).split('T')[0];
 }
 
 // ─── Tooltip Portal ─────────────────────────────────────────────────────────
@@ -538,7 +556,7 @@ export default function OrdersTable({
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Order ID', 'Customer', 'Delivery Partner', 'Amount', 'Slot', 'Status Timeline', 'Proof', 'Action'].map((h) => (
+                {['Order ID', 'Customer', 'Delivery Partner', 'Amount', 'Slot / Date', 'Status Timeline', 'Proof', 'Action'].map((h) => (
                   <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500">{h}</th>
                 ))}
               </tr>
@@ -610,7 +628,7 @@ export default function OrdersTable({
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Customer</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Delivery Partner</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Amount</th>
-              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Slot</th>
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap">Slot / Date</th>
               <th className="px-3 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500" style={{ width: 160 }}>Status Timeline</th>
               <th className="px-3 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 text-center whitespace-nowrap">Proof</th>
               <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-gray-500 text-center whitespace-nowrap">Action</th>
@@ -630,6 +648,7 @@ export default function OrdersTable({
               const partnerDisplayName = rawPartnerName || (partnerId ? `Partner (${partnerId})` : '');
               const amount       = formatMoney(order.total_amount || order.amount || order.subtotal);
               const slot         = stripHtml(order.delivery_slot || order.slot || '');
+              const scheduledDateFormatted = formatScheduledDate(order.scheduled_date);
               const statusRaw    = normalizeStatus(order.order_status || order.status);
 
               return (
@@ -692,9 +711,17 @@ export default function OrdersTable({
                     </div>
                   </td>
 
-                  {/* Slot */}
+                  {/* Slot & Scheduled Date */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <SlotBadge slot={slot} />
+                    <div className="flex flex-col gap-1 items-start">
+                      <SlotBadge slot={slot} />
+                      {scheduledDateFormatted && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-semibold" title={`Scheduled: ${scheduledDateFormatted}`}>
+                          <Calendar size={10} className="text-slate-400 shrink-0" />
+                          <span>{scheduledDateFormatted}</span>
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Timeline */}
