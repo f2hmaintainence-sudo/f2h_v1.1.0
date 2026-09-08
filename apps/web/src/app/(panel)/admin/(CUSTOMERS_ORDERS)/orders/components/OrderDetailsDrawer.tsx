@@ -28,6 +28,7 @@ import {
   Calendar,
   Camera,
   Eye,
+  XCircle,
 } from 'lucide-react';
 import OrderActionModal, { ModalType, ModalData } from './OrderActionModal';
 import { PaymentStatusBadge, getDeliveryImageUrl, ImagePreviewModal } from './OrdersTable';
@@ -231,6 +232,26 @@ export default function OrderDetailsDrawer({
 
         {/* Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+
+          {/* Failure / Cancellation Reason Banner */}
+          {statusInfo.label === 'Failed' && order.failed_reason && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 text-amber-900 shadow-2xs">
+              <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900">Delivery Failure Reason</h4>
+                <p className="text-xs font-medium text-amber-800 mt-1">{stripHtml(order.failed_reason)}</p>
+              </div>
+            </div>
+          )}
+          {statusInfo.label === 'Cancelled' && (order.cancel_reason || order.cancellation_reason) && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 text-rose-900 shadow-2xs">
+              <XCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-rose-900">Cancellation Reason</h4>
+                <p className="text-xs font-medium text-rose-800 mt-1">{stripHtml(order.cancel_reason || order.cancellation_reason)}</p>
+              </div>
+            </div>
+          )}
 
           {/* Customer & Delivery Information */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">

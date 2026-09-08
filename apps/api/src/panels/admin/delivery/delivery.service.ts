@@ -453,6 +453,28 @@ export class DeliveryManagementService {
           o.payment_status,
           o.payment_mode,
           o.delivery_image,
+          COALESCE(
+            (SELECT dra.failed_reason
+             FROM delivery_run_addresses dra
+             WHERE (
+               dra.order_ids LIKE '%' || o.order_id || '%'
+               OR (dra.address_id = o.address_id AND dra.customer_id = o.customer_id AND dra.delivery_status = 'failed')
+             )
+             AND dra.failed_reason IS NOT NULL AND dra.failed_reason != ''
+             ORDER BY dra.id DESC
+             LIMIT 1),
+            ''
+          ) AS failed_reason,
+          COALESCE(
+            (SELECT osl.notes
+             FROM order_status_logs osl
+             WHERE osl.order_id = o.order_id
+             AND osl.status = 'cancelled'
+             AND osl.notes IS NOT NULL AND osl.notes != ''
+             ORDER BY osl.id DESC
+             LIMIT 1),
+            ''
+          ) AS cancel_reason,
           o.delivery_partner_id,
           o.assignment_method,
           o.assigned_at,

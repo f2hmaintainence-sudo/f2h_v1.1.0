@@ -58,6 +58,8 @@ interface Order {
   scheduled_date?: string;
   created_at?: string;
   items?: OrderItem[];
+  failed_reason?: string;
+  cancel_reason?: string;
 }
 
 interface DeliveryPartner {
@@ -729,6 +731,16 @@ export default function LiveOrdersPage() {
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black border ${sc.bgColor} ${sc.borderColor} ${sc.color}`}>
                           <Icon size={10} /> {sc.label}
                         </span>
+                        {o.status === "failed" && o.failed_reason && (
+                          <div className="text-[10px] text-rose-600 mt-1 font-semibold max-w-[140px] truncate" title={o.failed_reason}>
+                            ⚠ {o.failed_reason}
+                          </div>
+                        )}
+                        {o.status === "cancelled" && o.cancel_reason && (
+                          <div className="text-[10px] text-slate-600 mt-1 font-semibold max-w-[140px] truncate" title={o.cancel_reason}>
+                            ⚠ {o.cancel_reason}
+                          </div>
+                        )}
                       </td>
 
                       {/* Action — Details ONLY (Admin cannot change status directly) */}
@@ -955,6 +967,26 @@ export default function LiveOrdersPage() {
                   })}
                 </div>
               </div>
+
+              {/* Failure / Cancellation Reason Banner */}
+              {detailOrder.status === "failed" && detailOrder.failed_reason && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2.5 text-rose-900 shadow-2xs">
+                  <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase tracking-wider text-rose-900">Delivery Failure Reason</h4>
+                    <p className="text-xs font-semibold text-rose-800 mt-0.5">{detailOrder.failed_reason}</p>
+                  </div>
+                </div>
+              )}
+              {detailOrder.status === "cancelled" && detailOrder.cancel_reason && (
+                <div className="bg-slate-100 border border-slate-300 rounded-xl p-3 flex items-start gap-2.5 text-slate-800 shadow-2xs">
+                  <XCircle size={16} className="text-slate-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-900">Cancellation Reason</h4>
+                    <p className="text-xs font-semibold text-slate-700 mt-0.5">{detailOrder.cancel_reason}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Customer + Partner */}
               <div className="grid grid-cols-2 gap-3">

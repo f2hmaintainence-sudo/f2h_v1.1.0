@@ -30,6 +30,7 @@ import {
   ChevronRight,
   Sparkles,
   Camera,
+  AlertCircle,
 } from 'lucide-react';
 
 import { PaymentStatusBadge, DeliveryProofCell, ImagePreviewModal } from './OrdersTable';
@@ -229,6 +230,24 @@ export default function OrderCardView({
                 </div>
                 <span className="text-xs font-mono font-bold">#{orderId}</span>
               </div>
+
+              {/* Failed / Cancelled Reason Notice if present */}
+              {statusInfo.label.toLowerCase().includes('fail') && order.failed_reason && (
+                <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5 text-[11px] text-amber-900 font-semibold flex items-center gap-1.5">
+                  <AlertCircle size={12} className="text-amber-600 shrink-0" />
+                  <span className="truncate" title={stripHtml(order.failed_reason)}>
+                    Reason: {stripHtml(order.failed_reason)}
+                  </span>
+                </div>
+              )}
+              {statusInfo.label.toLowerCase().includes('cancel') && (order.cancel_reason || order.cancellation_reason) && (
+                <div className="bg-rose-50 border-b border-rose-200/80 px-4 py-1.5 text-[11px] text-rose-900 font-semibold flex items-center gap-1.5">
+                  <XCircle size={12} className="text-rose-600 shrink-0" />
+                  <span className="truncate" title={stripHtml(order.cancel_reason || order.cancellation_reason)}>
+                    Reason: {stripHtml(order.cancel_reason || order.cancellation_reason)}
+                  </span>
+                </div>
+              )}
 
               {/* Main Card Content */}
               <div className="p-4 space-y-3 flex-1">

@@ -698,9 +698,27 @@ export default function OrdersTable({
                   </td>
 
                   {/* Timeline */}
-                  <td className="px-3 py-2" style={{ minWidth: 160, maxWidth: 180 }}>
+                  <td className="px-3 py-2" style={{ minWidth: 160, maxWidth: 190 }}>
                     <StatusTimeline status={statusRaw} />
                     <StatusBadge status={statusRaw} />
+                    {statusRaw === 'FAILED' && order.failed_reason && (
+                      <div
+                        className="mt-1 flex items-start gap-1 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 max-w-[180px]"
+                        title={stripHtml(order.failed_reason)}
+                      >
+                        <AlertCircle size={10} className="shrink-0 mt-0.5 text-amber-600" />
+                        <span className="truncate">{stripHtml(order.failed_reason)}</span>
+                      </div>
+                    )}
+                    {statusRaw === 'CANCELLED' && (order.cancel_reason || order.cancellation_reason) && (
+                      <div
+                        className="mt-1 flex items-start gap-1 text-[10px] text-rose-800 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5 max-w-[180px]"
+                        title={stripHtml(order.cancel_reason || order.cancellation_reason)}
+                      >
+                        <XCircle size={10} className="shrink-0 mt-0.5 text-rose-600" />
+                        <span className="truncate">{stripHtml(order.cancel_reason || order.cancellation_reason)}</span>
+                      </div>
+                    )}
                   </td>
 
                   {/* Delivery Proof */}
