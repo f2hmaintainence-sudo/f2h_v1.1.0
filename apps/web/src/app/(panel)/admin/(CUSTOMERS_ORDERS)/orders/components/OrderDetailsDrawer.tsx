@@ -28,6 +28,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import OrderActionModal, { ModalType, ModalData } from './OrderActionModal';
+import { PaymentStatusBadge } from './OrdersTable';
 
 export interface OrderItem {
   id: number | string;
@@ -434,6 +435,13 @@ export default function OrderDetailsDrawer({
             <div className="flex justify-between text-sm font-extrabold border-t border-emerald-200/90 pt-2 text-emerald-900">
               <span>Grand Total:</span>
               <span className="text-base text-emerald-700">{formatMoney(grandTotal)}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs font-semibold pt-2 border-t border-emerald-200/50">
+              <span className="text-slate-600">Payment Status:</span>
+              <PaymentStatusBadge
+                paymentStatus={order.payment_status}
+                paymentMode={order.payment_mode}
+              />
             </div>
           </div>
 

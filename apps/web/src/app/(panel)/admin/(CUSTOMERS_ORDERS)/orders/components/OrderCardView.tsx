@@ -31,6 +31,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { PaymentStatusBadge } from './OrdersTable';
+
 interface OrderCardViewProps {
   orders: Record<string, any>[];
   loading: boolean;
@@ -274,9 +276,15 @@ export default function OrderCardView({
                 <div className="flex items-center justify-between pt-1">
                   <div>
                     <span className="text-[11px] font-semibold text-gray-500 block">Total Amount</span>
-                    <span className="text-lg font-extrabold text-emerald-700">
-                      {formatMoney(order.total_amount || order.amount)}
-                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-lg font-extrabold text-emerald-700">
+                        {formatMoney(order.total_amount || order.amount)}
+                      </span>
+                      <PaymentStatusBadge
+                        paymentStatus={order.payment_status}
+                        paymentMode={order.payment_mode}
+                      />
+                    </div>
                   </div>
                   {order.items_count && (
                     <div className="text-right">

@@ -258,6 +258,56 @@ function SlotBadge({ slot }: { slot: string }) {
   return <span className="text-[11px] text-gray-500 font-medium">{slot || '—'}</span>;
 }
 
+// ─── Payment Status Badge ──────────────────────────────────────────────────
+
+export function PaymentStatusBadge({
+  paymentStatus,
+  paymentMode,
+}: {
+  paymentStatus: unknown;
+  paymentMode?: unknown;
+}) {
+  const rawStatus = stripHtml(paymentStatus).toLowerCase().trim();
+  const rawMode   = stripHtml(paymentMode).toUpperCase().trim();
+
+  const isPaid     = rawStatus === 'paid';
+  const isFailed   = rawStatus === 'failed';
+  const isRefunded = rawStatus === 'refunded';
+
+  let label = 'Unpaid';
+  let badgeCls = 'bg-amber-50 text-amber-700 border-amber-200/90';
+  let dotCls = 'bg-amber-500';
+
+  if (isPaid) {
+    label = 'Paid';
+    badgeCls = 'bg-emerald-50 text-emerald-700 border-emerald-200/90';
+    dotCls = 'bg-emerald-500';
+  } else if (isFailed) {
+    label = 'Failed';
+    badgeCls = 'bg-rose-50 text-rose-700 border-rose-200/90';
+    dotCls = 'bg-rose-500';
+  } else if (isRefunded) {
+    label = 'Refunded';
+    badgeCls = 'bg-purple-50 text-purple-700 border-purple-200/90';
+    dotCls = 'bg-purple-500';
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 w-fit px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeCls} transition-colors tracking-tight`}
+      title={rawMode ? `Payment: ${label} (${rawMode})` : `Payment: ${label}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}`} />
+      <span>{label}</span>
+      {rawMode && (
+        <span className="opacity-70 font-medium text-[9px] uppercase tracking-normal">
+          • {rawMode}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // ─── Main Table Component ─────────────────────────────────────────────────
 
 const PAGE_SIZE = 20;
@@ -364,6 +414,7 @@ export default function OrdersTable({
                   {[80, 110, 110, 60, 70, 160, 60].map((w, j) => (
                     <td key={j} className="px-4 py-3.5">
                       <div className="h-3.5 bg-gray-100 rounded animate-pulse" style={{ width: w }} />
+                      {j === 3 && <div className="mt-1 h-2.5 bg-gray-100 rounded animate-pulse" style={{ width: 45 }} />}
                       {j === 5 && <div className="mt-1.5 h-2 bg-gray-100 rounded animate-pulse" style={{ width: 100 }} />}
                     </td>
                   ))}
@@ -494,9 +545,15 @@ export default function OrdersTable({
                     )}
                   </td>
 
-                  {/* Amount */}
+                  {/* Amount & Payment Status */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="font-bold text-emerald-700 text-sm">{amount}</span>
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className="font-bold text-slate-800 text-sm leading-tight">{amount}</span>
+                      <PaymentStatusBadge
+                        paymentStatus={order.payment_status}
+                        paymentMode={order.payment_mode}
+                      />
+                    </div>
                   </td>
 
                   {/* Slot */}

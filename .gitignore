@@ -83,3 +83,6 @@ keys-set/
 keys
 keys/
 apps/api/src/shared/secrets/*.json
+
+# Runtime uploaded media
+apps/api/uploads/
