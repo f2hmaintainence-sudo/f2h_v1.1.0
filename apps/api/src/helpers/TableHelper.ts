@@ -124,7 +124,7 @@ function escapeHtml(str: string): string {
 
 /** Strip ' AS alias' from a column expression */
 function stripAlias(expr: string): string {
-  return expr.replace(/\s+AS\s+`?[^`]+`?$/i, '').trim();
+  return expr.replace(/\s+AS\s+[`"']?[^`"'\s]+[`"']?$/is, '').trim();
 }
 
 /** Get the part after the last '.' */
@@ -233,6 +233,8 @@ export class TableHelper {
         const searchWhere: any[] = [];
 
         for (const [, col] of Object.entries(set.columns ?? {})) {
+          const isSearchable = Array.isArray(col) ? col[1] !== false : true;
+          if (!isSearchable) continue;
           const columnDef = Array.isArray(col) && col[0] ? col[0] : String(col);
           const column = stripAlias(columnDef);
           if (column) {

@@ -209,25 +209,11 @@ export class OrdersTableService {
           delivery_image: ['orders.delivery_image', true],
           created_at: ['orders.created_at', true],
           failed_reason: [
-            `(SELECT dra.failed_reason
-             FROM delivery_run_addresses dra
-             WHERE (
-               dra.order_ids LIKE '%' || orders.order_id || '%'
-               OR (dra.address_id = orders.address_id AND dra.customer_id = orders.customer_id AND dra.delivery_status = 'failed')
-             )
-             AND dra.failed_reason IS NOT NULL AND dra.failed_reason != ''
-             ORDER BY dra.id DESC
-             LIMIT 1) AS failed_reason`,
+            "(SELECT dra.failed_reason FROM delivery_run_addresses dra WHERE (dra.order_ids LIKE '%' || orders.order_id || '%' OR (dra.address_id = orders.address_id AND dra.customer_id = orders.customer_id AND dra.delivery_status = 'failed')) AND dra.failed_reason IS NOT NULL AND dra.failed_reason != '' ORDER BY dra.id DESC LIMIT 1) AS failed_reason",
             false,
           ],
           cancel_reason: [
-            `(SELECT osl.notes
-             FROM order_status_logs osl
-             WHERE osl.order_id = orders.order_id
-             AND osl.status = 'cancelled'
-             AND osl.notes IS NOT NULL AND osl.notes != ''
-             ORDER BY osl.id DESC
-             LIMIT 1) AS cancel_reason`,
+            "(SELECT osl.notes FROM order_status_logs osl WHERE osl.order_id = orders.order_id AND osl.status = 'cancelled' AND osl.notes IS NOT NULL AND osl.notes != '' ORDER BY osl.id DESC LIMIT 1) AS cancel_reason",
             false,
           ],
         },

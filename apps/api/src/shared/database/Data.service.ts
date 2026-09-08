@@ -1627,7 +1627,7 @@ export async function qualifySelect(
     let rawCol = col;
     // Handle "column AS alias"
     if (typeof col === 'string') {
-      const match = col.match(/^(.+)\s+AS\s+`?([^`]+)`?$/i);
+      const match = col.match(/^([\s\S]+?)\s+AS\s+[`"']?([^`"'\s]+)[`"']?$/i);
       if (match) {
         rawCol = match[1].trim();
         alias = match[2].trim();
