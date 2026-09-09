@@ -584,9 +584,10 @@ class _HomeScreenState extends State<HomeScreen>
           }
         }
 
-        String locationLabel = 'Set Location';
+        String locationTitle = 'Set Delivery Location';
+        String subtitle = 'Tap to select address & delivery slot';
         String? branchName;
-        final branchId = defaultAddr?.branchId;
+        final branchId = defaultAddr?.branchId ?? session.profile?.branchId;
         if (branchId != null && branchId.isNotEmpty) {
           final matchingBranch = session.branches.firstWhere(
             (b) => (b is Map && (b['branch_id'] == branchId || b['id']?.toString() == branchId)),
@@ -599,109 +600,123 @@ class _HomeScreenState extends State<HomeScreen>
 
         if (defaultAddr != null) {
           if (defaultAddr.label.isNotEmpty) {
-            locationLabel = defaultAddr.label;
+            locationTitle = defaultAddr.label;
           } else if (defaultAddr.area.isNotEmpty) {
-            locationLabel = defaultAddr.area;
+            locationTitle = defaultAddr.area;
           } else if (defaultAddr.city.isNotEmpty) {
-            locationLabel = defaultAddr.city;
-          } else if (branchName != null && branchName.isNotEmpty) {
-            locationLabel = branchName;
+            locationTitle = defaultAddr.city;
+          } else {
+            locationTitle = 'Delivery Address';
           }
+
+          final parts = [
+            if (defaultAddr.street.isNotEmpty) defaultAddr.street,
+            if (defaultAddr.area.isNotEmpty && defaultAddr.area != locationTitle) defaultAddr.area,
+            if (defaultAddr.city.isNotEmpty && defaultAddr.city != locationTitle) defaultAddr.city,
+          ];
+          if (parts.isNotEmpty) {
+            subtitle = parts.join(', ');
+          } else if (branchName != null && branchName.isNotEmpty) {
+            subtitle = branchName;
+          } else {
+            subtitle = 'Tap to change delivery location';
+          }
+        } else if (branchName != null && branchName.isNotEmpty) {
+          locationTitle = branchName;
+          subtitle = 'Tap to set exact address';
         }
 
         final bool hasBranch = branchId != null && branchId.isNotEmpty;
 
-        return GestureDetector(
-          onTap: () async {
-            final sessionCubit = context.read<CustomerSessionCubit>();
-            final catalogBloc = context.read<CatalogBloc>();
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () async {
+              final sessionCubit = context.read<CustomerSessionCubit>();
+              final catalogBloc = context.read<CatalogBloc>();
 
-            final chosen = await AddressSelectorDrawer.show(context);
-            if (context.mounted) {
-              await sessionCubit.refreshSilently();
-              final latestSession = sessionCubit.state;
-              AddressModel? activeAddr = chosen;
-              if (latestSession.addresses.isNotEmpty) {
-                try {
-                  activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
-                } catch (_) {
-                  activeAddr ??= latestSession.addresses.first;
+              final chosen = await AddressSelectorDrawer.show(context);
+              if (context.mounted) {
+                await sessionCubit.refreshSilently();
+                final latestSession = sessionCubit.state;
+                AddressModel? activeAddr = chosen;
+                if (latestSession.addresses.isNotEmpty) {
+                  try {
+                    activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
+                  } catch (_) {
+                    activeAddr ??= latestSession.addresses.first;
+                  }
+                }
+                final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
+                    ? activeAddr!.branchId
+                    : (latestSession.profile?.branchId ?? '');
+                if (targetBranchId.isNotEmpty) {
+                  catalogBloc.add(LoadCatalog(branchId: targetBranchId));
                 }
               }
-              final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
-                  ? activeAddr!.branchId
-                  : (latestSession.profile?.branchId ?? '');
-              if (targetBranchId.isNotEmpty) {
-                catalogBloc.add(LoadCatalog(branchId: targetBranchId));
-              }
-            }
-          },
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-            constraints: const BoxConstraints(maxWidth: 160),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFF16653A).withValues(alpha: 0.15),
-                width: 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+            },
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(
-                  hasBranch ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
-                  color: const Color(0xFF16653A),
-                  size: 15,
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16653A).withValues(alpha: 0.09),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    hasBranch ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
+                    color: const Color(0xFF16653A),
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(width: 4),
-                Flexible(
+                const SizedBox(width: 8),
+                Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              locationTitle,
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.2,
+                                height: 1.15,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF16653A),
+                            size: 19,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
                       Text(
-                        locationLabel,
+                        subtitle,
                         style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF16653A),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
                           height: 1.1,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (branchName != null && branchName.isNotEmpty && branchName != locationLabel)
-                        Text(
-                          branchName,
-                          style: const TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w600,
-                            color: kTextSub,
-                            height: 1.1,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 2),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Color(0xFF16653A),
-                  size: 14,
                 ),
               ],
             ),
@@ -2215,166 +2230,58 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final double minHeight = minExtent;
-    final double maxHeight = maxExtent;
-    final double delta = maxHeight - minHeight;
-    final double shrinkFactor = delta > 0
-        ? (shrinkOffset / delta).clamp(0.0, 1.0)
-        : 0.0;
-
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: shrinkFactor > 0.8
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [],
+        border: Border(
+          bottom: BorderSide(
+            color: Color(0xFFF1F5F9),
+            width: 1.0,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: Stack(
-        fit: StackFit.expand,
+      padding: EdgeInsets.fromLTRB(16, topPadding + 6, 16, 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // 1. Farm Background Image (fades out as header collapses)
-          Opacity(
-            opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
-            child: AppAssetImage(
-              assetKey: 'api/uploads/app_assets/bg/home_bg.jpg',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(color: const Color(0xFFE8F5E9));
-              },
-            ),
-          ),
-
-          // 2. Solid color background overlay (smooth fade to solid color as collapses)
-          Positioned.fill(
-            child: Container(
-              color: Colors.white.withValues(alpha: shrinkFactor),
-            ),
-          ),
-
-          // 3. Darker bottom gradient for expanded state
-          Opacity(
-            opacity: (1.0 - shrinkFactor).clamp(0.0, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.0, 1.0],
-                  colors: [Colors.transparent, kBg.withValues(alpha: 0.85)],
-                ),
+          // Row 1: Fixed Address (Left) and Notifications (Right)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: branchWidget,
               ),
-            ),
+              const SizedBox(width: 12),
+              _buildNotificationBell(context),
+            ],
           ),
 
-          // 4. Top Row (App Logo, Title, Branch Info, Notification Bell) - fades out
-          Positioned(
-            top: topPadding + 10,
-            left: 12,
-            right: 8,
-            child: Opacity(
-              opacity: (1.0 - shrinkFactor * 1.8).clamp(0.0, 1.0),
-              child: Row(
-                children: [
-                  Flexible(
-                    flex: 5,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              'assets/icon/app_icon.png',
-                              width: 28,
-                              height: 28,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF16653A),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.eco_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Farm to Home',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF16653A),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    flex: 6,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: branchWidget,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _buildNotificationBell(context),
-                ],
-              ),
-            ),
-          ),
+          const SizedBox(height: 10),
 
-          // 5. Search Bar (slides up to stick at top)
-          Positioned(
-            left: 16,
-            right: 16,
-            top:
-                topPadding +
-                208 -
-                (shrinkFactor *
-                    200), // Interpolates from topPadding+208 to topPadding+8
+          // Row 2: Search Bar
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
             child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: onSearchTap,
               child: Container(
-                height: 46,
+                height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: const Color(0xFF16653A).withValues(alpha: 0.12),
+                    color: const Color(0xFFE2E8F0),
                     width: 1.0,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF16653A).withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Row(
                   children: [
@@ -2388,8 +2295,8 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                       child: Text(
                         searchHint,
                         style: const TextStyle(
-                          color: kTextSub,
-                          fontSize: 13,
+                          color: Color(0xFF94A3B8),
+                          fontSize: 13.5,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -2397,7 +2304,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                     const Icon(
                       Icons.tune_rounded,
                       color: Color(0xFF16653A),
-                      size: 20,
+                      size: 19,
                     ),
                   ],
                 ),
@@ -2416,55 +2323,53 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
         if (state is NotificationsLoaded) {
           hasUnread = state.unreadCount > 0;
         }
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const NotificationsScreen(),
-              ),
-            );
-          },
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFF16653A).withValues(alpha: 0.15),
-                width: 1.0,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
                 ),
-              ],
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF16653A),
-                  size: 20,
+              );
+            },
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFE2E8F0),
+                  width: 1.0,
                 ),
-                if (hasUnread)
-                  Positioned(
-                    top: 7,
-                    right: 7,
-                    child: Container(
-                      width: 7.5,
-                      height: 7.5,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
-                        shape: BoxShape.circle,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Icon(
+                    Icons.notifications_none_rounded,
+                    color: Color(0xFF1E293B),
+                    size: 20,
+                  ),
+                  if (hasUnread)
+                    Positioned(
+                      top: 7,
+                      right: 7,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -2473,10 +2378,10 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => 280;
+  double get maxExtent => topPadding + 110;
 
   @override
-  double get minExtent => topPadding + 62;
+  double get minExtent => topPadding + 110;
 
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {
