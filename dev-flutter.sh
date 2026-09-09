@@ -4,13 +4,13 @@
 # Fixed socket: /tmp/f2h-tmux.sock  — consistent across all shells
 # Usage: ./dev-flutter.sh [both|customer|partner|stop|status|reload|logs]
 # ═══════════════════════════════════════════════════════════════════════════════
-FLUTTER=/usr/local/bin/flutter
-REPO=/home/f2hfresh/htdocs/f2hfresh.com
-CUSTOMER_DIR=$REPO/apps/mobile/customer
-PARTNER_DIR=$REPO/apps/mobile/delivery
-LOG_DIR=/home/f2hfresh/logs/flutter
+FLUTTER="$(which flutter 2>/dev/null || echo /snap/bin/flutter)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CUSTOMER_DIR="$REPO/apps/mobile/customer"
+PARTNER_DIR="$REPO/apps/mobile/delivery"
+LOG_DIR="$(dirname "$REPO")/logs/flutter"
 SOCK=/tmp/f2h-tmux.sock
-DART_API=https://f2hfresh.com
+DART_API="${F2H_API_URL:-https://dev.f2hfresh.com}"
 G="\033[0;32m"; Y="\033[1;33m"; R="\033[0;31m"; C="\033[0;36m"; NC="\033[0m"
 TMUX="tmux -S $SOCK"
 mkdir -p "$LOG_DIR"
@@ -100,44 +100,39 @@ status_all() {
   $TMUX list-sessions 2>/dev/null || echo "  (no tmux sessions on $SOCK)"
 }
 
-case "${1:-both}" in
-  customer)  start_app customer "$CUSTOMER_DIR" 8081 ;;
-  partner)   start_app partner  "$PARTNER_DIR"  8082 ;;
-  stop)      stop_all ;;
-  status)    status_all ;;
-  reload)
-    TARGET="${2:-customer}"
-    $TMUX send-keys -t "flutter_${TARGET}" 'r' '' && \
-      echo -e "${G}  ✓ Hot-reload → ${TARGET}${NC}" || \
-      echo -e "${R}  ✗ ${TARGET} session not found${NC}" ;;
-  logs)
-    tail -f "${LOG_DIR}/${2:-customer}.log" ;;
-  both|*)
-    # Kill everything and restart fresh
-    pkill -f "flutter.*web-server" 2>/dev/null || true
-    pkill -f "inotifywait" 2>/dev/null || true
-    $TMUX kill-server 2>/dev/null || true
-    sleep 1
+reload_all() {
+  echo -e "${C}Triggering Flutter hot-reload for all apps…${NC}"
+  $TMUX send-keys -t flutter_customer 'r' '' 2>/dev/null && echo -e "  ${G}✓ Customer reloaded${NC}" || echo -e "  ${Y}○ Customer not running${NC}"
+  $TMUX send-keys -t flutter_partner  'r' '' 2>/dev/null && echo -e "  ${G}✓ Partner reloaded${NC}"  || echo -e "  ${Y}○ Partner not running${NC}"
+}
 
+COMMAND="${1:-both}"
+
+case "$COMMAND" in
+  customer)
     start_app customer "$CUSTOMER_DIR" 8081
-    start_app partner  "$PARTNER_DIR"  8082
-
-    echo ""
-    echo -e "${C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${G}  ⚡ FLUTTER HOT-RELOAD ACTIVE (tmux -S ${SOCK})${NC}"
-    echo -e ""
-    echo -e "${G}  HOW TO DEVELOP FAST:${NC}"
-    echo -e "  1. Open https://customer.f2hfresh.com once (1300 DDC modules load)"
-    echo -e "  2. After 1st load, modules CACHE → future soft-refreshes < 3s"
-    echo -e "  3. Save any .dart file → auto hot-reload → browser updates < 1s"
-    echo -e "  4. ❌ NEVER use Ctrl+Shift+R (hard refresh bypasses cache = 60s!)"
-    echo -e "  5. ✅ Use Ctrl+R (soft refresh) only if hot-reload didn't apply"
-    echo -e ""
-    echo -e "${C}  COMMANDS:${NC}"
-    echo -e "  ./dev-flutter.sh status              # check running status"
-    echo -e "  ./dev-flutter.sh reload customer     # manual hot-reload"
-    echo -e "  ./dev-flutter.sh logs customer       # follow flutter output"
-    echo -e "  tmux -S ${SOCK} attach -t flutter_customer"
-    echo -e "${C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    ;;
+  partner)
+    start_app partner "$PARTNER_DIR" 8082
+    ;;
+  both)
+    start_app customer "$CUSTOMER_DIR" 8081
+    start_app partner "$PARTNER_DIR" 8082
+    ;;
+  stop)
+    stop_all
+    ;;
+  status)
+    status_all
+    ;;
+  reload)
+    reload_all
+    ;;
+  logs)
+    tail -f "${LOG_DIR}/customer.log" "${LOG_DIR}/partner.log"
+    ;;
+  *)
+    echo "Usage: $0 {both|customer|partner|stop|status|reload|logs}"
+    exit 1
     ;;
 esac

@@ -2,6 +2,15 @@
     "folders": [
         {
             "path": "."
+        },
+        {
+            "path": "../../../f2hfresh-database/htdocs/database.f2hfresh.com"
+        },
+        {
+            "path": "../../../f2hfresh-c/htdocs/c.f2hfresh.com"
+        },
+        {
+            "path": "../../../f2hfresh-p/htdocs/p.f2hfresh.com"
         }
     ]
 }
