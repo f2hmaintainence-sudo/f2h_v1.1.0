@@ -1052,7 +1052,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                   surfaceTintColor: Colors.transparent,
                   elevation: 0,
                   pinned: true,
-                  titleSpacing: 24,
+                  leading: Navigator.canPop(context)
+                      ? IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _inkGreen),
+                          onPressed: () => Navigator.pop(context),
+                        )
+                      : null,
+                  titleSpacing: Navigator.canPop(context) ? 0 : 24,
                   title: const Text(
                     'My Profile',
                     style: TextStyle(

@@ -275,6 +275,9 @@ class AppShellState extends State<AppShell> {
   int get currentTab => _i;
 
   void setTab(int index, {String? category, String? productId, String? productName}) {
+    if (index >= _tabs.length) {
+      index = 0;
+    }
     if (category != null) {
       _pendingCategory = category;
     }
@@ -320,7 +323,6 @@ class AppShellState extends State<AppShell> {
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Shop'),
     (Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Subscribe'),
-    (Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
   ];
 
   @override
@@ -365,7 +367,6 @@ class AppShellState extends State<AppShell> {
           HomeScreen(isNavVisible: _showNav),
           BrowseScreen(isNavVisible: _showNav),
           const SubsScreen(),
-          const ProfileScreen(),
         ],
       ),
     ),
