@@ -59,6 +59,7 @@ The repository provides automated tools to manage migrations and backups:
 | `npm run db:migrate` | **Dry-run**: Connects to the database and prints exactly which migrations would be executed without applying changes. |
 | `npm run db:migrate:apply` | **Apply**: Executes pending migrations sequentially inside transactions and records their checksums in `schema_migrations`. |
 | `npm run db:backup [dbname]` | Creates a timestamped, gzip-compressed snapshot of the database in `backups/db/`. |
+| `npm run db:clone-prod-to-dev` | Clones production (`f2h_fresh`) data into dev (`f2h_dev`) safely and automatically applies all `v1.1.0` forward migrations. |
 
 ---
 
@@ -100,7 +101,69 @@ The repository provides automated tools to manage migrations and backups:
 
 ---
 
-### 2. How to Safely Host / Deploy `v1.1.0` to Production (`f2hfresh.com`)
+### 2. Managing Old Version Data During the 2-3 Weeks Development Cycle
+
+During the 2-3 weeks required to develop `v1.1.0`:
+* Live production (`f2hfresh.com` / `f2h_fresh`) is actively serving users, creating new orders, accepting payments, and updating wallet balances.
+* Developers in `dev.f2hfresh.com` (`f2h_dev`) need realistic catalogs, product categories, delivery zones, and customer records to build and test features.
+
+```
+─────────────────────────────────────────────────────────────────────────────
+                     DURING 2-3 WEEKS OF DEVELOPMENT
+─────────────────────────────────────────────────────────────────────────────
+ LIVE PRODUCTION (f2hfresh.com)             DEVELOPMENT (dev.f2hfresh.com)
+  Database: f2h_fresh                        Database: f2h_dev
+  Status: Continuous live orders             Status: Active feature building
+                                                     & schema migrations
+         │
+         │  1. ONE-WAY SAFE CLONE (on-demand)
+         │  `npm run db:clone-prod-to-dev`
+         │  (f2h_fresh is read-only; f2h_dev refreshed & migrations re-applied)
+         ▼
+─────────────────────────────────────────────────────────────────────────────
+                        AT CUTOVER (AFTER 2-3 WEEKS)
+─────────────────────────────────────────────────────────────────────────────
+ LIVE PRODUCTION (f2hfresh.com)
+  Database: f2h_fresh (Contains all past data + 3 weeks of accumulated orders!)
+  
+  Action:
+  1. Automated snapshot: `./scripts/db-backup.sh f2h_fresh`
+  2. Apply ONLY migrations: `DB_DATABASE=f2h_fresh npm run db:migrate:apply`
+  3. Zero data loss: All past users + all 3 weeks of orders are 100% intact!
+  
+  ⚠️ NEVER OVERWRITE f2h_fresh WITH f2h_dev!
+─────────────────────────────────────────────────────────────────────────────
+```
+
+#### Step A: Getting Old Version Data into Dev Anytime During Development
+Whenever developers want a fresh copy of production data in development to test against:
+
+```bash
+npm run db:clone-prod-to-dev
+```
+
+**What this automated command does:**
+1. Connects to `f2h_fresh` in **read-only** mode and takes a compressed dump.
+2. Restores the schema and rows into `f2h_dev`.
+3. Automatically executes all pending `v1.1.0` forward migrations (`021-...sql`, etc.) on `f2h_dev`.
+4. Restarts the dev NestJS API process.
+5. **Safety Guarantee**: Hardcoded guardrails prevent this script from ever running if target is production.
+
+#### Step B: Handling Data at Cutover / Go-Live (After 2-3 Weeks)
+When `v1.1.0` development is finished after 2-3 weeks:
+
+1. **Why we NEVER copy `f2h_dev` to `f2h_fresh`**:
+   During the 2-3 weeks, real customers made real purchases and deposits in `f2h_fresh`. If `f2h_dev` were copied to production, all 3 weeks of real orders and customer accounts would be deleted!
+2. **The Zero-Data-Loss Migration Cutover**:
+   Instead of moving databases, we apply **only the forward migrations** (`apps/api/migrations/021-*.sql`, etc.) to `f2h_fresh`.
+   Because each migration followed the Expand-and-Contract rules:
+   - Existing tables, columns, orders, users, and balances are never dropped or corrupted.
+   - New columns are added with default values or NULL.
+   - All 3 weeks of live data are 100% preserved.
+
+---
+
+### 3. How to Safely Host / Deploy `v1.1.0` to Production (`f2hfresh.com`)
 
 When it is time to host `v1.1.0` on `f2hfresh.com` using the existing `f2h_fresh` database:
 

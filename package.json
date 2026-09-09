@@ -13,7 +13,8 @@
     "db:migrate": "npm --workspace=apps/api run db:migrate",
     "db:migrate:apply": "npm --workspace=apps/api run db:migrate:apply",
     "db:create-migration": "npm --workspace=apps/api run db:create-migration",
-    "db:backup": "./scripts/db-backup.sh"
+    "db:backup": "./scripts/db-backup.sh",
+    "db:clone-prod-to-dev": "./scripts/db-clone-prod-to-dev.sh"
   },
   "workspaces": [
     "apps/api",

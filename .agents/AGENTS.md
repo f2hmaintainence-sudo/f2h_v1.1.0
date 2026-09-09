@@ -25,4 +25,5 @@
   - New columns MUST be `NULLABLE` or have a `DEFAULT` value.
   - Never drop or rename a column in one step. Follow Expand -> Backfill -> Deprecate -> Contract.
 - **Mandatory Pre-Hosting Backups**: Always run `./scripts/db-backup.sh <dbname>` before deploying migrations or hosting updates on live production.
+- **Development Data Synchronization (Never Overwrite Prod)**: During development cycles, use `npm run db:clone-prod-to-dev` to safely refresh `f2h_dev` with production data. Production `f2h_fresh` MUST NEVER be overwritten with development data; at go-live, only forward migrations are applied to `f2h_fresh`.
 - **Documentation Reference**: Detailed operational instructions live in `docs/DATABASE_VERSION_CONTROL.md`.
