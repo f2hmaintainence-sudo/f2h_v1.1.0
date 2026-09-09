@@ -17,3 +17,12 @@
 - **Mandatory Git Pull at Task Start**: At the start of EVERY task, conversation, or before inspecting/modifying any files, the agent MUST run `git pull origin main` to ensure the local workspace is 100% up-to-date with GitHub.
 - **Complete Git Auto-Push on Every Change**: Upon completing ANY task, feature, bugfix, refactor, or file modification, the agent MUST inspect `git status`, stage ALL modified and untracked files completely without missing any (`git add -A`), create a descriptive commit, and push directly to GitHub (`git push origin main`).
 - **Pre-Push Quality Verification**: Always test workspace builds (`npm run build:api`, `npm run build:web`) and verify PM2 process health (`pm2 status`) before committing and pushing updates to the main branch via git.
+
+## 4. Database Version Controlling & Schema Evolution Rules
+- **No In-Place Edits to Applied Migrations**: Once a migration file exists in `apps/api/migrations/`, it MUST NOT be edited or deleted. Always use `npm run db:create-migration <name>` to generate a new forward migration.
+- **Backward Compatibility for Production Hosting**: All schema modifications MUST preserve existing production records (`f2hfresh.com` / `f2h_fresh`). 
+- **Expand-and-Contract Lifecycle**:
+  - New columns MUST be `NULLABLE` or have a `DEFAULT` value.
+  - Never drop or rename a column in one step. Follow Expand -> Backfill -> Deprecate -> Contract.
+- **Mandatory Pre-Hosting Backups**: Always run `./scripts/db-backup.sh <dbname>` before deploying migrations or hosting updates on live production.
+- **Documentation Reference**: Detailed operational instructions live in `docs/DATABASE_VERSION_CONTROL.md`.

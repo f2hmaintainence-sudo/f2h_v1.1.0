@@ -20,6 +20,8 @@ docker-compose.override.yml
 *.log
 apps/api/logs/
 apps/api/src/logs.log
+backups/
+*.sql.gz
 
 # Flutter / Dart
 .dart_tool/

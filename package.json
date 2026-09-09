@@ -9,7 +9,11 @@
     "build:partner-web": "./build-flutter.sh partner",
     "deploy:customer-web": "./build-flutter.sh customer clean",
     "deploy:partner-web": "./build-flutter.sh partner clean",
-    "deploy:all": "./build-flutter.sh both clean"
+    "deploy:all": "./build-flutter.sh both clean",
+    "db:migrate": "npm --workspace=apps/api run db:migrate",
+    "db:migrate:apply": "npm --workspace=apps/api run db:migrate:apply",
+    "db:create-migration": "npm --workspace=apps/api run db:create-migration",
+    "db:backup": "./scripts/db-backup.sh"
   },
   "workspaces": [
     "apps/api",
