@@ -67,7 +67,11 @@ class _PromoBannerState extends State<PromoBanner> {
               final isActive = b['isActive'] ?? b['is_active'] ?? true;
               if (isActive == false) return false;
               final bType = (b['bannerType'] ?? b['banner_type'] ?? '').toString().toLowerCase();
-              return bType == 'home_carousel' || bType == 'offer_banner' || bType.isEmpty;
+              if (bType != 'home_carousel' && bType != 'offer_banner' && bType.isNotEmpty) {
+                return false;
+              }
+              final rawUrl = (b['imageUrl'] ?? b['image_url'] ?? b['imagePath'] ?? b['image_path'])?.toString().trim() ?? '';
+              return rawUrl.isNotEmpty;
             })
             .map((b) => Map<String, dynamic>.from(b as Map))
             .toList();
@@ -162,20 +166,20 @@ class _PromoBannerState extends State<PromoBanner> {
   String _formatImageUrl(String rawUrl) {
     if (rawUrl.isEmpty) return '';
 
+    if (rawUrl.contains('/uploads/')) {
+      final pathAfterUploads = rawUrl.substring(rawUrl.indexOf('/uploads/'));
+      return '${ApiEndpoints.host}$pathAfterUploads';
+    }
+
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       final uri = Uri.tryParse(rawUrl);
       if (uri != null) {
         const devHosts = {'localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'};
         if (devHosts.contains(uri.host)) {
-          return 'https://f2hfresh.com${uri.path}';
+          return '${ApiEndpoints.host}${uri.path}';
         }
         return rawUrl;
       }
-    }
-
-    if (rawUrl.contains('/uploads/')) {
-      final pathAfterUploads = rawUrl.substring(rawUrl.indexOf('/uploads/'));
-      return 'https://f2hfresh.com$pathAfterUploads';
     }
 
     if (rawUrl.contains('/assets/')) {
@@ -184,7 +188,7 @@ class _PromoBannerState extends State<PromoBanner> {
     }
 
     final formatted = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
-    return 'https://f2hfresh.com$formatted';
+    return '${ApiEndpoints.host}$formatted';
   }
 
   @override
@@ -245,10 +249,19 @@ class _PromoBannerState extends State<PromoBanner> {
                                   );
                                 },
                                 errorBuilder: (context, error, stackTrace) {
-                                  return _buildOfferCard(banner, imageUrl);
+                                  return Container(
+                                    color: const Color(0xFFF8FAFC),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image_outlined,
+                                        color: Color(0xFFCBD5E1),
+                                        size: 28,
+                                      ),
+                                    ),
+                                  );
                                 },
                               )
-                            : _buildOfferCard(banner, ''),
+                            : const SizedBox.shrink(),
                       ),
                     ),
                   ),
@@ -275,61 +288,6 @@ class _PromoBannerState extends State<PromoBanner> {
               }),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOfferCard(Map<String, dynamic> banner, String imageUrl) {
-    final title = banner['title']?.toString() ?? 'F2H Fresh';
-    final desc = banner['description']?.toString() ?? 'Fresh Daily Essentials Delivered To Your Doorstep';
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF15803D), Color(0xFF16A34A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  desc,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Image.asset(
-            'assets/icon/app_icon.png',
-            width: 50,
-            height: 50,
-            fit: BoxFit.contain,
-          ),
         ],
       ),
     );
