@@ -7,7 +7,7 @@
  * Flutter web apps run separately via ./dev-flutter.sh
  */
 
-const MONOREPO = '/home/f2hfresh/htdocs/f2hfresh.com';
+const MONOREPO = '/home/f2hfresh-dev/htdocs/dev.f2hfresh.com';
 
 module.exports = {
   apps: [
@@ -27,8 +27,8 @@ module.exports = {
         INTERNAL_API_URL: 'http://localhost:5001',
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
       },
-      out_file: '/home/f2hfresh/logs/pm2/api-out.log',
-      error_file: '/home/f2hfresh/logs/pm2/api-err.log',
+      out_file: '/home/f2hfresh-dev/logs/pm2/api-out.log',
+      error_file: '/home/f2hfresh-dev/logs/pm2/api-err.log',
       merge_logs: true,
       log_date_format: 'HH:mm:ss',
     },
@@ -49,8 +49,8 @@ module.exports = {
         INTERNAL_API_URL: 'http://localhost:5001',
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
       },
-      out_file: '/home/f2hfresh/logs/pm2/frontend-out.log',
-      error_file: '/home/f2hfresh/logs/pm2/frontend-err.log',
+      out_file: '/home/f2hfresh-dev/logs/pm2/frontend-out.log',
+      error_file: '/home/f2hfresh-dev/logs/pm2/frontend-err.log',
       merge_logs: true,
       log_date_format: 'HH:mm:ss',
     },
@@ -64,8 +64,8 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
       },
-      out_file: '/home/f2hfresh/logs/pm2/broadcaster-out.log',
-      error_file: '/home/f2hfresh/logs/pm2/broadcaster-err.log',
+      out_file: '/home/f2hfresh-dev/logs/pm2/broadcaster-out.log',
+      error_file: '/home/f2hfresh-dev/logs/pm2/broadcaster-err.log',
       merge_logs: true,
       log_date_format: 'HH:mm:ss',
     },

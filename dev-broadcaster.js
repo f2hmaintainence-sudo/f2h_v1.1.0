@@ -18,7 +18,7 @@ function triggerBuildAndReload(app) {
   isBuilding[app] = true;
   console.log(`⚡ [${app}] Dart source change detected. Rebuilding web app...`);
 
-  exec(`/home/f2hfresh/htdocs/f2hfresh.com/build-flutter.sh ${app}`, (err, stdout, stderr) => {
+  exec(`${__dirname}/build-flutter.sh ${app}`, (err, stdout, stderr) => {
     isBuilding[app] = false;
     if (err) {
       console.error(`❌ [${app}] Flutter build error:`, stderr);
@@ -44,7 +44,7 @@ function triggerBuildAndReload(app) {
 
 // Watch customer app source
 let customerDebounce = null;
-fs.watch('/home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer/lib', { recursive: true }, (evt, filename) => {
+fs.watch(`${__dirname}/apps/mobile/customer/lib`, { recursive: true }, (evt, filename) => {
   if (filename && filename.endsWith('.dart')) {
     clearTimeout(customerDebounce);
     customerDebounce = setTimeout(() => triggerBuildAndReload('customer'), 300);
@@ -53,7 +53,7 @@ fs.watch('/home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/customer/lib', { recurs
 
 // Watch delivery partner app source
 let partnerDebounce = null;
-fs.watch('/home/f2hfresh/htdocs/f2hfresh.com/apps/mobile/delivery/lib', { recursive: true }, (evt, filename) => {
+fs.watch(`${__dirname}/apps/mobile/delivery/lib`, { recursive: true }, (evt, filename) => {
   if (filename && filename.endsWith('.dart')) {
     clearTimeout(partnerDebounce);
     partnerDebounce = setTimeout(() => triggerBuildAndReload('partner'), 300);
