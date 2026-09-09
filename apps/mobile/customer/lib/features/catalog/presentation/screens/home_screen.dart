@@ -38,6 +38,11 @@ import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../wallet/presentation/screens/wallet_screen.dart';
 import '../../../../core/widgets/popup_banner_widget.dart';
 import '../../../../core/widgets/unpaid_bill_banner_widget.dart';
+import 'package:f2h_customer/core/guards/auth_guard.dart';
+import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_bloc.dart';
+import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';
+import 'package:f2h_customer/features/subscription/presentation/screens/subscription_setup_screen.dart';
+import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart';
 
 // ══════════════════════════════════════════════════════════
 //  HOME SCREEN
@@ -218,295 +223,315 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
 
-                    // 3. Category Shortcuts Row
+                    // 2C. Weekly Delivery Schedule Calendar (like in reference image)
+                    SliverToBoxAdapter(
+                      child: HomeDeliveryCalendarCard(
+                        onCalendarTap: () => AppShell.of(context)?.setTab(2),
+                      ),
+                    ),
+
+                    // 3. Top Banner (with banner count dots)
+                    const SliverToBoxAdapter(child: PromoBanner()),
+
+                    // 4. Subscription Products (Daily doorstep delivery with subscribe options)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Subscription Products',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const BrowseScreen(
+                                      initialCategory: 'All',
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'See All',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 12,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: BlocBuilder<CatalogBloc, CatalogState>(
+                        builder: (context, state) {
+                          final isOffline =
+                              context.read<NetworkBloc>().state is NetworkOffline;
+                          if (state is CatalogLoading ||
+                              state is CatalogInitial ||
+                              isOffline) {
+                            return SizedBox(
+                              height: 255,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                itemCount: 4,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 12),
+                                itemBuilder: (_, __) => const SizedBox(
+                                  width: 165,
+                                  child: _HomeSkeletonCard(),
+                                ),
+                              ),
+                            );
+                          }
+
+                          if (state is CatalogError) {
+                            return SizedBox(
+                              height: 255,
+                              child: Center(
+                                child: TextButton.icon(
+                                  onPressed: () => context
+                                      .read<CatalogBloc>()
+                                      .add(LoadCatalog(branchId: _getBranchId(context))),
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Retry products'),
+                                ),
+                              ),
+                            );
+                          }
+
+                          List<Product> products = [];
+                          if (state is CatalogLoaded) {
+                            products = state.products
+                                .where((p) => p.isSubscribable)
+                                .toList();
+                          }
+                          if (products.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          return SizedBox(
+                            height: 255,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemCount: products.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                return _subscriptionProductCard(
+                                  context,
+                                  products[index],
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // 5. Popular Products (Sorted based on ratings!)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Popular Products',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const BrowseScreen(
+                                      initialCategory: 'All',
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'See All',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 12,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: BlocBuilder<CatalogBloc, CatalogState>(
+                        builder: (context, state) {
+                          if (state is CatalogLoading ||
+                              state is CatalogInitial) {
+                            return SizedBox(
+                              height: 275,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                itemCount: 4,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 12),
+                                itemBuilder: (_, __) => const SizedBox(
+                                  width: 165,
+                                  child: _HomeSkeletonCard(),
+                                ),
+                              ),
+                            );
+                          }
+
+                          List<Product> popularProducts = [];
+                          if (state is CatalogLoaded) {
+                            final inStock = state.products
+                                .where((p) => !p.isOutOfStock)
+                                .toList();
+                            inStock.sort((a, b) {
+                              final r = b.rating.compareTo(a.rating);
+                              if (r != 0) return r;
+                              return b.reviews.compareTo(a.reviews);
+                            });
+                            popularProducts = inStock.take(15).toList();
+                          }
+                          if (popularProducts.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          return SizedBox(
+                            height: 275,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemCount: popularProducts.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                return oneTimeProductCard(
+                                  context,
+                                  popularProducts[index],
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // 6. Categories (Next show categories!)
+                    const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Shop by Category',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => AppShell.of(context)?.setTab(1),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'See All',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 12,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     SliverToBoxAdapter(child: _categoryShortcuts()),
 
-                  // 3. Top Banner (above Subscription Products)
-                  const SliverToBoxAdapter(child: PromoBanner()),
+                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-                  // 4. Subscription Products (Marketplace Catalog) - MOVED TO TOP!
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'Subscription Products',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: kText,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const BrowseScreen(
-                                    initialCategory: 'All',
-                                  ),
-                                ),
-                              );
-                            },
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'See All',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF16653A),
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_forward,
-                                  size: 12,
-                                  color: Color(0xFF16653A),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    // 7. Promotional Offer Cards (Live Preview Style)
+                    const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
+                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                    // 8. Per-category product groups with inline banners
+                    SliverToBoxAdapter(
+                      child: BlocBuilder<CatalogBloc, CatalogState>(
+                        builder: (context, state) {
+                          if (state is! CatalogLoaded) return const SizedBox.shrink();
+                          return _CategoryProductGroups(
+                            allProducts: state.products,
+                          );
+                        },
                       ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: BlocBuilder<CatalogBloc, CatalogState>(
-                      builder: (context, state) {
-                        final isOffline =
-                            context.read<NetworkBloc>().state is NetworkOffline;
-                        if (state is CatalogLoading ||
-                            state is CatalogInitial ||
-                            isOffline) {
-                          return SizedBox(
-                            height: 285,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              itemCount: 4,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (_, __) => const SizedBox(
-                                width: 165,
-                                child: _HomeSkeletonCard(),
-                              ),
-                            ),
-                          );
-                        }
 
-                        if (state is CatalogError) {
-                          return SizedBox(
-                            height: 285,
-                            child: Center(
-                              child: TextButton.icon(
-                                onPressed: () => context
-                                    .read<CatalogBloc>()
-                                    .add(LoadCatalog(branchId: _getBranchId(context))),
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Retry products'),
-                              ),
-                            ),
-                          );
-                        }
-
-                        List<Product> products = [];
-                        if (state is CatalogLoaded) {
-                          products = state.products
-                              .where((p) => p.isSubscribable)
-                              .toList();
-                        }
-                        if (products.isEmpty) {
-                          return SizedBox(
-                            height: 285,
-                            child: Center(
-                              child: TextButton.icon(
-                                onPressed: () => context
-                                    .read<CatalogBloc>()
-                                    .add(LoadCatalog(branchId: _getBranchId(context))),
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Retry products'),
-                              ),
-                            ),
-                          );
-                        }
-                        return InfiniteAutoScrollList(
-                          height: 285,
-                          itemWidth: 165,
-                          autoScrollInterval: const Duration(
-                            milliseconds: 10000,
-                          ),
-                          scrollDuration: const Duration(milliseconds: 1000),
-                          animateClockwise: true,
-                          items: products
-                              .map(
-                                (p) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  child: _subscriptionProductCard(context, p),
-                                ),
-                              )
-                              .toList(),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // 5. Image Banner (Below Subscription Products)
-                  // const SliverToBoxAdapter(
-                  //   child: Padding(
-                  //     padding: EdgeInsets.only(top: 8),
-                  //     child: ImageBanner(),
-                  //   ),
-                  // ),
-
-                  // const SliverToBoxAdapter(child: HomeCouponBanner()),
-                  
-                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-                  // 8B. Promotional Offer Cards (Live Preview Style)
-                  const SliverToBoxAdapter(child: _HomeBottomPromoBanners()),
-
-                  // 6. Popular Product
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'Popular Products',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: kText,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const BrowseScreen(
-                                    initialCategory: 'All',
-                                  ),
-                                ),
-                              );
-                            },
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'See All',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF16653A),
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_forward,
-                                  size: 12,
-                                  color: Color(0xFF16653A),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: BlocBuilder<CatalogBloc, CatalogState>(
-                      builder: (context, state) {
-                        final isOffline =
-                            context.read<NetworkBloc>().state is NetworkOffline;
-                        if (state is CatalogLoading ||
-                            state is CatalogInitial ||
-                            isOffline) {
-                          return SizedBox(
-                            height: 285,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              itemCount: 4,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (_, __) => const SizedBox(
-                                width: 165,
-                                child: _HomeSkeletonCard(),
-                              ),
-                            ),
-                          );
-                        }
-
-                        if (state is CatalogError) {
-                          return const SizedBox.shrink();
-                        }
-
-                        // Popular Products: in-stock, non-subscribable, rated — highest first
-                        List<Product> products = [];
-                        if (state is CatalogLoaded) {
-                          final all = state.products
-                              .where((p) =>
-                                  !p.isSubscribable &&
-                                  !p.isOutOfStock &&
-                                  p.rating > 0)
-                              .toList()
-                            ..sort((a, b) => b.rating.compareTo(a.rating));
-                          products = all.take(20).toList();
-                        }
-                        if (products.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
-                        return InfiniteAutoScrollList(
-                          height: 285,
-                          itemWidth: 165,
-                          autoScrollInterval: const Duration(
-                            milliseconds: 12000,
-                          ),
-                          scrollDuration: const Duration(milliseconds: 1000),
-                          animateClockwise: false,
-                          items: products
-                              .map(
-                                (p) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  child: oneTimeProductCard(context, p),
-                                ),
-                              )
-                              .toList(),
-                        );
-                      },
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                  // 7. Per-category product groups with inline banners
-                  SliverToBoxAdapter(
-                    child: BlocBuilder<CatalogBloc, CatalogState>(
-                      builder: (context, state) {
-                        if (state is! CatalogLoaded) return const SizedBox.shrink();
-                        return _CategoryProductGroups(
-                          allProducts: state.products,
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Spacing before Referral
-                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                    // Spacing before Referral
+                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
                   // 8. Referral Banner (Invite Friends, Earn Rewards!)
                   const SliverToBoxAdapter(
@@ -573,7 +598,9 @@ class _HomeScreenState extends State<HomeScreen>
         }
 
         if (defaultAddr != null) {
-          if (defaultAddr.area.isNotEmpty) {
+          if (defaultAddr.label.isNotEmpty) {
+            locationLabel = defaultAddr.label;
+          } else if (defaultAddr.area.isNotEmpty) {
             locationLabel = defaultAddr.area;
           } else if (defaultAddr.city.isNotEmpty) {
             locationLabel = defaultAddr.city;
@@ -1101,9 +1128,220 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _subscriptionProductCard(BuildContext context, Product p) {
-    return SizedBox(
+    final unit = p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit;
+    final subPrice = (p.subscriptionPrice != null && p.subscriptionPrice! > 0)
+        ? p.subscriptionPrice!
+        : p.price;
+
+    return Container(
       width: 165,
-      child: ProductGridCard(p),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row: "Subscribe" badge / Out of stock
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.repeat_rounded, size: 10, color: Color(0xFF16A34A)),
+                    SizedBox(width: 3),
+                    Text(
+                      'Daily',
+                      style: TextStyle(
+                        color: Color(0xFF16A34A),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (p.isOutOfStock)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Out of stock',
+                    style: TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
+          // Center Product Image
+          Expanded(
+            child: GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (_, _, _) => ProductDetailViewScreen(product: p),
+                  transitionsBuilder: (_, a, _, child) =>
+                      FadeTransition(opacity: a, child: child),
+                  transitionDuration: const Duration(milliseconds: 220),
+                ),
+              ),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Hero(
+                    tag: 'product-sub-${p.id}',
+                    child: buildProductImage(
+                      p.name,
+                      imageAsset: p.imageAsset,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Row: Unit Tag + "Subscribe" button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  unit,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  context.runWithAuth(() {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SubscriptionSetupScreen(product: p),
+                      ),
+                    );
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16A34A),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.repeat_rounded, size: 11, color: Colors.white),
+                      SizedBox(width: 3),
+                      Text(
+                        'Subscribe',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Product Name
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (_, _, _) => ProductDetailViewScreen(product: p),
+                transitionsBuilder: (_, a, _, child) =>
+                    FadeTransition(opacity: a, child: child),
+                transitionDuration: const Duration(milliseconds: 220),
+              ),
+            ),
+            child: Text(
+              p.displayName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+                height: 1.15,
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+
+          // Price row with / delivery
+          Row(
+            children: [
+              Text(
+                '₹${subPrice.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const Text(
+                ' / delivery',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1729,6 +1967,235 @@ class InfiniteAutoScrollList extends StatelessWidget {
   }
 }
 
+// ══════════════════════════════════════════════════════════
+//  WEEKLY DELIVERY SCHEDULE CALENDAR CARD (Matching Image)
+// ══════════════════════════════════════════════════════════
+
+class HomeDeliveryCalendarCard extends StatefulWidget {
+  final VoidCallback? onCalendarTap;
+  const HomeDeliveryCalendarCard({super.key, this.onCalendarTap});
+
+  @override
+  State<HomeDeliveryCalendarCard> createState() =>
+      _HomeDeliveryCalendarCardState();
+}
+
+class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
+  late DateTime _selectedDate;
+  bool _isCollapsed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = DateTime.now();
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    // Week starting on Sunday
+    final diffToSunday = now.weekday % 7;
+    final sunday = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: diffToSunday));
+    final weekDays = List.generate(7, (i) => sunday.add(Duration(days: i)));
+
+    // Check active subscriptions to see orders scheduled
+    final subState = context.watch<SubscriptionBloc>().state;
+    int ordersForSelectedDay = 0;
+    if (subState is SubscriptionLoaded) {
+      for (final sub in subState.subscriptions) {
+        if (!sub.isActive && !sub.isPaused) continue;
+        ordersForSelectedDay++;
+      }
+    }
+
+    final scheduleTitle = ordersForSelectedDay > 0
+        ? '$ordersForSelectedDay order${ordersForSelectedDay > 1 ? "s" : ""} scheduled for this day'
+        : 'There are no orders scheduled for this day';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F8FE), // soft light blue like screenshot
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFD6EAF8),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Schedule status + Collapse/Expand toggle
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                setState(() {
+                  _isCollapsed = !_isCollapsed;
+                });
+              },
+              child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_month_rounded,
+                        color: Color(0xFF0284C7),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          scheduleTitle,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E293B),
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _isCollapsed
+                      ? Icons.keyboard_arrow_down_rounded
+                      : Icons.keyboard_arrow_up_rounded,
+                  color: const Color(0xFF64748B),
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+          if (!_isCollapsed) ...[
+            const SizedBox(height: 12),
+
+            // 7 Days of the Week Selector Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: weekDays.map((day) {
+                final isToday = _isSameDay(day, now);
+                final isSelected = _isSameDay(day, _selectedDate);
+                final dayName = isToday
+                    ? 'Today'
+                    : const [
+                        'Sun',
+                        'Mon',
+                        'Tue',
+                        'Wed',
+                        'Thu',
+                        'Fri',
+                        'Sat'
+                      ][day.weekday % 7];
+                final dateNum = day.day.toString().padLeft(2, '0');
+
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDate = day;
+                    });
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        dayName,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected
+                              ? const Color(0xFF0284C7)
+                              : const Color(0xFF475569),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF1E88E5) // solid vivid blue circle
+                              : Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          dateNum,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 14),
+
+            // Status Legend Row: Delivered, Upcoming, Vacation, On Hold
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _legendItem(const Color(0xFF10B981), 'Delivered'),
+                _legendItem(const Color(0xFF38BDF8), 'Upcoming'),
+                _legendItem(const Color(0xFFF59E0B), 'Vacation'),
+                _legendItem(const Color(0xFFEF4444), 'On Hold'),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _legendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 13,
+          height: 3.5,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF334155),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double topPadding;
   final String searchHint;
@@ -2006,7 +2473,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => 300;
+  double get maxExtent => 280;
 
   @override
   double get minExtent => topPadding + 62;

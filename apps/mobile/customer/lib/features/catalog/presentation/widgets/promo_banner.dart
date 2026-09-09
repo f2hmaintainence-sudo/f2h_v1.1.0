@@ -19,6 +19,7 @@ class _PromoBannerState extends State<PromoBanner> {
   List<Map<String, dynamic>> _banners = [];
   bool _loading = true;
   static const int _initialPage = 3000;
+  late int _currentPage = _initialPage;
   late final PageController _pageController = PageController(
     initialPage: _initialPage,
   );
@@ -192,60 +193,89 @@ class _PromoBannerState extends State<PromoBanner> {
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      child: AspectRatio(
-        aspectRatio: 2.0,
-        child: PageView.builder(
-          controller: _pageController,
-          itemCount: 100000,
-          itemBuilder: (context, index) {
-            final banner = _banners[index % _banners.length];
-            final rawUrl = (banner['imageUrl'] ?? banner['image_url'] ?? banner['imagePath'] ?? banner['image_path'])?.toString() ?? '';
-            final imageUrl = _formatImageUrl(rawUrl);
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: 2.0,
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                if (mounted) {
+                  setState(() => _currentPage = index);
+                }
+              },
+              itemCount: 100000,
+              itemBuilder: (context, index) {
+                final banner = _banners[index % _banners.length];
+                final rawUrl = (banner['imageUrl'] ?? banner['image_url'] ?? banner['imagePath'] ?? banner['image_path'])?.toString() ?? '';
+                final imageUrl = _formatImageUrl(rawUrl);
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: Colors.white,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: GestureDetector(
-                    onTap: () => _onBannerTap(banner),
-                    child: imageUrl.isNotEmpty
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            loadingBuilder: (_, child, progress) {
-                              if (progress == null) return child;
-                              return Container(
-                                color: const Color(0xFFF1F5F9),
-                                child: const Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFF16A34A),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.white,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: GestureDetector(
+                        onTap: () => _onBannerTap(banner),
+                        child: imageUrl.isNotEmpty
+                            ? Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                loadingBuilder: (_, child, progress) {
+                                  if (progress == null) return child;
+                                  return Container(
+                                    color: const Color(0xFFF1F5F9),
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF16A34A),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildOfferCard(banner, imageUrl);
-                            },
-                          )
-                        : _buildOfferCard(banner, ''),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return _buildOfferCard(banner, imageUrl);
+                                },
+                              )
+                            : _buildOfferCard(banner, ''),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
+                );
+              },
+            ),
+          ),
+          if (_banners.length > 1) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_banners.length, (index) {
+                final isSelected = index == (_currentPage % _banners.length);
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                  width: isSelected ? 8 : 5.5,
+                  height: isSelected ? 8 : 5.5,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFCBD5E1),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
       ),
     );
   }
