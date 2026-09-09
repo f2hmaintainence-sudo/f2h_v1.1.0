@@ -5,6 +5,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/core/session/customer_session_state.dart';
 
@@ -16,9 +17,11 @@ extension AuthGuardExtension on BuildContext {
   Future<void> runWithAuth(VoidCallback action) async {
     final authState = read<AuthBloc>().state;
     final sessionState = read<CustomerSessionCubit>().state;
+    final hasSession = await TokenStorage.hasSession();
     
-    if (authState is Authenticated || sessionState.profile != null) {
+    if (authState is Authenticated || sessionState.profile != null || hasSession) {
       action();
+      return;
     } else {
       // User is not authenticated. Push LoginScreen with popOnSuccess set to true.
       final loginSuccess = await Navigator.push<bool>(

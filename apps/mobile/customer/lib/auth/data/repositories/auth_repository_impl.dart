@@ -168,7 +168,12 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       await dioClient.dio.get(ApiEndpoints.customerBootstrap);
       return true;
-    } catch (_) {
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 401) {
+        await TokenStorage.clear();
+        return false;
+      }
+      // Transient error or offline: retain local authenticated session
       return true;
     }
   }

@@ -8,6 +8,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:f2h_customer/auth/presentation/screens/signup_screen.dart';
 import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,6 +22,40 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAlreadyAuthenticated();
+  }
+
+  void _checkAlreadyAuthenticated() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _redirectToApp();
+      return;
+    }
+    final hasSession = await TokenStorage.hasSession();
+    if (hasSession && mounted) {
+      context.read<AuthBloc>().add(const AuthCheckRequested());
+      _redirectToApp();
+    }
+  }
+
+  void _redirectToApp() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.popOnSuccess) {
+        Navigator.pop(context, true);
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const AppShell()),
+          (route) => false,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -96,6 +131,15 @@ class _LoginScreenState extends State<LoginScreen> {
       },
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
+          if (state is Authenticated) {
+            _redirectToApp();
+            return const Scaffold(
+              backgroundColor: Colors.white,
+              body: Center(
+                child: CircularProgressIndicator(color: kPrimary),
+              ),
+            );
+          }
           final loading = state is AuthLoading;
           return AuthScaffold(
             title: 'Welcome to F2H Fresh!',

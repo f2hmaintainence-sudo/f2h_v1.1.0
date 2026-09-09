@@ -33,8 +33,8 @@ class UserModel {
       userId: json['user_id']?.toString() ?? json['userId']?.toString() ?? '',
       email: json['email'] ?? '',
       mustChangePassword: json['must_change_password'] ?? json['mustChangePassword'] ?? false,
-      token: json['accessToken'] ?? json['token'],
-      refreshToken: json['refreshToken'],
+      token: json['accessToken'] ?? json['token'] ?? json['access_token'],
+      refreshToken: json['refreshToken'] ?? json['refresh_token'],
       cachedAt: DateTime.now(),
     );
   }

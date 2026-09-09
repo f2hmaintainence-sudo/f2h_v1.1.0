@@ -37,7 +37,21 @@ class TokenStorage {
     if (kIsWeb) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        return prefs.getString(key);
+        final val = prefs.getString(key);
+        if (val != null && val.trim().isNotEmpty) return val.trim();
+        if (key == _kAccessToken) {
+          final fallback = prefs.getString('access_token') ??
+              prefs.getString('accessToken') ??
+              prefs.getString('token') ??
+              prefs.getString('jwt');
+          if (fallback != null && fallback.trim().isNotEmpty) return fallback.trim();
+        }
+        if (key == _kRefreshToken) {
+          final fallback = prefs.getString('refresh_token') ??
+              prefs.getString('refreshToken');
+          if (fallback != null && fallback.trim().isNotEmpty) return fallback.trim();
+        }
+        return null;
       } catch (_) {
         return null;
       }
@@ -125,10 +139,13 @@ class TokenStorage {
   static Future<String?> getUserRole()     async => _readRaw(_kUserRole);
   static Future<String?> getLastAuthAt()   async => _readRaw(_kLastAuthAt);
 
-  /// True if a refresh token exists (i.e., user has ever logged in).
+  /// True if an access token or refresh token exists (i.e., user is authenticated).
   static Future<bool> hasSession() async {
+    final at = await getAccessToken();
+    if (at != null && at.trim().isNotEmpty) return true;
     final rt = await getRefreshToken();
-    return rt != null && rt.isNotEmpty;
+    if (rt != null && rt.trim().isNotEmpty) return true;
+    return false;
   }
 
   // ---------------------------------------------------------------------------

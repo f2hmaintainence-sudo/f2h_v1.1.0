@@ -18,6 +18,10 @@ import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/core/config/app_config.dart';
 import 'package:f2h_customer/core/services/location_helper.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
+import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 
 enum MapLayerType { googleRoadmap, googleSatellite, googleTerrain }
 
@@ -273,6 +277,19 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authState = context.read<AuthBloc>().state;
+      final sessionCubit = context.read<CustomerSessionCubit>();
+      final hasSession = await TokenStorage.hasSession();
+      final bool isLoggedIn = authState is Authenticated ||
+          sessionCubit.state.profile != null ||
+          hasSession;
+      if (!isLoggedIn && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen(popOnSuccess: true)),
+        );
+      }
+    });
     _loadBranches();
     final address = widget.existing;
 

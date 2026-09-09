@@ -15,6 +15,7 @@ import 'package:f2h_customer/auth/presentation/screens/otp_screen.dart';
 import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
@@ -46,6 +47,31 @@ class _SignupScreenState extends State<SignupScreen> {
   void initState() {
     super.initState();
     _referralCodeController.addListener(_onReferralChanged);
+    _checkAlreadyAuthenticated();
+  }
+
+  void _checkAlreadyAuthenticated() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _redirectToApp();
+      return;
+    }
+    final hasSession = await TokenStorage.hasSession();
+    if (hasSession && mounted) {
+      context.read<AuthBloc>().add(const AuthCheckRequested());
+      _redirectToApp();
+    }
+  }
+
+  void _redirectToApp() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const AppShell()),
+        (route) => false,
+      );
+    });
   }
 
   @override
@@ -197,6 +223,15 @@ class _SignupScreenState extends State<SignupScreen> {
       },
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
+          if (state is Authenticated) {
+            _redirectToApp();
+            return const Scaffold(
+              backgroundColor: Colors.white,
+              body: Center(
+                child: CircularProgressIndicator(color: kPrimary),
+              ),
+            );
+          }
           final googleLoading = state is AuthLoading;
           return AuthScaffold(
             title: 'Create your F2H account',

@@ -11,12 +11,28 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/features/address/data/models/profile_address.dart';
 import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
 
 class AddressSelectorDrawer extends StatefulWidget {
   const AddressSelectorDrawer({super.key});
-  
 
-  static Future<AddressModel?> show(BuildContext context) {
+  static Future<AddressModel?> show(BuildContext context) async {
+    final authState = context.read<AuthBloc>().state;
+    final sessionState = context.read<CustomerSessionCubit>().state;
+    final hasSession = await TokenStorage.hasSession();
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null || hasSession;
+    if (!isLoggedIn) {
+      if (context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const LoginScreen(popOnSuccess: true),
+          ),
+        );
+      }
+      return null;
+    }
+
+    if (!context.mounted) return null;
     return showModalBottomSheet<AddressModel?>(
       context: context,
       isScrollControlled: true,
@@ -35,28 +51,25 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
   String? _selectedAddressId;
   bool _isUpdating = false;
 
-  void _openAddAddress(BuildContext context, {AddressModel? existing}) {
+  Future<void> _openAddAddress(BuildContext context, {AddressModel? existing}) async {
     final authState = context.read<AuthBloc>().state;
     final sessionState = context.read<CustomerSessionCubit>().state;
-    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
+    final hasSession = await TokenStorage.hasSession();
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null || hasSession;
     if (!isLoggedIn) {
-      F2HToast.info(
-        context,
-        'Please sign in to manage addresses.',
-        title: 'Sign In Required',
-        actionText: 'Sign In',
-        onAction: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const LoginScreen(popOnSuccess: true),
-            ),
-          );
-        },
-      );
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const LoginScreen(popOnSuccess: true),
+          ),
+        );
+      }
       return;
     }
 
+    if (!context.mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => AddAddressScreen(existing: existing)),
@@ -136,17 +149,7 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
               border: Border.all(color: kBorder),
             ),
             child: InkWell(
-              onTap: () async {
-                Navigator.of(context).pop();
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const AddAddressScreen(),
-                  ),
-                );
-                if (result != null && context.mounted) {
-                  await context.read<CustomerSessionCubit>().refreshSilently();
-                }
-              },
+              onTap: () => _openAddAddress(context),
               borderRadius: BorderRadius.circular(16),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -479,28 +482,25 @@ class _AddressSelectorDrawerState extends State<AddressSelectorDrawer> {
     }
   }
 
-  void _editAddress(BuildContext context, AddressModel addr) {
+  Future<void> _editAddress(BuildContext context, AddressModel addr) async {
     final authState = context.read<AuthBloc>().state;
     final sessionState = context.read<CustomerSessionCubit>().state;
-    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
+    final hasSession = await TokenStorage.hasSession();
+    final isLoggedIn = authState is Authenticated || sessionState.profile != null || hasSession;
     if (!isLoggedIn) {
-      F2HToast.info(
-        context,
-        'Please sign in to manage addresses.',
-        title: 'Sign In Required',
-        actionText: 'Sign In',
-        onAction: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const LoginScreen(popOnSuccess: true),
-            ),
-          );
-        },
-      );
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const LoginScreen(popOnSuccess: true),
+          ),
+        );
+      }
       return;
     }
 
+    if (!context.mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(

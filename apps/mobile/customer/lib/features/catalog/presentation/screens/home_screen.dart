@@ -43,6 +43,10 @@ import 'package:f2h_customer/features/subscription/presentation/bloc/subscriptio
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/subscription_setup_screen.dart';
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
+import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
+import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 
 // ══════════════════════════════════════════════════════════
 //  HOME SCREEN
@@ -572,6 +576,49 @@ class _HomeScreenState extends State<HomeScreen>
   );
 }
 
+  Future<bool> _isUserAuthenticated() async {
+    final authState = context.read<AuthBloc>().state;
+    final sessionState = context.read<CustomerSessionCubit>().state;
+    if (authState is Authenticated || sessionState.profile != null) return true;
+    return await TokenStorage.hasSession();
+  }
+
+  Future<void> _handleAddressTap() async {
+    final isAuthed = await _isUserAuthenticated();
+    if (!isAuthed) {
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(popOnSuccess: true),
+        ),
+      );
+      return;
+    }
+
+    final sessionCubit = context.read<CustomerSessionCubit>();
+    final catalogBloc = context.read<CatalogBloc>();
+
+    final chosen = await AddressSelectorDrawer.show(context);
+    if (!mounted) return;
+
+    await sessionCubit.refreshSilently();
+    final latestSession = sessionCubit.state;
+    AddressModel? activeAddr = chosen;
+    if (latestSession.addresses.isNotEmpty) {
+      try {
+        activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
+      } catch (_) {
+        activeAddr ??= latestSession.addresses.first;
+      }
+    }
+    final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
+        ? activeAddr!.branchId
+        : (latestSession.profile?.branchId ?? '');
+    if (targetBranchId.isNotEmpty) {
+      catalogBloc.add(LoadCatalog(branchId: targetBranchId));
+    }
+  }
+
   Widget _branchInfoChip(BuildContext context) {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
       builder: (context, session) {
@@ -632,30 +679,7 @@ class _HomeScreenState extends State<HomeScreen>
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () async {
-              final sessionCubit = context.read<CustomerSessionCubit>();
-              final catalogBloc = context.read<CatalogBloc>();
-
-              final chosen = await AddressSelectorDrawer.show(context);
-              if (context.mounted) {
-                await sessionCubit.refreshSilently();
-                final latestSession = sessionCubit.state;
-                AddressModel? activeAddr = chosen;
-                if (latestSession.addresses.isNotEmpty) {
-                  try {
-                    activeAddr = latestSession.addresses.firstWhere((a) => a.isDefault);
-                  } catch (_) {
-                    activeAddr ??= latestSession.addresses.first;
-                  }
-                }
-                final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
-                    ? activeAddr!.branchId
-                    : (latestSession.profile?.branchId ?? '');
-                if (targetBranchId.isNotEmpty) {
-                  catalogBloc.add(LoadCatalog(branchId: targetBranchId));
-                }
-              }
-            },
+            onTap: _handleAddressTap,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -735,146 +759,128 @@ class _HomeScreenState extends State<HomeScreen>
           alignment: Alignment.center,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 500),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: const Color(0xFF16A34A).withValues(alpha: 0.45),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF16A34A).withValues(alpha: 0.12),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF15803D), Color(0xFF16A34A)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _handleAddressTap,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFF16A34A).withValues(alpha: 0.45),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
                       ),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF16A34A).withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.location_on_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Select Delivery Address',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF14532D),
-                            letterSpacing: -0.2,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Set your location for accurate stock & delivery times.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF16A34A),
-                            height: 1.25,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () async {
-                      final sessionCubit = context.read<CustomerSessionCubit>();
-                      final catalogBloc = context.read<CatalogBloc>();
-                      final chosen = await AddressSelectorDrawer.show(context);
-                      if (context.mounted) {
-                        await sessionCubit.refreshSilently();
-                        final session = sessionCubit.state;
-                        AddressModel? activeAddr = chosen;
-                        if (session.addresses.isNotEmpty) {
-                          try {
-                            activeAddr = session.addresses.firstWhere((a) => a.isDefault);
-                          } catch (_) {
-                            activeAddr ??= session.addresses.first;
-                          }
-                        }
-                        final targetBranchId = (activeAddr?.branchId.isNotEmpty == true)
-                            ? activeAddr!.branchId
-                            : (session.profile?.branchId ?? '');
-                        if (targetBranchId.isNotEmpty) {
-                          catalogBloc.add(LoadCatalog(branchId: targetBranchId));
-                        }
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF15803D), Color(0xFF16A34A)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF16A34A).withValues(alpha: 0.35),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Set',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
-                          ),
-                          SizedBox(width: 3),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.location_on_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Select Delivery Address',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF14532D),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Set your location for accurate stock & delivery times.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF16A34A),
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF16A34A).withValues(alpha: 0.35),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Set',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 3),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
