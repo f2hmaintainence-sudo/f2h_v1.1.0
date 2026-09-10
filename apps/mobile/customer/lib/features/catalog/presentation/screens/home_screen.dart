@@ -278,8 +278,11 @@ class _HomeScreenState extends State<HomeScreen>
                                       : cleaned)
                                   : 'Fresh Cow Milk';
 
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
@@ -395,6 +398,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         },
                                       ),
                                     ),
+                                    const SizedBox(height: 12),
                                   ],
                                 ),
                               );
