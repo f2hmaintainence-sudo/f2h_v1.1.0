@@ -2378,7 +2378,7 @@ class _AnimatedSearchTriggerState extends State<AnimatedSearchTrigger> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: const Color(0xFF16A34A),
               width: 1.4,
