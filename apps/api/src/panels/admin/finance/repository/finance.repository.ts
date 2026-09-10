@@ -1315,6 +1315,18 @@ export class FinanceRepository {
     };
   }
 
+  async getCompanyProfile(): Promise<any> {
+    const sql = `
+      SELECT name, legal_name, gst_number, pan_number, email, phone, 
+             secondary_phone, whatsapp, address, city, state, pincode, logo_url, website
+      FROM public.company_profile
+      ORDER BY created_at ASC NULLS LAST, id ASC
+      LIMIT 1
+    `;
+    const rows = await this.db.query(sql, []).catch(() => []);
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+  }
+
   async getBranches(): Promise<any[]> {
     const sql = `SELECT branch_id, branch_name FROM public.branches WHERE is_active = 1 AND deleted_at IS NULL ORDER BY branch_name ASC`;
     const rows = await this.db.query(sql, []).catch(() => []);
