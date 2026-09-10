@@ -516,12 +516,15 @@ IconData getProductFallbackIcon(String name) {
     return Icons.local_cafe_rounded;
   }
   if (n.contains('oil')) {
-    return Icons.water_drop_outlined;
+    return Icons.opacity_rounded;
   }
   if (n.contains('honey')) {
     return Icons.hive_rounded;
   }
-  return Icons.shopping_bag_outlined;
+  if (n.contains('fruit') || n.contains('apple') || n.contains('veg')) {
+    return Icons.eco_rounded;
+  }
+  return Icons.shopping_bag_rounded;
 }
 
 (Color, Color) getFallbackColors(String name) {
@@ -564,6 +567,7 @@ Widget buildProductImage(
   double? height,
   BoxFit fit = BoxFit.cover,
   Color? fallbackColor,
+  bool transparentBg = false,
 }) {
   String? asset = imageAsset;
 
@@ -579,10 +583,10 @@ Widget buildProductImage(
           fit: fit,
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
-            return _fallbackIconWidget(name, width, height, fallbackColor);
+            return _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg);
           },
           errorBuilder: (context, error, stackTrace) =>
-              _fallbackIconWidget(name, width, height, fallbackColor),
+              _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg),
         );
       }
       return CachedNetworkImage(
@@ -591,9 +595,9 @@ Widget buildProductImage(
         height: height,
         fit: fit,
         placeholder: (context, url) =>
-            _fallbackIconWidget(name, width, height, fallbackColor),
+            _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg),
         errorWidget: (context, url, error) =>
-            _fallbackIconWidget(name, width, height, fallbackColor),
+            _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg),
       );
     } else {
       String resolvedAsset = asset;
@@ -651,10 +655,10 @@ Widget buildProductImage(
             fit: fit,
             loadingBuilder: (context, child, progress) {
               if (progress == null) return child;
-              return _fallbackIconWidget(name, width, height, fallbackColor);
+              return _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg);
             },
             errorBuilder: (context, error, stackTrace) =>
-                _fallbackIconWidget(name, width, height, fallbackColor),
+                _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg),
           );
         }
 
@@ -664,28 +668,29 @@ Widget buildProductImage(
           height: height,
           fit: fit,
           placeholder: (context, url) =>
-              _fallbackIconWidget(name, width, height, fallbackColor),
+              _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg),
           errorWidget: (context, url, err) =>
-              _fallbackIconWidget(name, width, height, fallbackColor),
+              _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg),
         );
       }
     }
   }
 
-  return _fallbackIconWidget(name, width, height, fallbackColor);
+  return _fallbackIconWidget(name, width, height, fallbackColor, transparentBg: transparentBg);
 }
 
 Widget _fallbackIconWidget(
   String name,
   double? width,
   double? height,
-  Color? fallbackColor,
-) {
+  Color? fallbackColor, {
+  bool transparentBg = false,
+}) {
   final (bg, defaultIconColor) = getFallbackColors(name);
   return Container(
     width: width,
     height: height,
-    color: bg,
+    color: transparentBg ? Colors.transparent : bg,
     child: Center(
       child: Icon(
         getProductFallbackIcon(name),

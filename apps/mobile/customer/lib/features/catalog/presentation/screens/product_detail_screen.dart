@@ -612,6 +612,18 @@ class _SidebarItem extends StatelessWidget {
     required this.onTap,
   });
 
+  IconData _getCategoryFallbackIcon(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('milk') || n.contains('dairy')) return Icons.water_drop_rounded;
+    if (n.contains('curd') || n.contains('yogurt')) return Icons.soup_kitchen_rounded;
+    if (n.contains('fruit') || n.contains('apple') || n.contains('veg')) return Icons.eco_rounded;
+    if (n.contains('oil') || n.contains('ghee')) return Icons.opacity_rounded;
+    if (n.contains('paneer') || n.contains('cheese')) return Icons.grid_view_rounded;
+    if (n.contains('sweet') || n.contains('bakery') || n.contains('bread')) return Icons.cake_rounded;
+    if (n.contains('nut') || n.contains('dry fruit')) return Icons.grain_rounded;
+    return Icons.shopping_bag_rounded;
+  }
+
   @override
   Widget build(BuildContext context) {
     final catName = cat['name'] as String? ?? '';
@@ -640,48 +652,16 @@ class _SidebarItem extends StatelessWidget {
                 width: 58,
                 height: 58,
                 decoration: BoxDecoration(
+                  color: Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
-                  gradient: isAll
-                      ? const LinearGradient(
-                          colors: [Color(0xFF15803D), Color(0xFF16A34A)],
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                        )
-                      : (isSelected
-                          ? const LinearGradient(
-                              colors: [
-                                Color(0xFF86EFAC),
-                                Color(0xFFDCFCE7),
-                                Colors.white,
-                              ],
-                              stops: [0.0, 0.55, 1.0],
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                            )
-                          : const LinearGradient(
-                              colors: [Color(0xFFF1F5F9), Color(0xFFF8FAFC), Color(0xFFFFFFFF)],
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                            )),
                   border: Border.all(
-                    color: isAll
-                        ? Colors.white
-                        : (isSelected
-                            ? const Color(0xFF16A34A)
-                            : const Color(0xFFE2E8F0)),
-                    width: isSelected ? 2.2 : 1.2,
+                    color: isSelected
+                        ? const Color(0xFF16A34A)
+                        : (imagePath != null && imagePath.isNotEmpty && !isAll
+                            ? const Color(0xFFE2E8F0)
+                            : Colors.transparent),
+                    width: isSelected ? 2.0 : 1.0,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isAll
-                          ? const Color(0xFF16A34A).withValues(alpha: 0.35)
-                          : (isSelected
-                              ? const Color(0xFF16A34A).withValues(alpha: 0.22)
-                              : Colors.black.withValues(alpha: 0.04)),
-                      blurRadius: isSelected ? 8 : 4,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -689,8 +669,8 @@ class _SidebarItem extends StatelessWidget {
                       ? const Center(
                           child: Icon(
                             Icons.grid_view_rounded,
-                            color: Colors.white,
-                            size: 26,
+                            color: Color(0xFF16A34A),
+                            size: 28,
                           ),
                         )
                       : (imagePath != null && imagePath.isNotEmpty
@@ -701,15 +681,15 @@ class _SidebarItem extends StatelessWidget {
                                   catName,
                                   imageAsset: imagePath,
                                   fit: BoxFit.cover,
+                                  fallbackColor: const Color(0xFF16A34A),
+                                  transparentBg: true,
                                 ),
                               )
                             : Center(
                                 child: Icon(
-                                  Icons.water_drop_rounded,
-                                  color: isSelected
-                                      ? const Color(0xFF16A34A)
-                                      : const Color(0xFF64748B),
-                                  size: 24,
+                                  _getCategoryFallbackIcon(catName),
+                                  color: const Color(0xFF16A34A),
+                                  size: 26,
                                 ),
                               )),
                 ),

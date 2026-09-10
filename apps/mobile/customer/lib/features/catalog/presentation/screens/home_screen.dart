@@ -1090,12 +1090,14 @@ class _HomeScreenState extends State<HomeScreen>
                                 label,
                                 imageAsset: imagePath,
                                 fit: BoxFit.cover,
+                                fallbackColor: const Color(0xFF16A34A),
+                                transparentBg: true,
                               ),
                             )
                           : const Center(
                               child: Icon(
-                                Icons.shopping_bag_outlined,
-                                color: Color(0xFF16653A),
+                                Icons.shopping_bag_rounded,
+                                color: Color(0xFF16A34A),
                                 size: 28,
                               ),
                             )),
