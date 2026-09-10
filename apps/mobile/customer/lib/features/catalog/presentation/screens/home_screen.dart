@@ -279,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   : 'Fresh Cow Milk';
 
                               return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
+                                margin: const EdgeInsets.only(top: 4, bottom: 16),
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                 ),
@@ -289,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   children: [
                                     // Section Header: Product Name + Daily badge + Subtitle + See All
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min,
@@ -363,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen>
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 3),
+                                          const SizedBox(height: 4),
                                           Text(
                                             rawProdName.toLowerCase().contains('milk')
                                                 ? 'Farm-fresh, zero preservatives, delivered in chilled glass bottles'
@@ -383,10 +383,10 @@ class _HomeScreenState extends State<HomeScreen>
 
                                     // Variants Row (two variants in a row)
                                     SizedBox(
-                                      height: 220,
+                                      height: 224,
                                       child: ListView.separated(
                                         scrollDirection: Axis.horizontal,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
                                         itemCount: variants.length,
                                         separatorBuilder: (_, _) => const SizedBox(width: 12),
                                         itemBuilder: (context, index) {
@@ -398,7 +398,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         },
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 16),
                                   ],
                                 ),
                               );
@@ -411,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen>
                     // 5. Popular Products (Sorted based on ratings!)
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                         child: Row(
                           children: [
                             const Text(
@@ -556,10 +556,10 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
 
                     // 6. Categories (Next show categories!)
-                    const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 18)),
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                         child: Row(
                           children: [
                             const Text(
@@ -1061,7 +1061,7 @@ class _HomeScreenState extends State<HomeScreen>
 
         return Container(
           height: 118,
-          margin: const EdgeInsets.only(top: 4, bottom: 10),
+          margin: const EdgeInsets.only(bottom: 4),
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -3151,7 +3151,7 @@ class _CategorySection extends StatelessWidget {
           ),
         ],
 
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
       ],
     );
   }
@@ -3489,13 +3489,13 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
 
     if (_promoBanners.length == 1) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
         child: _buildCard(context, _promoBanners.first),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
