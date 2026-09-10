@@ -66,15 +66,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   bool get wantKeepAlive => true;
 
-  // Search Typing Hint variables
-  int _searchIndex = 0;
-  Timer? _searchTimer;
-  final List<String> _searchHints = [
-    'Search "fresh milk"...',
-    'Search "creamy paneer"...',
-    'Search "organic ghee"...',
-    'Search "thick curd"...',
-  ];
+
 
   String? _getBranchId(BuildContext context) {
     try {
@@ -113,19 +105,11 @@ class _HomeScreenState extends State<HomeScreen>
       }
     });
 
-    // 1. Typing animation timer
-    _searchTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted) {
-        setState(() {
-          _searchIndex = (_searchIndex + 1) % _searchHints.length;
-        });
-      }
-    });
+
   }
 
   @override
   void dispose() {
-    _searchTimer?.cancel();
     super.dispose();
   }
 
@@ -186,12 +170,11 @@ class _HomeScreenState extends State<HomeScreen>
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
-                    // 1. Sticky App Header with Collapsing Search Bar & Branch Info
+                    // 1. Sticky App Header with Address, Search Option & Profile
                     SliverPersistentHeader(
                       pinned: true,
                       delegate: HomeHeaderDelegate(
                         topPadding: MediaQuery.of(context).padding.top,
-                        searchHint: _searchHints[_searchIndex],
                         branchWidget: _branchInfoChip(context),
                         onSearchTap: () {
                           Navigator.push(
@@ -632,7 +615,6 @@ class _HomeScreenState extends State<HomeScreen>
           }
         }
 
-        String locationTitle = 'Set Location';
         String? branchName;
         final branchId = defaultAddr?.branchId ?? session.profile?.branchId;
         if (branchId != null && branchId.isNotEmpty) {
@@ -644,93 +626,171 @@ class _HomeScreenState extends State<HomeScreen>
             branchName = matchingBranch['branch_name']?.toString() ?? matchingBranch['name']?.toString();
           }
         }
-
-        if (defaultAddr != null) {
-          if (defaultAddr.label.isNotEmpty) {
-            locationTitle = defaultAddr.label;
-          } else if (defaultAddr.area.isNotEmpty) {
-            locationTitle = defaultAddr.area;
-          } else if (defaultAddr.city.isNotEmpty) {
-            locationTitle = defaultAddr.city;
-          } else {
-            locationTitle = 'Delivery Address';
+        if ((branchName == null || branchName.isEmpty) && defaultAddr?.branchName != null && defaultAddr!.branchName!.isNotEmpty) {
+          branchName = defaultAddr.branchName;
+        }
+        if ((branchName == null || branchName.isEmpty) && session.branches.isNotEmpty) {
+          final firstB = session.branches.first;
+          if (firstB is Map) {
+            branchName = firstB['branch_name']?.toString() ?? firstB['name']?.toString();
           }
-        } else if (branchName != null && branchName.isNotEmpty) {
-          locationTitle = branchName;
+        }
+
+        String branchDisplay = '';
+        if (branchName != null && branchName.trim().isNotEmpty) {
+          final clean = branchName.replaceAll(RegExp(r'\s+'), ' ').trim();
+          if (clean.isNotEmpty) {
+            final words = clean.split(' ').map((w) {
+              if (w.isEmpty) return '';
+              return '${w[0].toUpperCase()}${w.substring(1)}';
+            }).join(' ');
+            branchDisplay = words.toLowerCase().contains('branch') ? words : '$words Branch';
+          }
+        }
+
+        String addressType = '';
+        if (defaultAddr != null) {
+          if (defaultAddr.addressType.trim().isNotEmpty) {
+            addressType = defaultAddr.addressType.trim();
+          } else if (defaultAddr.label.trim().isNotEmpty) {
+            addressType = defaultAddr.label.trim();
+          } else if (defaultAddr.area.trim().isNotEmpty) {
+            addressType = defaultAddr.area.trim();
+          } else {
+            addressType = 'Home';
+          }
+          if (addressType.isNotEmpty) {
+            addressType = '${addressType[0].toUpperCase()}${addressType.substring(1)}';
+          }
+        }
+
+        String areaText = '';
+        if (defaultAddr != null) {
+          if (defaultAddr.area.isNotEmpty) {
+            areaText = defaultAddr.area;
+          } else if (defaultAddr.city.isNotEmpty) {
+            areaText = defaultAddr.city;
+          } else if (defaultAddr.street.isNotEmpty) {
+            areaText = defaultAddr.street;
+          }
         }
 
         final bool hasBranch = branchId != null && branchId.isNotEmpty;
+        final bool hasAddress = defaultAddr != null;
 
         return MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: _handleAddressTap,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 105),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16653A).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      hasBranch ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
-                      color: const Color(0xFF16653A),
-                      size: 17,
-                    ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16653A).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'DELIVER TO',
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF16A34A),
-                            letterSpacing: 0.3,
-                            height: 1.0,
+                  child: Icon(
+                    hasBranch || hasAddress ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
+                    color: const Color(0xFF16653A),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              hasAddress ? addressType : (branchDisplay.isNotEmpty ? branchDisplay : 'Set Location'),
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.2,
+                                height: 1.15,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF16653A),
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (branchDisplay.isNotEmpty) ...[
+                            const Icon(
+                              Icons.storefront_rounded,
+                              size: 12,
+                              color: Color(0xFF16A34A),
+                            ),
+                            const SizedBox(width: 3),
                             Flexible(
                               child: Text(
-                                locationTitle,
+                                branchDisplay,
                                 style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0F172A),
-                                  letterSpacing: -0.2,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF16653A),
                                   height: 1.1,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Color(0xFF16653A),
-                              size: 15,
+                          ],
+                          if (areaText.isNotEmpty) ...[
+                            Flexible(
+                              child: Text(
+                                branchDisplay.isNotEmpty ? ' • $areaText' : areaText,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                  height: 1.1,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ] else if (branchDisplay.isEmpty) ...[
+                            const Flexible(
+                              child: Text(
+                                'Tap to select delivery location',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                  height: 1.1,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -1272,25 +1332,26 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF16A34A),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF16A34A), width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF16A34A).withValues(alpha: 0.2),
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.08),
                         blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        offset: const Offset(0, 1.5),
                       ),
                     ],
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.repeat_rounded, size: 11, color: Colors.white),
+                      Icon(Icons.repeat_rounded, size: 11, color: Color(0xFF16A34A)),
                       SizedBox(width: 3),
                       Text(
                         'Subscribe',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Color(0xFF16A34A),
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -2207,13 +2268,11 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
 
 class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double topPadding;
-  final String searchHint;
   final Widget branchWidget;
   final VoidCallback onSearchTap;
 
   HomeHeaderDelegate({
     required this.topPadding,
-    required this.searchHint,
     required this.branchWidget,
     required this.onSearchTap,
   });
@@ -2246,14 +2305,14 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. Short Address Details (Left)
-          branchWidget,
+          // 1. Address Details (Left - Expanded)
+          Expanded(
+            child: branchWidget,
+          ),
           const SizedBox(width: 8),
 
-          // 2. Highlighted Search Bar (Center / Expanded)
-          Expanded(
-            child: _buildHighlightedSearchBar(context),
-          ),
+          // 2. Search Option (Action button without search text)
+          _buildSearchButton(context),
           const SizedBox(width: 8),
 
           // 3. Profile Avatar Button (Right - Replaces Notification)
@@ -2263,18 +2322,18 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     );
   }
 
-  Widget _buildHighlightedSearchBar(BuildContext context) {
+  Widget _buildSearchButton(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onSearchTap,
         child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             color: const Color(0xFFF0FDF4),
-            borderRadius: BorderRadius.circular(20),
+            shape: BoxShape.circle,
             border: Border.all(
               color: const Color(0xFF16A34A),
               width: 1.5,
@@ -2287,32 +2346,11 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
               ),
             ],
           ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.search_rounded,
-                color: Color(0xFF16653A),
-                size: 19,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  searchHint,
-                  style: const TextStyle(
-                    color: Color(0xFF475569),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Icon(
-                Icons.tune_rounded,
-                color: Color(0xFF16653A),
-                size: 17,
-              ),
-            ],
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF16653A),
+            size: 20,
           ),
         ),
       ),
@@ -2416,8 +2454,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {
-    return oldDelegate.searchHint != searchHint ||
-        oldDelegate.branchWidget != branchWidget ||
+    return oldDelegate.branchWidget != branchWidget ||
         oldDelegate.topPadding != topPadding;
   }
 }

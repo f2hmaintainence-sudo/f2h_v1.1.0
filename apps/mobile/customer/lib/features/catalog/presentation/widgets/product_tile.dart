@@ -1133,12 +1133,12 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: kPrimary.withValues(alpha: 0.35), width: 1.5),
+                        border: Border.all(color: kPrimary, width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: kPrimary.withValues(alpha: 0.04),
+                            color: kPrimary.withValues(alpha: 0.08),
                             blurRadius: 4,
-                            offset: const Offset(0, 2),
+                            offset: const Offset(0, 1.5),
                           ),
                         ],
                       ),

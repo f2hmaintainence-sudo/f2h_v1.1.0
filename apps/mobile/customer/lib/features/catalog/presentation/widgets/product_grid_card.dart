@@ -657,18 +657,19 @@ class _CardAction extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           child: _ActionShell(
             color: kPrimary,
+            isOutlined: true,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (_subscriptionOnly) ...[
-                  const Icon(Icons.autorenew_rounded, size: 15, color: Colors.white),
+                  const Icon(Icons.autorenew_rounded, size: 15, color: kPrimary),
                   const SizedBox(width: 4),
                   const Text(
                     'Subscribe',
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: kPrimary,
                     ),
                   ),
                 ] else ...[
@@ -677,7 +678,7 @@ class _CardAction extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: kPrimary,
                     ),
                   ),
                 ],
@@ -697,11 +698,13 @@ class _ActionShell extends StatelessWidget {
   /// When true the child spans the pill (the quantity stepper) instead of
   /// being centred and shrink-wrapped (the labelled actions).
   final bool fill;
+  final bool isOutlined;
 
   const _ActionShell({
     required this.color,
     required this.child,
     this.fill = false,
+    this.isOutlined = false,
   });
 
   @override
@@ -711,8 +714,20 @@ class _ActionShell extends StatelessWidget {
     alignment: Alignment.center,
     padding: const EdgeInsets.symmetric(horizontal: 6),
     decoration: BoxDecoration(
-      color: color,
+      color: isOutlined ? Colors.white : color,
       borderRadius: BorderRadius.circular(10),
+      border: isOutlined
+          ? Border.all(color: color, width: 1.5)
+          : null,
+      boxShadow: isOutlined
+          ? [
+              BoxShadow(
+                color: color.withValues(alpha: 0.08),
+                blurRadius: 4,
+                offset: const Offset(0, 1.5),
+              ),
+            ]
+          : null,
     ),
     child: fill ? child : FittedBox(fit: BoxFit.scaleDown, child: child),
   );
