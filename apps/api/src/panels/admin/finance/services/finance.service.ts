@@ -298,7 +298,8 @@ export class FinanceService {
     doc.text(`Phone: ${bill.customer_phone || '—'}`, 42, cardY + 38);
     doc.text(`Email: ${bill.customer_email || '—'}`, 42, cardY + 50);
     const addr = String(bill.customer_address || 'Registered Delivery Address').trim();
-    doc.text(`Address: ${addr.length > 40 ? addr.slice(0, 37) + '...' : addr}`, 42, cardY + 62, { width: 240 });
+    doc.font('Helvetica').fontSize(7.5).fillColor('#475569');
+    doc.text(`Address: ${addr}`, 42, cardY + 62, { width: 240, lineGap: 1.5 });
 
     // Card 2: Invoice & Payment Details
     doc.roundedRect(303, cardY, 260, cardH, 6).fillAndStroke('#f8fafc', '#e2e8f0');
@@ -392,17 +393,24 @@ export class FinanceService {
     doc.font('Helvetica').fontSize(7.5).fillColor('#64748b');
     doc.text('• Farm fresh produce supplied in prime condition.', 42, currentY + 22, { width: 240 });
     if (company?.phone) {
-      doc.text(`• Phone: ${String(company.phone).trim()}`, 42, currentY + 46, { width: 240 });
+      doc.text(`• Phone: ${String(company.phone).trim()}`, 42, currentY + 35, { width: 240 });
     }
-    doc.text('• Any discrepancy must be reported within 24 hours of delivery.', 42, currentY + 58, { width: 240 });
+    const discY = company?.phone ? currentY + 48 : currentY + 36;
+    doc.text('• Any discrepancy must be reported within 24 hours of delivery.', 42, discY, { width: 240 });
 
-    const addrParts = [company?.address, company?.city, company?.pincode]
+    const addrParts = [
+      company?.address,
+      company?.city,
+      company?.state,
+      company?.pincode ? `PIN: ${company.pincode}` : '',
+    ]
       .filter(Boolean)
       .map((s: any) => String(s).trim())
       .filter((s: string) => s.length > 0);
     if (addrParts.length > 0) {
       const officeAddr = addrParts.join(', ');
-      doc.font('Helvetica-Oblique').fontSize(6.8).fillColor('#94a3b8').text(`Reg. Office: ${officeAddr.length > 55 ? officeAddr.slice(0, 52) + '...' : officeAddr}`, 42, currentY + 76, { width: 240 });
+      doc.font('Helvetica-Oblique').fontSize(6.8).fillColor('#64748b');
+      doc.text(`Reg. Office: ${officeAddr}`, 42, discY + 15, { width: 240, lineGap: 2 });
     } else {
       doc.font('Helvetica-Oblique').fontSize(7).fillColor('#94a3b8').text('Thank you for choosing farm-fresh healthy living!', 42, currentY + 76, { width: 240 });
     }
