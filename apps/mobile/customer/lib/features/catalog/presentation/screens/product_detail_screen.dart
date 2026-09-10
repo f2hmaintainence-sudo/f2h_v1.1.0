@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -47,6 +48,24 @@ class _BrowseState extends State<BrowseScreen>
   bool get wantKeepAlive => true;
 
   late String _cat;
+  static const List<String> _kSearchProducts = [
+    'organic ghee',
+    'fresh cow milk',
+    'malai paneer',
+    'farm curd',
+    'white butter',
+    'country eggs',
+    'cold pressed oil',
+    'fresh vegetables',
+    'tender coconut',
+    'pure honey',
+  ];
+
+  int _searchProductIndex = 0;
+  int _searchCharIndex = 0;
+  bool _isSearchDeleting = false;
+  Timer? _searchTypingTimer;
+
   String _searchQuery = '';
   String? _targetProductId;
   String? _targetProductName;
@@ -58,6 +77,7 @@ class _BrowseState extends State<BrowseScreen>
   @override
   void initState() {
     super.initState();
+    _startTypingAnimation();
     _cat = widget.initialCategory ?? 'All';
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
@@ -92,9 +112,49 @@ class _BrowseState extends State<BrowseScreen>
 
   @override
   void dispose() {
+    _searchTypingTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _startTypingAnimation() {
+    _searchTypingTimer?.cancel();
+    _stepTypingAnimation();
+  }
+
+  void _stepTypingAnimation() {
+    if (!mounted) return;
+
+    final currentWord = _kSearchProducts[_searchProductIndex];
+
+    if (!_isSearchDeleting) {
+      if (_searchCharIndex < currentWord.length) {
+        _searchCharIndex++;
+        setState(() {});
+        _searchTypingTimer =
+            Timer(const Duration(milliseconds: 75), _stepTypingAnimation);
+      } else {
+        _searchTypingTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (!mounted) return;
+          _isSearchDeleting = true;
+          _stepTypingAnimation();
+        });
+      }
+    } else {
+      if (_searchCharIndex > 0) {
+        _searchCharIndex--;
+        setState(() {});
+        _searchTypingTimer =
+            Timer(const Duration(milliseconds: 35), _stepTypingAnimation);
+      } else {
+        _isSearchDeleting = false;
+        _searchProductIndex =
+            (_searchProductIndex + 1) % _kSearchProducts.length;
+        _searchTypingTimer =
+            Timer(const Duration(milliseconds: 250), _stepTypingAnimation);
+      }
+    }
   }
 
   void _selectCat(String name, String id) {
@@ -270,11 +330,14 @@ class _BrowseState extends State<BrowseScreen>
   // ── SEARCH BAR ──────────────────────────────────────────────
   PreferredSizeWidget _buildSearchBar() {
     final canPop = Navigator.canPop(context);
+    final currentWord = _kSearchProducts[_searchProductIndex];
+    final displayedText = currentWord.substring(0, _searchCharIndex);
+
     return AppBar(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      toolbarHeight: 68,
+      toolbarHeight: 56,
       leadingWidth: canPop ? 44 : 0,
       leading: canPop
           ? IconButton(
@@ -290,77 +353,109 @@ class _BrowseState extends State<BrowseScreen>
       title: Padding(
         padding: EdgeInsets.only(left: canPop ? 0 : 16, right: 12),
         child: Container(
-          height: 50,
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE6ECE8), width: 1.2),
+            border: Border.all(
+              color: const Color(0xFF16A34A),
+              width: 1.4,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: const Color(0xFF16A34A).withValues(alpha: 0.08),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
               ),
             ],
           ),
           child: Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                margin: const EdgeInsets.only(left: 4),
-                decoration: BoxDecoration(
-                  color: kPrimaryPl.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.search_rounded,
-                  color: kPrimary,
-                  size: 22,
-                ),
+              const Icon(
+                Icons.search_rounded,
+                color: Color(0xFF16653A),
+                size: 18,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  autofocus: widget.autoFocusSearch,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: kText,
-                  ),
-                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                  decoration: const InputDecoration(
-                    hintText: 'Search milk, ghee, paneer…',
-                    hintStyle: TextStyle(
-                      color: Color(0xFF9AA5A0),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    if (_searchController.text.isEmpty)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              displayedText.isEmpty ? ' ' : displayedText,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF334155),
+                                letterSpacing: -0.1,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            width: 1.5,
+                            height: 14,
+                            margin: const EdgeInsets.only(left: 1),
+                            color: const Color(0xFF16A34A),
+                          ),
+                        ],
+                      ),
+                    TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      autofocus: widget.autoFocusSearch,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF334155),
+                        letterSpacing: -0.1,
+                      ),
+                      cursorColor: const Color(0xFF16A34A),
+                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        filled: false,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 4),
               if (_isSearching)
                 GestureDetector(
-                  onTap: () => _searchController.clear(),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    _searchController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
                   child: const Padding(
-                    padding: EdgeInsets.all(10),
+                    padding: EdgeInsets.symmetric(horizontal: 2),
                     child: Icon(
                       Icons.close_rounded,
                       size: 18,
-                      color: kTextSub,
+                      color: Color(0xFF64748B),
                     ),
                   ),
+                )
+              else
+                const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFF16A34A),
+                  size: 18,
                 ),
             ],
           ),
