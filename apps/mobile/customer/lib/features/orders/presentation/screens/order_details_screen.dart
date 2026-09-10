@@ -58,6 +58,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     return '';
   }
 
+  String _formatDisplayDate(Order order) {
+    final raw = order.scheduledDate.isNotEmpty ? order.scheduledDate : order.date;
+    if (raw.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(raw);
+        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+      } catch (_) {
+        return order.date.isNotEmpty ? order.date : raw;
+      }
+    }
+    return 'Scheduled';
+  }
+
   bool _isOneTimeOrder(Order order) {
     final src = order.orderSource.toLowerCase().trim();
     final type = order.orderType.toLowerCase().trim();
@@ -365,14 +379,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 statusColor = Colors.orange;
               }
 
-              final String subtitleText;
-              if (isDelivered) {
-                subtitleText = deliveryTimeOnly.isNotEmpty ? deliveryTimeOnly : 'Delivered';
-              } else {
-                final dateStr = order.scheduledDate.isNotEmpty ? order.scheduledDate : order.date;
-                final slotStr = order.deliverySlot.trim().isNotEmpty ? ' · ${_formatSlot(order.deliverySlot)}' : '';
-                subtitleText = '$dateStr$slotStr';
-              }
+              final dateStr = _formatDisplayDate(order);
+              final slotStr = order.deliverySlot.trim().isNotEmpty ? ' · ${_formatSlot(order.deliverySlot)}' : '';
+              final deliveryStr = (isDelivered && deliveryTimeOnly.isNotEmpty) ? ' · $deliveryTimeOnly' : '';
+              final subtitleText = '$dateStr$slotStr$deliveryStr';
 
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -419,11 +429,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               // Items card
               _buildItemsCard(order),
 
-              // Address card
-              _buildAddressCard(contactName, contactMobile, addressDetails),
-
-              // Payment and Billing card
-              _buildBillingCard(order),
+              // Payment, Billing and Address card
+              _buildBillingCard(order, contactName, contactMobile, addressDetails),
 
               // Cancel button section
               if (order.status.toLowerCase() == 'placed')
@@ -582,71 +589,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  Widget _buildAddressCard(String name, String mobile, String addressStr) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'DELIVERY ADDRESS',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: kTextSub,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.location_on_outlined, color: kPrimary, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: kText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      mobile,
-                      style: const TextStyle(fontSize: 11, color: kTextSub),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      addressStr,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: kTextSub,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBillingCard(Order order) {
+  Widget _buildBillingCard(
+    Order order,
+    String contactName,
+    String contactMobile,
+    String addressDetails,
+  ) {
     final subtotal = order.amount; // total amount
     final total = subtotal;
 
@@ -693,34 +641,71 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ),
             ],
           ),
-          if (order.status.toLowerCase() == 'delivered' && _isOneTimeOrder(order)) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _downloadInvoice(order),
-                icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
-                label: const Text(
-                  'DOWNLOAD INVOICE',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                    color: Colors.white,
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: kBgDeep,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.payment_outlined, color: kTextMid, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${order.paymentMode.toUpperCase()} (${order.paymentStatus.toUpperCase()})',
+                    style: const TextStyle(fontSize: 12, color: kTextMid, fontWeight: FontWeight.w600),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              ],
+            ),
+          ),
+          if (addressDetails.isNotEmpty || contactName.isNotEmpty || contactMobile.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.location_on_outlined, color: kPrimary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (contactName.isNotEmpty)
+                        Text(
+                          contactName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: kText,
+                          ),
+                        ),
+                      if (contactMobile.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          contactMobile,
+                          style: const TextStyle(fontSize: 11, color: kTextSub),
+                        ),
+                      ],
+                      if (addressDetails.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          addressDetails,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: kTextSub,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-              ),
+              ],
             ),
           ],
+
         ],
       ),
     );

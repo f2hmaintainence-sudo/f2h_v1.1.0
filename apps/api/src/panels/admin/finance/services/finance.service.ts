@@ -315,9 +315,8 @@ export class FinanceService {
     doc.roundedRect(32, tableTop, 531, 24, 4).fill('#047857'); // Emerald header
 
     doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
-    doc.text('SL', 40, tableTop + 7, { width: 20 });
-    doc.text('DELIVERY DATE & SLOT', 65, tableTop + 7, { width: 140 });
-    doc.text('ITEM / PRODUCE', 210, tableTop + 7, { width: 175 });
+    doc.text('SL', 40, tableTop + 7, { width: 25 });
+    doc.text('ITEM / PRODUCE', 75, tableTop + 7, { width: 305 });
     doc.text('QTY', 390, tableTop + 7, { width: 35, align: 'center' });
     doc.text('RATE', 430, tableTop + 7, { width: 60, align: 'right' });
     doc.text('TOTAL', 495, tableTop + 7, { width: 60, align: 'right' });
@@ -342,19 +341,12 @@ export class FinanceService {
       doc.rect(32, currentY + 21, 531, 0.5).fill('#e2e8f0');
 
       doc.font('Helvetica').fontSize(8).fillColor('#64748b');
-      doc.text(String(idx + 1), 40, currentY + 6, { width: 20 });
+      doc.text(String(idx + 1), 40, currentY + 6, { width: 25 });
 
-      // Delivery Date & Slot
-      doc.font('Helvetica').fontSize(8).fillColor('#0f172a');
-      const dateStr = item.scheduled_date
-        ? `${fmtDate(item.scheduled_date)} (${item.delivery_slot ? item.delivery_slot.charAt(0).toUpperCase() + item.delivery_slot.slice(1) : 'Morning'})`
-        : String(item.reference_id || item.order_id || '—');
-      doc.text(dateStr.slice(0, 24), 65, currentY + 6, { width: 140 });
-
-      // Item Description
+      // Item Description (Expanded width since Delivery Date & Slot is removed)
       doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a');
       const itemName = String(item.item_name || item.product_name || 'Produce Item').trim();
-      doc.text(itemName.length > 28 ? itemName.slice(0, 26) + '...' : itemName, 210, currentY + 6, { width: 175 });
+      doc.text(itemName.length > 55 ? itemName.slice(0, 52) + '...' : itemName, 75, currentY + 6, { width: 305 });
 
       // Qty
       doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#334155');

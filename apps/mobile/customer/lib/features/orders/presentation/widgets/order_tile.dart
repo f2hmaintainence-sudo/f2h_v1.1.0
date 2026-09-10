@@ -68,9 +68,10 @@ class ORow extends StatelessWidget {
         } catch (_) {}
       }
     }
-    final timingText = (isDelivered && deliveryTimeOnly.isNotEmpty) ? deliveryTimeOnly : slotText;
     final dateDisplay = o.date.isNotEmpty ? o.date : 'Scheduled';
-    final dateAndSlot = timingText.isNotEmpty ? '$dateDisplay · $timingText' : dateDisplay;
+    final slotPart = slotText.isNotEmpty ? ' · $slotText' : '';
+    final deliveryPart = (isDelivered && deliveryTimeOnly.isNotEmpty) ? ' · $deliveryTimeOnly' : '';
+    final dateAndSlot = '$dateDisplay$slotPart$deliveryPart';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
