@@ -31,9 +31,8 @@ class AppTheme {
       // fontFamily: GoogleFonts.poppins().fontFamily,
       // textTheme: GoogleFonts.poppinsTextTheme(textTheme),
 
-
-     fontFamily: GoogleFonts.outfit().fontFamily,
-textTheme: GoogleFonts.outfitTextTheme(textTheme),
+      fontFamily: GoogleFonts.inter().fontFamily,
+      textTheme: GoogleFonts.interTextTheme(textTheme),
       colorScheme: ColorScheme.light(
         primary: AppColors.primary,
         onPrimary: Colors.white,

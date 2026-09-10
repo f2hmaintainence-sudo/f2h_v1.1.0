@@ -7,7 +7,7 @@ class AppTypography {
     fontSize: 32,
     fontWeight: FontWeight.w800,
     color: kText,
-    letterSpacing: -0.8,
+    letterSpacing: -0.5,
     height: 1.2,
   );
 
@@ -15,7 +15,7 @@ class AppTypography {
     fontSize: 28,
     fontWeight: FontWeight.w800,
     color: kText,
-    letterSpacing: -0.6,
+    letterSpacing: -0.4,
     height: 1.25,
   );
 
@@ -74,7 +74,7 @@ class AppTypography {
     fontSize: 16,
     fontWeight: FontWeight.w400,
     color: kTextMid,
-    letterSpacing: 0.1,
+    letterSpacing: 0.15,
     height: 1.5,
   );
 
@@ -82,7 +82,7 @@ class AppTypography {
     fontSize: 14,
     fontWeight: FontWeight.w400,
     color: kTextMid,
-    letterSpacing: 0.1,
+    letterSpacing: 0.15,
     height: 1.45,
   );
 
@@ -99,7 +99,7 @@ class AppTypography {
     fontSize: 14,
     fontWeight: FontWeight.w700,
     color: kText,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   );
 
   static const TextStyle labelMedium = TextStyle(
