@@ -53,8 +53,24 @@ class ORow extends StatelessWidget {
 
     final isSubOrder = o.orderSource == 'subscription';
     final slotText = _formatSlot(o.deliverySlot);
+    final isDelivered = normalizedStatus == 'delivered';
+    String deliveryTimeOnly = '';
+    if (isDelivered) {
+      final rawTime = o.deliveredAt.isNotEmpty ? o.deliveredAt : o.updatedAt;
+      if (rawTime.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(rawTime).toLocal();
+          final hour = dt.hour;
+          final minute = dt.minute.toString().padLeft(2, '0');
+          final period = hour >= 12 ? 'PM' : 'AM';
+          final formattedHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+          deliveryTimeOnly = '${formattedHour.toString().padLeft(2, '0')}:$minute $period';
+        } catch (_) {}
+      }
+    }
+    final timingText = (isDelivered && deliveryTimeOnly.isNotEmpty) ? deliveryTimeOnly : slotText;
     final dateDisplay = o.date.isNotEmpty ? o.date : 'Scheduled';
-    final dateAndSlot = slotText.isNotEmpty ? '$dateDisplay · $slotText' : dateDisplay;
+    final dateAndSlot = timingText.isNotEmpty ? '$dateDisplay · $timingText' : dateDisplay;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),

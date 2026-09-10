@@ -72,6 +72,7 @@ class Order {
   final String subscriptionId;
   final String createdAt;
   final String updatedAt;
+  final String deliveredAt;
   final List<OrderItem> items;
   final int? rating;
   final String? ratingFeedback;
@@ -98,6 +99,7 @@ class Order {
     this.subscriptionId = '',
     this.createdAt = '',
     this.updatedAt = '',
+    this.deliveredAt = '',
     this.items = const [],
     this.rating,
     this.ratingFeedback,
@@ -206,6 +208,11 @@ class Order {
       subscriptionId: json['subscription_id']?.toString() ?? '',
       createdAt: json['created_at']?.toString() ?? '',
       updatedAt: json['updated_at']?.toString() ?? '',
+      deliveredAt: json['delivered_at']?.toString() ??
+          json['deliveredAt']?.toString() ??
+          json['delivery_time']?.toString() ??
+          json['actual_delivery_time']?.toString() ??
+          '',
       items: items,
       rating: json['rating'] != null ? int.tryParse(json['rating'].toString()) : null,
       ratingFeedback: json['rating_feedback']?.toString(),

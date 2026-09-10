@@ -13,6 +13,9 @@ import '../../../catalog/presentation/bloc/catalog_bloc.dart';
 import '../../../catalog/presentation/bloc/catalog_state.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:f2h_customer/core/auth/token_storage.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final Order? order;
@@ -31,6 +34,59 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   bool _isSubmittingRating = false;
 
   String get _orderId => _currentOrder?.id ?? widget.order?.id ?? widget.orderId ?? '';
+
+  String _formatSlot(String slot) {
+    final s = slot.trim().toLowerCase();
+    if (s == 'morning') return 'Morning slot';
+    if (s == 'evening') return 'Evening slot';
+    if (s.isEmpty) return '';
+    return '${slot.trim()} slot';
+  }
+
+  String _formatDeliveryTimeOnly(Order order) {
+    final raw = order.deliveredAt.isNotEmpty ? order.deliveredAt : order.updatedAt;
+    if (raw.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(raw).toLocal();
+        final hour = dt.hour;
+        final minute = dt.minute.toString().padLeft(2, '0');
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final formattedHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        return '${formattedHour.toString().padLeft(2, '0')}:$minute $period';
+      } catch (_) {}
+    }
+    return '';
+  }
+
+  bool _isOneTimeOrder(Order order) {
+    final src = order.orderSource.toLowerCase().trim();
+    final type = order.orderType.toLowerCase().trim();
+    if (src == 'subscription' || type == 'subscription' || order.subscriptionId.trim().isNotEmpty) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _downloadInvoice(Order order) async {
+    try {
+      final token = await TokenStorage.getAccessToken();
+      final basePdfUrl = ApiEndpoints.receiptPdf(order.id);
+      final pdfUrl = token != null && token.isNotEmpty
+          ? '$basePdfUrl?token=$token'
+          : basePdfUrl;
+      final uri = Uri.parse(pdfUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      debugPrint('Error downloading invoice: $e');
+      if (mounted) {
+        F2HToast.show(context, 'Could not download invoice: $e', isError: true);
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -296,15 +352,64 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             icon: const Icon(Icons.arrow_back_ios_new, color: kText, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
-          title: Text(
-            'Order #${order.id.toUpperCase().substring(0, Math.min(order.id.length, 20))}',
-            style: const TextStyle(
-              color: kText,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+          title: Builder(
+            builder: (context) {
+              final isDelivered = order.status.toLowerCase() == 'delivered';
+              final deliveryTimeOnly = _formatDeliveryTimeOnly(order);
+              final statusTitle = order.status.toUpperCase();
+
+              Color statusColor = kPrimary;
+              if (order.status.toLowerCase() == 'cancelled') {
+                statusColor = kRed;
+              } else if (order.status.toLowerCase() == 'placed') {
+                statusColor = Colors.orange;
+              }
+
+              final String subtitleText;
+              if (isDelivered) {
+                subtitleText = deliveryTimeOnly.isNotEmpty ? deliveryTimeOnly : 'Delivered';
+              } else {
+                final dateStr = order.scheduledDate.isNotEmpty ? order.scheduledDate : order.date;
+                final slotStr = order.deliverySlot.trim().isNotEmpty ? ' · ${_formatSlot(order.deliverySlot)}' : '';
+                subtitleText = '$dateStr$slotStr';
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    statusTitle,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitleText,
+                    style: const TextStyle(
+                      color: kTextSub,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              );
+            },
           ),
           centerTitle: true,
+          actions: [
+            if (order.status.toLowerCase() == 'delivered' && _isOneTimeOrder(order))
+              IconButton(
+                icon: const Icon(Icons.download_rounded, color: kPrimary),
+                tooltip: 'Download Invoice',
+                onPressed: () => _downloadInvoice(order),
+              ),
+          ],
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.only(bottom: 40),
@@ -384,7 +489,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Scheduled: ${order.scheduledDate} · ${order.deliverySlot.toUpperCase()} slot',
+                  order.status.toLowerCase() == 'delivered'
+                      ? (_formatDeliveryTimeOnly(order).isNotEmpty
+                          ? 'Delivered at ${_formatDeliveryTimeOnly(order)}'
+                          : 'Delivered')
+                      : 'Scheduled: ${order.scheduledDate.isNotEmpty ? order.scheduledDate : order.date} · ${_formatSlot(order.deliverySlot)}',
                   style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w600),
                 ),
                 if (['out_for_delivery', 'assigned', 'confirmed'].contains(order.status.toLowerCase())) ...[
@@ -667,8 +776,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildBillingCard(Order order) {
     final subtotal = order.amount; // total amount
-    const deliveryFee = 0.0;
-    final total = subtotal + deliveryFee;
+    final total = subtotal;
 
     return Container(
       width: double.infinity,
@@ -697,14 +805,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             children: [
               const Text('Subtotal', style: TextStyle(color: kTextSub, fontSize: 13)),
               Text('₹${subtotal.toStringAsFixed(2)}', style: const TextStyle(color: kText, fontSize: 13, fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Delivery Fee', style: TextStyle(color: kTextSub, fontSize: 13)),
-              Text('FREE', style: TextStyle(color: kPrimary, fontSize: 13, fontWeight: FontWeight.w800)),
             ],
           ),
           const Padding(
@@ -741,6 +841,34 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
             ),
           ),
+          if (order.status.toLowerCase() == 'delivered' && _isOneTimeOrder(order)) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _downloadInvoice(order),
+                icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
+                label: const Text(
+                  'DOWNLOAD INVOICE',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

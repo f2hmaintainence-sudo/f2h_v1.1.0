@@ -1160,6 +1160,55 @@ export class FinanceRepository {
       }
     }
 
+    // 5.5 Fetch direct line items from order_items if bill references an order
+    if (!orderItems || orderItems.length === 0) {
+      try {
+        const orderIdTarget = rawBill.reference_id || cleanId;
+        const directItemsSql = `
+          SELECT 
+            oi.id,
+            'order' AS reference_type,
+            oi.order_id AS reference_id,
+            oi.variant_id AS product_variant_id,
+            COALESCE(
+              NULLIF(TRIM(CONCAT(pr.name, ' - ', pv.name)), ' - '),
+              pv.name,
+              pr.name,
+              'Farm Fresh Produce'
+            ) AS item_name,
+            COALESCE(pr.name, '') AS product_name,
+            COALESCE(pv.name, '') AS variant_name,
+            COALESCE(oi.quantity, 1) AS quantity,
+            COALESCE(oi.unit_price, 0) AS unit_price,
+            0 AS discount_amount,
+            0 AS tax_amount,
+            COALESCE(oi.total_price, oi.unit_price * oi.quantity, 0) AS total_amount,
+            oi.created_at
+          FROM public.order_items oi
+          LEFT JOIN public.product_variants pv ON (pv.variant_id = oi.variant_id)
+          LEFT JOIN public.products pr ON (pr.product_id = pv.product_id)
+          WHERE (oi.order_id = $1::varchar OR oi.order_id = $2::varchar)
+            AND oi.deleted_at IS NULL
+          ORDER BY oi.id ASC
+        `;
+        const directRows = await this.db.query(directItemsSql, [
+          orderIdTarget,
+          String(orderIdTarget).replace(/^BILL_/, ''),
+        ]).catch(() => []);
+
+        if (Array.isArray(directRows) && directRows.length > 0) {
+          orderItems = directRows.map((item: any) => ({
+            ...item,
+            quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+            unit_price: Number(item.unit_price || 0),
+            total_amount: Number(item.total_amount || 0),
+          }));
+        }
+      } catch {
+        // Deliberately tolerated: the caller has a valid fallback for this failure.
+      }
+    }
+
     // 6. Fallback from orders if customer_bill_items & subscription_items empty
     if (!orderItems || orderItems.length === 0) {
       try {
