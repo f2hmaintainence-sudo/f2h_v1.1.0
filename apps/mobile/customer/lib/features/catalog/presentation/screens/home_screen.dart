@@ -383,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                                     // Variants Row (two variants in a row)
                                     SizedBox(
-                                      height: 224,
+                                      height: 268,
                                       child: ListView.separated(
                                         scrollDirection: Axis.horizontal,
                                         padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
