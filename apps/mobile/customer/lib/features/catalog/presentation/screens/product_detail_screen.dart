@@ -176,9 +176,17 @@ class _BrowseState extends State<BrowseScreen>
       list = List<Product>.from(sourceProducts);
     } else {
       list = sourceProducts.where((p) {
-        return p.name.toLowerCase().contains(q) ||
-            p.vendor.toLowerCase().contains(q) ||
-            p.category.toLowerCase().contains(q);
+        final nameMatch = p.name.toLowerCase().contains(q) ||
+            p.displayName.toLowerCase().contains(q) ||
+            (p.productName != null && p.productName!.toLowerCase().contains(q));
+        final vendorMatch = p.vendor.toLowerCase().contains(q);
+        final catMatch = p.category.toLowerCase().contains(q);
+        final descMatch = p.description != null && p.description!.toLowerCase().contains(q);
+        final variantMatch = p.variants.any((v) =>
+            v.label.toLowerCase().contains(q) ||
+            (v.unitType != null && v.unitType!.toLowerCase().contains(q)) ||
+            (v.unitValue != null && v.unitValue!.toLowerCase().contains(q)));
+        return nameMatch || vendorMatch || catMatch || descMatch || variantMatch;
       }).toList();
     }
 
@@ -201,6 +209,26 @@ class _BrowseState extends State<BrowseScreen>
       return a.isOutOfStock ? 1 : -1;
     });
     return list;
+  }
+
+  List<Product> _getSuggestedProducts(List<Product> allProducts) {
+    if (allProducts.isEmpty) return [];
+    final seen = <String>{};
+    final deduped = <Product>[];
+    for (final p in allProducts) {
+      final pid = p.productId;
+      final key = (pid != null && pid.isNotEmpty)
+          ? pid
+          : (p.id.isNotEmpty ? p.id : p.name.toLowerCase());
+      if (seen.add(key)) {
+        deduped.add(p);
+      }
+    }
+    deduped.sort((a, b) {
+      if (a.isOutOfStock == b.isOutOfStock) return 0;
+      return a.isOutOfStock ? 1 : -1;
+    });
+    return deduped;
   }
 
   @override
@@ -285,7 +313,7 @@ class _BrowseState extends State<BrowseScreen>
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: tags.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final tag = tags[i];
           final isSelected = _searchQuery.toLowerCase().trim() == tag.toLowerCase().trim();
@@ -469,28 +497,136 @@ class _BrowseState extends State<BrowseScreen>
   Widget _buildGrid() {
     return BlocBuilder<CatalogBloc, CatalogState>(
       builder: (context, state) {
-        final products = state is CatalogLoaded ? state.filteredProducts : <Product>[];
-        final filtered = _getFilteredProducts(products);
+        final allCatalogProducts = state is CatalogLoaded ? state.products : <Product>[];
+        final categoryProducts = state is CatalogLoaded ? state.filteredProducts : <Product>[];
+        final sourceProducts = _isSearching
+            ? (allCatalogProducts.isNotEmpty ? allCatalogProducts : categoryProducts)
+            : categoryProducts;
+
+        final filtered = _getFilteredProducts(sourceProducts);
 
         final isLoading =
             (state is CatalogLoading) ||
             (state is CatalogLoaded && state.isFiltering);
 
-        if (filtered.isEmpty && !isLoading) {
+        final isSuggestionMode = filtered.isEmpty && !isLoading;
+        final displayList = isSuggestionMode
+            ? _getSuggestedProducts(allCatalogProducts.isNotEmpty ? allCatalogProducts : categoryProducts)
+            : filtered;
+
+        if (displayList.isEmpty && !isLoading) {
           return _EmptyResults(query: _searchQuery.trim());
         }
 
         return LayoutBuilder(
-          builder: (context, constraints) => GridView.builder(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, _kBottomInset),
-            gridDelegate: _gridDelegate(constraints.maxWidth),
-            itemCount: isLoading ? 6 : filtered.length,
-            itemBuilder: (_, i) => isLoading
-                ? const _SkeletonCard()
-                : RepaintBoundary(child: ProductGridCard(filtered[i])),
+          builder: (context, constraints) => CustomScrollView(
+            slivers: [
+              if (isSuggestionMode)
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildNoResultsBanner(_searchQuery.trim()),
+                      _buildSuggestionsHeader(),
+                    ],
+                  ),
+                ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, _kBottomInset),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => isLoading
+                        ? const _SkeletonCard()
+                        : RepaintBoundary(child: ProductGridCard(displayList[i])),
+                    childCount: isLoading ? 6 : displayList.length,
+                  ),
+                  gridDelegate: _gridDelegate(constraints.maxWidth),
+                ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildNoResultsBanner(String query) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.search_off_rounded,
+              size: 18,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  query.isNotEmpty
+                      ? 'No results for "$query"'
+                      : 'No products in this category',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Explore popular products you may like',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionsHeader() {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome_rounded, size: 15, color: Color(0xFF16A34A)),
+          SizedBox(width: 6),
+          Text(
+            'Suggested Products',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
