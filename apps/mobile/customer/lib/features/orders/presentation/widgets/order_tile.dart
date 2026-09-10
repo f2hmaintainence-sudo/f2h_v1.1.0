@@ -93,24 +93,13 @@ class ORow extends StatelessWidget {
           const SizedBox(height: 6),
 
           // ── 2. Below: Full Order ID and Product Info ───────────
-          Row(
-            children: [
-              Text(
-                '#${o.id.toUpperCase()}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: kTextSub,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (o.vendorName.isNotEmpty && o.vendorName != 'F2H Partner') ...[
-                const SizedBox(width: 6),
-                Text(
-                  '· ${o.vendorName}',
-                  style: const TextStyle(fontSize: 11, color: kTextSub),
-                ),
-              ],
-            ],
+          Text(
+            '#${o.id.toUpperCase()}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: kTextSub,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
