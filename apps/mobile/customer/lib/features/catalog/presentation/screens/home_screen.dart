@@ -284,74 +284,94 @@ class _HomeScreenState extends State<HomeScreen>
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Section Header: Product Name + Daily badge + See All
+                                    // Section Header: Product Name + Daily badge + Subtitle + See All
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-                                      child: Row(
+                                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                displayProdName,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: kText,
+                                                  letterSpacing: -0.4,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFECFDF5),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.check_rounded, size: 12, color: Color(0xFF047857)),
+                                                    SizedBox(width: 3),
+                                                    Text(
+                                                      'Daily',
+                                                      style: TextStyle(
+                                                        color: Color(0xFF047857),
+                                                        fontSize: 10.5,
+                                                        fontWeight: FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              GestureDetector(
+                                                onTap: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) => const BrowseScreen(
+                                                        initialCategory: 'All',
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      'See All',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: Color(0xFF16A34A),
+                                                      ),
+                                                    ),
+                                                    SizedBox(width: 4),
+                                                    Icon(
+                                                      Icons.arrow_forward_ios_rounded,
+                                                      size: 12,
+                                                      color: Color(0xFF16A34A),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 3),
                                           Text(
-                                            displayProdName,
+                                            rawProdName.toLowerCase().contains('milk')
+                                                ? 'Farm-fresh, zero preservatives, delivered in chilled glass bottles'
+                                                : (first.description != null && first.description!.isNotEmpty
+                                                    ? first.description!
+                                                    : 'Farm-fresh, zero preservatives, delivered in chilled glass bottles'),
                                             style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w900,
-                                              color: kText,
-                                              letterSpacing: -0.4,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFECFDF5),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(color: const Color(0xFFBBF7D0)),
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.repeat_rounded, size: 11, color: Color(0xFF16A34A)),
-                                                SizedBox(width: 3),
-                                                Text(
-                                                  'Daily',
-                                                  style: TextStyle(
-                                                    color: Color(0xFF16A34A),
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          GestureDetector(
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => const BrowseScreen(
-                                                    initialCategory: 'All',
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  'See All',
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFF16A34A),
-                                                  ),
-                                                ),
-                                                SizedBox(width: 4),
-                                                Icon(
-                                                  Icons.arrow_forward_ios_rounded,
-                                                  size: 12,
-                                                  color: Color(0xFF16A34A),
-                                                ),
-                                              ],
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w400,
+                                              color: Color(0xFF64748B),
+                                              letterSpacing: -0.1,
                                             ),
                                           ),
                                         ],
@@ -360,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                                     // Variants Row (two variants in a row)
                                     SizedBox(
-                                      height: 278,
+                                      height: 220,
                                       child: ListView.separated(
                                         scrollDirection: Axis.horizontal,
                                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1279,30 +1299,23 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Top row: Daily badge / Out of stock
+          // 1. Top row: Quantity badge on left, Out of stock on right
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
+                  color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(5),
                 ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.repeat_rounded, size: 10, color: Color(0xFF16A34A)),
-                    SizedBox(width: 3),
-                    Text(
-                      'Daily',
-                      style: TextStyle(
-                        color: Color(0xFF16A34A),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  unit,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF334155),
+                  ),
                 ),
               ),
               if (p.isOutOfStock)
@@ -1356,205 +1369,144 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ),
-          const SizedBox(height: 6),
-
-          // 3. Unit badge + One-time Add to Cart option
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  unit,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF334155),
-                  ),
-                ),
-              ),
-              BlocBuilder<CartBloc, CartState>(
-                builder: (context, cartState) {
-                  final items = context.read<CartBloc>().currentItems;
-                  final cartQty = items
-                      .where((item) =>
-                          (item.productId == p.id || item.variantId == p.id) &&
-                          item.purchaseType == 'onetime')
-                      .fold(0, (sum, item) => sum + (item.quantity ?? 1));
-
-                  if (cartQty > 0) {
-                    return InkWell(
-                      onTap: () {
-                        context.runWithAuth(() {
-                          HapticFeedback.lightImpact();
-                          showPurchaseOptionsSheet(context, p, selectedVariantId: p.id);
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF16A34A),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.shopping_bag_outlined, size: 10, color: Colors.white),
-                            const SizedBox(width: 3),
-                            Text(
-                              '$cartQty',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  return InkWell(
-                    onTap: () {
-                      context.runWithAuth(() {
-                        HapticFeedback.lightImpact();
-                        showPurchaseOptionsSheet(context, p, selectedVariantId: p.id);
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add_rounded, size: 12, color: Color(0xFF16A34A)),
-                          SizedBox(width: 2),
-                          Text(
-                            'Add',
-                            style: TextStyle(
-                              color: Color(0xFF16A34A),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-
-          // 4. Prices (Subscription price & normal selling price) - NO variant name!
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '₹${subPrice.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF15803D),
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(width: 2),
-              const Text(
-                ' / delivery',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF16A34A),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 1),
-          Row(
-            children: [
-              Text(
-                '₹${normalPrice.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(width: 3),
-              const Text(
-                'normal',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-              if (p.originalPrice > normalPrice) ...[
-                const SizedBox(width: 4),
-                Text(
-                  '₹${p.originalPrice.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    decoration: TextDecoration.lineThrough,
-                    color: Color(0xFFCBD5E1),
-                  ),
-                ),
-              ],
-            ],
-          ),
           const SizedBox(height: 8),
 
-          // 5. Full-width Subscribe button
-          InkWell(
-            onTap: () {
-              context.runWithAuth(() {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SubscriptionSetupScreen(product: p),
-                  ),
-                );
-              });
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.repeat_rounded, size: 12, color: Color(0xFF16A34A)),
-                  SizedBox(width: 4),
-                  Text(
-                    'Subscribe',
-                    style: TextStyle(
-                      color: Color(0xFF16A34A),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
+          // 3. Bottom of image: Two buttons in a single row
+          Row(
+            children: [
+              // Button 1: Subscribe
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    context.runWithAuth(() {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SubscriptionSetupScreen(product: p),
+                        ),
+                      );
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFA7F3D0), width: 1.2),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                '₹${subPrice.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  color: Color(0xFF047857),
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(width: 1.5),
+                              const Text(
+                                '/sub',
+                                style: TextStyle(
+                                  color: Color(0xFF059669),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        const Text(
+                          'Subscribe',
+                          style: TextStyle(
+                            color: Color(0xFF047857),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(width: 6),
+
+              // Button 2: Buy Once +
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    context.runWithAuth(() {
+                      HapticFeedback.lightImpact();
+                      showPurchaseOptionsSheet(context, p, selectedVariantId: p.id);
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                '₹${normalPrice.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(width: 1.5),
+                              const Text(
+                                '/add',
+                                style: TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        const Text(
+                          'Buy Once +',
+                          style: TextStyle(
+                            color: Color(0xFF334155),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
