@@ -70,7 +70,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   late DateTime _startDate;
 
   // ── Options ──────────────────────────────────────────
-  bool _autoRenew = true;
+  bool _autoRenew = false;
 
   /// 'prepaid' | 'postpaid'
   String _paymentType = 'prepaid';
@@ -1029,121 +1029,126 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: vars.map((v) {
-                final isSel = v.id == _variant.id;
-                final subPrice = v.subscriptionPrice ?? v.price;
-                final isGone = v.isOutOfStock;
-                final variantTitle = (v.formattedUnit.isNotEmpty && v.formattedUnit != 'Standard')
-                    ? v.formattedUnit
-                    : v.label;
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              child: Row(
+                children: vars.map((v) {
+                  final isSel = v.id == _variant.id;
+                  final subPrice = v.subscriptionPrice ?? v.price;
+                  final isGone = v.isOutOfStock;
+                  final variantTitle = (v.formattedUnit.isNotEmpty && v.formattedUnit != 'Standard')
+                      ? v.formattedUnit
+                      : v.label;
 
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _variant = v);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSel
-                          ? const Color(0xFFF0FDF4)
-                          : (isGone ? const Color(0xFFF8FAFC) : Colors.white),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSel
-                            ? const Color(0xFF16A34A)
-                            : (isGone ? const Color(0xFFE2E8F0) : const Color(0xFFCBD5E1)),
-                        width: isSel ? 1.8 : 1.0,
-                      ),
-                      boxShadow: isSel
-                          ? [
-                              const BoxShadow(
-                                color: Color(0x1A16A34A),
-                                blurRadius: 6,
-                                offset: Offset(0, 2),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              variantTitle,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
-                                color: isGone
-                                    ? const Color(0xFF94A3B8)
-                                    : (isSel ? const Color(0xFF14532D) : const Color(0xFF1E293B)),
-                              ),
-                            ),
-                            if (isSel) ...[
-                              const SizedBox(width: 6),
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: Color(0xFF16A34A),
-                                size: 14,
-                              ),
-                            ],
-                          ],
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _variant = v);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
                         ),
-                        if (isGone) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'OUT OF STOCK',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFDC2626),
-                              letterSpacing: 0.2,
-                            ),
+                        decoration: BoxDecoration(
+                          color: isSel
+                              ? const Color(0xFFF0FDF4)
+                              : (isGone ? const Color(0xFFF8FAFC) : Colors.white),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSel
+                                ? const Color(0xFF16A34A)
+                                : (isGone ? const Color(0xFFE2E8F0) : const Color(0xFFCBD5E1)),
+                            width: isSel ? 1.8 : 1.0,
                           ),
-                        ],
-                        const SizedBox(height: 3),
-                        Row(
+                          boxShadow: isSel
+                              ? [
+                                  const BoxShadow(
+                                    color: Color(0x1A16A34A),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              '₹${subPrice.toStringAsFixed(0)}/unit',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w900,
-                                color: isGone
-                                    ? const Color(0xFF94A3B8)
-                                    : (isSel ? const Color(0xFF15803D) : const Color(0xFF16A34A)),
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  variantTitle,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
+                                    color: isGone
+                                        ? const Color(0xFF94A3B8)
+                                        : (isSel ? const Color(0xFF14532D) : const Color(0xFF1E293B)),
+                                  ),
+                                ),
+                                if (isSel) ...[
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: Color(0xFF16A34A),
+                                    size: 14,
+                                  ),
+                                ],
+                              ],
                             ),
-                            if (v.originalPrice > subPrice) ...[
-                              const SizedBox(width: 4),
+                            if (isGone) ...[
+                              const SizedBox(height: 2),
                               Text(
-                                '₹${v.originalPrice.toStringAsFixed(0)}',
+                                'OUT OF STOCK',
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF94A3B8),
-                                  decoration: TextDecoration.lineThrough,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFFDC2626),
+                                  letterSpacing: 0.2,
                                 ),
                               ),
                             ],
+                            const SizedBox(height: 3),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '₹${subPrice.toStringAsFixed(0)}/unit',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: isGone
+                                        ? const Color(0xFF94A3B8)
+                                        : (isSel ? const Color(0xFF15803D) : const Color(0xFF16A34A)),
+                                  ),
+                                ),
+                                if (v.originalPrice > subPrice) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '₹${v.originalPrice.toStringAsFixed(0)}',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF94A3B8),
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ],
@@ -1360,7 +1365,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          'MORNING (${morningWin.timeRangeText})',
+                          'MORNING',
                           style: const TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w900,
@@ -1375,7 +1380,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          'EVENING (${eveningWin.timeRangeText})',
+                          'EVENING',
                           style: const TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w900,
@@ -1459,7 +1464,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          'MORNING (${morningWin.timeRangeText})',
+                          'MORNING',
                           style: const TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w900,
@@ -1474,7 +1479,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          'EVENING (${eveningWin.timeRangeText})',
+                          'EVENING',
                           style: const TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w900,
@@ -1653,69 +1658,32 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         },
         borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(11),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      color: kPrimaryPl,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.play_circle_fill_rounded, size: 14, color: kPrimary),
-                  ),
-                  const SizedBox(width: 7),
-                  const Expanded(
-                    child: Text(
-                      'Start From',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: kText,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: kPrimaryPl,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: kPrimary.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.calendar_today_rounded, size: 11, color: kPrimary),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        dateStr,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: kPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                child: const Icon(Icons.calendar_today_rounded, size: 14, color: kPrimary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  dateStr,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: kText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF94A3B8)),
             ],
           ),
         ),
@@ -1733,61 +1701,44 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         border: Border.all(color: const Color(0xFFEFF2F0)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(11),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: kPrimaryPl,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.autorenew_rounded, size: 14, color: kPrimary),
-                ),
-                const SizedBox(width: 6),
-                const Expanded(
-                  child: Text(
-                    'Auto Renew',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: kText,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Transform.scale(
-                  scale: 0.75,
-                  alignment: Alignment.centerRight,
-                  child: Switch(
-                    value: _autoRenew,
-                    onChanged: (v) {
-                      HapticFeedback.lightImpact();
-                      setState(() => _autoRenew = v);
-                    },
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: kPrimary,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _autoRenew ? 'Renews automatically' : 'Single month only',
-              style: const TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w600,
-                color: kTextSub,
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: kPrimaryPl,
+                borderRadius: BorderRadius.circular(8),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              child: const Icon(Icons.autorenew_rounded, size: 14, color: kPrimary),
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Auto Renew',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: kText,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Transform.scale(
+              scale: 0.75,
+              alignment: Alignment.centerRight,
+              child: Switch(
+                value: _autoRenew,
+                onChanged: (v) {
+                  HapticFeedback.lightImpact();
+                  setState(() => _autoRenew = v);
+                },
+                activeThumbColor: Colors.white,
+                activeTrackColor: kPrimary,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ],
         ),
