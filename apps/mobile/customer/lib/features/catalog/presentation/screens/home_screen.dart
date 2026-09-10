@@ -223,57 +223,7 @@ class _HomeScreenState extends State<HomeScreen>
                     // 3. Top Banner (with banner count dots)
                     const SliverToBoxAdapter(child: PromoBanner()),
 
-                    // 4. Subscription Products (Daily doorstep delivery with subscribe options)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-                        child: Row(
-                          children: [
-                            const Text(
-                              'Subscription Products',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: kText,
-                                letterSpacing: -0.4,
-                              ),
-                            ),
-                            const Spacer(),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const BrowseScreen(
-                                      initialCategory: 'All',
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'See All',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF16A34A),
-                                    ),
-                                  ),
-                                  SizedBox(width: 4),
-                                  Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 12,
-                                    color: Color(0xFF16A34A),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    // 4. Subscribable Products Grouped by Parent Product (in a row two variants)
                     SliverToBoxAdapter(
                       child: BlocBuilder<CatalogBloc, CatalogState>(
                         builder: (context, state) {
@@ -282,65 +232,153 @@ class _HomeScreenState extends State<HomeScreen>
                           if (state is CatalogLoading ||
                               state is CatalogInitial ||
                               isOffline) {
-                            return SizedBox(
-                              height: 255,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                itemCount: 4,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(width: 12),
-                                itemBuilder: (_, __) => const SizedBox(
-                                  width: 165,
-                                  child: _HomeSkeletonCard(),
-                                ),
-                              ),
-                            );
-                          }
-
-                          if (state is CatalogError) {
-                            return SizedBox(
-                              height: 255,
-                              child: Center(
-                                child: TextButton.icon(
-                                  onPressed: () => context
-                                      .read<CatalogBloc>()
-                                      .add(LoadCatalog(branchId: _getBranchId(context))),
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Retry products'),
-                                ),
-                              ),
-                            );
-                          }
-
-                          List<Product> products = [];
-                          if (state is CatalogLoaded) {
-                            products = state.products
-                                .where((p) => p.isSubscribable)
-                                .toList();
-                          }
-                          if (products.isEmpty) {
                             return const SizedBox.shrink();
                           }
-                          return SizedBox(
-                            height: 255,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              itemCount: products.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, index) {
-                                return _subscriptionProductCard(
-                                  context,
-                                  products[index],
-                                );
-                              },
-                            ),
+
+                          if (state is CatalogError || state is! CatalogLoaded) {
+                            return const SizedBox.shrink();
+                          }
+
+                          final subProducts = state.products
+                              .where((p) => p.isSubscribable)
+                              .toList();
+                          if (subProducts.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          // Group variants by parent product identity so each product gets its own dedicated section
+                          final Map<String, List<Product>> subGroups = {};
+                          for (final p in subProducts) {
+                            final groupKey = (p.productId != null && p.productId!.isNotEmpty)
+                                ? p.productId!
+                                : (p.productName != null && p.productName!.isNotEmpty
+                                    ? p.productName!
+                                    : p.name.split(' - ')[0].trim());
+                            subGroups.putIfAbsent(groupKey, () => []).add(p);
+                          }
+
+                          final screenWidth = MediaQuery.of(context).size.width;
+                          final cardWidth = ((screenWidth - 44) / 2).clamp(160.0, 195.0);
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: subGroups.entries.map((entry) {
+                              final variants = entry.value;
+                              variants.sort((a, b) => a.price.compareTo(b.price));
+
+                              final first = variants.first;
+                              final rawProdName = (first.productName != null && first.productName!.isNotEmpty)
+                                  ? first.productName!
+                                  : first.name.split(' - ')[0].trim();
+                              final cleaned = cleanCategoryName(rawProdName).trim();
+                              final displayProdName = cleaned.isNotEmpty
+                                  ? (cleaned == cleaned.toLowerCase()
+                                      ? cleaned.split(' ').map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1)).join(' ')
+                                      : cleaned)
+                                  : 'Fresh Cow Milk';
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Section Header: Product Name + Daily badge + See All
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            displayProdName,
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w900,
+                                              color: kText,
+                                              letterSpacing: -0.4,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFECFDF5),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFBBF7D0)),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.repeat_rounded, size: 11, color: Color(0xFF16A34A)),
+                                                SizedBox(width: 3),
+                                                Text(
+                                                  'Daily',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF16A34A),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => const BrowseScreen(
+                                                    initialCategory: 'All',
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'See All',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF16A34A),
+                                                  ),
+                                                ),
+                                                SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.arrow_forward_ios_rounded,
+                                                  size: 12,
+                                                  color: Color(0xFF16A34A),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Variants Row (two variants in a row)
+                                    SizedBox(
+                                      height: 278,
+                                      child: ListView.separated(
+                                        scrollDirection: Axis.horizontal,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        itemCount: variants.length,
+                                        separatorBuilder: (_, _) => const SizedBox(width: 12),
+                                        itemBuilder: (context, index) {
+                                          return _subscriptionProductCard(
+                                            context,
+                                            variants[index],
+                                            cardWidth: cardWidth,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
                           );
                         },
                       ),
@@ -1208,14 +1246,23 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _subscriptionProductCard(BuildContext context, Product p) {
-    final unit = p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit;
+  Widget _subscriptionProductCard(BuildContext context, Product p, {double? cardWidth}) {
+    final unit = p.formattedUnit.isNotEmpty
+        ? p.formattedUnit
+        : (p.unitValue != null && p.unitType != null
+            ? '${p.unitValue} ${p.unitType}'
+            : (p.unit.isNotEmpty ? p.unit : 'Standard'));
+
     final subPrice = (p.subscriptionPrice != null && p.subscriptionPrice! > 0)
         ? p.subscriptionPrice!
         : p.price;
+    final normalPrice = p.price;
+
+    final width = cardWidth ??
+        ((MediaQuery.of(context).size.width - 44) / 2).clamp(160.0, 195.0);
 
     return Container(
-      width: 165,
+      width: width,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1232,12 +1279,12 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: "Subscribe" badge / Out of stock
+          // 1. Top row: Daily badge / Out of stock
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(5),
@@ -1278,7 +1325,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           const SizedBox(height: 4),
 
-          // Center Product Image
+          // 2. Center Product Image (Tap opens ProductDetailViewScreen)
           Expanded(
             child: GestureDetector(
               onTap: () => Navigator.push(
@@ -1311,116 +1358,203 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           const SizedBox(height: 6),
 
-          // Row: Unit Tag + "Subscribe" button
+          // 3. Unit badge + One-time Add to Cart option
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: Text(
                   unit,
                   style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF475569),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF334155),
                   ),
                 ),
               ),
-              InkWell(
-                onTap: () {
-                  context.runWithAuth(() {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SubscriptionSetupScreen(product: p),
-                      ),
-                    );
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF16A34A), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF16A34A).withValues(alpha: 0.08),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1.5),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.repeat_rounded, size: 11, color: Color(0xFF16A34A)),
-                      SizedBox(width: 3),
-                      Text(
-                        'Subscribe',
-                        style: TextStyle(
-                          color: Color(0xFF16A34A),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+              BlocBuilder<CartBloc, CartState>(
+                builder: (context, cartState) {
+                  final items = context.read<CartBloc>().currentItems;
+                  final cartQty = items
+                      .where((item) =>
+                          (item.productId == p.id || item.variantId == p.id) &&
+                          item.purchaseType == 'onetime')
+                      .fold(0, (sum, item) => sum + (item.quantity ?? 1));
+
+                  if (cartQty > 0) {
+                    return InkWell(
+                      onTap: () {
+                        context.runWithAuth(() {
+                          HapticFeedback.lightImpact();
+                          showPurchaseOptionsSheet(context, p, selectedVariantId: p.id);
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.shopping_bag_outlined, size: 10, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text(
+                              '$cartQty',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    );
+                  }
+
+                  return InkWell(
+                    onTap: () {
+                      context.runWithAuth(() {
+                        HapticFeedback.lightImpact();
+                        showPurchaseOptionsSheet(context, p, selectedVariantId: p.id);
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_rounded, size: 12, color: Color(0xFF16A34A)),
+                          SizedBox(width: 2),
+                          Text(
+                            'Add',
+                            style: TextStyle(
+                              color: Color(0xFF16A34A),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
           const SizedBox(height: 6),
 
-          // Product Name
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (_, _, _) => ProductDetailViewScreen(product: p),
-                transitionsBuilder: (_, a, _, child) =>
-                    FadeTransition(opacity: a, child: child),
-                transitionDuration: const Duration(milliseconds: 220),
-              ),
-            ),
-            child: Text(
-              p.displayName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-                height: 1.15,
-              ),
-            ),
-          ),
-          const SizedBox(height: 3),
-
-          // Price row with / delivery
+          // 4. Prices (Subscription price & normal selling price) - NO variant name!
           Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
                 '₹${subPrice.toStringAsFixed(0)}',
                 style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF15803D),
+                  letterSpacing: -0.3,
                 ),
               ),
+              const SizedBox(width: 2),
               const Text(
                 ' / delivery',
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 9.5,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
+                  color: Color(0xFF16A34A),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 1),
+          Row(
+            children: [
+              Text(
+                '₹${normalPrice.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 3),
+              const Text(
+                'normal',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              if (p.originalPrice > normalPrice) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '₹${p.originalPrice.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    decoration: TextDecoration.lineThrough,
+                    color: Color(0xFFCBD5E1),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // 5. Full-width Subscribe button
+          InkWell(
+            onTap: () {
+              context.runWithAuth(() {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SubscriptionSetupScreen(product: p),
+                  ),
+                );
+              });
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.repeat_rounded, size: 12, color: Color(0xFF16A34A)),
+                  SizedBox(width: 4),
+                  Text(
+                    'Subscribe',
+                    style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
