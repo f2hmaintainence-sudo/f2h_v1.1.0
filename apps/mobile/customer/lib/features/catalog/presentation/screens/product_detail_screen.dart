@@ -29,9 +29,11 @@ const double _kBottomInset = 160;
 class BrowseScreen extends StatefulWidget {
   final String? initialCategory;
   final bool isNavVisible;
+  final bool autoFocusSearch;
   const BrowseScreen({
     this.initialCategory,
     this.isNavVisible = true,
+    this.autoFocusSearch = false,
     super.key,
   });
 
@@ -49,6 +51,7 @@ class _BrowseState extends State<BrowseScreen>
   String? _targetProductId;
   String? _targetProductName;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   bool get _isSearching => _searchQuery.trim().isNotEmpty;
 
@@ -59,6 +62,14 @@ class _BrowseState extends State<BrowseScreen>
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
+
+    if (widget.autoFocusSearch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _searchFocusNode.requestFocus();
+        }
+      });
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -82,6 +93,7 @@ class _BrowseState extends State<BrowseScreen>
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -120,7 +132,7 @@ class _BrowseState extends State<BrowseScreen>
         return false;
       }).toList();
       if (matched.isNotEmpty) {
-        return matched;
+        list = matched;
       }
     }
 
@@ -173,11 +185,18 @@ class _BrowseState extends State<BrowseScreen>
       body: CartBarScrollScope(
         child: Stack(
           children: [
-            Row(
+            Column(
               children: [
-                // Hidden while searching so results span the full width.
-                if (!_isSearching) _buildSidebar(),
-                Expanded(child: _buildGrid()),
+                _buildTrendingSearchTags(),
+                Expanded(
+                  child: Row(
+                    children: [
+                      // Hidden while searching so results span the full width.
+                      if (!_isSearching) _buildSidebar(),
+                      Expanded(child: _buildGrid()),
+                    ],
+                  ),
+                ),
               ],
             ),
             AnimatedPositioned(
@@ -193,6 +212,57 @@ class _BrowseState extends State<BrowseScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTrendingSearchTags() {
+    const tags = ['Milk', 'Curd', 'Paneer', 'Ghee', 'Butter', 'Bread', 'Eggs', 'Vegetables', 'Fruits'];
+    return Container(
+      height: 38,
+      margin: const EdgeInsets.only(top: 4, bottom: 4),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: tags.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final tag = tags[i];
+          final isSelected = _searchQuery.toLowerCase().trim() == tag.toLowerCase().trim();
+          return InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              if (isSelected) {
+                _searchController.clear();
+              } else {
+                _searchController.text = tag;
+                _searchController.selection = TextSelection.fromPosition(
+                  TextPosition(offset: tag.length),
+                );
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF16653A) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF16653A) : const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                tag,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF334155),
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -253,6 +323,8 @@ class _BrowseState extends State<BrowseScreen>
               Expanded(
                 child: TextField(
                   controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  autofocus: widget.autoFocusSearch,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,

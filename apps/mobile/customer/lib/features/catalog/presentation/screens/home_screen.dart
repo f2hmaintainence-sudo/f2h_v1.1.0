@@ -180,8 +180,10 @@ class _HomeScreenState extends State<HomeScreen>
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  const BrowseScreen(initialCategory: 'All'),
+                              builder: (_) => const BrowseScreen(
+                                initialCategory: 'All',
+                                autoFocusSearch: true,
+                              ),
                             ),
                           );
                         },
@@ -661,33 +663,105 @@ class _HomeScreenState extends State<HomeScreen>
           }
         }
 
-        final bool hasBranch = branchId != null && branchId.isNotEmpty;
         final bool hasAddress = defaultAddr != null;
 
-        return MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _handleAddressTap,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
+        final profile = session.profile;
+        final bool isMember = profile?.isMember == true;
+
+        String initials = '';
+        if (profile != null) {
+          final fn = profile.firstName.trim();
+          final ln = profile.lastName.trim();
+          if (fn.isNotEmpty && ln.isNotEmpty) {
+            initials = '${fn[0]}${ln[0]}'.toUpperCase();
+          } else if (profile.name.trim().isNotEmpty) {
+            final parts = profile.name.trim().split(' ');
+            if (parts.length > 1 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+            } else if (parts[0].isNotEmpty) {
+              initials = parts[0][0].toUpperCase();
+            }
+          }
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Profile Avatar (replaces location icon)
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF16653A).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
+                    gradient: isMember
+                        ? const LinearGradient(
+                            colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isMember
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
+                            : Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1.5),
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    hasBranch || hasAddress ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
-                    color: const Color(0xFF16653A),
-                    size: 18,
+                  padding: const EdgeInsets.all(2),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isMember ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                    ),
+                    alignment: Alignment.center,
+                    child: initials.isNotEmpty
+                        ? Text(
+                            initials,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
+                            ),
+                          )
+                        : Icon(
+                            Icons.person_rounded,
+                            size: 19,
+                            color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
+                          ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Address & Branch (tappable to select address)
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _handleAddressTap,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 150),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -732,9 +806,9 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -2247,144 +2321,67 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. Address Details (Left - Expanded)
+          // 1. Profile Avatar + Address Info (Left)
+          branchWidget,
+          const SizedBox(width: 10),
+
+          // 2. Updated Search Bar (Fills remaining space with modern UI)
           Expanded(
-            child: branchWidget,
+            child: _buildSearchBar(context),
           ),
-          const SizedBox(width: 8),
-
-          // 2. Search Option (Action button without search text)
-          _buildSearchButton(context),
-          const SizedBox(width: 8),
-
-          // 3. Profile Avatar Button (Right - Replaces Notification)
-          _buildProfileButton(context),
         ],
       ),
     );
   }
 
-  Widget _buildSearchButton(BuildContext context) {
+  Widget _buildSearchBar(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onSearchTap,
         child: Container(
-          width: 38,
           height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
-            shape: BoxShape.circle,
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: const Color(0xFF16A34A),
-              width: 1.5,
+              color: const Color(0xFFE2E8F0),
+              width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF16A34A).withValues(alpha: 0.12),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
               ),
             ],
           ),
-          alignment: Alignment.center,
-          child: const Icon(
-            Icons.search_rounded,
-            color: Color(0xFF16653A),
-            size: 20,
+          child: Row(
+            children: [
+              const Icon(
+                Icons.search_rounded,
+                color: Color(0xFF16653A),
+                size: 19,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Search milk, curd, paneer…',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.w400,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildProfileButton(BuildContext context) {
-    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
-      builder: (context, session) {
-        final profile = session.profile;
-        final bool isMember = profile?.isMember == true;
-
-        String initials = '';
-        if (profile != null) {
-          final fn = profile.firstName.trim();
-          final ln = profile.lastName.trim();
-          if (fn.isNotEmpty && ln.isNotEmpty) {
-            initials = '${fn[0]}${ln[0]}'.toUpperCase();
-          } else if (profile.name.trim().isNotEmpty) {
-            final parts = profile.name.trim().split(' ');
-            if (parts.length > 1 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
-              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-            } else if (parts[0].isNotEmpty) {
-              initials = parts[0][0].toUpperCase();
-            }
-          }
-        }
-
-        return MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ProfileScreen(),
-                ),
-              );
-            },
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: isMember
-                    ? const LinearGradient(
-                        colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : const LinearGradient(
-                        colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isMember
-                        ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
-                        : Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(2),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isMember ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                ),
-                alignment: Alignment.center,
-                child: initials.isNotEmpty
-                    ? Text(
-                        initials,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
-                        ),
-                      )
-                    : Icon(
-                        Icons.person_rounded,
-                        size: 20,
-                        color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
-                      ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 
