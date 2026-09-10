@@ -640,11 +640,10 @@ class _HomeScreenState extends State<HomeScreen>
         if (branchName != null && branchName.trim().isNotEmpty) {
           final clean = branchName.replaceAll(RegExp(r'\s+'), ' ').trim();
           if (clean.isNotEmpty) {
-            final words = clean.split(' ').map((w) {
+            branchDisplay = clean.split(' ').map((w) {
               if (w.isEmpty) return '';
               return '${w[0].toUpperCase()}${w.substring(1)}';
             }).join(' ');
-            branchDisplay = words.toLowerCase().contains('branch') ? words : '$words Branch';
           }
         }
 
@@ -654,24 +653,11 @@ class _HomeScreenState extends State<HomeScreen>
             addressType = defaultAddr.addressType.trim();
           } else if (defaultAddr.label.trim().isNotEmpty) {
             addressType = defaultAddr.label.trim();
-          } else if (defaultAddr.area.trim().isNotEmpty) {
-            addressType = defaultAddr.area.trim();
           } else {
             addressType = 'Home';
           }
           if (addressType.isNotEmpty) {
             addressType = '${addressType[0].toUpperCase()}${addressType.substring(1)}';
-          }
-        }
-
-        String areaText = '';
-        if (defaultAddr != null) {
-          if (defaultAddr.area.isNotEmpty) {
-            areaText = defaultAddr.area;
-          } else if (defaultAddr.city.isNotEmpty) {
-            areaText = defaultAddr.city;
-          } else if (defaultAddr.street.isNotEmpty) {
-            areaText = defaultAddr.street;
           }
         }
 
@@ -711,7 +697,7 @@ class _HomeScreenState extends State<HomeScreen>
                         children: [
                           Flexible(
                             child: Text(
-                              hasAddress ? addressType : (branchDisplay.isNotEmpty ? branchDisplay : 'Set Location'),
+                              hasAddress ? addressType : 'Set Location',
                               style: const TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w800,
@@ -732,60 +718,16 @@ class _HomeScreenState extends State<HomeScreen>
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (branchDisplay.isNotEmpty) ...[
-                            const Icon(
-                              Icons.storefront_rounded,
-                              size: 12,
-                              color: Color(0xFF16A34A),
-                            ),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                branchDisplay,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF16653A),
-                                  height: 1.1,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                          if (areaText.isNotEmpty) ...[
-                            Flexible(
-                              child: Text(
-                                branchDisplay.isNotEmpty ? ' • $areaText' : areaText,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF64748B),
-                                  height: 1.1,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ] else if (branchDisplay.isEmpty) ...[
-                            const Flexible(
-                              child: Text(
-                                'Tap to select delivery location',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF64748B),
-                                  height: 1.1,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        branchDisplay.isNotEmpty ? branchDisplay : 'Select Branch',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: branchDisplay.isNotEmpty ? FontWeight.w600 : FontWeight.w500,
+                          color: branchDisplay.isNotEmpty ? const Color(0xFF16653A) : const Color(0xFF64748B),
+                          height: 1.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
