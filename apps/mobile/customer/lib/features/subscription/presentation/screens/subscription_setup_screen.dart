@@ -1029,11 +1029,15 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              child: Row(
-                children: vars.map((v) {
+            SizedBox(
+              height: 60,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: vars.length,
+                separatorBuilder: (_, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final v = vars[index];
                   final isSel = v.id == _variant.id;
                   final subPrice = v.subscriptionPrice ?? v.price;
                   final isGone = v.isOutOfStock;
@@ -1041,115 +1045,116 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                       ? v.formattedUnit
                       : v.label;
 
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _variant = v);
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
+                  return GestureDetector(
+                    onTap: isGone
+                        ? null
+                        : () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _variant = v);
+                          },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSel
+                            ? const Color(0xFFF0FDF4)
+                            : (isGone ? const Color(0xFFF8FAFC) : Colors.white),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
                           color: isSel
-                              ? const Color(0xFFF0FDF4)
-                              : (isGone ? const Color(0xFFF8FAFC) : Colors.white),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSel
-                                ? const Color(0xFF16A34A)
-                                : (isGone ? const Color(0xFFE2E8F0) : const Color(0xFFCBD5E1)),
-                            width: isSel ? 1.8 : 1.0,
-                          ),
-                          boxShadow: isSel
-                              ? [
-                                  const BoxShadow(
-                                    color: Color(0x1A16A34A),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
+                              ? const Color(0xFF16A34A)
+                              : (isGone ? const Color(0xFFE2E8F0) : const Color(0xFFCBD5E1)),
+                          width: isSel ? 1.8 : 1.0,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  variantTitle,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
-                                    color: isGone
-                                        ? const Color(0xFF94A3B8)
-                                        : (isSel ? const Color(0xFF14532D) : const Color(0xFF1E293B)),
-                                  ),
+                        boxShadow: isSel
+                            ? [
+                                const BoxShadow(
+                                  color: Color(0x1A16A34A),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
                                 ),
-                                if (isSel) ...[
-                                  const SizedBox(width: 6),
-                                  const Icon(
-                                    Icons.check_circle_rounded,
-                                    color: Color(0xFF16A34A),
-                                    size: 14,
-                                  ),
-                                ],
-                              ],
-                            ),
-                            if (isGone) ...[
-                              const SizedBox(height: 2),
+                              ]
+                            : null,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               Text(
-                                'OUT OF STOCK',
+                                variantTitle,
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFFDC2626),
-                                  letterSpacing: 0.2,
+                                  fontSize: 12,
+                                  fontWeight: isSel ? FontWeight.w900 : FontWeight.w700,
+                                  color: isGone
+                                      ? const Color(0xFF94A3B8)
+                                      : (isSel ? const Color(0xFF14532D) : const Color(0xFF1E293B)),
                                 ),
                               ),
-                            ],
-                            const SizedBox(height: 3),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '₹${subPrice.toStringAsFixed(0)}/unit',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w900,
-                                    color: isGone
-                                        ? const Color(0xFF94A3B8)
-                                        : (isSel ? const Color(0xFF15803D) : const Color(0xFF16A34A)),
-                                  ),
+                              if (isSel) ...[
+                                const SizedBox(width: 5),
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Color(0xFF16A34A),
+                                  size: 13,
                                 ),
-                                if (v.originalPrice > subPrice) ...[
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '₹${v.originalPrice.toStringAsFixed(0)}',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF94A3B8),
-                                      decoration: TextDecoration.lineThrough,
-                                    ),
-                                  ),
-                                ],
                               ],
+                            ],
+                          ),
+                          if (isGone) ...[
+                            const SizedBox(height: 1),
+                            Text(
+                              'OUT OF STOCK',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFFDC2626),
+                                letterSpacing: 0.2,
+                              ),
                             ),
                           ],
-                        ),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '₹${subPrice.toStringAsFixed(0)}/unit',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: isGone
+                                      ? const Color(0xFF94A3B8)
+                                      : (isSel ? const Color(0xFF15803D) : const Color(0xFF16A34A)),
+                                ),
+                              ),
+                              if (v.originalPrice > subPrice) ...[
+                                const SizedBox(width: 4),
+                                Text(
+                                  '₹${v.originalPrice.toStringAsFixed(0)}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF94A3B8),
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   );
-                }).toList(),
+                },
               ),
             ),
+            const SizedBox(height: 6),
           ],
         ],
       ),
@@ -1276,15 +1281,46 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     final bothClosed = !isMorningOpen && !isEveningOpen;
 
     return _SectionCard(
+      border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
+          spreadRadius: 1,
+        ),
+        const BoxShadow(
+          color: Color(0x0F000000),
+          blurRadius: 8,
+          offset: Offset(0, 2),
+        ),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Frequency title and Daily/Weekly buttons in a single row ──
           Row(
             children: [
-              const _SectionTitle(
-                icon: Icons.repeat_rounded,
-                label: 'Frequency',
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.repeat_rounded,
+                  size: 16,
+                  color: Color(0xFF15803D),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Frequency',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
               const Spacer(),
               _FreqChip(
@@ -1444,12 +1480,34 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   ),
                 )
               else
-                Text(
-                  'Daily: ${_morningQty + _eveningQty} items/day · ₹${((_morningQty + _eveningQty) * _subscriptionUnitPrice).toStringAsFixed(0)}/day',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: kText,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFDCFCE7), width: 1.0),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Daily Schedule',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF15803D),
+                        ),
+                      ),
+                      Text(
+                        '${_morningQty + _eveningQty} items/day · ₹${((_morningQty + _eveningQty) * _subscriptionUnitPrice).toStringAsFixed(0)}/day',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF14532D),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -1562,13 +1620,34 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         )
-                      : Text(
-                          'Weekly: $weekTotal items · ₹${(_weeklySchedule.values.fold(0.0, (s, d) => s + ((d['morning'] ?? 0) + (d['evening'] ?? 0)) * _subscriptionUnitPrice)).toStringAsFixed(0)}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: kText,
+                      : Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFDCFCE7), width: 1.0),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Weekly Schedule',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF15803D),
+                                ),
+                              ),
+                              Text(
+                                '$weekTotal items/wk · ₹${(_weeklySchedule.values.fold(0.0, (s, d) => s + ((d['morning'] ?? 0) + (d['evening'] ?? 0)) * _subscriptionUnitPrice)).toStringAsFixed(0)}/wk',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF14532D),
+                                ),
+                              ),
+                            ],
                           ),
                         );
                 },
@@ -2113,32 +2192,40 @@ class _SectionCard extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final Color? backgroundColor;
   final Border? border;
+  final List<BoxShadow>? boxShadow;
   const _SectionCard({
     required this.child,
     this.padding,
     this.backgroundColor,
     this.border,
+    this.boxShadow,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.white,
         borderRadius: BorderRadius.circular(16),
         border:
             border ?? Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
+        boxShadow: boxShadow ??
+            const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
       ),
-      child: child,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: padding ?? const EdgeInsets.all(16),
+          child: child,
+        ),
+      ),
     );
   }
 }
@@ -2360,7 +2447,7 @@ class _MiniQtyControl extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF6F7F9),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: accentColor.withOpacity(0.35)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
