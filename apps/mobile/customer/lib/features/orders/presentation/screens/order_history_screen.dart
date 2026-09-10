@@ -39,22 +39,18 @@ class OrderHistoryView extends StatefulWidget {
 class _OrderHistoryViewState extends State<OrderHistoryView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _selectedFilter = 'All';
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
-  
 
   // ── locally-held data (instant updates without full bloc rebuild) ──────────
   List<Order> _oneTimeOrders = [];
   List<Order> _subscriptionOrders = [];
   List<SubscriptionPlan> _subscriptionPlans = [];
 
-  static const _filters = ['All', 'placed', 'Delivered', 'Cancelled'];
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -66,14 +62,11 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
 
   // ── filter helpers ─────────────────────────────────────────────────────────
   List<Order> _filterOrders(List<Order> list) {
-    return list.where((o) {
-      final matchStatus = _selectedFilter == 'All' ||
-          o.status.toLowerCase() == _selectedFilter.toLowerCase();
-      final matchSearch = _searchQuery.isEmpty ||
-          o.productName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          o.id.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchStatus && matchSearch;
-    }).toList();
+    if (_searchQuery.isEmpty) return list;
+    final q = _searchQuery.toLowerCase();
+    return list.where((o) =>
+        o.productName.toLowerCase().contains(q) ||
+        o.id.toLowerCase().contains(q)).toList();
   }
 
   List<SubscriptionPlan> _filterPlans(List<SubscriptionPlan> list) {
@@ -119,7 +112,6 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
               children: [
                 _buildOneTimeTab(),
                 _buildSubscriptionOrdersTab(),
-                _buildSubscriptionPlansTab(),
               ],
             );
           },
@@ -157,7 +149,6 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
             tabs: [
               _tabWithBadge('One-Time', _oneTimeOrders.length),
               _tabWithBadge('Sub Orders', _subscriptionOrders.length),
-              _tabWithBadge('My Plans', _subscriptionPlans.length),
             ],
           ),
         ),
@@ -196,7 +187,6 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
     return Column(
       children: [
         _buildSearchBar('Search one-time orders…'),
-        _buildFilterChips(),
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async =>
@@ -230,7 +220,6 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
     return Column(
       children: [
         _buildSearchBar('Search subscription orders…'),
-        _buildFilterChips(),
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async =>
@@ -666,46 +655,7 @@ class _OrderHistoryViewState extends State<OrderHistoryView>
     );
   }
 
-  // ── filter chips (for order tabs only) ───────────────────────────────────
-  Widget _buildFilterChips() {
-    return Container(
-      color: kSurface,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: _filters.map((f) {
-            final selected = _selectedFilter == f;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(
-                  f,
-                  style: TextStyle(
-                    color: selected ? Colors.white : kTextSub,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-                selected: selected,
-                selectedColor: kPrimary,
-                backgroundColor: kBg,
-                elevation: 0,
-                pressElevation: 0,
-                shadowColor: Colors.transparent,
-                selectedShadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  side: BorderSide(color: selected ? kPrimary : kBorder),
-                ),
-                onSelected: (v) { if (v) setState(() => _selectedFilter = f); },
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
+
 
   // ── empty state ───────────────────────────────────────────────────────────
   Widget _buildEmpty({
