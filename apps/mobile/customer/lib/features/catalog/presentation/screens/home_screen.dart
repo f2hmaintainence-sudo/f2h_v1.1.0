@@ -457,49 +457,8 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
 
-                    // 6. Categories (Next show categories!)
-                    const SliverToBoxAdapter(child: SizedBox(height: 10)),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                        child: Row(
-                          children: [
-                            const Text(
-                              'Shop by Category',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: kText,
-                                letterSpacing: -0.4,
-                              ),
-                            ),
-                            const Spacer(),
-                            GestureDetector(
-                              onTap: () => AppShell.of(context)?.setTab(1),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'See All',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF16A34A),
-                                    ),
-                                  ),
-                                  SizedBox(width: 4),
-                                  Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 12,
-                                    color: Color(0xFF16A34A),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    // 6. Categories
+                    const SliverToBoxAdapter(child: SizedBox(height: 6)),
                     SliverToBoxAdapter(child: _categoryShortcuts()),
 
                     const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -961,47 +920,20 @@ class _HomeScreenState extends State<HomeScreen>
           categories = state.categories;
         }
 
-        final colors = [
-          const Color(0xFFE8F5E9), // soft green
-          const Color(0xFFE3F2FD), // soft blue
-          const Color(0xFFFFF3E0), // soft orange
-          const Color(0xFFF3E5F5), // soft purple
-          const Color(0xFFFFFDE7), // soft yellow
-        ];
-
         return Container(
-          height: 102,
-          margin: const EdgeInsets.symmetric(vertical: 14),
+          height: 118,
+          margin: const EdgeInsets.only(top: 4, bottom: 10),
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
-              // "All" item
-              _categoryShortcutItem(
-                label: 'All',
-                icon: Icons.grid_view_rounded,
-                isAll: true,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const BrowseScreen(initialCategory: 'All'),
-                    ),
-                  );
-                },
-              ),
-              // Dynamic categories
-              ...categories.take(5).toList().asMap().entries.map((entry) {
-                final idx = entry.key;
-                final cat = entry.value;
+              // Dynamic categories (without "All" option)
+              ...categories.map((cat) {
                 final label = cat['name'] ?? '';
                 final imagePath = cat['image_path'] ?? '';
-                final bgColor = const Color(0xFFE8F5E9);
                 return _categoryShortcutItem(
                   label: label,
                   imagePath: imagePath,
-                  // bgColor: bgColor,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -1012,21 +944,6 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                 );
               }),
-              // "More" item
-              _categoryShortcutItem(
-                label: 'More',
-                icon: Icons.more_horiz_rounded,
-                isMore: true,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const BrowseScreen(initialCategory: 'All'),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
         );
@@ -1046,21 +963,21 @@ class _HomeScreenState extends State<HomeScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 66,
-        margin: const EdgeInsets.only(right: 12),
+        width: 76,
+        margin: const EdgeInsets.only(right: 14),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 68,
+              height: 68,
               decoration: BoxDecoration(
                 color: isAll
                     ? const Color(0xFF16A34A)
                     : (isMore
                           ? const Color(0xFFECEFF1)
                           : (bgColor ?? Colors.white)),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isAll
                       ? Colors.transparent
@@ -1072,20 +989,20 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(15),
                 child: icon != null
                     ? Center(
                         child: Icon(
                           icon,
                           color: isAll ? Colors.white : const Color(0xFF16653A),
-                          size: 28,
+                          size: 30,
                         ),
                       )
                     : (imagePath != null && imagePath.isNotEmpty
@@ -1102,19 +1019,19 @@ class _HomeScreenState extends State<HomeScreen>
                               child: Icon(
                                 Icons.shopping_bag_outlined,
                                 color: Color(0xFF16653A),
-                                size: 26,
+                                size: 28,
                               ),
                             )),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
             Text(
               cleanCategoryName(label),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 color: kText,
                 letterSpacing: -0.2,
