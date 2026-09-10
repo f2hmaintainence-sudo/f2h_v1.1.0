@@ -416,9 +416,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Order status card
-              _buildStatusCard(order),
-
               // Items card
               _buildItemsCard(order),
 
@@ -438,135 +435,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  Widget _buildStatusCard(Order order) {
-    Color statusColor = kPrimary;
-    IconData statusIcon = Icons.info_outline;
-    String statusText = order.status.toUpperCase();
-
-    if (order.status.toLowerCase() == 'delivered') {
-      statusColor = kPrimary;
-      statusIcon = Icons.check_circle;
-    } else if (order.status.toLowerCase() == 'cancelled') {
-      statusColor = kRed;
-      statusIcon = Icons.cancel;
-    } else if (order.status.toLowerCase() == 'placed') {
-      statusColor = Colors.orange;
-      statusIcon = Icons.hourglass_empty;
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(statusIcon, color: statusColor, size: 26),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: statusColor,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  order.status.toLowerCase() == 'delivered'
-                      ? (_formatDeliveryTimeOnly(order).isNotEmpty
-                          ? 'Delivered at ${_formatDeliveryTimeOnly(order)}'
-                          : 'Delivered')
-                      : 'Scheduled: ${order.scheduledDate.isNotEmpty ? order.scheduledDate : order.date} · ${_formatSlot(order.deliverySlot)}',
-                  style: const TextStyle(fontSize: 12, color: kTextSub, fontWeight: FontWeight.w600),
-                ),
-                if (['out_for_delivery', 'assigned', 'confirmed'].contains(order.status.toLowerCase())) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.phone_in_talk_rounded, size: 13, color: Color(0xFF047857)),
-                        SizedBox(width: 5),
-                        Flexible(
-                          child: Text(
-                            'Delivery partner will call you soon',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF047857),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                  decoration: BoxDecoration(
-                    color: order.orderSource == 'subscription' ? const Color(0xFFE0F2FE) : const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        order.orderSource == 'subscription' ? Icons.autorenew_rounded : Icons.shopping_bag_outlined,
-                        size: 9,
-                        color: order.orderSource == 'subscription' ? const Color(0xFF0369A1) : const Color(0xFF2E7D32),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        order.orderSource == 'subscription' ? 'Subscription Order' : 'One-Time Order',
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w800,
-                          color: order.orderSource == 'subscription' ? const Color(0xFF0369A1) : const Color(0xFF2E7D32),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
   Widget _buildItemsCard(Order order) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: kSurface,
@@ -820,26 +692,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 style: const TextStyle(color: kPrimary, fontSize: 16, fontWeight: FontWeight.w900),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: kBgDeep,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.payment_outlined, color: kTextMid, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Paid via ${order.paymentMode.toUpperCase()} (${order.paymentStatus.toUpperCase()})',
-                    style: const TextStyle(fontSize: 12, color: kTextMid, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
           ),
           if (order.status.toLowerCase() == 'delivered' && _isOneTimeOrder(order)) ...[
             const SizedBox(height: 16),
