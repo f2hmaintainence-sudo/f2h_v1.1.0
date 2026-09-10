@@ -473,46 +473,38 @@ class _NavItem extends StatelessWidget {
     onTap: onTap,
     behavior: HitTestBehavior.opaque,
     child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       color: Colors.transparent,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 40,
-            height: 40,
-            child: AnimatedScale(
-              scale: isActive ? 1.10 : 1.0,
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isActive ? activeColor : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isActive ? activeIcon : icon,
-                      color: isActive ? Colors.white : kTextSub,
-                      size: 20,
-                    ),
+            width: 32,
+            height: 30,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                AnimatedScale(
+                  scale: isActive ? 1.08 : 1.0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    color: isActive ? activeColor : kTextSub,
+                    size: isActive ? 26 : 22,
                   ),
-                  if (badge != null) Positioned(top: 0, right: 0, child: badge!),
-                ],
-              ),
+                ),
+                if (badge != null) Positioned(top: -3, right: -7, child: badge!),
+              ],
             ),
           ),
           const SizedBox(height: 3),
           AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 180),
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+              fontSize: 10.5,
+              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
               color: isActive ? activeColor : kTextSub,
               letterSpacing: 0.1,
             ),
