@@ -665,103 +665,31 @@ class _HomeScreenState extends State<HomeScreen>
 
         final bool hasAddress = defaultAddr != null;
 
-        final profile = session.profile;
-        final bool isMember = profile?.isMember == true;
-
-        String initials = '';
-        if (profile != null) {
-          final fn = profile.firstName.trim();
-          final ln = profile.lastName.trim();
-          if (fn.isNotEmpty && ln.isNotEmpty) {
-            initials = '${fn[0]}${ln[0]}'.toUpperCase();
-          } else if (profile.name.trim().isNotEmpty) {
-            final parts = profile.name.trim().split(' ');
-            if (parts.length > 1 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
-              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-            } else if (parts[0].isNotEmpty) {
-              initials = parts[0][0].toUpperCase();
-            }
-          }
-        }
-
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Profile Avatar (replaces location icon)
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileScreen(),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _handleAddressTap,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
+                    color: const Color(0xFF16653A).withValues(alpha: 0.1),
                     shape: BoxShape.circle,
-                    gradient: isMember
-                        ? const LinearGradient(
-                            colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : const LinearGradient(
-                            colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isMember
-                            ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
-                            : Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1.5),
-                      ),
-                    ],
                   ),
-                  padding: const EdgeInsets.all(2),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isMember ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                    ),
-                    alignment: Alignment.center,
-                    child: initials.isNotEmpty
-                        ? Text(
-                            initials,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
-                            ),
-                          )
-                        : Icon(
-                            Icons.person_rounded,
-                            size: 19,
-                            color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
-                          ),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: Color(0xFF16653A),
+                    size: 16,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // Address & Branch (tappable to select address)
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _handleAddressTap,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 150),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 105),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,7 +701,7 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Text(
                               hasAddress ? addressType : 'Set Location',
                               style: const TextStyle(
-                                fontSize: 13.5,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF0F172A),
                                 letterSpacing: -0.2,
@@ -783,11 +711,11 @@ class _HomeScreenState extends State<HomeScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 3),
+                          const SizedBox(width: 2),
                           const Icon(
                             Icons.keyboard_arrow_down_rounded,
                             color: Color(0xFF16653A),
-                            size: 16,
+                            size: 15,
                           ),
                         ],
                       ),
@@ -795,7 +723,7 @@ class _HomeScreenState extends State<HomeScreen>
                       Text(
                         branchDisplay.isNotEmpty ? branchDisplay : 'Select Branch',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: branchDisplay.isNotEmpty ? FontWeight.w600 : FontWeight.w500,
                           color: branchDisplay.isNotEmpty ? const Color(0xFF16653A) : const Color(0xFF64748B),
                           height: 1.1,
@@ -806,9 +734,9 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -2282,6 +2210,138 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
   }
 }
 
+class AnimatedSearchTrigger extends StatefulWidget {
+  final VoidCallback onTap;
+  final VoidCallback? onFilterTap;
+
+  const AnimatedSearchTrigger({
+    required this.onTap,
+    this.onFilterTap,
+    super.key,
+  });
+
+  @override
+  State<AnimatedSearchTrigger> createState() => _AnimatedSearchTriggerState();
+}
+
+class _AnimatedSearchTriggerState extends State<AnimatedSearchTrigger> {
+  static const List<String> _kSearchSuggestions = [
+    'organic ghee',
+    'fresh cow milk',
+    'paneer',
+    'farm curd',
+    'white butter',
+    'country eggs',
+    'cold pressed oil',
+    'fresh vegetables',
+    'tender coconut',
+    'pure honey',
+  ];
+
+  int _suggestionIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _suggestionIndex = (_suggestionIndex + 1) % _kSearchSuggestions.length;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFF16A34A),
+              width: 1.4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF16A34A).withValues(alpha: 0.08),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.search_rounded,
+                color: Color(0xFF16653A),
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder: (child, animation) {
+                    final offsetAnimation = Tween<Offset>(
+                      begin: const Offset(0.0, 0.5),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ));
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: offsetAnimation,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Text(
+                    'Search "${_kSearchSuggestions[_suggestionIndex]}"...',
+                    key: ValueKey<int>(_suggestionIndex),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF475569),
+                      letterSpacing: -0.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onFilterTap ?? widget.onTap,
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFF16A34A),
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double topPadding;
   final Widget branchWidget;
@@ -2321,67 +2381,119 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. Profile Avatar + Address Info (Left)
+          // 1. Location & Address Section (Left)
           branchWidget,
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
 
-          // 2. Updated Search Bar (Fills remaining space with modern UI)
+          // 2. Search Option (Center - Animated Pill with Green Border & Tune Icon)
           Expanded(
-            child: _buildSearchBar(context),
+            child: AnimatedSearchTrigger(
+              onTap: onSearchTap,
+              onFilterTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const BrowseScreen(initialCategory: 'All'),
+                  ),
+                );
+              },
+            ),
           ),
+          const SizedBox(width: 8),
+
+          // 3. Profile Avatar Button (Right)
+          _buildProfileButton(context),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onSearchTap,
-        child: Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: const Color(0xFFE2E8F0),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.search_rounded,
-                color: Color(0xFF16653A),
-                size: 19,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Search milk, curd, paneer…',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    color: Color(0xFF94A3B8),
-                    fontWeight: FontWeight.w400,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+  Widget _buildProfileButton(BuildContext context) {
+    return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
+      builder: (context, session) {
+        final profile = session.profile;
+        final bool isMember = profile?.isMember == true;
+
+        String initials = '';
+        if (profile != null) {
+          final fn = profile.firstName.trim();
+          final ln = profile.lastName.trim();
+          if (fn.isNotEmpty && ln.isNotEmpty) {
+            initials = '${fn[0]}${ln[0]}'.toUpperCase();
+          } else if (profile.name.trim().isNotEmpty) {
+            final parts = profile.name.trim().split(' ');
+            if (parts.length > 1 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+              initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+            } else if (parts[0].isNotEmpty) {
+              initials = parts[0][0].toUpperCase();
+            }
+          }
+        }
+
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ProfileScreen(),
                 ),
+              );
+            },
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: isMember
+                    ? const LinearGradient(
+                        colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isMember
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
+                        : Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1.5),
+                  ),
+                ],
               ),
-            ],
+              padding: const EdgeInsets.all(2),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isMember ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                ),
+                alignment: Alignment.center,
+                child: initials.isNotEmpty
+                    ? Text(
+                        initials,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
+                        ),
+                      )
+                    : Icon(
+                        Icons.person_rounded,
+                        size: 19,
+                        color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
+                      ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
