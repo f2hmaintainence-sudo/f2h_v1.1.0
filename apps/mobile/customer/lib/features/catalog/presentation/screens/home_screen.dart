@@ -423,14 +423,50 @@ class _HomeScreenState extends State<HomeScreen>
                           List<Product> popularProducts = [];
                           if (state is CatalogLoaded) {
                             final inStock = state.products
-                                .where((p) => !p.isOutOfStock)
+                                .where((p) =>
+                                    !p.isOutOfStock &&
+                                    !p.isSubscribable &&
+                                    !p.hasSubscription &&
+                                    (p.subscriptionPrice == null ||
+                                        p.subscriptionPrice! <= 0))
                                 .toList();
                             inStock.sort((a, b) {
                               final r = b.rating.compareTo(a.rating);
                               if (r != 0) return r;
                               return b.reviews.compareTo(a.reviews);
                             });
-                            popularProducts = inStock.take(15).toList();
+
+                            final cartItems = context.read<CartBloc>().currentItems;
+                            final seenProductKeys = <String>{};
+                            final uniqueProducts = <Product>[];
+                            for (final p in inStock) {
+                              final key = (p.productId != null && p.productId!.trim().isNotEmpty)
+                                  ? p.productId!.trim().toLowerCase()
+                                  : (p.productName != null && p.productName!.trim().isNotEmpty
+                                      ? p.productName!.trim().toLowerCase()
+                                      : p.name.trim().toLowerCase());
+                              if (seenProductKeys.contains(key)) continue;
+
+                              // Find all variants for this product in inStock
+                              final variantsForProd = inStock.where((cand) {
+                                final candKey = (cand.productId != null && cand.productId!.trim().isNotEmpty)
+                                    ? cand.productId!.trim().toLowerCase()
+                                    : (cand.productName != null && cand.productName!.trim().isNotEmpty
+                                        ? cand.productName!.trim().toLowerCase()
+                                        : cand.name.trim().toLowerCase());
+                                return candKey == key;
+                              }).toList();
+
+                              // If any variant is in cart, prefer displaying that variant; otherwise choose lowest price
+                              Product chosen = variantsForProd.firstWhere(
+                                (cand) => cartItems.any((ci) => ci.variantId == cand.id || ci.productId == cand.id),
+                                orElse: () => variantsForProd.reduce((a, b) => a.price <= b.price ? a : b),
+                              );
+
+                              seenProductKeys.add(key);
+                              uniqueProducts.add(chosen);
+                            }
+                            popularProducts = uniqueProducts.take(15).toList();
                           }
                           if (popularProducts.isEmpty) {
                             return const SizedBox.shrink();
@@ -457,8 +493,49 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
 
-                    // 6. Categories
-                    const SliverToBoxAdapter(child: SizedBox(height: 6)),
+                    // 6. Categories (Next show categories!)
+                    const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Shop by Category',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => AppShell.of(context)?.setTab(1),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'See All',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 12,
+                                    color: Color(0xFF16A34A),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     SliverToBoxAdapter(child: _categoryShortcuts()),
 
                     const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -479,8 +556,8 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
 
-                    // Spacing before Referral
-                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  // Spacing before Referral
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
                   // 8. Referral Banner (Invite Friends, Earn Rewards!)
                   const SliverToBoxAdapter(
@@ -2511,20 +2588,21 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
                   children: [
                     Text(
                       p.displayName,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: kText,
                         letterSpacing: -0.2,
+                        height: 1.15,
                       ),
                     ),
                     if ((p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit)
                             .isNotEmpty &&
                         (p.formattedUnit.isNotEmpty ? p.formattedUnit : p.unit)
                                 .toLowerCase() !=
-                            p.name.toLowerCase()) ...[
+                            p.displayName.toLowerCase()) ...[
                       const SizedBox(height: 3),
                       Text(
                         p.formattedUnit.isNotEmpty
@@ -2679,51 +2757,6 @@ Widget oneTimeProductCard(BuildContext context, Product p) {
               ),
             ),
           ),
-          // Bottom of Image: Subscribe pill (if subscribable)
-          if (p.isSubscribable && !p.isOutOfStock)
-            Positioned(
-              top: 94,
-              left: 6,
-              right: 6,
-              child: Container(
-                height: 22,
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: kPrimary,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.autorenew_rounded,
-                        size: 10,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        'Subscribe @ ₹${(p.subscriptionPrice != null && p.subscriptionPrice! > 0 ? p.subscriptionPrice! : p.price).toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 11,
-                        color: Colors.white,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     ),
@@ -2966,47 +2999,6 @@ class _CategorySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Category header ─────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-          child: Row(
-            children: [
-              Text(
-                cleanCategoryName(categoryName),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: kText,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  final catId = products.firstOrNull?.categoryId ?? (banner != null ? (banner!['categoryId'] ?? banner!['category_id']) : null);
-                  final target = (catId != null && catId.toString().isNotEmpty) ? catId.toString() : categoryName;
-                  AppShell.of(context)?.setTab(1, category: target);
-                },
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'See All',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF16653A),
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(Icons.arrow_forward, size: 12, color: Color(0xFF16653A)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
         // ── Inline category banner (Image ONLY - full width, uncropped) ─────
         if (banner != null) ...[
           GestureDetector(

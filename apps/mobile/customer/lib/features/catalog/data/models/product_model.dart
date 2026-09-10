@@ -200,10 +200,96 @@ class Product {
     this.images = const [],
   });
 
+  Product copyWith({
+    String? id,
+    String? name,
+    String? variantName,
+    String? productName,
+    String? vendor,
+    String? unit,
+    String? unitValue,
+    String? unitType,
+    String? category,
+    String? categoryId,
+    String? productId,
+    String? emoji,
+    double? price,
+    double? originalPrice,
+    double? subscriptionPrice,
+    double? availableQuantity,
+    double? lowStockThreshold,
+    double? rating,
+    int? reviews,
+    bool? isOrganic,
+    bool? isSubscribable,
+    bool? isOneTime,
+    bool? isOutOfStock,
+    bool? isLowStock,
+    String? description,
+    String? highlights,
+    String? ingredients,
+    String? legalInfo,
+    String? badge,
+    Color? badgeColor,
+    List<ProductVariant>? variants,
+    String? imageAsset,
+    List<String>? images,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      variantName: variantName ?? this.variantName,
+      productName: productName ?? this.productName,
+      vendor: vendor ?? this.vendor,
+      unit: unit ?? this.unit,
+      unitValue: unitValue ?? this.unitValue,
+      unitType: unitType ?? this.unitType,
+      category: category ?? this.category,
+      categoryId: categoryId ?? this.categoryId,
+      productId: productId ?? this.productId,
+      emoji: emoji ?? this.emoji,
+      price: price ?? this.price,
+      originalPrice: originalPrice ?? this.originalPrice,
+      subscriptionPrice: subscriptionPrice ?? this.subscriptionPrice,
+      availableQuantity: availableQuantity ?? this.availableQuantity,
+      lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+      rating: rating ?? this.rating,
+      reviews: reviews ?? this.reviews,
+      isOrganic: isOrganic ?? this.isOrganic,
+      isSubscribable: isSubscribable ?? this.isSubscribable,
+      isOneTime: isOneTime ?? this.isOneTime,
+      isOutOfStock: isOutOfStock ?? this.isOutOfStock,
+      isLowStock: isLowStock ?? this.isLowStock,
+      description: description ?? this.description,
+      highlights: highlights ?? this.highlights,
+      ingredients: ingredients ?? this.ingredients,
+      legalInfo: legalInfo ?? this.legalInfo,
+      badge: badge ?? this.badge,
+      badgeColor: badgeColor ?? this.badgeColor,
+      variants: variants ?? this.variants,
+      imageAsset: imageAsset ?? this.imageAsset,
+      images: images ?? this.images,
+    );
+  }
+
   /// Returns the variant name at all places
   String get displayName {
-    if (variantName != null && variantName!.trim().isNotEmpty) {
+    if (variantName != null &&
+        variantName!.trim().isNotEmpty &&
+        variantName!.trim().toLowerCase() != 'standard') {
       return variantName!.trim();
+    }
+    if (variants.isNotEmpty) {
+      final match = variants.where(
+        (v) => v.id == id || (unit.isNotEmpty && v.label == unit),
+      );
+      if (match.isNotEmpty) {
+        final v = match.first;
+        if (v.label.trim().isNotEmpty &&
+            v.label.trim().toLowerCase() != 'standard') {
+          return v.label.trim();
+        }
+      }
     }
     final raw = name.trim();
     if (raw.isNotEmpty) return raw;
@@ -288,6 +374,8 @@ class Product {
     return {
       'id': id,
       'name': name,
+      'variant_name': variantName,
+      'product_name': productName,
       'vendor': vendor,
       'unit': unit,
       'unit_value': unitValue,
@@ -338,7 +426,9 @@ class Product {
     final variantNameRaw = json['variant_name']?.toString() ?? json['variantName']?.toString();
     final nameRaw = json['name']?.toString();
     final productNameRaw = json['product_name']?.toString() ?? json['productName']?.toString();
-    final resolvedName = (variantNameRaw != null && variantNameRaw.trim().isNotEmpty)
+    final resolvedName = (variantNameRaw != null &&
+            variantNameRaw.trim().isNotEmpty &&
+            variantNameRaw.trim().toLowerCase() != 'standard')
         ? variantNameRaw.trim()
         : ((nameRaw != null && nameRaw.trim().isNotEmpty)
             ? nameRaw.trim()

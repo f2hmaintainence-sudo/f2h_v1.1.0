@@ -82,32 +82,10 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
               orElse: () => cp,
             );
             if (master.isOutOfStock || master.isLowStock) {
-              return Product(
-                id: cp.id,
-                name: cp.name,
-                vendor: cp.vendor,
-                unit: cp.unit,
-                category: cp.category,
-                emoji: cp.emoji,
-                price: cp.price,
-                originalPrice: cp.originalPrice,
-                subscriptionPrice: cp.subscriptionPrice,
-                rating: cp.rating,
-                reviews: cp.reviews,
-                isOrganic: cp.isOrganic,
-                isSubscribable: cp.isSubscribable,
+              return cp.copyWith(
                 isOneTime: master.isLowStock ? false : cp.isOneTime,
                 isOutOfStock: master.isOutOfStock || cp.isOutOfStock,
                 isLowStock: master.isLowStock || cp.isLowStock,
-                description: cp.description,
-                highlights: cp.highlights,
-                ingredients: cp.ingredients,
-                legalInfo: cp.legalInfo,
-                badge: cp.badge,
-                badgeColor: cp.badgeColor,
-                imageAsset: cp.imageAsset,
-                images: cp.images,
-                variants: cp.variants,
               );
             }
             return cp;

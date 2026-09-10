@@ -248,9 +248,15 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         localItems[key] = qty == 0 ? 1 : qty;
         localSubs[key] = isSub;
 
+        final resolvedTitle = item.variantName.isNotEmpty && item.variantName.toLowerCase() != 'standard'
+            ? item.variantName
+            : item.productName;
         localProducts[key] = Product(
           id: item.variantId,
-          name: item.productName,
+          name: resolvedTitle,
+          variantName: item.variantName.isNotEmpty ? item.variantName : null,
+          productName: item.productName.isNotEmpty ? item.productName : null,
+          productId: item.productId,
           vendor: 'Farm to Home',
           unit: item.variantName,
           category: 'General',

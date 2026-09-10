@@ -15,8 +15,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
     // Cache key is branch-specific so each branch's stock is stored separately
     final cacheKey = branchId != null && branchId.isNotEmpty
-        ? 'cached_products_v15_$branchId'
-        : 'cached_products_v15';
+        ? 'cached_products_v16_$branchId'
+        : 'cached_products_v16';
 
     // 1. Try to load from cache
     try {
@@ -55,7 +55,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
       final products = _mapRawProducts(rawList);
 
       if (products.isNotEmpty) {
-        final key = cacheKey ?? 'cached_products_v15';
+        final key = cacheKey ?? 'cached_products_v16';
         final encoded = jsonEncode(products.map((p) => p.toJson()).toList());
         await prefs.setString(key, encoded);
       }
@@ -170,11 +170,11 @@ class CatalogRepositoryImpl implements CatalogRepository {
       if (products.any((p) => p.id == variantId)) continue; // Avoid duplicate product cards
 
       final productId = item['product_id']?.toString() ?? variantId;
-      final rawProdName = item['product_name']?.toString()?.trim() ?? '';
-      final rawVarName = item['variant_name']?.toString()?.trim() ?? '';
-      final variantName = rawProdName.isNotEmpty
-          ? rawProdName
-          : (rawVarName.isNotEmpty ? rawVarName : 'Variant');
+      final rawProdName = item['product_name']?.toString().trim() ?? '';
+      final rawVarName = item['variant_name']?.toString().trim() ?? '';
+      final variantName = (rawVarName.isNotEmpty && rawVarName.toLowerCase() != 'standard')
+          ? rawVarName
+          : (rawProdName.isNotEmpty ? rawProdName : 'Variant');
       final unitValue = item['unit_value']?.toString() ?? '';
       final unitType = item['unit_type']?.toString() ?? '';
 
@@ -230,6 +230,10 @@ class CatalogRepositoryImpl implements CatalogRepository {
       products.add(Product(
         id: variantId, // Product card represents THIS variant!
         name: variantName.trim(), // Variant Name ONLY
+        variantName: rawVarName.isNotEmpty ? rawVarName : null,
+        productName: rawProdName.isNotEmpty ? rawProdName : null,
+        productId: productId.isNotEmpty ? productId : null,
+        categoryId: item['category_id']?.toString() ?? item['categoryId']?.toString(),
         vendor: vendor,
         unit: '',
         unitValue: unitValue.isNotEmpty ? unitValue : null,

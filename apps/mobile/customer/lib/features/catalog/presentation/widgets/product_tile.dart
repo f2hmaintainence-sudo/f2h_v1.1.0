@@ -1044,7 +1044,7 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
       CartItemEntity? matchedItem;
       try {
         matchedItem = items.firstWhere(
-          (item) => item.productId == widget.p.id,
+          (item) => item.productId == widget.p.id || item.variantId == widget.p.id,
         );
       } catch (_) {}
 
@@ -1073,7 +1073,7 @@ class ZeptoAddButtonState extends State<ZeptoAddButton>
       builder: (ctx, state) {
         final items = ctx.read<CartBloc>().currentItems;
         int qty = items
-            .where((item) => item.productId == widget.p.id)
+            .where((item) => item.productId == widget.p.id || item.variantId == widget.p.id)
             .fold(0, (sum, item) => sum + (item.purchaseType == 'subscription' ? 1 : (item.quantity ?? 1)));
 
         if (qty == 0) {
