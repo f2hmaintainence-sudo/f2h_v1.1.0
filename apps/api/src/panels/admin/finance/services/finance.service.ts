@@ -218,12 +218,7 @@ export class FinanceService {
       // confirm that a bill with this id exists.
       throw new NotFoundException(`Invoice receipt ${id} not found.`);
     }
-    data.company = company || {
-      name: 'F2H FRESH',
-      legal_name: 'MURALI',
-      gst_number: '29CXKPM2351R1ZN',
-      pan_number: 'CXKPM2351R',
-    };
+    data.company = company || null;
     return {
       status: true,
       data,
@@ -273,18 +268,15 @@ export class FinanceService {
     doc.rect(32, 28, 531, 62).fill('#064e3b'); // Dark Forest Emerald
 
     // Brand Name
-    const brandName = String(company?.name || 'F2H FRESH').toUpperCase();
-    const gstin = String(company?.gst_number || '29CXKPM2351R1ZN').trim();
-    const pan = String(company?.pan_number || 'CXKPM2351R').trim();
+    const brandName = String(company?.name || bill.company_name || 'F2H FRESH').trim().toUpperCase();
+    const gstin = String(company?.gst_number || '').trim();
 
     doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff').text(brandName, 46, 38);
     doc.font('Helvetica').fontSize(8.5).fillColor('#a7f3d0').text('Farm to Home Supply & Subscription Services', 46, 59);
 
-    const taxMetaParts: string[] = [];
-    if (gstin) taxMetaParts.push(`GSTIN: ${gstin}`);
-    if (pan) taxMetaParts.push(`PAN: ${pan}`);
-    const taxMeta = taxMetaParts.length > 0 ? taxMetaParts.join('  •  ') : 'GSTIN: 29CXKPM2351R1ZN  •  PAN: CXKPM2351R';
-    doc.font('Helvetica').fontSize(7.5).fillColor('#d1fae5').text(taxMeta, 46, 70);
+    if (gstin) {
+      doc.font('Helvetica').fontSize(8).fillColor('#d1fae5').text(`GSTIN: ${gstin}`, 46, 70);
+    }
 
     // Right Side: Tax Invoice Title
     doc.font('Helvetica-Bold').fontSize(14).fillColor('#ffffff').text('TAX INVOICE', 350, 40, { width: 200, align: 'right' });
@@ -399,14 +391,21 @@ export class FinanceService {
     doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a').text('TERMS & INSTRUCTIONS:', 42, currentY + 8);
     doc.font('Helvetica').fontSize(7.5).fillColor('#64748b');
     doc.text('• Farm fresh produce supplied in prime condition.', 42, currentY + 22, { width: 240 });
-    const supportPhone = String(company?.phone || '+91 91487 73591').trim();
-    doc.text(`• UPI ID: f2hfresh@icici  |  Phone: ${supportPhone}`, 42, currentY + 46, { width: 240 });
+    if (company?.phone) {
+      doc.text(`• Phone: ${String(company.phone).trim()}`, 42, currentY + 46, { width: 240 });
+    }
     doc.text('• Any discrepancy must be reported within 24 hours of delivery.', 42, currentY + 58, { width: 240 });
 
-    const officeAddr = company?.address
-      ? `${company.address}, ${company.city || ''} ${company.pincode || ''}`.trim()
-      : 'NO.11, SJP Layout, 1st Cross, Nagondahalli, Whitefield, Bengaluru 560066';
-    doc.font('Helvetica-Oblique').fontSize(6.8).fillColor('#94a3b8').text(`Reg. Office: ${officeAddr.length > 55 ? officeAddr.slice(0, 52) + '...' : officeAddr}`, 42, currentY + 76, { width: 240 });
+    const addrParts = [company?.address, company?.city, company?.pincode]
+      .filter(Boolean)
+      .map((s: any) => String(s).trim())
+      .filter((s: string) => s.length > 0);
+    if (addrParts.length > 0) {
+      const officeAddr = addrParts.join(', ');
+      doc.font('Helvetica-Oblique').fontSize(6.8).fillColor('#94a3b8').text(`Reg. Office: ${officeAddr.length > 55 ? officeAddr.slice(0, 52) + '...' : officeAddr}`, 42, currentY + 76, { width: 240 });
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(7).fillColor('#94a3b8').text('Thank you for choosing farm-fresh healthy living!', 42, currentY + 76, { width: 240 });
+    }
 
     // Right Box: Financial Summary
     doc.roundedRect(totalsX, currentY, totalsW, totalsH, 6).fillAndStroke('#f8fafc', '#cbd5e1');

@@ -1316,15 +1316,44 @@ export class FinanceRepository {
   }
 
   async getCompanyProfile(): Promise<any> {
-    const sql = `
-      SELECT name, legal_name, gst_number, pan_number, email, phone, 
-             secondary_phone, whatsapp, address, city, state, pincode, logo_url, website
-      FROM public.company_profile
-      ORDER BY created_at ASC NULLS LAST, id ASC
-      LIMIT 1
-    `;
-    const rows = await this.db.query(sql, []).catch(() => []);
-    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    try {
+      const [profileRows, settingRows] = await Promise.all([
+        this.db.query(
+          `SELECT id, name, legal_name, gst_number, pan_number, email, phone, 
+                  secondary_phone, whatsapp, address, city, state, pincode, logo_url, website
+           FROM public.company_profile
+           ORDER BY created_at ASC NULLS LAST, id ASC
+           LIMIT 1`
+        ).catch(() => []),
+        this.db.query(
+          `SELECT key, value FROM public.site_settings`
+        ).catch(() => []),
+      ]);
+
+      const profile = Array.isArray(profileRows) && profileRows.length > 0 ? profileRows[0] : {};
+      const settings: Record<string, string> = {};
+      if (Array.isArray(settingRows)) {
+        for (const row of settingRows) {
+          if (row?.key) settings[row.key] = row.value;
+        }
+      }
+
+      return {
+        name: profile.name || settings.company_name || settings.name || '',
+        legal_name: profile.legal_name || settings.legal_name || '',
+        gst_number: profile.gst_number || settings.gst_number || '',
+        email: profile.email || settings.email || '',
+        phone: profile.phone || settings.phone || '',
+        address: profile.address || settings.address || '',
+        city: profile.city || settings.city || '',
+        state: profile.state || settings.state || '',
+        pincode: profile.pincode || settings.pincode || '',
+        logo_url: profile.logo_url || settings.logo_url || '',
+        website: profile.website || settings.website || '',
+      };
+    } catch {
+      return null;
+    }
   }
 
   async getBranches(): Promise<any[]> {
