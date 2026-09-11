@@ -24,24 +24,20 @@ class ApiEndpoints {
   static const String _envBaseUrl = String.fromEnvironment('F2H_API_BASE_URL');
   static String get _devBaseUrl {
     if (kIsWeb) {
-      if (Uri.base.origin.isNotEmpty && !Uri.base.origin.startsWith('null')) {
-        return Uri.base.origin;
+      final host = Uri.base.host;
+      if (host == 'localhost' || host == '127.0.0.1' || Uri.base.origin.isEmpty || Uri.base.origin.startsWith('null')) {
+        return 'https://f2hfresh.com';
       }
-      return 'https://f2hfresh.com';
+      return Uri.base.origin;
     }
     if (kReleaseMode || _envBaseUrl.isEmpty) {
       return 'https://f2hfresh.com';
     }
-    return 'http://192.168.1.6:5001';
+    return 'http://localhost:5001';
   }
 
   /// Root host (scheme + host + port), no trailing slash or /api/v1 path.
   static String get host {
-    if (kIsWeb) {
-      if (Uri.base.origin.isNotEmpty && !Uri.base.origin.startsWith('null')) {
-        return Uri.base.origin;
-      }
-    }
     final raw = _envBaseUrl.isNotEmpty ? _envBaseUrl : _devBaseUrl;
     return raw.replaceAll(RegExp(r'/api(/v1)?/?$'), '').replaceAll(RegExp(r'/+$'), '');
   }
