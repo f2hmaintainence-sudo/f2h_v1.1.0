@@ -25,12 +25,12 @@ class ApiEndpoints {
     if (kIsWeb) {
       final host = Uri.base.host;
       if (host == 'localhost' || host == '127.0.0.1' || Uri.base.origin.isEmpty || Uri.base.origin.startsWith('null')) {
-        return 'https://f2hfresh.com';
+        return 'https://dev.f2hfresh.com';
       }
       return Uri.base.origin;
     }
     if (kReleaseMode || _envBaseUrl.isEmpty) {
-      return 'https://f2hfresh.com';
+      return 'https://dev.f2hfresh.com';
     }
     return 'http://localhost:5001';
   }

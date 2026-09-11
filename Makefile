@@ -1,6 +1,6 @@
 .PHONY: help customer partner customer-run customer-bg customer-attach partner-run partner-bg partner-attach api web build-customer build-partner build-all dev-all stop status run dev
 
-DART_API = https://f2hfresh.com
+DART_API = https://dev.f2hfresh.com
 
 help:
 	@echo ""
