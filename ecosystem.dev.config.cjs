@@ -7,7 +7,9 @@
  * Flutter web apps run separately via ./dev-flutter.sh
  */
 
-const MONOREPO = '/home/f2hfresh-dev/htdocs/dev.f2hfresh.com';
+const path = require('path');
+const MONOREPO = process.env.MONOREPO || path.resolve(__dirname);
+const LOG_DIR = process.env.PM2_LOG_DIR || path.resolve(MONOREPO, 'logs/pm2');
 
 module.exports = {
   apps: [
@@ -27,8 +29,8 @@ module.exports = {
         INTERNAL_API_URL: 'http://localhost:5001',
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
       },
-      out_file: '/home/f2hfresh-dev/logs/pm2/api-out.log',
-      error_file: '/home/f2hfresh-dev/logs/pm2/api-err.log',
+      out_file: `${LOG_DIR}/api-out.log`,
+      error_file: `${LOG_DIR}/api-err.log`,
       merge_logs: true,
       log_date_format: 'HH:mm:ss',
     },
@@ -49,8 +51,8 @@ module.exports = {
         INTERNAL_API_URL: 'http://localhost:5001',
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
       },
-      out_file: '/home/f2hfresh-dev/logs/pm2/frontend-out.log',
-      error_file: '/home/f2hfresh-dev/logs/pm2/frontend-err.log',
+      out_file: `${LOG_DIR}/frontend-out.log`,
+      error_file: `${LOG_DIR}/frontend-err.log`,
       merge_logs: true,
       log_date_format: 'HH:mm:ss',
     },
@@ -64,8 +66,8 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
       },
-      out_file: '/home/f2hfresh-dev/logs/pm2/broadcaster-out.log',
-      error_file: '/home/f2hfresh-dev/logs/pm2/broadcaster-err.log',
+      out_file: `${LOG_DIR}/broadcaster-out.log`,
+      error_file: `${LOG_DIR}/broadcaster-err.log`,
       merge_logs: true,
       log_date_format: 'HH:mm:ss',
     },
