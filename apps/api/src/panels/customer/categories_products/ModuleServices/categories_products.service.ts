@@ -531,4 +531,59 @@ export class CategoriesProductsService {
       return { status: false, data: [], message: 'Failed to load reviews' };
     }
   }
+
+  /**
+   * Check if a product or variant is active and not deleted.
+   */
+  async checkProductAvailability(productIdOrVariantId: string, warehouseId?: string | null) {
+    try {
+      if (!productIdOrVariantId) {
+        return { status: false, available: false, reason: 'missing_id' };
+      }
+
+      const rows = await this.db.query(
+        `SELECT pv.variant_id,
+                pv.product_id,
+                pv.name AS variant_name,
+                pv.price,
+                pv.status AS variant_status,
+                p.name AS product_name,
+                p.is_active AS product_is_active,
+                COALESCE(p.is_out_of_stock, false) AS is_out_of_stock
+           FROM product_variants pv
+           JOIN products p ON p.product_id = pv.product_id
+          WHERE (pv.variant_id = $1 OR pv.product_id = $1 OR p.product_id = $1)
+            AND pv.deleted_at IS NULL
+            AND p.deleted_at IS NULL
+            AND (pv.status = 'active' OR pv.status IS NULL)
+            AND (p.is_active = true OR p.is_active IS NULL)
+          LIMIT 1`,
+        [productIdOrVariantId],
+      );
+
+      if (!rows || rows.length === 0) {
+        return {
+          status: true,
+          available: false,
+          reason: 'deleted_or_inactive',
+        };
+      }
+
+      return {
+        status: true,
+        available: true,
+        data: {
+          variant_id: rows[0].variant_id,
+          product_id: rows[0].product_id,
+          name: rows[0].product_name || rows[0].variant_name,
+          price: rows[0].price,
+          is_out_of_stock: rows[0].is_out_of_stock,
+        },
+      };
+    } catch (e) {
+      console.error('Error in checkProductAvailability service:', e);
+      return { status: false, available: false, reason: 'internal_error' };
+    }
+  }
 }
+

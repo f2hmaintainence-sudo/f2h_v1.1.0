@@ -89,6 +89,7 @@ export class StockAvailabilityService {
               pv.name AS variant_name,
               p.name  AS product_name,
               ((pv.status = 'active' OR pv.status IS NULL)
+                AND pv.deleted_at IS NULL
                 AND (p.is_active = true OR p.is_active IS NULL)
                 AND p.deleted_at IS NULL) AS is_listable,
               CASE
@@ -172,6 +173,7 @@ export class StockAvailabilityService {
               COALESCE(sb.available_quantity, 0) AS available_quantity,
               COALESCE(p.is_out_of_stock, false) AS enforce_stock,
               ((pv.status = 'active' OR pv.status IS NULL)
+                AND pv.deleted_at IS NULL
                 AND (p.is_active = true OR p.is_active IS NULL)
                 AND p.deleted_at IS NULL) AS is_listable,
               CASE

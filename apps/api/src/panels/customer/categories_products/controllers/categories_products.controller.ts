@@ -336,4 +336,24 @@ export class CategoriesController {
   async getProductReviews(@Req() req: Request) {
     return this.service.getProductReviews(req.params.productId as string);
   }
+
+  /**
+   * Check if a product or variant is active and not deleted.
+   * GET /customer/products/:productId/availability
+   */
+  @Public()
+  @Get('products/:productId/availability')
+  async checkProductAvailability(
+    @Req() req: Request,
+    @Query('branch_id') branchId?: string,
+  ) {
+    const warehouseId = branchId
+      ? await this.service.resolveWarehouseId(branchId)
+      : null;
+    return this.service.checkProductAvailability(
+      req.params.productId as string,
+      warehouseId,
+    );
+  }
 }
+

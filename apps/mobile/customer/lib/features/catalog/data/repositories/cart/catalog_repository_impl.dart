@@ -338,4 +338,16 @@ class CatalogRepositoryImpl implements CatalogRepository {
       return [];
     }
   }
+
+  @override
+  Future<bool> checkProductAvailability(String productId, {String? branchId}) async {
+    try {
+      final res = await remoteDataSource.checkProductAvailability(productId, branchId: branchId);
+      return res['available'] == true;
+    } catch (e) {
+      print('Error checking product availability in repository: $e');
+      return false;
+    }
+  }
 }
+

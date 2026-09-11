@@ -184,8 +184,14 @@ export class CartService {
       }
     }
 
+    const validItems: any[] = [];
     for (const item of items) {
       const product = productsByVariantId[item.product_variant_id];
+      if (!product) {
+        // Product variant was deleted or inactive in DB; do not return it in cart
+        continue;
+      }
+      validItems.push(item);
 
       itemsSubtotal += this.calculateItemSubtotal(item, product);
 
@@ -210,6 +216,19 @@ export class CartService {
           is_one_time: product?.is_one_time,
         },
       });
+    }
+
+    // Auto-prune deleted or unreferenced items from the database carts table
+    if (validItems.length !== items.length) {
+      try {
+        await this.Data.update(
+          'carts',
+          { cart_data: JSON.stringify(validItems), updated_at: new Date() },
+          [{ column: 'user_id', operator: '=', value: userId }],
+        );
+      } catch (e) {
+        this.developer?.warn('[CartService] Failed to auto-prune deleted cart items', { error: e });
+      }
     }
 
     return {

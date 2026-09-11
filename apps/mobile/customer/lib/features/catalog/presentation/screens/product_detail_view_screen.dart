@@ -46,6 +46,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
   List<Map<String, dynamic>> _reviews = [];
   bool _isLoadingReviews = true;
+  bool _isServerUnavailable = false;
 
   @override
   void initState() {
@@ -62,6 +63,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
     _slideCtrl.forward();
     _loadReviews();
+    _checkLiveAvailability();
 
     final p = widget.product;
     final vars = p.allVariants;
@@ -76,6 +78,8 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
               originalPrice: p.originalPrice,
               subscriptionPrice: p.subscriptionPrice,
               availableQuantity: p.availableQuantity,
+              isOutOfStock: p.isOutOfStock,
+              isLowStock: p.isLowStock,
             ),
     );
   }
@@ -122,6 +126,21 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     }
   }
 
+  Future<void> _checkLiveAvailability() async {
+    try {
+      final repo = context.read<CatalogBloc>().catalogRepository;
+      final targetId = widget.product.productId?.isNotEmpty == true
+          ? widget.product.productId!
+          : widget.product.id;
+      final isAvail = await repo.checkProductAvailability(targetId);
+      if (!isAvail && mounted) {
+        setState(() {
+          _isServerUnavailable = true;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
@@ -133,11 +152,39 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.product;
-    final state = context.read<CatalogBloc>().state;
+    final catState = context.watch<CatalogBloc>().state;
+    Product p = widget.product;
+    bool isUnavailable = _isServerUnavailable;
     List<Product> allProducts = [];
-    if (state is CatalogLoaded) {
-      allProducts = state.products;
+
+    if (catState is CatalogLoaded) {
+      allProducts = catState.products;
+      Product? liveMatch;
+      for (final cp in allProducts) {
+        if (cp.id == widget.product.id ||
+            (widget.product.productId != null && cp.id == widget.product.productId) ||
+            cp.variants.any((v) => v.id == widget.product.id || v.id == _selectedVariant.id)) {
+          liveMatch = cp;
+          break;
+        }
+      }
+      if (liveMatch != null) {
+        p = liveMatch;
+        if (p.allVariants.isNotEmpty && !p.allVariants.any((v) => v.id == _selectedVariant.id)) {
+          _selectedVariant = p.allVariants.firstWhere(
+            (v) => v.label == _selectedVariant.label || v.label == p.unit || v.id == p.id,
+            orElse: () => p.allVariants.first,
+          );
+        }
+      } else {
+        isUnavailable = true;
+      }
+    } else if (p.isOutOfStock || p.name.trim().toLowerCase() == 'product') {
+      isUnavailable = true;
+    }
+
+    if (_isServerUnavailable) {
+      isUnavailable = true;
     }
 
     final related = allProducts
@@ -373,7 +420,8 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ],
                         ),
                       ],
-                      if (_selectedVariant.isOutOfStock ||
+                      if (isUnavailable ||
+                          _selectedVariant.isOutOfStock ||
                           _selectedVariant.isLowStock ||
                           (_selectedVariant.id == p.id &&
                               (p.isLowStock || p.isOutOfStock))) ...[
@@ -400,9 +448,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                p.isOutOfStock
-                                    ? 'OUT OF STOCK'
-                                    : 'LOW STOCK — One-Time Order Unavailable',
+                                isUnavailable
+                                    ? 'PRODUCT NO LONGER AVAILABLE'
+                                    : (p.isOutOfStock
+                                        ? 'OUT OF STOCK'
+                                        : 'LOW STOCK — One-Time Order Unavailable'),
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -640,11 +690,11 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                       // 1. ADD TO CART Button (Full Screen Width)
                       SizedBox(
                         width: double.infinity,
-                        child: _buildAddButton(p),
+                        child: _buildAddButton(p, isUnavailable),
                       ),
 
                       // 2. Subscription section (Full Screen Width Subscription Button)
-                      if (p.hasSubscription) ...[
+                      if (!isUnavailable && p.hasSubscription) ...[
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
@@ -1156,9 +1206,37 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
 
 
 
-  Widget _buildAddButton(Product p) {
+  Widget _buildAddButton(Product p, bool isUnavailable) {
     return BlocBuilder<CartBloc, CartState>(
       builder: (ctx, state) {
+        if (isUnavailable) {
+          return SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE0E0E0),
+                foregroundColor: const Color(0xFF757575),
+                disabledBackgroundColor: const Color(0xFFE0E0E0),
+                disabledForegroundColor: const Color(0xFF757575),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'ITEM UNAVAILABLE',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          );
+        }
+
         // Delivery slot windows and cutoffs are configured in the admin panel;
         // the helpers' built-in defaults sit hours away from them, so the
         // session values are threaded through every stamp below.
@@ -1178,6 +1256,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         final maxStock = _selectedVariant.maxStock;
 
         void dispatchAdd() {
+          if (isUnavailable) {
+            F2HToast.error(context, 'This product is no longer available');
+            return;
+          }
           if (qty + 1 > maxStock) {
             F2HToast.error(context, 'Only $maxStock unit(s) available in stock');
             return;

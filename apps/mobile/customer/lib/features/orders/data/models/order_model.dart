@@ -76,6 +76,8 @@ class Order {
   final List<OrderItem> items;
   final int? rating;
   final String? ratingFeedback;
+  final bool? isCancellable;
+  final String? cancellationMessage;
 
   const Order({
     required this.id,
@@ -103,6 +105,8 @@ class Order {
     this.items = const [],
     this.rating,
     this.ratingFeedback,
+    this.isCancellable,
+    this.cancellationMessage,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -216,6 +220,10 @@ class Order {
       items: items,
       rating: json['rating'] != null ? int.tryParse(json['rating'].toString()) : null,
       ratingFeedback: json['rating_feedback']?.toString(),
+      isCancellable: json['is_cancellable'] == null
+          ? null
+          : (json['is_cancellable'] == true || json['is_cancellable'].toString() == 'true'),
+      cancellationMessage: json['cancellation_message']?.toString(),
     );
   }
 }

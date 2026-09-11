@@ -6,4 +6,5 @@ abstract class CatalogRepository {
   Future<List<Map<String, dynamic>>> getCategories();
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
   Future<List<Map<String, dynamic>>> getProductReviews(String productId);
+  Future<bool> checkProductAvailability(String productId, {String? branchId});
 }

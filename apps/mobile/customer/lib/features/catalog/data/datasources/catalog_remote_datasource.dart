@@ -7,6 +7,7 @@ abstract class CatalogRemoteDataSource {
   Future<List<dynamic>> getCategories();
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
   Future<List<dynamic>> getProductReviews(String productId);
+  Future<Map<String, dynamic>> checkProductAvailability(String productId, {String? branchId});
 }
 
 class CatalogRemoteDataSourceImpl implements CatalogRemoteDataSource {
@@ -76,6 +77,24 @@ class CatalogRemoteDataSourceImpl implements CatalogRemoteDataSource {
     } catch (e) {
       print('Error fetching product reviews in remote datasource: $e');
       return [];
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> checkProductAvailability(String productId, {String? branchId}) async {
+    try {
+      final base = '${ApiEndpoints.products}/$productId/availability';
+      final url = (branchId != null && branchId.isNotEmpty)
+          ? '$base?branch_id=${Uri.encodeComponent(branchId)}'
+          : base;
+      final response = await dioClient.dio.get(url);
+      if (response.data != null && response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'available': false};
+    } catch (e) {
+      print('Error checking product availability in remote datasource: $e');
+      return {'available': false};
     }
   }
 }

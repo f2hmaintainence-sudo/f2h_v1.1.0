@@ -181,6 +181,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   bool _canCancelOrder(Order order) {
+    // If backend API provided dynamic cancellation eligibility, use it directly
+    if (order.isCancellable != null) {
+      return order.isCancellable!;
+    }
+
     // Only one-time orders
     if (order.orderSource.toLowerCase() == 'subscription') {
       return false;
@@ -194,39 +199,57 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     try {
       final now = DateTime.now();
       final deliveryDate = DateTime.parse(order.scheduledDate);
-      
-      DateTime freezeTime;
+      final isEvening = order.deliverySlot.toLowerCase() == 'evening';
 
-      if (order.deliverySlot.toLowerCase() == 'evening') {
-        // Same day 11:55 AM
-        freezeTime = DateTime(
-          deliveryDate.year,
-          deliveryDate.month,
-          deliveryDate.day,
-          11,
-          55,
-        );
-      } else {
-        // Previous day 11:55 PM
-        freezeTime = DateTime(
-          deliveryDate.year,
-          deliveryDate.month,
-          deliveryDate.day,
-        ).subtract(const Duration(minutes: 5));
-      }
+      // Dynamically resolve Customer Order Cutoff Time from sessionState.slotTimings
+      final sessionState = context.read<CustomerSessionCubit>().state;
+      final slotTimings = sessionState.slotTimings;
+      final slotConfig = (isEvening ? slotTimings['evening_slot'] : slotTimings['morning_slot']) as Map?;
 
-      return now.isBefore(freezeTime);
+      final cutoffTimeStr = slotConfig?['customer_cutoff_time']?.toString() ??
+          (isEvening
+              ? (slotTimings['evening_cutoff_time']?.toString() ?? '14:00')
+              : (slotTimings['morning_cutoff_time']?.toString() ?? '20:00'));
+      final dayOffset = int.tryParse(slotConfig?['customer_cutoff_day_offset']?.toString() ?? '') ??
+          (isEvening ? 0 : -1);
+
+      final parts = cutoffTimeStr.split(':');
+      final cutoffHour = int.tryParse(parts[0]) ?? (isEvening ? 14 : 20);
+      final cutoffMinute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+
+      final targetDate = deliveryDate.add(Duration(days: dayOffset));
+      final cutoffTime = DateTime(
+        targetDate.year,
+        targetDate.month,
+        targetDate.day,
+        cutoffHour,
+        cutoffMinute,
+      );
+
+      return now.isBefore(cutoffTime);
     } catch (_) {
       return false;
     }
   }
 
   String _getFreezeTimeMessage(Order order) {
-    if (order.deliverySlot.toLowerCase() == 'evening') {
-      return 'Evening deliveries freeze at 11:55 AM on delivery day.';
-    } else {
-      return 'Morning deliveries freeze at 11:55 PM on the night before delivery.';
+    if (order.cancellationMessage != null && order.cancellationMessage!.isNotEmpty) {
+      return order.cancellationMessage!;
     }
+
+    final isEvening = order.deliverySlot.toLowerCase() == 'evening';
+    final sessionState = context.read<CustomerSessionCubit>().state;
+    final slotTimings = sessionState.slotTimings;
+    final slotConfig = (isEvening ? slotTimings['evening_slot'] : slotTimings['morning_slot']) as Map?;
+    final desc = slotConfig?['customer_cutoff_description']?.toString();
+
+    if (desc != null && desc.isNotEmpty) {
+      return '${isEvening ? "Evening" : "Morning"} deliveries cutoff at $desc.';
+    }
+
+    return isEvening
+        ? 'Evening deliveries cutoff at 2:00 PM on delivery day.'
+        : 'Morning deliveries cutoff at 8:00 PM on the night before delivery.';
   }
 
   void _submitRating() {
@@ -485,25 +508,27 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       Product? liveProduct;
                       if (catState is CatalogLoaded) {
                         for (final cp in catState.products) {
-                          if (cp.id == item.variantId ||
+                          if ((item.productId.isNotEmpty && cp.id == item.productId) ||
+                              cp.id == item.variantId ||
                               cp.variants.any((v) => v.id == item.variantId)) {
                             liveProduct = cp;
                             break;
                           }
                         }
                       }
-                      final product = liveProduct ??
-                          getProductById(
-                            item.variantId,
-                            name: item.productName,
-                            variantName: item.variantName,
-                            price: item.unitPrice,
-                          );
+                      if (liveProduct == null) {
+                        F2HToast.error(
+                          context,
+                          'This product is no longer available in the catalog',
+                          title: 'Item Unavailable',
+                        );
+                        return;
+                      }
                       Navigator.push(
                         context,
                         PageRouteBuilder(
                           pageBuilder: (_, a, _) =>
-                              ProductDetailViewScreen(product: product),
+                              ProductDetailViewScreen(product: liveProduct!),
                           transitionsBuilder: (_, a, _, child) =>
                               FadeTransition(opacity: a, child: child),
                           transitionDuration: const Duration(milliseconds: 220),
@@ -730,7 +755,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'This order cannot be cancelled as it is past the freeze time.\n${_getFreezeTimeMessage(order)}',
+                    _getFreezeTimeMessage(order),
                     style: const TextStyle(fontSize: 11, color: kRed, fontWeight: FontWeight.w600, height: 1.4),
                   ),
                 ),

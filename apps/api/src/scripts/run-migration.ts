@@ -135,7 +135,12 @@ async function main() {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await client.query(sql);
+        // Strip psql meta-commands (e.g. \restrict, \unrestrict) that standard SQL engines cannot parse
+        const executableSql = sql
+          .split('\n')
+          .map((line) => (line.trimStart().startsWith('\\') ? `-- ${line}` : line))
+          .join('\n');
+        await client.query(executableSql);
         await client.query(
           `INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)`,
           [filename, checksum],

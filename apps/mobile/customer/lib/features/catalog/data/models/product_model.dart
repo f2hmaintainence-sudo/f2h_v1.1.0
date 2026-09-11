@@ -737,11 +737,11 @@ Product getProductById(
   double? price,
   double? subscriptionPrice,
   String? imageAsset,
-  bool isSubscribable = true,
+  bool isSubscribable = false,
   bool isOneTime = true,
   // Callers that can resolve the real catalog row should pass these; the
   // defaults only mean "unknown", and an unknown must never re-enable Add.
-  bool isOutOfStock = false,
+  bool isOutOfStock = true,
   bool isLowStock = false,
 }) {
   final cleanUnit = variantName != null ? formatUnitName(variantName) : 'Unit';

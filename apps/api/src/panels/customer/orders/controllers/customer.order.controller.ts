@@ -139,18 +139,38 @@ export class CustomerOrderController {
         itemsByOrder.set(mappedItem.order_id, list);
       }
 
-      // Build formatted orders (in-memory only, no more DB calls)
-      const formattedOrders = orders.map((order: any) => {
-        const items = itemsByOrder.get(order.order_id) ?? [];
-        // Support legacy order-level rating fallback by looking at the first item's rating
-        const firstItemWithRating = items.find((i: any) => i.rating !== null);
-        return {
-          ...order,
-          items,
-          rating: firstItemWithRating ? Number(firstItemWithRating.rating) : null,
-          rating_feedback: firstItemWithRating?.rating_feedback ?? null,
-        };
-      });
+      // Build formatted orders with dynamic cancellation eligibility
+      let slotTimingsConfig: any = null;
+      try {
+        const rows = await this.db.query(
+          `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+        );
+        slotTimingsConfig = rows?.[0]?.config_data;
+        if (typeof slotTimingsConfig === 'string') {
+          try {
+            slotTimingsConfig = JSON.parse(slotTimingsConfig);
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      const formattedOrders = await Promise.all(
+        orders.map(async (order: any) => {
+          const items = itemsByOrder.get(order.order_id) ?? [];
+          // Support legacy order-level rating fallback by looking at the first item's rating
+          const firstItemWithRating = items.find((i: any) => i.rating !== null);
+          const eligibility = await this.evaluateOrderCancellation(order, slotTimingsConfig);
+          return {
+            ...order,
+            items,
+            is_cancellable: eligibility.isCancellable,
+            cancellation_message: eligibility.cancellationMessage,
+            cancellation_cutoff_time: eligibility.cutoffTime?.toISOString(),
+            cancellation_cutoff_description: eligibility.cutoffDescription,
+            rating: firstItemWithRating ? Number(firstItemWithRating.rating) : null,
+            rating_feedback: firstItemWithRating?.rating_feedback ?? null,
+          };
+        }),
+      );
 
       // ── Query 4: Subscriptions + items + product name in one JOIN ─────────
       const [subRows]: any = await conn.query(
@@ -571,9 +591,18 @@ export class CustomerOrderController {
 
       const firstItemWithRating = enrichedItems.find((i: any) => i.rating !== null);
 
+      const eligibility = await this.evaluateOrderCancellation(order);
+      const enrichedOrder = {
+        ...order,
+        is_cancellable: eligibility.isCancellable,
+        cancellation_message: eligibility.cancellationMessage,
+        cancellation_cutoff_time: eligibility.cutoffTime?.toISOString(),
+        cancellation_cutoff_description: eligibility.cutoffDescription,
+      };
+
       return {
         status: true,
-        order,
+        order: enrichedOrder,
         items: enrichedItems,
         feedback: firstItemWithRating
           ? {
@@ -624,95 +653,13 @@ export class CustomerOrderController {
       throw new BadRequestException('Order not found');
     }
 
-    // 3. Only one-time / non-subscription pending orders can be cancelled
-    if (order.order_source === 'subscription') {
-      throw new BadRequestException('Subscription orders cannot be cancelled individually');
-    }
-    if (!['pending', 'placed'].includes(order.status?.toLowerCase())) {
-      throw new BadRequestException(`Order cannot be cancelled: status is '${order.status}'`);
-    }
-
-    // 4. Freeze time check: dynamically fetch Delivery Run Generation Cron Time from system_configurations
-    let slotTimingsConfig: any = null;
-    try {
-      const rows = await this.db.query(
-        `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
-      );
-      if (rows?.[0]?.config_data) {
-        slotTimingsConfig = rows[0].config_data;
-      }
-    } catch (err) {
-      this.logger.warn(`Failed to fetch slot_timings from system_configurations: ${err}`);
-    }
-
-    const isEvening = order.delivery_slot?.toLowerCase() === 'evening';
-    const slotConfig = isEvening ? slotTimingsConfig?.evening_slot : slotTimingsConfig?.morning_slot;
-
-    // Delivery Run Generation Cron Time from system_configurations with fallback
-    const fallbackCronTime = isEvening
-      ? (process.env.E_FREEZE || '14:30')
-      : (process.env.M_FREEZE || '20:30');
-    const cronTimeStr = slotConfig?.cron_run_time || fallbackCronTime;
-
-    const parseTimeOrCron = (timeStr?: string, defaultHour = 20, defaultMinute = 30) => {
-      if (!timeStr || typeof timeStr !== 'string') {
-        return { hour: defaultHour, minute: defaultMinute };
-      }
-      const trimmed = timeStr.trim();
-      if (trimmed.includes(':')) {
-        const parts = trimmed.split(':');
-        const hour = parseInt(parts[0], 10);
-        const minute = parseInt(parts[1], 10);
-        return {
-          hour: isNaN(hour) ? defaultHour : hour,
-          minute: isNaN(minute) ? defaultMinute : minute,
-        };
-      }
-      const parts = trimmed.split(/\s+/);
-      if (parts.length >= 6) {
-        const minute = parseInt(parts[1], 10);
-        const hour = parseInt(parts[2], 10);
-        return {
-          hour: isNaN(hour) ? defaultHour : hour,
-          minute: isNaN(minute) ? defaultMinute : minute,
-        };
-      }
-      if (parts.length >= 2) {
-        const minute = parseInt(parts[0], 10);
-        const hour = parseInt(parts[1], 10);
-        return {
-          hour: isNaN(hour) ? defaultHour : hour,
-          minute: isNaN(minute) ? defaultMinute : minute,
-        };
-      }
-      return { hour: defaultHour, minute: defaultMinute };
-    };
-
-    const { hour, minute } = parseTimeOrCron(
-      cronTimeStr,
-      isEvening ? 14 : 20,
-      isEvening ? 30 : 30,
-    );
-
-    // Day offset: morning defaults to -1 (previous day D-1), evening defaults to 0 (same day D)
-    const dayOffset = typeof slotConfig?.cron_run_day_offset === 'number'
-      ? slotConfig.cron_run_day_offset
-      : (isEvening ? 0 : -1);
-
-    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-
-    const dateStr = typeof order.scheduled_date === 'string'
-      ? order.scheduled_date.split('T')[0]
-      : new Date(order.scheduled_date).toISOString().split('T')[0];
-    const [y, m, d] = dateStr.split('-').map(Number);
-
-    const freezeLimit = new Date(y, m - 1, d + dayOffset, hour, minute, 0);
-
-    if (nowIst.getTime() >= freezeLimit.getTime()) {
+    // 3. Dynamic cancellation eligibility check based on Customer Order Cutoff Time from system_configurations
+    const eligibility = await this.evaluateOrderCancellation(order);
+    if (!eligibility.isCancellable) {
       throw new BadRequestException({
-        message: 'Order cannot be cancelled — past dispatch freeze time.',
-        current_time: nowIst,
-        freeze_time: freezeLimit,
+        status: false,
+        message: eligibility.cancellationMessage,
+        cutoff_time: eligibility.cutoffTime,
         slot: order.delivery_slot,
         scheduled_date: order.scheduled_date,
       });
@@ -1034,6 +981,142 @@ export class CustomerOrderController {
       },
       stops_away: stopsAway,
       eta_minutes: etaMinutes,
+    };
+  }
+
+  /**
+   * Evaluates whether a customer order can be cancelled based on:
+   * 1. Order source (subscription orders cannot be cancelled individually)
+   * 2. Order status (only pending / placed orders)
+   * 3. Customer Order Cutoff Time dynamically fetched from system_configurations.slot_timings table
+   * 4. Scheduled delivery date & slot delivery window (if crossed, cannot cancel)
+   */
+  private async evaluateOrderCancellation(
+    order: any,
+    cachedSlotTimings?: any,
+  ): Promise<{
+    isCancellable: boolean;
+    cancellationMessage: string;
+    cutoffTime?: Date;
+    cutoffDescription?: string;
+  }> {
+    if (!order) {
+      return { isCancellable: false, cancellationMessage: 'Order not found.' };
+    }
+
+    // 1. Subscription orders cannot be cancelled individually
+    if (order.order_source === 'subscription') {
+      return {
+        isCancellable: false,
+        cancellationMessage: 'Subscription orders cannot be cancelled individually.',
+      };
+    }
+
+    // 2. Only pending or placed orders can be cancelled
+    const status = (order.status || '').toLowerCase();
+    if (!['pending', 'placed'].includes(status)) {
+      return {
+        isCancellable: false,
+        cancellationMessage: `Order cannot be cancelled: status is '${order.status}'.`,
+      };
+    }
+
+    // 3. Dynamic Customer Order Cutoff Time from system_configurations (NO HARDCODING)
+    let slotTimings = cachedSlotTimings;
+    if (!slotTimings) {
+      try {
+        const rows = await this.db.query(
+          `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
+        );
+        slotTimings = rows?.[0]?.config_data;
+      } catch (err) {
+        this.logger.warn(`Failed to fetch slot_timings from system_configurations: ${err}`);
+      }
+    }
+
+    if (typeof slotTimings === 'string') {
+      try {
+        slotTimings = JSON.parse(slotTimings);
+      } catch (_) {}
+    }
+
+    const isEvening = (order.delivery_slot || '').toLowerCase() === 'evening';
+    const slotConfig = isEvening ? slotTimings?.evening_slot : slotTimings?.morning_slot;
+    const slotName = slotConfig?.slot_name || (isEvening ? 'Evening' : 'Morning');
+
+    // Customer Order Cutoff Time strictly from system_configurations
+    const cutoffTimeStr = slotConfig?.customer_cutoff_time || (isEvening ? '14:00' : '20:00');
+    const dayOffset = typeof slotConfig?.customer_cutoff_day_offset === 'number'
+      ? slotConfig.customer_cutoff_day_offset
+      : (isEvening ? 0 : -1);
+
+    // Format 24h time string (HH:mm) to 12h AM/PM representation dynamically
+    const format12h = (time24?: string) => {
+      if (!time24) return '';
+      const [hStr, mStr] = time24.split(':');
+      let h = parseInt(hStr, 10) || 0;
+      const m = parseInt(mStr, 10) || 0;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+    };
+
+    const dynamicCutoffDesc = `${format12h(cutoffTimeStr)} ${dayOffset === 0 ? 'on delivery day' : 'on the night before delivery'}`;
+    const cutoffDescription = slotConfig?.customer_cutoff_description || dynamicCutoffDesc;
+
+    const [hourPart, minPart] = cutoffTimeStr.split(':');
+    const cutoffHour = parseInt(hourPart, 10) || 0;
+    const cutoffMin = parseInt(minPart, 10) || 0;
+
+    // Parse scheduled date
+    const dateStr = typeof order.scheduled_date === 'string'
+      ? order.scheduled_date.split('T')[0]
+      : new Date(order.scheduled_date).toISOString().split('T')[0];
+    const [y, m, d] = dateStr.split('-').map(Number);
+
+    // Calculate cutoff datetime in IST (+05:30)
+    const cutoffTargetDate = new Date(Date.UTC(y, m - 1, d + dayOffset));
+    const cYear = cutoffTargetDate.getUTCFullYear();
+    const cMonth = String(cutoffTargetDate.getUTCMonth() + 1).padStart(2, '0');
+    const cDay = String(cutoffTargetDate.getUTCDate()).padStart(2, '0');
+    const cHour = String(cutoffHour).padStart(2, '0');
+    const cMinute = String(cutoffMin).padStart(2, '0');
+
+    const cutoffIsoString = `${cYear}-${cMonth}-${cDay}T${cHour}:${cMinute}:00+05:30`;
+    const cutoffLimit = new Date(cutoffIsoString);
+    const now = new Date();
+
+    // Check if current time has crossed the Customer Order Cutoff Time
+    if (now.getTime() >= cutoffLimit.getTime()) {
+      return {
+        isCancellable: false,
+        cancellationMessage: `This order cannot be cancelled as it is past the cutoff time. ${slotName} deliveries cutoff at ${cutoffDescription}.`,
+        cutoffTime: cutoffLimit,
+        cutoffDescription,
+      };
+    }
+
+    // Check if order delivery window has already started or passed
+    const windowStartStr = slotConfig?.delivery_window_start || (isEvening ? '17:00' : '06:00');
+    const [wHour, wMin] = windowStartStr.split(':').map(Number);
+    const windowIsoString = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(wHour).padStart(2, '0')}:${String(wMin || 0).padStart(2, '0')}:00+05:30`;
+    const deliveryWindowStart = new Date(windowIsoString);
+
+    if (now.getTime() >= deliveryWindowStart.getTime()) {
+      return {
+        isCancellable: false,
+        cancellationMessage: 'This order cannot be cancelled as the delivery window has already started.',
+        cutoffTime: deliveryWindowStart,
+        cutoffDescription: 'Delivery window started',
+      };
+    }
+
+    return {
+      isCancellable: true,
+      cancellationMessage: `${slotName} deliveries can be cancelled before ${cutoffDescription}.`,
+      cutoffTime: cutoffLimit,
+      cutoffDescription,
     };
   }
 }

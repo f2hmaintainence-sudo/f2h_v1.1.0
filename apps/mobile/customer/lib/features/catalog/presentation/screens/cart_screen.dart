@@ -615,9 +615,15 @@ class _CartScreenState extends State<CartScreen> {
                 // knows nothing about stock, so look the variant up in the
                 // catalog and carry its real flags across. Without this the
                 // cart shows a sold-out line as freshly addable.
+                final catState = context.read<CatalogBloc>().state;
+                final isCatLoaded = catState is CatalogLoaded;
                 final catalogMatch = _findCatalogVariant(context, matchedItem.variantId);
                 final catalogProduct = _findCatalogProduct(context, matchedItem.variantId, productId: matchedItem.productId);
-                final isOos = (catalogMatch?.isOutOfStock == true) ||
+                final isMissingFromCatalog = (isCatLoaded && catalogMatch == null && catalogProduct == null) ||
+                    getEffectivePrice(matchedItem) <= 0 ||
+                    (matchedItem.productName.trim().toLowerCase() == 'product' && catalogMatch == null);
+                final isOos = isMissingFromCatalog ||
+                    (catalogMatch?.isOutOfStock == true) ||
                     (catalogProduct?.isOutOfStock == true) ||
                     (catalogMatch != null && catalogMatch.maxStock == 0);
                 final isLow = !isOos && ((catalogMatch?.isLowStock == true) || (catalogProduct?.isLowStock == true));
@@ -671,9 +677,11 @@ class _CartScreenState extends State<CartScreen> {
 
     for (final item in filteredItems) {
       final key = '${item.variantId}_once';
+      final catLoaded = context.read<CatalogBloc>().state is CatalogLoaded;
       final v = _findCatalogVariant(context, item.variantId);
       final prod = _findCatalogProduct(context, item.variantId, productId: item.productId);
-      final isOos = (v?.isOutOfStock == true) || (prod?.isOutOfStock == true) || (v != null && v.maxStock == 0);
+      final isMissing = catLoaded && v == null && prod == null;
+      final isOos = isMissing || (v?.isOutOfStock == true) || (prod?.isOutOfStock == true) || (v != null && v.maxStock == 0);
 
       if (!isOos && (_selectedItems[key] ?? true)) {
         final price = getEffectivePrice(item);
@@ -876,9 +884,11 @@ class _CartScreenState extends State<CartScreen> {
                         item = filteredItems.firstWhere((it) => '${it.variantId}_once' == k || it.variantId == k);
                       } catch (_) {}
                       if (item == null) return false;
+                      final catLoaded = context.read<CatalogBloc>().state is CatalogLoaded;
                       final v = _findCatalogVariant(context, item.variantId);
                       final prod = _findCatalogProduct(context, item.variantId, productId: item.productId);
-                      final isOos = (v?.isOutOfStock == true) || (prod?.isOutOfStock == true) || (v != null && v.maxStock == 0);
+                      final isMissing = catLoaded && v == null && prod == null;
+                      final isOos = isMissing || (v?.isOutOfStock == true) || (prod?.isOutOfStock == true) || (v != null && v.maxStock == 0);
                       if (isOos) return false;
                       return _selectedItems[k] ?? true;
                     }).toList();
@@ -1394,9 +1404,17 @@ class _CartItemTileState extends State<_CartItemTile> {
     final p = widget.product;
     final displayPrice = p.price;
     final effectiveQty = widget.baseQty;
+    final catState = context.read<CatalogBloc>().state;
+    final isCatLoaded = catState is CatalogLoaded;
     final matchedVar = p.allVariants.where((v) => v.id == (widget.cartItem?.variantId ?? p.id)).firstOrNull;
+    final hasCatalogItem = isCatLoaded
+        ? (catState.products.any((cp) =>
+            cp.id == (widget.cartItem?.productId ?? p.id) ||
+            cp.variants.any((v) => v.id == (widget.cartItem?.variantId ?? p.id))))
+        : !p.isOutOfStock;
+    final isMissingFromCatalog = !hasCatalogItem || displayPrice <= 0 || (p.name.trim().toLowerCase() == 'product' && !hasCatalogItem);
     final maxStock = matchedVar?.maxStock ?? p.maxStock;
-    final isOutOfStock = p.isOutOfStock || (matchedVar != null && matchedVar.isOutOfStock) || maxStock == 0;
+    final isOutOfStock = isMissingFromCatalog || p.isOutOfStock || (matchedVar != null && matchedVar.isOutOfStock) || maxStock == 0;
     final isLowStock = !isOutOfStock && (p.isLowStock || (matchedVar != null && matchedVar.isLowStock));
     final isExceededStock = !isOutOfStock && effectiveQty > maxStock;
 
@@ -1422,6 +1440,14 @@ class _CartItemTileState extends State<_CartItemTile> {
           const SizedBox(width: 2),
           GestureDetector(
             onTap: () {
+              if (isMissingFromCatalog) {
+                F2HToast.error(
+                  context,
+                  'This product is no longer available in the catalog',
+                  title: 'Item Unavailable',
+                );
+                return;
+              }
               Product fullProduct = p;
               final catState = context.read<CatalogBloc>().state;
               if (catState is CatalogLoaded) {
@@ -1502,14 +1528,14 @@ class _CartItemTileState extends State<_CartItemTile> {
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(color: const Color(0xFFFCA5A5)),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFFDC2626)),
-                                  SizedBox(width: 3),
+                                  const Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFFDC2626)),
+                                  const SizedBox(width: 3),
                                   Text(
-                                    'Out of Stock',
-                                    style: TextStyle(
+                                    isMissingFromCatalog ? 'Unavailable' : 'Out of Stock',
+                                    style: const TextStyle(
                                       color: Color(0xFFDC2626),
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,

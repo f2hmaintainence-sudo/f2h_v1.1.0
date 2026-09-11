@@ -91,7 +91,7 @@ sudo -u postgres psql -d "$TARGET_DB" -c "
 
 echo "4/4 Applying v1.1.0 forward migrations to $TARGET_DB..."
 cd "$ROOT_DIR"
-DB_DATABASE="$TARGET_DB" npm run db:migrate:apply
+DB_DATABASE="$TARGET_DB" npm --workspace=apps/api run db:migrate:apply -- --baseline=020-add-playstore-oauth-client-id.sql
 
 # Restart dev API if running
 if command -v pm2 >/dev/null 2>&1; then

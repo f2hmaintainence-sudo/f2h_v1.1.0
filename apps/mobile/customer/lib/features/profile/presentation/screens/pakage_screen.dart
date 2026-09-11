@@ -219,23 +219,103 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
       );
     }
 
+    final totalBalance = balances.fold<int>(0, (sum, e) => sum + e.balanceQuantity);
+    final totalIssued = balances.fold<int>(0, (sum, e) => sum + e.issuedQuantity);
+    final totalReturned = balances.fold<int>(0, (sum, e) => sum + e.returnedQuantity);
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.all(16),
       children: [
+        // Total Containers Card
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              colors: [
+                kPrimary,
+                kPrimaryMid,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: kPrimary.withValues(alpha: 0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.inventory_2_outlined,
+                color: Colors.white,
+                size: 44,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Total Containers Held',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '$totalBalance',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 40,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Summary Row
+        Row(
+          children: [
+            Expanded(
+              child: _summaryCard(
+                'Issued',
+                '$totalIssued',
+                Icons.outbox_outlined,
+                const Color(0xFFFFF3E0),
+                const Color(0xFFE65100),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _summaryCard(
+                'Returned',
+                '$totalReturned',
+                Icons.assignment_return_outlined,
+                const Color(0xFFE8F5E9),
+                const Color(0xFF2E7D32),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
         const Text(
-          'Container Insights',
+          'Container Details',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
             color: kText,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Breakdown by container type',
-          style: TextStyle(fontSize: 12.5, color: kTextSub),
-        ),
-        const SizedBox(height: 16),
+
+        const SizedBox(height: 12),
 
         ...balances.map(
           (item) => _containerCard(
@@ -251,8 +331,59 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
     );
   }
 
-
-
+  static Widget _summaryCard(
+    String title,
+    String value,
+    IconData icon,
+    Color bg,
+    Color iconColor,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: bg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: kText,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: kTextSub,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   static Widget _containerCard({
     required String name,
