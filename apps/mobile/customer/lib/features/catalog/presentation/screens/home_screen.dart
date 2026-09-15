@@ -2462,11 +2462,14 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
               ),
               GestureDetector(
                 onTap: () async {
+                  final maxDays = maxAdvanceDaysOf(context);
+                  final maxDate = DateTime(now.year, now.month, now.day).add(Duration(days: maxDays));
+                  final initial = _selectedDate.isAfter(maxDate) ? now : _selectedDate;
                   final picked = await showDatePicker(
                     context: context,
-                    initialDate: _selectedDate,
+                    initialDate: initial,
                     firstDate: DateTime(now.year - 1),
-                    lastDate: DateTime(now.year + 2),
+                    lastDate: maxDate,
                     builder: (context, child) {
                       return Theme(
                         data: Theme.of(context).copyWith(
