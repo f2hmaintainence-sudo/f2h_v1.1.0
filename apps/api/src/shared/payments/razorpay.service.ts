@@ -307,6 +307,19 @@ export class RazorpayService {
     );
   }
 
+  /**
+   * Fetches all payment attempts made against a Razorpay order.
+   * Used for active gateway reconciliation when client callback was interrupted.
+   */
+  async fetchOrderPayments(
+    orderId: string,
+  ): Promise<{ entity: string; count: number; items: RazorpayPayment[] }> {
+    return this.request<{ entity: string; count: number; items: RazorpayPayment[] }>(
+      'GET',
+      `/orders/${encodeURIComponent(orderId)}/payments`,
+    );
+  }
+
   async fetchPayment(paymentId: string): Promise<RazorpayPayment> {
     return this.request<RazorpayPayment>(
       'GET',

@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/theme/app_typography.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
+import 'package:f2h_customer/features/wallet/data/models/transaction_model.dart';
 import 'package:f2h_customer/features/wallet/presentation/widgets/transaction_tile.dart';
-// import 'package:f2h_customer/features/orders/data/models/order_model.dart';
-// import 'package:f2h_customer/features/orders/presentation/widgets/order_tile.dart';
 import 'package:f2h_customer/features/wallet/presentation/widgets/topup_drawer.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_customer/core/payments/payment_recovery_service.dart';
+
 // ══════════════════════════════════════════════════════════
 //  WALLET SCREEN — Clean white unique redesign
 // ══════════════════════════════════════════════════════════
@@ -22,128 +24,82 @@ class WalletScreen extends StatefulWidget {
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
-class _WalletScreenState extends State<WalletScreen> {
-  final int _transactionsReload = 0;
+class _WalletScreenState extends State<WalletScreen>
+    with WidgetsBindingObserver {
+  late final WalletTransactionsController _transactionsController;
 
   @override
   void initState() {
     super.initState();
+    _transactionsController = WalletTransactionsController();
+    WidgetsBinding.instance.addObserver(this);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<CustomerSessionCubit>().bootstrap();
+      PaymentRecoveryService.instance.checkAndRecoverPendingPayment(context);
     });
   }
 
-  // void _showTopUpSheet(BuildContext context) {
-  //   double selectedAmount = 500;
-  //   showModalBottomSheet(
-  //     context: context,
-  //     backgroundColor: Colors.white,
-  //     shape: const RoundedRectangleBorder(
-  //       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-  //     ),
-  //     builder: (ctx) {
-  //       return StatefulBuilder(
-  //         builder: (context, setModalState) {
-  //           return Padding(
-  //             padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-  //             child: Column(
-  //               mainAxisSize: MainAxisSize.min,
-  //               crossAxisAlignment: CrossAxisAlignment.start,
-  //               children: [
-  //                 Center(
-  //                   child: Container(
-  //                     width: 36,
-  //                     height: 4,
-  //                     decoration: BoxDecoration(
-  //                       color: kBorder,
-  //                       borderRadius: BorderRadius.circular(2),
-  //                     ),
-  //                   ),
-  //                 ),
-  //                 const SizedBox(height: 16),
-  //                 const Text(
-  //                   'Add Money to Wallet',
-  //                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: kText),
-  //                 ),
-  //                 const SizedBox(height: 20),
-  //                 Container(
-  //                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  //                   decoration: BoxDecoration(
-  //                     color: const Color(0xFFF5F5F5),
-  //                     borderRadius: BorderRadius.circular(14),
-  //                   ),
-  //                   child: Row(
-  //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //                     children: [
-  //                       const Text('Amount to add',
-  //                           style: TextStyle(color: kTextSub, fontSize: 13)),
-  //                       Text(
-  //                         '₹${selectedAmount.toStringAsFixed(0)}',
-  //                         style: const TextStyle(
-  //                             color: kPrimary, fontSize: 22, fontWeight: FontWeight.w900),
-  //                       ),
-  //                     ],
-  //                   ),
-  //                 ),
-  //                 const SizedBox(height: 16),
-  //                 Row(
-  //                   children: [200.0, 500.0, 1000.0].map((amt) {
-  //                     final isSel = selectedAmount == amt;
-  //                     return Expanded(
-  //                       child: GestureDetector(
-  //                         onTap: () => setModalState(() => selectedAmount = amt),
-  //                         child: AnimatedContainer(
-  //                           duration: const Duration(milliseconds: 200),
-  //                           margin: const EdgeInsets.symmetric(horizontal: 4),
-  //                           padding: const EdgeInsets.symmetric(vertical: 12),
-  //                           decoration: BoxDecoration(
-  //                             color: isSel ? kPrimary : Colors.white,
-  //                             borderRadius: BorderRadius.circular(12),
-  //                             border: Border.all(
-  //                                 color: isSel ? kPrimary : kBorder),
-  //                           ),
-  //                           child: Text(
-  //                             '+ ₹${amt.toStringAsFixed(0)}',
-  //                             textAlign: TextAlign.center,
-  //                             style: TextStyle(
-  //                               fontWeight: FontWeight.w700,
-  //                               fontSize: 13,
-  //                               color: isSel ? Colors.white : kTextMid,
-  //                             ),
-  //                           ),
-  //                         ),
-  //                       ),
-  //                     );
-  //                   }).toList(),
-  //                 ),
-  //                 const SizedBox(height: 24),
-  //                 ElevatedButton(
-  //                   onPressed: () {
-  //                     cartController.recharge(selectedAmount);
-  //                     Navigator.pop(ctx);
-  //                     _showTopUpSuccess(context, selectedAmount);
-  //                   },
-  //                   style: ElevatedButton.styleFrom(
-  //                     backgroundColor: kPrimary,
-  //                     foregroundColor: Colors.white,
-  //                     minimumSize: const Size(double.infinity, 52),
-  //                     shape: RoundedRectangleBorder(
-  //                         borderRadius: BorderRadius.circular(14)),
-  //                     elevation: 0,
-  //                   ),
-  //                   child: const Text('PROCEED TO PAY',
-  //                       style:
-  //                           TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-  //                 ),
-  //               ],
-  //             ),
-  //           );
-  //         },
-  //       );
-  //     },
-  //   );
-  // }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _handleAppResumed();
+    }
+  }
+
+  Future<void> _handleAppResumed() async {
+    if (!mounted) return;
+    try {
+      await PaymentRecoveryService.instance.checkAndRecoverPendingPayment(
+        context,
+        showToast: true,
+      );
+    } catch (_) {}
+
+    if (!mounted) return;
+    try {
+      await context.read<CustomerSessionCubit>().refresh();
+    } catch (_) {}
+
+    if (mounted) {
+      _transactionsController.refresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _transactionsController.dispose();
+    super.dispose();
+  }
+
+  void _handleTopupSuccess(TopupSuccessResult result) {
+    if (!mounted) return;
+    final session = context.read<CustomerSessionCubit>().state;
+    final customerId = session.profile?.customerId ?? '';
+    final currentBal = session.profile?.walletBalance ?? 0.0;
+    final newBal = result.newBalance ?? (currentBal + result.amount);
+
+    _transactionsController.prependTransaction(
+      CustomerWalletTransaction(
+        id: DateTime.now().millisecondsSinceEpoch,
+        transactionId: result.transactionId ??
+            'WT${DateTime.now().millisecondsSinceEpoch}',
+        customerId: customerId,
+        transactionType: 'credit',
+        amount: result.amount,
+        balanceAfter: newBal,
+        referenceType: 'topup',
+        referenceId: result.transactionId,
+        remarks: 'Wallet top-up via Razorpay',
+        createdBy: customerId,
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    _transactionsController.refresh();
+  }
 
   void _showTopUpSuccess(BuildContext context, double amount) {
     showDialog(
@@ -157,35 +113,38 @@ class _WalletScreenState extends State<WalletScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: const BoxDecoration(
-                color: kPrimaryPl,
+                color: Color(0xFFE8F5E9),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.check_circle_rounded,
-                color: kPrimary,
+                color: Color(0xFF16A34A),
                 size: 44,
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
+            Text(
               'Top-up Successful!',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: kPrimary,
+              style: AppTypography.titleLarge.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF16A34A),
+                letterSpacing: 0.0,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               '₹${amount.toStringAsFixed(0)} added to your wallet.',
-              style: const TextStyle(fontSize: 13, color: kTextSub),
+              style: AppTypography.bodySmall.copyWith(
+                color: kTextSub,
+                letterSpacing: 0.2,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
               style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
+                backgroundColor: const Color(0xFF16A34A),
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 46),
                 shape: RoundedRectangleBorder(
@@ -193,9 +152,13 @@ class _WalletScreenState extends State<WalletScreen> {
                 ),
                 elevation: 0,
               ),
-              child: const Text(
+              child: Text(
                 'Awesome',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: AppTypography.labelLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.1,
+                ),
               ),
             ),
           ],
@@ -206,63 +169,72 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF5F5F5),
-    body: CustomScrollView(
-      slivers: [
-        // ── APP BAR ─────────────────────────────────────
-        const SliverAppBar(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          pinned: true,
-          elevation: 0,
-          title: Text(
-            'Wallet & Orders',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: kText,
+    backgroundColor: const Color(0xFFF8F9FA),
+    body: RefreshIndicator(
+      color: kPrimary,
+      onRefresh: () async {
+        await context.read<CustomerSessionCubit>().bootstrap();
+        await _transactionsController.refresh();
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          // ── APP BAR ─────────────────────────────────────
+          SliverAppBar(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            pinned: true,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: kText),
+              onPressed: () => Navigator.maybePop(context),
+            ),
+            title: Text(
+              'Wallet & Transactions',
+              style: AppTypography.headlineSmall.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: kText,
+                letterSpacing: -0.3,
+              ),
             ),
           ),
-        ),
 
-        // ── BALANCE HERO CARD ──────────────────────────
-        SliverToBoxAdapter(
-          child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
-            builder: (context, state) {
-              final profile = state.profile;
-              final pBal = profile?.walletBalance ?? 0.0;
-              final wBal = double.tryParse(state.wallet['balance']?.toString() ?? '') ?? 0.0;
-              final balanceToDisplay = (pBal > wBal ? pBal : wBal);
+          // ── BALANCE HERO CARD ──────────────────────────
+          SliverToBoxAdapter(
+            child: BlocConsumer<CustomerSessionCubit, CustomerSessionState>(
+              listenWhen: (previous, current) {
+                final prevBal = previous.profile?.walletBalance ?? 0.0;
+                final currBal = current.profile?.walletBalance ?? 0.0;
+                return prevBal != currBal;
+              },
+              listener: (context, state) {
+                _transactionsController.refresh();
+              },
+              builder: (context, state) {
+                final profile = state.profile;
+                final pBal = profile?.walletBalance ?? 0.0;
+                final wBal =
+                    double.tryParse(state.wallet['balance']?.toString() ?? '') ??
+                        0.0;
+                final balanceToDisplay = (pBal > wBal ? pBal : wBal);
 
-              return _buildBalanceCard(
-                context,
-                balanceToDisplay,
-                isLoading: state.status == CustomerSessionStatus.loading,
-              );
-            },
+                return _buildBalanceCard(
+                  context,
+                  balanceToDisplay,
+                  isLoading: state.status == CustomerSessionStatus.loading,
+                );
+              },
+            ),
           ),
-        ),
 
-        // ── QUICK ACTIONS ─────────────────────────────
-        // SliverToBoxAdapter(child: _buildQuickActions(context)),
+          // ── TRANSACTIONS ──────────────────────────────
+          SliverToBoxAdapter(child: _sectionHead('Transactions')),
+          WalletTransactionsSliver(controller: _transactionsController),
 
-        // ── REWARDS BANNER ─────────────────────────────
-        // SliverToBoxAdapter(child: _buildRewardsBanner(context)),
-
-        // ── TRANSACTIONS ──────────────────────────────
-        SliverToBoxAdapter(child: _sectionHead('Transactions')),
-        const WalletTransactionsSliver(),
-
-        // ── RECENT ORDERS ─────────────────────────────
-        // SliverToBoxAdapter(child: _sectionHead('Recent Orders')),
-        // SliverList(
-        //   delegate: SliverChildBuilderDelegate(
-        //     (_, i) => ORow(mockOrders[i]),
-        //     childCount: mockOrders.length,
-        //   ),
-        // ),
-        const SliverToBoxAdapter(child: SizedBox(height: 40)),
-      ],
+          const SliverToBoxAdapter(child: SizedBox(height: 40)),
+        ],
+      ),
     ),
   );
 
@@ -273,73 +245,74 @@ class _WalletScreenState extends State<WalletScreen> {
   }) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: kBorder),
+        border: Border.all(color: const Color(0xFFEEEEEE), width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Balance display
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'F2H Wallet Balance',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: kTextSub,
-                      fontWeight: FontWeight.w600,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'F2H Wallet Balance',
+                      style: AppTypography.labelMedium.copyWith(
+                        fontSize: 12,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.25,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-
-                  Text(
-                    isLoading
-                        ? 'Loading...'
-                        : '₹${walletBalance.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 40,
-                      fontWeight: FontWeight.w900,
-                      color: kText,
-                      letterSpacing: -1,
+                    const SizedBox(height: 6),
+                    Text(
+                      isLoading
+                          ? 'Loading...'
+                          : '₹${walletBalance.toStringAsFixed(2)}',
+                      style: AppTypography.displayLarge.copyWith(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const Spacer(),
               Container(
-                width: 52,
-                height: 52,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
-                  color: kPrimaryPl,
+                  color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Center(
                   child: Icon(
-                    Icons.account_balance_wallet_outlined,
-                    color: kPrimary,
+                    Icons.account_balance_wallet_rounded,
+                    color: Color(0xFF16A34A),
                     size: 26,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Status pill
+          // Status pill (Clean badge without valid thru)
           Row(
             children: [
               Container(
@@ -348,32 +321,24 @@ class _WalletScreenState extends State<WalletScreen> {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: kPrimaryPl,
+                  color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.circle, color: kPrimaryLt, size: 7),
-                    SizedBox(width: 6),
+                    const Icon(Icons.circle, color: Color(0xFF16A34A), size: 7),
+                    const SizedBox(width: 6),
                     Text(
                       'Active · F2H Platinum',
-                      style: TextStyle(
+                      style: AppTypography.labelSmall.copyWith(
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: kPrimary,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF16A34A),
+                        letterSpacing: 0.25,
                       ),
                     ),
                   ],
-                ),
-              ),
-              const Spacer(),
-              const Text(
-                'VALID THRU 12/32',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: kMuted,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -382,11 +347,12 @@ class _WalletScreenState extends State<WalletScreen> {
 
           // Add money button
           GestureDetector(
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
               final authState = context.read<AuthBloc>().state;
               final sessionState = context.read<CustomerSessionCubit>().state;
-              final isLoggedIn = authState is Authenticated || sessionState.profile != null;
+              final isLoggedIn =
+                  authState is Authenticated || sessionState.profile != null;
 
               if (!isLoggedIn) {
                 F2HToast.info(
@@ -406,34 +372,64 @@ class _WalletScreenState extends State<WalletScreen> {
                 return;
               }
 
-              showModalBottomSheet(
+              bool handledLive = false;
+              final result = await showModalBottomSheet<dynamic>(
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.white,
                 shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                builder: (_) => const TopupDrawer(),
+                builder: (_) => TopupDrawer(
+                  onTopupSuccess: (topupResult) {
+                    handledLive = true;
+                    _handleTopupSuccess(topupResult);
+                  },
+                ),
               );
+
+              if (!mounted) return;
+
+              if (result is TopupSuccessResult) {
+                if (!handledLive) {
+                  _handleTopupSuccess(result);
+                }
+                _showTopUpSuccess(context, result.amount);
+              } else {
+                _transactionsController.refresh();
+              }
             },
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: kPrimary,
-                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFF16A34A),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF16A34A).withValues(alpha: 0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
+                  const Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
                   Text(
                     'Add Money',
-                    style: TextStyle(
+                    style: AppTypography.labelLarge.copyWith(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: Colors.white,
+                      letterSpacing: 0.1,
                     ),
                   ),
                 ],
@@ -445,236 +441,15 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorder),
-      ),
-      child: Row(
-        children: [
-          _actionBtn(Icons.history_rounded, 'History', () {}),
-          _actionBtn(
-            Icons.card_giftcard_rounded,
-            '234 Points',
-            () => _showRewardsInfo(context),
-          ),
-          _actionBtn(
-            Icons.share_rounded,
-            'Refer & Earn',
-            () => _showReferInfo(context),
-          ),
-          _actionBtn(Icons.receipt_outlined, 'Statement', () {}),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionBtn(IconData icon, String label, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-          child: Column(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(child: Icon(icon, color: kText, size: 20)),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: kTextSub,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRewardsBanner(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFF8E1), Color(0xFFFFF3CD)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kAccent.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: kAccent.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Center(
-              child: Icon(Icons.stars_rounded, color: kAccent, size: 26),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '234 Reward Points',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF6D4C00),
-                  ),
-                ),
-                Text(
-                  'Earn 1 point for every ₹10 spent',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: kAccent.withValues(alpha: 0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: kAccent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text(
-              'Redeem',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1A1000),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRewardsInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.card_giftcard, color: kPrimary, size: 24),
-            SizedBox(width: 8),
-            Text(
-              'F2H Reward Points',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Current points: 234',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: kPrimary,
-              ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Earn 1 point for every ₹10 spent. Points can be redeemed for free delivery or discounts!',
-              style: TextStyle(color: kTextMid, height: 1.4),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Close',
-              style: TextStyle(color: kPrimary, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showReferInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.share, color: kAccent, size: 24),
-            SizedBox(width: 8),
-            Text('Refer & Earn', style: TextStyle(fontWeight: FontWeight.w800)),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Get ₹100 Wallet Cash',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: kAccent,
-              ),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Share your referral code and get ₹100 cash back when your friend places their first order!',
-              style: TextStyle(color: kTextMid, height: 1.4),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Close',
-              style: TextStyle(color: kPrimary, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _sectionHead(String t) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+    padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
     child: Text(
       t,
-      style: const TextStyle(
-        fontSize: 17,
-        fontWeight: FontWeight.w800,
+      style: AppTypography.headlineSmall.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
         color: kText,
+        letterSpacing: -0.3,
       ),
     ),
   );

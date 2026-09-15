@@ -23,6 +23,7 @@ import '../bloc/checkout/checkout_bloc.dart';
 import '../bloc/checkout/checkout_event.dart';
 import '../bloc/checkout/checkout_state.dart';
 import '../../domain/entities/checkout/checkout_request_entity.dart';
+import '../../../../core/payments/payment_recovery_service.dart';
 import '../../domain/repositories/checkout/checkout_repository.dart';
 import '../../../address/presentation/widgets/address_selector_drawer.dart';
 import '../../../address/presentation/screens/add_address_screen.dart';
@@ -163,6 +164,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<CustomerSessionCubit>().refreshSilently();
+        PaymentRecoveryService.instance.checkAndRecoverPendingPayment(context);
       }
     });
   }

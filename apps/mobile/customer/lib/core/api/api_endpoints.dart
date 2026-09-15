@@ -92,6 +92,7 @@ class ApiEndpoints {
   static const String customerCategory = '$_customer/category';
   static const String products = '$_customer/products';
   static const String orders = '$_customer/orders';
+  static String ordersByDate(String dateStr) => '$orders?date=$dateStr';
   static const String checkOut = '$_customer/checkout/payment';
   static const String availableCoupons = '$_customer/coupons';
   static const String validateCoupon = '$_customer/coupon/validate';
@@ -104,6 +105,7 @@ class ApiEndpoints {
   static const String paymentConfig      = '$_customer/payment/config';
   static const String paymentCreateOrder = '$_customer/payment/create-order';
   static const String paymentVerify      = '$_customer/payment/verify';
+  static const String paymentOrderStatus = '$_customer/payment/order-status';
   static const String paymentHistory     = '$_customer/payment/history';
   static const String paymentUnpaidBills = '$_customer/payment/unpaid-bills';
   static const String subscriptions = '$_customer/subscriptions';

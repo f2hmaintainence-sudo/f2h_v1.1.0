@@ -33,7 +33,18 @@ export class PaymentReconciliationCron {
     if (!(await this.cronLock.acquire('sweepStrandedPayments', 300))) return;
 
     try {
-      const { swept } = await this.paymentService.reconcileStrandedOrderPayments();
+      // 1. Actively poll gateway for payments > 10m old in 'created' state (e.g. killed app)
+      const gatewayResult =
+        await this.paymentService.reconcileActiveGatewayTransactions();
+      if (gatewayResult.recovered > 0 || gatewayResult.failed > 0) {
+        this.logger.log(
+          `[CRON] Active gateway reconciliation: recovered ${gatewayResult.recovered}, failed ${gatewayResult.failed} (processed ${gatewayResult.processed}).`,
+        );
+      }
+
+      // 2. Sweep captured-but-unconsumed 'order' payments (> 20 min) into customer wallets
+      const { swept } =
+        await this.paymentService.reconcileStrandedOrderPayments();
       if (swept > 0) {
         this.logger.log(
           `[CRON] Swept ${swept} stranded online payment(s) into customer wallets.`,

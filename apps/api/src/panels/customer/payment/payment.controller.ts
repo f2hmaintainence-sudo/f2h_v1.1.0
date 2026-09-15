@@ -19,6 +19,7 @@ import {
   UseGuards,
   Req,
   HttpCode,
+  Param,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
@@ -60,6 +61,13 @@ export class CustomerPaymentController {
   @UseGuards(AuthGuard('jwt'))
   async verifyPayment(@Req() req: Request, @Body() body: VerifyPaymentDto) {
     return this.paymentService.verifyPayment(resolveUserId(req), body);
+  }
+
+  // ── Lifecycle recovery check status ──
+  @Get('order-status/:id')
+  @UseGuards(AuthGuard('jwt'))
+  async getOrderStatus(@Req() req: Request, @Param('id') orderId: string) {
+    return this.paymentService.checkOrderStatus(resolveUserId(req), orderId);
   }
 
   @Get('history')

@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, Post, UseGuards, Req, BadRequestException, Param,
+  Body, Controller, Get, Post, UseGuards, Req, BadRequestException, Param, Query,
   Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -28,7 +28,7 @@ export class CustomerOrderController {
   // Query count: 4 fixed queries regardless of order/subscription volume.
   // ─────────────────────────────────────────────────────────────────────────────
   @Get()
-  async getOrders(@Req() req: Request) {
+  async getOrders(@Req() req: Request, @Query('date') dateFilter?: string) {
     const user = req.user as any;
     const email = user?.email;
     const userId = user?.user_id;
@@ -52,11 +52,16 @@ export class CustomerOrderController {
     // Open a single shared connection for all read queries
     const conn = await this.data.getSharedConnection();
     try {
-      // ── Query 1: All orders for this customer ─────────────────────────────
-      const [ordersRows]: any = await conn.query(
-        `SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC`,
-        [customerId],
-      );
+      // ── Query 1: Orders for this customer (optionally filtered by date) ────
+      let orderQuery = `SELECT * FROM orders WHERE customer_id = $1`;
+      const orderParams: any[] = [customerId];
+      if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter.trim())) {
+        orderParams.push(dateFilter.trim());
+        orderQuery += ` AND (scheduled_date = $2 OR created_at::date = $2)`;
+      }
+      orderQuery += ` ORDER BY created_at DESC`;
+
+      const [ordersRows]: any = await conn.query(orderQuery, orderParams);
       const orders: any[] = ordersRows || [];
 
       // ── Query 2: All order items + variant + product name in one JOIN ──────

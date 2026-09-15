@@ -15,16 +15,16 @@ class AppTypography {
     fontSize: 28,
     fontWeight: FontWeight.w800,
     color: kText,
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
     height: 1.25,
   );
 
-  // Headline styles - Page/Section headers (Bold with soft spacing)
+  // Headline styles - Page/Section headers
   static const TextStyle headlineLarge = TextStyle(
     fontSize: 24,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w700,
     color: kText,
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
     height: 1.3,
   );
 
@@ -40,16 +40,16 @@ class AppTypography {
     fontSize: 18,
     fontWeight: FontWeight.w700,
     color: kText,
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
     height: 1.3,
   );
 
   // Title styles - Card headers, subheadings
   static const TextStyle titleLarge = TextStyle(
     fontSize: 18,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w700,
     color: kText,
-    letterSpacing: -0.1,
+    letterSpacing: 0.0,
     height: 1.3,
   );
 
@@ -113,7 +113,7 @@ class AppTypography {
     fontSize: 10,
     fontWeight: FontWeight.w600,
     color: kTextSub,
-    letterSpacing: 0.3,
+    letterSpacing: 0.25,
   );
 
   // Aliases for quick access & compatibility

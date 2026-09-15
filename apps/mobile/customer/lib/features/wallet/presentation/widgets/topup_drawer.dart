@@ -4,15 +4,36 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/theme/app_typography.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/core/payments/payment_service.dart';
 import 'package:f2h_customer/core/payments/payment_models.dart';
+import 'package:f2h_customer/core/payments/payment_recovery_service.dart';
+
+class TopupSuccessResult {
+  final double amount;
+  final double? newBalance;
+  final String? transactionId;
+  final String? paymentId;
+
+  const TopupSuccessResult({
+    required this.amount,
+    this.newBalance,
+    this.transactionId,
+    this.paymentId,
+  });
+}
 
 class TopupDrawer extends StatefulWidget {
-  const TopupDrawer({super.key});
+  final void Function(TopupSuccessResult result)? onTopupSuccess;
+
+  const TopupDrawer({
+    super.key,
+    this.onTopupSuccess,
+  });
 
   @override
   State<TopupDrawer> createState() => _TopupDrawerState();
@@ -41,6 +62,16 @@ class _TopupDrawerState extends State<TopupDrawer> {
     if (maxAllowed <= 0) return 'Wallet is full (₹${_walletCap.toStringAsFixed(0)} limit reached)';
     if (amt > maxAllowed) return 'Max you can add: ₹${maxAllowed.toStringAsFixed(0)}';
     return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        PaymentRecoveryService.instance.checkAndRecoverPendingPayment(context);
+      }
+    });
   }
 
   @override
@@ -97,6 +128,15 @@ class _TopupDrawerState extends State<TopupDrawer> {
       } else {
         sessionCubit.rechargeWallet(amount);
       }
+      final successResult = TopupSuccessResult(
+        amount: amount,
+        newBalance: newBalance ?? (sessionCubit.state.profile?.walletBalance),
+        transactionId: result.transactionId,
+        paymentId: result.razorpayPaymentId,
+      );
+
+      widget.onTopupSuccess?.call(successResult);
+
       await sessionCubit.refresh();
 
       if (!mounted) return;
@@ -104,7 +144,7 @@ class _TopupDrawerState extends State<TopupDrawer> {
         context,
         '₹${amount.toStringAsFixed(0)} added successfully',
       );
-      Navigator.pop(context, true);
+      Navigator.pop(context, successResult);
     } catch (e) {
       if (!mounted) return;
       F2HToast.error(context, 'Payment failed. Please try again.');
@@ -129,12 +169,12 @@ class _TopupDrawerState extends State<TopupDrawer> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Add Money to Wallet',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                style: AppTypography.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
                   color: kText,
+                  letterSpacing: 0.0,
                 ),
               ),
               const SizedBox(height: 20),
@@ -149,30 +189,34 @@ class _TopupDrawerState extends State<TopupDrawer> {
                   LengthLimitingTextInputFormatter(4), // max 4 digits (5000)
                 ],
                 onChanged: (_) => setState(() {}),
-                style: const TextStyle(
+                style: AppTypography.displayMedium.copyWith(
                   fontSize: 28,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   color: kPrimary,
+                  letterSpacing: -0.5,
                 ),
                 decoration: InputDecoration(
                   prefixText: '₹ ',
-                  prefixStyle: const TextStyle(
+                  prefixStyle: AppTypography.displayMedium.copyWith(
                     fontSize: 28,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     color: kPrimary,
+                    letterSpacing: -0.5,
                   ),
                   hintText: '0',
-                  hintStyle: TextStyle(
+                  hintStyle: AppTypography.displayMedium.copyWith(
                     fontSize: 28,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     color: kPrimary.withValues(alpha: 0.25),
+                    letterSpacing: -0.5,
                   ),
                   helperText: maxAllowed <= 0
                       ? 'Wallet full (₹${_walletCap.toStringAsFixed(0)} limit)'
                       : 'Max you can add: ₹${maxAllowed.toStringAsFixed(0)}',
-                  helperStyle: TextStyle(
+                  helperStyle: AppTypography.bodySmall.copyWith(
                     fontSize: 11,
                     color: maxAllowed <= 0 ? Colors.red : kTextSub,
+                    letterSpacing: 0.2,
                   ),
                   errorText: validationErr,
                   filled: true,
@@ -228,10 +272,11 @@ class _TopupDrawerState extends State<TopupDrawer> {
                         child: Text(
                           '+ ₹${amt.toStringAsFixed(0)}',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: AppTypography.labelLarge.copyWith(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                             color: isSelected ? Colors.white : kTextMid,
+                            letterSpacing: 0.1,
                           ),
                         ),
                       ),
@@ -260,21 +305,23 @@ class _TopupDrawerState extends State<TopupDrawer> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Instant UPI & Cards via Razorpay',
-                            style: TextStyle(
+                            style: AppTypography.labelLarge.copyWith(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: kText,
+                              letterSpacing: 0.1,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
                             'Google Pay, PhonePe, Paytm, BHIM, NetBanking & Cards',
-                            style: TextStyle(
+                            style: AppTypography.bodySmall.copyWith(
                               fontSize: 10,
                               color: kTextSub,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ],
@@ -335,11 +382,13 @@ class _TopupDrawerState extends State<TopupDrawer> {
                           ),
                         ),
                       )
-                    : const Text(
+                    : Text(
                         'PROCEED TO PAY',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
+                        style: AppTypography.labelLarge.copyWith(
+                          fontWeight: FontWeight.w700,
                           fontSize: 15,
+                          letterSpacing: 0.1,
+                          color: Colors.white,
                         ),
                       ),
               ),

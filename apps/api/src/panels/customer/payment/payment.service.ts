@@ -394,6 +394,195 @@ export class CustomerPaymentService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  //  2b. Check / recover order status (client resume from background / UPI app)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async checkOrderStatus(customerId: string, razorpayOrderId: string) {
+    if (!razorpayOrderId) {
+      throw new BadRequestException('razorpay_order_id is required');
+    }
+
+    const customer = await this.resolveCustomer(customerId);
+
+    const txnRows = await this.db.query(
+      `SELECT * FROM payment_transactions
+        WHERE provider_order_id = $1 AND deleted_at IS NULL
+        LIMIT 1`,
+      [razorpayOrderId],
+    );
+    let txn = txnRows?.[0];
+
+    if (!txn) {
+      throw new NotFoundException('Payment transaction not found');
+    }
+    if (txn.customer_id !== customer.customer_id) {
+      throw new BadRequestException(
+        'This payment does not belong to the current customer',
+      );
+    }
+
+    // If already fulfilled, return current fulfilled status
+    if (txn.status === 'fulfilled') {
+      return {
+        status: true,
+        recovered: true,
+        payment_status: 'fulfilled',
+        message: 'Payment already processed and credited',
+        data: this.presentTransaction(txn),
+      };
+    }
+
+    // If marked paid, fulfill if top-up or bill
+    if (txn.status === 'paid') {
+      if (
+        txn.purpose === 'wallet_topup' ||
+        txn.purpose === 'bill' ||
+        (txn.purpose === 'subscription' && txn.reference_id)
+      ) {
+        const fulfilResult = await this.fulfil(txn.transaction_id);
+        return {
+          status: true,
+          recovered: true,
+          payment_status: 'fulfilled',
+          message: 'Payment recovered and credited successfully.',
+          data: fulfilResult.data || this.presentTransaction(txn),
+        };
+      }
+      return {
+        status: true,
+        recovered: true,
+        payment_status: 'paid',
+        message: 'Payment verified and ready for checkout.',
+        data: this.presentTransaction(txn),
+      };
+    }
+
+    if (txn.status === 'failed') {
+      return {
+        status: false,
+        recovered: false,
+        payment_status: 'failed',
+        message: txn.failure_reason || 'Payment failed at gateway',
+        data: this.presentTransaction(txn),
+      };
+    }
+
+    // If still in 'created' state, actively query Razorpay API
+    if (txn.status === 'created') {
+      try {
+        const orderPayments = await this.razorpay.fetchOrderPayments(razorpayOrderId);
+        const items = orderPayments?.items || [];
+        const captured = items.find(
+          (p: any) => p.status === 'captured' || p.status === 'authorized',
+        );
+
+        if (captured) {
+          const paidAmount = this.toAmount(captured.amount / 100);
+          const expectedAmount = this.toAmount(txn.amount);
+
+          if (paidAmount + 0.001 >= expectedAmount) {
+            // Atomic conditional update locking row from 'created' to 'paid'
+            await this.markPaid(
+              txn.transaction_id,
+              captured.id,
+              null,
+              captured.method,
+            );
+
+            // Re-fetch updated txn
+            const updatedRows = await this.db.query(
+              `SELECT * FROM payment_transactions WHERE transaction_id = $1 LIMIT 1`,
+              [txn.transaction_id],
+            );
+            txn = updatedRows?.[0] || txn;
+
+            if (txn.purpose === 'wallet_topup') {
+              const fulfilResult = await this.fulfil(txn.transaction_id);
+              return {
+                status: true,
+                recovered: true,
+                payment_status: 'fulfilled',
+                message: 'Payment recovered and credited successfully.',
+                data: fulfilResult.data || this.presentTransaction(txn),
+              };
+            }
+
+            if (
+              txn.purpose === 'bill' ||
+              (txn.purpose === 'subscription' && txn.reference_id)
+            ) {
+              const fulfilResult = await this.fulfil(txn.transaction_id);
+              return {
+                status: true,
+                recovered: true,
+                payment_status: 'fulfilled',
+                message: 'Bill payment recovered and settled successfully.',
+                data: fulfilResult.data || this.presentTransaction(txn),
+              };
+            }
+
+            if (txn.purpose === 'order') {
+              const ageMinutes =
+                (Date.now() - new Date(txn.created_at).getTime()) / (60 * 1000);
+              if (ageMinutes > ORDER_PAYMENT_RECONCILE_MINUTES) {
+                await this.reconcileStrandedOrderPayments();
+                return {
+                  status: true,
+                  recovered: true,
+                  payment_status: 'fulfilled',
+                  message:
+                    'Payment recovered and credited to your wallet balance.',
+                  data: this.presentTransaction(txn),
+                };
+              }
+              return {
+                status: true,
+                recovered: true,
+                payment_status: 'paid',
+                message: 'Payment recovered. You may proceed with checkout.',
+                data: this.presentTransaction(txn),
+              };
+            }
+          }
+        } else if (
+          items.length > 0 &&
+          items.every((p: any) => p.status === 'failed')
+        ) {
+          const lastFailed = items[items.length - 1];
+          await this.markFailed(
+            txn.transaction_id,
+            lastFailed.error_description || 'Payment failed at gateway',
+            lastFailed.id,
+          );
+          return {
+            status: false,
+            recovered: false,
+            payment_status: 'failed',
+            message: lastFailed.error_description || 'Payment failed at gateway',
+            data: this.presentTransaction(txn),
+          };
+        }
+      } catch (err) {
+        this.developer.error(
+          'Error fetching order payments in checkOrderStatus',
+          {
+            razorpayOrderId,
+            error: err,
+          },
+        );
+      }
+    }
+
+    return {
+      status: true,
+      recovered: false,
+      payment_status: txn.status || 'created',
+      message: 'Payment is pending at gateway',
+      data: this.presentTransaction(txn),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   //  3. State transitions (idempotent)
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -949,6 +1138,110 @@ export class CustomerPaymentService {
   // ══════════════════════════════════════════════════════════════════════════
   //  6. Reconciliation — money paid but never consumed
   // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Self-healing active gateway reconciliation:
+   * Actively polls Razorpay for payment_transactions that are older than 10 minutes
+   * but remain in 'created' state (e.g. app killed during UPI intent, dropped callback).
+   */
+  async reconcileActiveGatewayTransactions(): Promise<{
+    recovered: number;
+    failed: number;
+    processed: number;
+  }> {
+    const rows = await this.db.query(
+      `SELECT * FROM payment_transactions
+        WHERE provider = 'razorpay'
+          AND status = 'created'
+          AND created_at < NOW() - INTERVAL '10 minutes'
+          AND created_at > NOW() - INTERVAL '48 hours'
+          AND deleted_at IS NULL
+        ORDER BY created_at ASC
+        LIMIT 50`,
+    );
+
+    let recovered = 0;
+    let failed = 0;
+
+    for (const txn of rows || []) {
+      if (!txn.provider_order_id) continue;
+      try {
+        const orderPayments = await this.razorpay.fetchOrderPayments(
+          txn.provider_order_id,
+        );
+        const items = orderPayments?.items || [];
+        const captured = items.find(
+          (p: any) => p.status === 'captured' || p.status === 'authorized',
+        );
+
+        if (captured) {
+          const paidAmount = this.toAmount(captured.amount / 100);
+          const expectedAmount = this.toAmount(txn.amount);
+
+          if (paidAmount + 0.001 >= expectedAmount) {
+            // Atomic conditional update locking row from 'created' to 'paid'
+            const marked = await this.db.query(
+              `UPDATE payment_transactions
+                  SET status = 'paid',
+                      provider_payment_id = COALESCE(provider_payment_id, $2),
+                      method = COALESCE($3, method),
+                      paid_at = COALESCE(paid_at, NOW()),
+                      updated_at = NOW()
+                WHERE transaction_id = $1 AND status = 'created'
+                RETURNING *`,
+              [txn.transaction_id, captured.id, captured.method],
+            );
+
+            if (marked?.length) {
+              if (txn.purpose === 'wallet_topup') {
+                await this.fulfil(txn.transaction_id);
+                recovered++;
+                this.developer.info(
+                  `[Reconciliation] Recovered and credited wallet top-up ${txn.transaction_id} (₹${expectedAmount})`,
+                );
+              } else if (
+                txn.purpose === 'bill' ||
+                (txn.purpose === 'subscription' && txn.reference_id)
+              ) {
+                await this.fulfil(txn.transaction_id);
+                recovered++;
+                this.developer.info(
+                  `[Reconciliation] Recovered and settled bill payment ${txn.transaction_id} (₹${expectedAmount})`,
+                );
+              } else if (txn.purpose === 'order') {
+                recovered++;
+                this.developer.info(
+                  `[Reconciliation] Marked order payment ${txn.transaction_id} as paid (₹${expectedAmount})`,
+                );
+              }
+            }
+          }
+        } else if (
+          items.length > 0 &&
+          items.every((p: any) => p.status === 'failed')
+        ) {
+          const lastFailed = items[items.length - 1];
+          await this.markFailed(
+            txn.transaction_id,
+            lastFailed.error_description || 'Payment failed at gateway',
+            lastFailed.id,
+          );
+          failed++;
+        }
+      } catch (err) {
+        this.developer.error(
+          '[Reconciliation] Failed active gateway polling for transaction',
+          {
+            transactionId: txn.transaction_id,
+            orderId: txn.provider_order_id,
+            error: err,
+          },
+        );
+      }
+    }
+
+    return { recovered, failed, processed: (rows || []).length };
+  }
 
   /**
    * Sweeps `order` payments that were captured but never turned into an order

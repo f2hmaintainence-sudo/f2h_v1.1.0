@@ -28,6 +28,9 @@ class OrderHistoryLoaded extends OrderHistoryState {
     required this.subscriptionPlans,
   });
 
+  /// All orders combining one-time and subscription orders
+  List<Order> get allOrders => [...oneTimeOrders, ...subscriptionOrders];
+
   @override
   List<Object?> get props => [oneTimeOrders, subscriptionOrders, subscriptionPlans];
 }

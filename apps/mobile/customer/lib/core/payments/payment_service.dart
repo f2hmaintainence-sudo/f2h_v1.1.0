@@ -21,6 +21,7 @@ import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 
 import 'payment_models.dart';
+import 'pending_payment_store.dart';
 import 'razorpay_checkout.dart';
 
 class PaymentService {
@@ -61,9 +62,22 @@ class PaymentService {
       );
     }
 
-    return PaymentOrder.fromJson(
+    final order = PaymentOrder.fromJson(
       (body['data'] as Map).cast<String, dynamic>(),
     );
+
+    // Persist pending payment state locally immediately upon receiving the gateway order
+    await PendingPaymentStore.save(PendingPayment(
+      razorpayOrderId: order.razorpayOrderId,
+      internalTxnId: order.transactionId,
+      purpose: purpose.apiValue,
+      amount: order.amount,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      billId: billId,
+      notes: notes,
+    ));
+
+    return order;
   }
 
   /// Step 3 — server-side signature verification and fulfilment.
@@ -87,16 +101,38 @@ class PaymentService {
       );
     }
 
+    // Clear pending payment state once verified successfully
+    await PendingPaymentStore.clear();
+
     final data = (body['data'] as Map?)?.cast<String, dynamic>() ?? {};
     return PaymentResult(
       success: true,
       message: body['message']?.toString() ?? 'Payment successful',
-      transactionId: data['transaction_id']?.toString(),
+      transactionId: data['wallet_transaction_id']?.toString() ??
+          data['transaction_id']?.toString(),
       razorpayOrderId: outcome.razorpayOrderId,
       razorpayPaymentId: outcome.razorpayPaymentId,
       razorpaySignature: outcome.razorpaySignature,
       walletBalance: (data['wallet_balance'] as num?)?.toDouble(),
     );
+  }
+
+  /// Step 4 — check / recover order status upon app resume or reload
+  Future<Map<String, dynamic>> checkOrderStatus(String razorpayOrderId) async {
+    try {
+      await DioClient().fetchCsrfToken();
+      final response = await _dio.get('${ApiEndpoints.paymentOrderStatus}/$razorpayOrderId');
+      final body = response.data;
+      if (body is Map) {
+        return body.cast<String, dynamic>();
+      }
+      return {'status': false, 'message': 'Invalid response from server'};
+    } catch (e) {
+      return {
+        'status': false,
+        'message': extractErrorMessage(e, fallback: 'Could not check payment status'),
+      };
+    }
   }
 
   /// Full round trip for wallet top-ups and bill payments, where the server
@@ -122,7 +158,10 @@ class PaymentService {
       );
     }
 
-    if (outcome.cancelled) return PaymentResult.cancelled();
+    if (outcome.cancelled) {
+      await PendingPaymentStore.clear();
+      return PaymentResult.cancelled();
+    }
     if (!outcome.success) {
       return PaymentResult.failure(
         outcome.errorMessage ?? 'Payment failed. Please try again.',
@@ -133,8 +172,7 @@ class PaymentService {
       return await verify(outcome);
     } catch (e) {
       // The money is captured but we could not confirm it. The gateway webhook
-      // settles this server-side, so tell the customer to expect it shortly
-      // rather than implying the payment was lost.
+      // or recovery service settles this server-side.
       return PaymentResult.failure(
         'Payment received, but confirmation is pending. It will reflect in a few minutes.',
       );
@@ -166,7 +204,10 @@ class PaymentService {
       );
     }
 
-    if (outcome.cancelled) return PaymentResult.cancelled();
+    if (outcome.cancelled) {
+      await PendingPaymentStore.clear();
+      return PaymentResult.cancelled();
+    }
     if (!outcome.success) {
       return PaymentResult.failure(
         outcome.errorMessage ?? 'Payment failed. Please try again.',

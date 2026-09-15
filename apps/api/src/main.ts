@@ -35,6 +35,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: isDev ? ['log', 'error', 'warn', 'debug'] : ['error', 'warn'],
+    rawBody: true,
   });
 
 
@@ -91,11 +92,17 @@ async function bootstrap() {
     '/api/v1/delivery-partner/profile',
     '/api/v1/DeliveryPartner/profile',
   ];
+  const rawBodySaver = (req: any, _res: any, buf: Buffer) => {
+    if (buf && buf.length) {
+      req.rawBody = buf.toString('utf8');
+    }
+  };
+
   for (const route of LARGE_BODY_ROUTES) {
-    app.use(route, json({ limit: '15mb' }));
+    app.use(route, json({ limit: '15mb', verify: rawBodySaver }));
     app.use(route, urlencoded({ extended: true, limit: '15mb' }));
   }
-  app.use(json({ limit: '1mb' }));
+  app.use(json({ limit: '1mb', verify: rawBodySaver }));
   app.use(urlencoded({ extended: true, limit: '1mb' }));
 
   // Essential for Throttler to see correct IP (especially on localhost/proxies)

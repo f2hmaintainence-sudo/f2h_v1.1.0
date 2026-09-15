@@ -181,7 +181,10 @@ export class WalletController {
       where: customerIds.length > 1
         ? [{ column: 'customer_id', operator: 'IN', value: customerIds }]
         : [{ column: 'customer_id', operator: '=', value: customerIds[0] }],
-      orderBy: [{ column: 'created_at', direction: 'DESC' }],
+      orderBy: [
+        { column: 'created_at', direction: 'DESC' },
+        { column: 'id', direction: 'DESC' },
+      ],
     });
     return {
       status: true,

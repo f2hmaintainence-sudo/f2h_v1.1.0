@@ -4,6 +4,7 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 abstract class OrdersRemoteDataSource {
   /// Returns combined {orders: [...], subscriptions: [...]} from a single API call
   Future<Map<String, dynamic>> getOrdersAndSubscriptions();
+  Future<Map<String, dynamic>> getOrdersByDate(String dateStr);
   Future<Map<String, dynamic>> getOrderById(String orderId);
   Future<Map<String, dynamic>> cancelOrder(String orderId);
   Future<Map<String, dynamic>> rateOrder(String orderId, int rating, String feedback, {String? productId});
@@ -16,6 +17,15 @@ class OrdersRemoteDataSourceImpl implements OrdersRemoteDataSource {
   @override
   Future<Map<String, dynamic>> getOrdersAndSubscriptions() async {
     final response = await dioClient.dio.get(ApiEndpoints.orders);
+    if (response.data != null) {
+      return Map<String, dynamic>.from(response.data as Map);
+    }
+    return {'orders': [], 'subscriptions': []};
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOrdersByDate(String dateStr) async {
+    final response = await dioClient.dio.get(ApiEndpoints.ordersByDate(dateStr));
     if (response.data != null) {
       return Map<String, dynamic>.from(response.data as Map);
     }

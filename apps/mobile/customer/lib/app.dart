@@ -35,6 +35,7 @@ import 'package:f2h_customer/features/orders/presentation/bloc/order_history_eve
 import 'package:f2h_customer/core/services/notification_service.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/core/widgets/force_update_gate.dart';
+import 'package:f2h_customer/core/payments/payment_recovery_service.dart';
 
 class F2HApp extends StatelessWidget {
   const F2HApp({super.key});
@@ -261,7 +262,7 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => AppShellState();
 }
 
-class AppShellState extends State<AppShell> {
+class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _i = AppShell.activeTab;
   late final PageController _pageController;
   String? _pendingCategory;
@@ -328,9 +329,27 @@ class AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) VersionChecker.checkUpdates(context);
+      if (mounted) {
+        VersionChecker.checkUpdates(context);
+        PaymentRecoveryService.instance.checkAndRecoverPendingPayment(context);
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && mounted) {
+      PaymentRecoveryService.instance.checkAndRecoverPendingPayment(context);
+    }
   }
 
   @override
