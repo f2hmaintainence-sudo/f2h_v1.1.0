@@ -10,7 +10,7 @@ import 'package:f2h_customer/core/widgets/popup_banner_widget.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart'; // Contains SubsScreen
-import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
+// Wallet screen kept in codebase but removed from nav tab (accessible via other flows)
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -256,9 +256,8 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
 class AppShell extends StatefulWidget {
   static const int tabHome = 0;
   static const int tabShop = 1;
-  static const int tabWallet = 2;
-  static const int tabSubscription = 3;
-  static const int tabReferral = 4;
+  static const int tabSubscription = 2;
+  static const int tabReferral = 3;
 
   static int activeTab = tabHome;
   const AppShell({super.key});
@@ -331,7 +330,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   static const _tabs = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Shop'),
-    (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'Wallet'),
     (Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Subscription'),
     (Icons.card_giftcard_outlined, Icons.card_giftcard_rounded, 'Referral'),
   ];
@@ -395,7 +393,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         children: [
           HomeScreen(isNavVisible: _showNav),
           BrowseScreen(isNavVisible: _showNav),
-          const WalletScreen(),
           const SubsScreen(),
           const ReferralScreen(showBackButton: false),
         ],
@@ -465,20 +462,21 @@ class _BottomNav extends StatelessWidget {
               ),
               child: SafeArea(
                 top: false,
+                bottom: true,
+                left: false,
+                right: false,
                 child: SizedBox(
                   height: 56,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: List.generate(tabs.length, (i) {
                       final tab = tabs[i];
-                      final isCenter = i == AppShell.tabWallet;
                       return Expanded(
                         child: _NavItem(
                           icon: tab.$1,
                           activeIcon: tab.$2,
                           label: tab.$3,
                           isActive: i == activeIndex,
-                          isCenter: isCenter,
                           activeColor: activeColor,
                           badge: i == AppShell.tabSubscription ? const _SubscriptionBadgeCount() : null,
                           onTap: () => onSelect(i),
@@ -501,7 +499,6 @@ class _NavItem extends StatelessWidget {
   final IconData activeIcon;
   final String label;
   final bool isActive;
-  final bool isCenter;
   final Color activeColor;
   final Widget? badge;
   final VoidCallback onTap;
@@ -511,7 +508,6 @@ class _NavItem extends StatelessWidget {
     required this.activeIcon,
     required this.label,
     required this.isActive,
-    this.isCenter = false,
     required this.activeColor,
     required this.onTap,
     this.badge,
@@ -519,67 +515,6 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isCenter) {
-      final buttonColor = isActive ? activeColor : const Color(0xFF047857);
-      return GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          height: 56,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
-            children: [
-              // Circular Wallet button extending above top border line of navigation bar
-              Positioned(
-                top: -24,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: buttonColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 3.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: buttonColor.withValues(alpha: 0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      isActive ? activeIcon : icon,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 4,
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                    color: isActive ? activeColor : const Color(0xFF475569),
-                    letterSpacing: -0.1,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.visible,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
