@@ -26,11 +26,13 @@ const _kTextSecond  = Color(0xFF6B746E);
 class ReferralScreen extends StatefulWidget {
   final String? referralCode;
   final String? referralStatus;
+  final bool showBackButton;
 
   const ReferralScreen({
     super.key,
     this.referralCode,
     this.referralStatus,
+    this.showBackButton = true,
   });
 
   @override
@@ -371,26 +373,29 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   // ── APP BAR ───────────────────────────────────────────────
   Widget _buildAppBar() {
+    final canPop = widget.showBackButton && Navigator.of(context).canPop();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       color: Colors.white,
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F4F2),
-                shape: BoxShape.circle,
-                border: Border.all(color: kBorder),
+          if (canPop) ...[
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F4F2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: kBorder),
+                ),
+                child: const Icon(Icons.arrow_back_rounded,
+                    color: _kTextPrimary, size: 20),
               ),
-              child: const Icon(Icons.arrow_back_rounded,
-                  color: _kTextPrimary, size: 20),
             ),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

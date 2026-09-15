@@ -10,6 +10,8 @@ import 'package:f2h_customer/core/widgets/popup_banner_widget.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart'; // Contains SubsScreen
+import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/di/injection.dart';
@@ -252,7 +254,13 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
 }
 
 class AppShell extends StatefulWidget {
-  static int activeTab = 0;
+  static const int tabHome = 0;
+  static const int tabShop = 1;
+  static const int tabWallet = 2;
+  static const int tabSubscription = 3;
+  static const int tabReferral = 4;
+
+  static int activeTab = tabHome;
   const AppShell({super.key});
 
   static AppShellState? of(BuildContext context) =>
@@ -323,7 +331,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   static const _tabs = [
     (Icons.home_outlined, Icons.home_rounded, 'Home'),
     (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Shop'),
-    (Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Subscribe'),
+    (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'Wallet'),
+    (Icons.calendar_today_outlined, Icons.calendar_today_rounded, 'Subscription'),
+    (Icons.card_giftcard_outlined, Icons.card_giftcard_rounded, 'Referral'),
   ];
 
   @override
@@ -385,7 +395,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         children: [
           HomeScreen(isNavVisible: _showNav),
           BrowseScreen(isNavVisible: _showNav),
+          const WalletScreen(),
           const SubsScreen(),
+          const ReferralScreen(showBackButton: false),
         ],
       ),
     ),
@@ -433,6 +445,13 @@ class _BottomNav extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: kSurface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
             border: Border(
               top: BorderSide(
                 color: isVip ? const Color(0xFFFFD700) : kBorderLt,
@@ -443,18 +462,21 @@ class _BottomNav extends StatelessWidget {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.only(top: 0, bottom: 4),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: List.generate(tabs.length, (i) {
                   final tab = tabs[i];
+                  final isCenter = i == AppShell.tabWallet;
                   return Expanded(
                     child: _NavItem(
                       icon: tab.$1,
                       activeIcon: tab.$2,
                       label: tab.$3,
                       isActive: i == activeIndex,
+                      isCenter: isCenter,
                       activeColor: activeColor,
-                      badge: i == 2 ? const _SubscriptionBadgeCount() : null,
+                      badge: i == AppShell.tabSubscription ? const _SubscriptionBadgeCount() : null,
                       onTap: () => onSelect(i),
                     ),
                   );
@@ -473,6 +495,7 @@ class _NavItem extends StatelessWidget {
   final IconData activeIcon;
   final String label;
   final bool isActive;
+  final bool isCenter;
   final Color activeColor;
   final Widget? badge;
   final VoidCallback onTap;
@@ -482,57 +505,131 @@ class _NavItem extends StatelessWidget {
     required this.activeIcon,
     required this.label,
     required this.isActive,
+    this.isCenter = false,
     required this.activeColor,
     required this.onTap,
     this.badge,
   });
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    behavior: HitTestBehavior.opaque,
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      color: Colors.transparent,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 32,
-            height: 30,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                AnimatedScale(
-                  scale: isActive ? 1.08 : 1.0,
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  child: Icon(
-                    isActive ? activeIcon : icon,
-                    color: isActive ? activeColor : kTextSub,
-                    size: isActive ? 26 : 22,
+  Widget build(BuildContext context) {
+    if (isCenter) {
+      return GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          color: Colors.transparent,
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Transform.translate(
+                offset: const Offset(0, -8),
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: isActive ? activeColor : const Color(0xFF16653A),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 3.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isActive ? activeColor : const Color(0xFF16653A))
+                            .withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                   ),
                 ),
-                if (badge != null) Positioned(top: -3, right: -7, child: badge!),
-              ],
-            ),
+              ),
+              Transform.translate(
+                offset: const Offset(0, -6),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                    color: isActive ? activeColor : kTextSub,
+                    letterSpacing: -0.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.visible,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 3),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 180),
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              color: isActive ? activeColor : kTextSub,
-              letterSpacing: 0.1,
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        color: Colors.transparent,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Top active indicator bar (as in reference image)
+            Container(
+              height: 2.5,
+              width: 24,
+              decoration: BoxDecoration(
+                color: isActive ? activeColor : Colors.transparent,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(3),
+                ),
+              ),
             ),
-            child: Text(label, maxLines: 1, overflow: TextOverflow.visible, softWrap: false),
-          ),
-        ],
+            const SizedBox(height: 5),
+            SizedBox(
+              width: 32,
+              height: 26,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  AnimatedScale(
+                    scale: isActive ? 1.08 : 1.0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      color: isActive ? activeColor : kTextSub,
+                      size: isActive ? 24 : 21,
+                    ),
+                  ),
+                  if (badge != null) Positioned(top: -4, right: -8, child: badge!),
+                ],
+              ),
+            ),
+            const SizedBox(height: 2),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 180),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? activeColor : kTextSub,
+                letterSpacing: -0.1,
+              ),
+              child: Text(label, maxLines: 1, overflow: TextOverflow.visible, softWrap: false),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// Red pip carrying the number of active or paused subscriptions.

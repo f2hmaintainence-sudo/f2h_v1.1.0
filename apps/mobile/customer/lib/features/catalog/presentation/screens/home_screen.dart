@@ -175,12 +175,13 @@ class _HomeScreenState extends State<HomeScreen>
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
-                    // 1. Sticky App Header with Address, Search Option & Profile
+                    // 1. Sticky App Header with Address, Notification & Search Option
                     SliverPersistentHeader(
                       pinned: true,
                       delegate: HomeHeaderDelegate(
                         topPadding: MediaQuery.of(context).padding.top,
                         branchWidget: _branchInfoChip(context),
+                        notificationWidget: _notificationBell(context),
                         onSearchTap: () {
                           Navigator.push(
                             context,
@@ -189,6 +190,14 @@ class _HomeScreenState extends State<HomeScreen>
                                 initialCategory: 'All',
                                 autoFocusSearch: true,
                               ),
+                            ),
+                          );
+                        },
+                        onFilterTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BrowseScreen(initialCategory: 'All'),
                             ),
                           );
                         },
@@ -221,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen>
                     // 2C. Weekly Delivery Schedule Calendar (like in reference image)
                     SliverToBoxAdapter(
                       child: HomeDeliveryCalendarCard(
-                        onCalendarTap: () => AppShell.of(context)?.setTab(2),
+                        onCalendarTap: () => AppShell.of(context)?.setTab(AppShell.tabSubscription),
                       ),
                     ),
 
@@ -858,13 +867,12 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(width: 7),
 
             // Address & Branch (tappable to select address)
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _handleAddressTap,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 120),
+            Expanded(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _handleAddressTap,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -912,6 +920,89 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _notificationBell(BuildContext context) {
+    return BlocBuilder<NotificationsBloc, NotificationsState>(
+      builder: (context, notifState) {
+        int unreadCount = 0;
+        if (notifState is NotificationsLoaded) {
+          unreadCount = notifState.unreadCount;
+        }
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () async {
+            final isAuthed = await _isUserAuthenticated();
+            if (!isAuthed) {
+              if (!context.mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen(popOnSuccess: true)),
+              );
+              return;
+            }
+            if (!context.mounted) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            );
+          },
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.notifications_outlined,
+                  color: Color(0xFF1E293B),
+                  size: 20,
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: 1,
+                    right: 1,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -2777,12 +2868,16 @@ class _AnimatedSearchTriggerState extends State<AnimatedSearchTrigger> {
 class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double topPadding;
   final Widget branchWidget;
+  final Widget notificationWidget;
   final VoidCallback onSearchTap;
+  final VoidCallback onFilterTap;
 
   HomeHeaderDelegate({
     required this.topPadding,
     required this.branchWidget,
+    required this.notificationWidget,
     required this.onSearchTap,
+    required this.onFilterTap,
   });
 
   @override
@@ -2808,28 +2903,26 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           ),
         ],
       ),
-      padding: EdgeInsets.fromLTRB(12, topPadding + 6, 12, 8),
-      alignment: Alignment.center,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      padding: EdgeInsets.fromLTRB(14, topPadding + 6, 14, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Profile Avatar + Address Section (Left)
-          branchWidget,
-          const SizedBox(width: 8),
+          // Row 1: Profile + Address on Left, Notification Bell on Right
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: branchWidget),
+              const SizedBox(width: 8),
+              notificationWidget,
+            ],
+          ),
+          const SizedBox(height: 8),
 
-          // 2. Search Option (Right - Animated Typing Pill with Green Border & Tune Icon)
-          Expanded(
-            child: AnimatedSearchTrigger(
-              onTap: onSearchTap,
-              onFilterTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const BrowseScreen(initialCategory: 'All'),
-                  ),
-                );
-              },
-            ),
+          // Row 2: Full-width Search Option ("next below search option")
+          AnimatedSearchTrigger(
+            onTap: onSearchTap,
+            onFilterTap: onFilterTap,
           ),
         ],
       ),
@@ -2837,14 +2930,15 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => topPadding + 54;
+  double get maxExtent => topPadding + 102;
 
   @override
-  double get minExtent => topPadding + 54;
+  double get minExtent => topPadding + 102;
 
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {
     return oldDelegate.branchWidget != branchWidget ||
+        oldDelegate.notificationWidget != notificationWidget ||
         oldDelegate.topPadding != topPadding;
   }
 }
@@ -3530,15 +3624,12 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
     }
 
     if (actionType == 'SUBSCRIPTION') {
-      AppShell.of(context)?.setTab(2);
+      AppShell.of(context)?.setTab(AppShell.tabSubscription);
       return;
     }
 
     if (actionType == 'WALLET') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const WalletScreen()),
-      );
+      AppShell.of(context)?.setTab(AppShell.tabWallet);
       return;
     }
 

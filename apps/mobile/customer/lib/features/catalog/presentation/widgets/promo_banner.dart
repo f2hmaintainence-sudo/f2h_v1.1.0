@@ -135,25 +135,19 @@ class _PromoBannerState extends State<PromoBanner> {
 
     // 3. SUBSCRIPTION REDIRECTION
     if (actionType == 'SUBSCRIPTION' || route == 'subscribe' || bannerType == 'subscribe') {
-      AppShell.of(context)?.setTab(2);
+      AppShell.of(context)?.setTab(AppShell.tabSubscription);
       return;
     }
 
     // 4. WALLET REDIRECTION
     if (actionType == 'WALLET' || route == 'wallet' || banner['imageUrl'].toString().toLowerCase().contains('wallet_banner')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const WalletScreen()),
-      );
+      AppShell.of(context)?.setTab(AppShell.tabWallet);
       return;
     }
 
     // 5. REFERRAL REDIRECTION
     if (actionType == 'REFERRAL' || route == 'refer') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ReferralScreen()),
-      );
+      AppShell.of(context)?.setTab(AppShell.tabReferral);
       return;
     }
 

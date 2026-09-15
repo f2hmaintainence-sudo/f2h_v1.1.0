@@ -416,7 +416,7 @@ class PopupBannerWidget {
     }
 
     if (actionType == 'SUBSCRIPTION') {
-      AppShell.of(context)?.setTab(2);
+      AppShell.of(context)?.setTab(AppShell.tabSubscription);
       return;
     }
 

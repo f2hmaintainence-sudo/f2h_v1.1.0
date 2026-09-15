@@ -2086,20 +2086,18 @@ class _CheckoutPromoBannerWidgetState extends State<_CheckoutPromoBannerWidget> 
     }
 
     if (actionType == 'SUBSCRIPTION') {
-      AppShell.of(context)?.setTab(2);
+      AppShell.of(context)?.setTab(AppShell.tabSubscription);
       if (Navigator.of(context).canPop()) Navigator.of(context).pop();
       return;
     }
 
     if (actionType == 'WALLET') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const WalletScreen()),
-      );
+      AppShell.of(context)?.setTab(AppShell.tabWallet);
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
       return;
     }
 
-    AppShell.of(context)?.setTab(1);
+    AppShell.of(context)?.setTab(AppShell.tabShop);
     if (Navigator.of(context).canPop()) Navigator.of(context).pop();
   }
 

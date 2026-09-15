@@ -8,7 +8,7 @@ FLUTTER="$(which flutter 2>/dev/null || echo /snap/bin/flutter)"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CUSTOMER_DIR="$REPO/apps/mobile/customer"
 PARTNER_DIR="$REPO/apps/mobile/delivery"
-LOG_DIR="$(dirname "$REPO")/logs/flutter"
+LOG_DIR="$REPO/logs/flutter"
 SOCK=/tmp/f2h-tmux.sock
 DART_API="${F2H_API_URL:-https://dev.f2hfresh.com}"
 G="\033[0;32m"; Y="\033[1;33m"; R="\033[0;31m"; C="\033[0;36m"; NC="\033[0m"
@@ -22,28 +22,34 @@ start_app() {
   local SESSION="flutter_${NAME}"
 
   # Kill existing session for this app
-  $TMUX kill-session -t "$SESSION" 2>/dev/null || true
+  command -v tmux >/dev/null 2>&1 && $TMUX kill-session -t "$SESSION" 2>/dev/null || true
   pkill -f "inotifywait.*${NAME}" 2>/dev/null || true
   sleep 0.5
 
   echo -e "${C}▶  Starting Flutter ${NAME} on :${PORT}…${NC}"
 
-  # Launch flutter run inside a detached tmux session using fixed socket
-  $TMUX new-session -d -s "$SESSION" -x 220 -y 50 \
-    "cd '${DIR}' && \
-     ${FLUTTER} pub get -q 2>&1 ; \
-     ${FLUTTER} run --debug -d web-server \
-       --web-port=${PORT} --web-hostname=0.0.0.0 \
-       --dart-define=F2H_API_BASE_URL=${DART_API} 2>&1 | \
-     tee '${LOG_DIR}/${NAME}.log'"
-
-  echo -e "${G}  ✓ tmux session: ${SESSION}   Port: ${PORT}${NC}"
-  echo -e "${G}    attach:  tmux -S ${SOCK} attach -t ${SESSION}${NC}"
+  # Launch flutter run inside tmux if available, otherwise background process
+  if command -v tmux >/dev/null 2>&1; then
+    $TMUX new-session -d -s "$SESSION" -x 220 -y 50 \
+      "cd '${DIR}' && \
+       ${FLUTTER} pub get -q 2>&1 ; \
+       ${FLUTTER} run --debug -d web-server \
+         --web-port=${PORT} --web-hostname=0.0.0.0 \
+         --dart-define=F2H_API_BASE_URL=${DART_API} 2>&1 | \
+       tee '${LOG_DIR}/${NAME}.log'"
+    echo -e "${G}  ✓ tmux session: ${SESSION}   Port: ${PORT}${NC}"
+    echo -e "${G}    attach:  tmux -S ${SOCK} attach -t ${SESSION}${NC}"
+  else
+    pkill -f "flutter.*--web-port=${PORT}" 2>/dev/null || true
+    nohup bash -c "cd '${DIR}' && ${FLUTTER} run --debug -d web-server --web-port=${PORT} --web-hostname=0.0.0.0 --dart-define=F2H_API_BASE_URL=${DART_API} > '${LOG_DIR}/${NAME}.log' 2>&1" >/dev/null 2>&1 &
+    echo -e "${G}  ✓ Background daemon started: ${NAME}   Port: ${PORT}${NC}"
+  fi
   echo -e "${G}    logs:    tail -f ${LOG_DIR}/${NAME}.log${NC}"
 
-  # Launch inotifywait watcher in background — sends 'r' via tmux on .dart change
-  WATCHER_SCRIPT="${LOG_DIR}/${NAME}_watcher.sh"
-  cat > "$WATCHER_SCRIPT" << WATCHEOF
+  # Launch inotifywait watcher in background if tmux exists — sends 'r' via tmux on .dart change
+  if command -v tmux >/dev/null 2>&1; then
+    WATCHER_SCRIPT="${LOG_DIR}/${NAME}_watcher.sh"
+    cat > "$WATCHER_SCRIPT" << WATCHEOF
 #!/bin/bash
 SOCK="${SOCK}"
 SESSION="${SESSION}"
@@ -58,15 +64,15 @@ while true; do
     echo "\$(date +'%H:%M:%S') WARN: send-keys failed" >> "\$LOG"
 done
 WATCHEOF
-  chmod +x "$WATCHER_SCRIPT"
-  nohup bash "$WATCHER_SCRIPT" >/dev/null 2>&1 &
-  echo $! > "${LOG_DIR}/${NAME}_watch.pid"
-  echo -e "${G}  ✓ watcher started — save any .dart file → instant hot-reload${NC}"
+    chmod +x "$WATCHER_SCRIPT"
+    nohup "$WATCHER_SCRIPT" >/dev/null 2>&1 &
+    echo -e "${G}  ✓ watcher started — save any .dart file → instant hot-reload${NC}"
+  fi
 }
 
 stop_app() {
   local NAME="$1"
-  $TMUX kill-session -t "flutter_${NAME}" 2>/dev/null || true
+  command -v tmux >/dev/null 2>&1 && $TMUX kill-session -t "flutter_${NAME}" 2>/dev/null || true
   if [ -f "${LOG_DIR}/${NAME}_watch.pid" ]; then
     kill -9 "$(cat "${LOG_DIR}/${NAME}_watch.pid")" 2>/dev/null || true
     rm -f "${LOG_DIR}/${NAME}_watch.pid"
@@ -74,12 +80,10 @@ stop_app() {
 }
 
 stop_all() {
-  echo -e "${Y}■  Stopping all Flutter servers…${NC}"
-  stop_app customer
-  stop_app partner
+  echo -e "${Y}Stopping all Flutter dev servers…${NC}"
   pkill -f "flutter.*web-server" 2>/dev/null || true
   pkill -f "inotifywait" 2>/dev/null || true
-  $TMUX kill-server 2>/dev/null || true
+  command -v tmux >/dev/null 2>&1 && $TMUX kill-server 2>/dev/null || true
   echo -e "${G}  ✓ Done${NC}"
 }
 
@@ -90,14 +94,14 @@ status_all() {
     RESP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:${PORT}/ 2>/dev/null)
     if [[ "$RESP" == "200" ]]; then
       echo -e "  ${G}● ${name}   :${PORT}  RUNNING (HTTP 200)${NC}"
-    elif $TMUX has-session -t "flutter_${name}" 2>/dev/null; then
-      echo -e "  ${Y}● ${name}   :${PORT}  STARTING (tmux session alive, port not ready yet)${NC}"
+    elif pgrep -f "flutter.*--web-port=${PORT}" >/dev/null 2>&1 || (command -v tmux >/dev/null 2>&1 && $TMUX has-session -t "flutter_${name}" 2>/dev/null); then
+      echo -e "  ${Y}● ${name}   :${PORT}  STARTING (process alive, port not ready yet)${NC}"
     else
       echo -e "  ${R}○ ${name}   :${PORT}  STOPPED${NC}"
     fi
   done
   echo ""
-  $TMUX list-sessions 2>/dev/null || echo "  (no tmux sessions on $SOCK)"
+  command -v tmux >/dev/null 2>&1 && ($TMUX list-sessions 2>/dev/null || echo "  (no tmux sessions on $SOCK)")
 }
 
 reload_all() {
