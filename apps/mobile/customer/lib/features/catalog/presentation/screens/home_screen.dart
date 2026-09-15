@@ -3768,19 +3768,29 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
               },
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(_promoBanners.length, (i) {
               final isSel = i == _currentPage;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: isSel ? 14 : 5,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isSel ? const Color(0xFF16A34A) : const Color(0xFFD1D5DB),
-                  borderRadius: BorderRadius.circular(3),
+              return GestureDetector(
+                onTap: () {
+                  _pageController.animateToPage(
+                    i,
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeOutCubic,
+                  );
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: isSel ? 22 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isSel ? const Color(0xFF16A34A) : const Color(0xFFD1D5DB),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
               );
             }),

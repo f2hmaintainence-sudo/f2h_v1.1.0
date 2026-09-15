@@ -41,10 +41,10 @@ class _PromoBannerState extends State<PromoBanner> {
   void _startAutoScroll() {
     _autoScrollTimer?.cancel();
     if (_banners.length <= 1) return;
-    _autoScrollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || !_pageController.hasClients) return;
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 650),
+        duration: const Duration(milliseconds: 600),
         curve: Curves.fastOutSlowIn,
       );
     });
@@ -269,14 +269,28 @@ class _PromoBannerState extends State<PromoBanner> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(_banners.length, (index) {
                 final isSelected = index == (_currentPage % _banners.length);
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                  width: isSelected ? 8 : 5.5,
-                  height: isSelected ? 8 : 5.5,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFCBD5E1),
+                return GestureDetector(
+                  onTap: () {
+                    final currentMod = _currentPage % _banners.length;
+                    final targetPage = _currentPage + (index - currentMod);
+                    _pageController.animateToPage(
+                      targetPage,
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                    );
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: isSelected ? 20 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 );
               }),
