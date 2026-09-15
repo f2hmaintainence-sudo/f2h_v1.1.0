@@ -2508,6 +2508,9 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                         final dayOrders = _getOrdersForDate(day, allOrders);
                         final itemsCount = dayOrders.length;
 
+                        final todayDate = DateTime(now.year, now.month, now.day);
+                        final isPast = normalizedDay.isBefore(todayDate);
+
                         if (isSelected) {
                           // Expanded Selected Day Pill Card (matching reference design)
                           return Padding(
@@ -2575,31 +2578,50 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                                         Text(
                                           itemsCount > 0
                                               ? '$itemsCount item${itemsCount > 1 ? 's' : ''} $relativeDay'
-                                              : '1 item $relativeDay',
+                                              : (isPast ? 'No deliveries' : '1 item $relativeDay'),
                                           style: const TextStyle(
                                             fontSize: 11.5,
                                             fontWeight: FontWeight.w600,
                                             color: Color(0xFF1E293B),
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
-                                        // ADD / VIEW Black Pill Button
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black,
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: Text(
-                                            itemsCount > 0 ? 'VIEW' : 'ADD',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.5,
+                                        if (itemsCount > 0) ...[
+                                          const SizedBox(width: 10),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Text(
+                                              'VIEW',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.5,
+                                              ),
                                             ),
                                           ),
-                                        ),
+                                        ] else if (!isPast && !isBeyondHorizon) ...[
+                                          const SizedBox(width: 10),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Text(
+                                              'ADD',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
