@@ -778,7 +778,6 @@ class _HomeScreenState extends State<HomeScreen>
         final bool hasAddress = defaultAddr != null;
 
         final profile = session.profile;
-        final bool isMember = profile?.isMember == true;
 
         String initials = '';
         if (profile != null) {
@@ -2589,6 +2588,15 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                                     ? Colors.white
                                     : const Color(0xFF0F172A),
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Container(
+                            width: 12,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: statusColor ?? Colors.transparent,
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                         ],
