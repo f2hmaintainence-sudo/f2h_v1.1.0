@@ -34,14 +34,14 @@ start_app() {
       "cd '${DIR}' && \
        ${FLUTTER} pub get -q 2>&1 ; \
        ${FLUTTER} run --debug -d web-server \
-         --web-port=${PORT} --web-hostname=0.0.0.0 \
+         --web-port=${PORT} --web-hostname=192.168.1.112 \
          --dart-define=F2H_API_BASE_URL=${DART_API} 2>&1 | \
        tee '${LOG_DIR}/${NAME}.log'"
     echo -e "${G}  ✓ tmux session: ${SESSION}   Port: ${PORT}${NC}"
     echo -e "${G}    attach:  tmux -S ${SOCK} attach -t ${SESSION}${NC}"
   else
     pkill -f "flutter.*--web-port=${PORT}" 2>/dev/null || true
-    nohup bash -c "cd '${DIR}' && ${FLUTTER} run --debug -d web-server --web-port=${PORT} --web-hostname=0.0.0.0 --dart-define=F2H_API_BASE_URL=${DART_API} > '${LOG_DIR}/${NAME}.log' 2>&1" >/dev/null 2>&1 &
+    nohup bash -c "cd '${DIR}' && ${FLUTTER} run --debug -d web-server --web-port=${PORT} --web-hostname=192.168.1.112 --dart-define=F2H_API_BASE_URL=${DART_API} > '${LOG_DIR}/${NAME}.log' 2>&1" >/dev/null 2>&1 &
     echo -e "${G}  ✓ Background daemon started: ${NAME}   Port: ${PORT}${NC}"
   fi
   echo -e "${G}    logs:    tail -f ${LOG_DIR}/${NAME}.log${NC}"
