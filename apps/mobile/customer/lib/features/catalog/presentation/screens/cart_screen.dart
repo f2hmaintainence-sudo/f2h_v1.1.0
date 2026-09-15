@@ -248,8 +248,13 @@ class _CartScreenState extends State<CartScreen> {
                   }
                 }
 
-                // If selected date is before firstAllowedDate (e.g. today's cutoff has passed), move to firstAllowedDate
-                if (_globalOnetimeDate == null || _globalOnetimeDate!.isBefore(firstAllowedDate)) {
+                final maxDays = maxAdvanceDaysOf(context);
+                final maxAllowedDate = DateTime(now.year, now.month, now.day).add(Duration(days: maxDays));
+
+                // If selected date is before firstAllowedDate or after maxAllowedDate, reset to firstAllowedDate
+                if (_globalOnetimeDate == null ||
+                    _globalOnetimeDate!.isBefore(firstAllowedDate) ||
+                    _globalOnetimeDate!.isAfter(maxAllowedDate)) {
                   _globalOnetimeDate = firstAllowedDate;
                 }
 
@@ -1257,6 +1262,7 @@ class _CartScreenState extends State<CartScreen> {
     List<CartItemEntity> items,
   ) async {
     final now = DateTime.now();
+    final maxDays = maxAdvanceDaysOf(context);
     final sessionState = context.read<CustomerSessionCubit>().state;
     final firstDate = getFirstAllowedDate(now, sessionState.slotTimings);
 
@@ -1265,7 +1271,7 @@ class _CartScreenState extends State<CartScreen> {
       initialDate: _globalOnetimeDate ?? firstDate,
       initialSlot: _globalOnetimeSlot,
       firstDate: firstDate,
-      lastDate: now.add(const Duration(days: 30)),
+      lastDate: now.add(Duration(days: maxDays)),
       title: 'Select Delivery Date',
       slotTimings: sessionState.slotTimings,
     );

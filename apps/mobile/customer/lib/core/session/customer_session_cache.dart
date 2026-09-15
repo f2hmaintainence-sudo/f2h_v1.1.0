@@ -11,6 +11,7 @@ class CustomerSessionCache {
   static const _walletKey = 'customer_session_wallet'; 
   static const _deliveryRulesKey = 'customer_session_delivery_rules';
   static const _slotTimingsKey = 'customer_session_slot_timings';
+  static const _orderRulesKey = 'customer_session_order_rules';
   static const _todayDeliveryPartnersKey = 'customer_session_today_delivery_partners';
 
   Future<void> save(CustomerSessionState session) async {
@@ -28,6 +29,7 @@ class CustomerSessionCache {
     await prefs.setString(_walletKey, jsonEncode(session.wallet));
     await prefs.setString(_deliveryRulesKey, jsonEncode(session.deliveryRules));
     await prefs.setString(_slotTimingsKey, jsonEncode(session.slotTimings));
+    await prefs.setString(_orderRulesKey, jsonEncode(session.orderRules));
     await prefs.setString(
       _todayDeliveryPartnersKey,
       jsonEncode(session.todayDeliveryPartners.map((p) => p.toJson()).toList()),
@@ -68,6 +70,11 @@ class CustomerSessionCache {
         ? <String, dynamic>{}
         : Map<String, dynamic>.from(jsonDecode(slotTimingsJson) as Map);
 
+    final orderRulesJson = prefs.getString(_orderRulesKey);
+    final orderRules = orderRulesJson == null
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(jsonDecode(orderRulesJson) as Map);
+
     final todayPartnersJson = prefs.getString(_todayDeliveryPartnersKey);
     final todayPartners = todayPartnersJson == null
         ? <TodayDeliveryPartner>[]
@@ -83,6 +90,7 @@ class CustomerSessionCache {
       wallet: wallet,
       deliveryRules: deliveryRules,
       slotTimings: slotTimings,
+      orderRules: orderRules,
       todayDeliveryPartners: todayPartners,
     );
   }
@@ -94,6 +102,7 @@ class CustomerSessionCache {
     await prefs.remove(_walletKey);
     await prefs.remove(_deliveryRulesKey);
     await prefs.remove(_slotTimingsKey);
+    await prefs.remove(_orderRulesKey);
     await prefs.remove(_todayDeliveryPartnersKey);
   }
 

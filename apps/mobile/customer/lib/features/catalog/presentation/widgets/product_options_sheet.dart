@@ -369,11 +369,12 @@ class _ProductOptionsSheetState extends State<ProductOptionsSheet> {
                       ),
                       GestureDetector(
                         onTap: () async {
+                          final maxDays = maxAdvanceDaysOf(context);
                           final picked = await showCustomDatePicker(
                             context: context,
                             initialDate: _startDate,
                             firstDate: DateTime.now().add(const Duration(days: 1)),
-                            lastDate: DateTime.now().add(const Duration(days: 30)),
+                            lastDate: DateTime.now().add(Duration(days: maxDays)),
                             title: 'Start Date',
                           );
                           if (picked != null) {

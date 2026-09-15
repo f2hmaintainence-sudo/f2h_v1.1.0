@@ -163,8 +163,9 @@ export class CustomerBootstrapController {
       firebaseConfig,
       deliveryRulesRes,
       slotTimingsRes,
+      orderRulesRes,
       todayPartnersData,
-    ] = await Promise.all([
+    ]: any = await Promise.all([
       this.db.query(
         `SELECT ca.*,
                 b.branch_name,
@@ -202,6 +203,10 @@ export class CustomerBootstrapController {
         `SELECT config_data FROM system_configurations WHERE config_key = 'slot_timings' AND is_active = true LIMIT 1`,
       ).catch(() => null),
 
+      this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'order_rules' AND is_active = true LIMIT 1`,
+      ).catch(() => null),
+
       this.getTodayDeliveryPartners(customerId),
     ]);
 
@@ -237,6 +242,20 @@ export class CustomerBootstrapController {
       };
     }
 
+    let orderRules: any = {
+      min_order_subtotal: 40.0,
+      max_advance_days: 7,
+      auto_pause_subscription_low_balance: true,
+      subscription_advance_notice_hours: 12,
+      allow_instant_slot_switching: true,
+    };
+    if (orderRulesRes?.[0]?.config_data) {
+      orderRules = {
+        ...orderRules,
+        ...orderRulesRes[0].config_data,
+      };
+    }
+
     const addressesList = Array.isArray(addressesResult) ? addressesResult : ((addressesResult as any)?.data || []);
     const normalizedAddresses = addressesList
       .map((addr: any) => this.normalizeAddress(addr))
@@ -256,9 +275,10 @@ export class CustomerBootstrapController {
       firebase_config: firebaseConfig,
       delivery_rules: deliveryRules,
       slot_timings: slotTimings,
-      today_delivery_partners: todayPartnersData.delivery_partners,
-      current_delivery_slot: todayPartnersData.current_slot,
-      today_date: todayPartnersData.today_date,
+      order_rules: orderRules,
+      today_delivery_partners: todayPartnersData?.delivery_partners || [],
+      current_delivery_slot: todayPartnersData?.current_slot || null,
+      today_date: todayPartnersData?.today_date || null,
     };
   }
 

@@ -143,8 +143,8 @@ int _parseCutoffMinutes(dynamic timeStr, int defaultMinutes) {
   return parseTimeToMinutes(timeStr, defaultMinutes);
 }
 
-/// Returns the list of allowed delivery dates based on current time and slot cutoffs.
-List<DateTime> getAllowedDeliveryDates(DateTime now, [Map<String, dynamic>? slotTimings]) {
+/// Returns the list of allowed delivery dates based on current time, slot cutoffs, and max advance booking horizon.
+List<DateTime> getAllowedDeliveryDates(DateTime now, [Map<String, dynamic>? slotTimings, int maxAdvanceDays = 7]) {
   final List<DateTime> dates = [];
   final nowMinutes = now.hour * 60 + now.minute;
 
@@ -160,8 +160,8 @@ List<DateTime> getAllowedDeliveryDates(DateTime now, [Map<String, dynamic>? slot
     dates.add(DateTime(now.year, now.month, now.day));
   }
 
-  // Add Tomorrow through +30 days
-  for (int i = 1; i <= 30; i++) {
+  // Add Tomorrow through +maxAdvanceDays
+  for (int i = 1; i <= maxAdvanceDays; i++) {
     final d = now.add(Duration(days: i));
     dates.add(DateTime(d.year, d.month, d.day));
   }

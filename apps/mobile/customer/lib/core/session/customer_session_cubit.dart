@@ -130,3 +130,26 @@ Map<String, dynamic>? slotTimingsOf(BuildContext context) {
     return null;
   }
 }
+
+/// Admin-configured ordering rules for the current session.
+Map<String, dynamic> orderRulesOf(BuildContext context) {
+  try {
+    return context.read<CustomerSessionCubit>().state.orderRules;
+  } catch (_) {
+    return const {};
+  }
+}
+
+/// Admin-configured max advance booking horizon in days (defaults to 7 if unconfigured).
+int maxAdvanceDaysOf(BuildContext context) {
+  try {
+    final rules = context.read<CustomerSessionCubit>().state.orderRules;
+    final val = rules['max_advance_days'];
+    if (val != null) {
+      return int.tryParse(val.toString()) ?? 7;
+    }
+    return 7;
+  } catch (_) {
+    return 7;
+  }
+}

@@ -44,6 +44,9 @@ class CustomerBootstrapApi {
       slotTimings: Map<String, dynamic>.from(
         data['slot_timings'] as Map? ?? {},
       ),
+      orderRules: Map<String, dynamic>.from(
+        data['order_rules'] as Map? ?? {},
+      ),
       todayDeliveryPartners: todayPartners,
     );
   }
