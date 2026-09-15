@@ -13,7 +13,7 @@ import '../../../../app.dart';
 import '../../../../core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import '../../../../core/widgets/app_refresh_indicator.dart';
-import '../../../../core/widgets/hot_toast.dart';
+import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import '../../../../core/widgets/referral_invite_card.dart';
 import '../../../../core/network/network_bloc.dart';
 import '../../../../core/network/network_state.dart';
