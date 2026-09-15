@@ -440,50 +440,56 @@ class _BottomNav extends StatelessWidget {
     return BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
       builder: (context, sessionState) {
         final isVip = sessionState.profile?.isMember == true;
-        final activeColor = isVip ? const Color(0xFFB8860B) : kPrimary;
+        final activeColor = isVip ? const Color(0xFFB8860B) : const Color(0xFF047857);
 
-        return Container(
-          decoration: BoxDecoration(
-            color: kSurface,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
+        return Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: kSurface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+                border: Border(
+                  top: BorderSide(
+                    color: isVip ? const Color(0xFFFFD700) : kBorderLt,
+                    width: isVip ? 1.5 : 1.0,
+                  ),
+                ),
               ),
-            ],
-            border: Border(
-              top: BorderSide(
-                color: isVip ? const Color(0xFFFFD700) : kBorderLt,
-                width: isVip ? 1.5 : 1.0,
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: 56,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: List.generate(tabs.length, (i) {
+                      final tab = tabs[i];
+                      final isCenter = i == AppShell.tabWallet;
+                      return Expanded(
+                        child: _NavItem(
+                          icon: tab.$1,
+                          activeIcon: tab.$2,
+                          label: tab.$3,
+                          isActive: i == activeIndex,
+                          isCenter: isCenter,
+                          activeColor: activeColor,
+                          badge: i == AppShell.tabSubscription ? const _SubscriptionBadgeCount() : null,
+                          onTap: () => onSelect(i),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
               ),
             ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 0, bottom: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(tabs.length, (i) {
-                  final tab = tabs[i];
-                  final isCenter = i == AppShell.tabWallet;
-                  return Expanded(
-                    child: _NavItem(
-                      icon: tab.$1,
-                      activeIcon: tab.$2,
-                      label: tab.$3,
-                      isActive: i == activeIndex,
-                      isCenter: isCenter,
-                      activeColor: activeColor,
-                      badge: i == AppShell.tabSubscription ? const _SubscriptionBadgeCount() : null,
-                      onTap: () => onSelect(i),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ),
+          ],
         );
       },
     );
@@ -514,31 +520,32 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isCenter) {
+      final buttonColor = isActive ? activeColor : const Color(0xFF047857);
       return GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: Container(
-          color: Colors.transparent,
-          padding: const EdgeInsets.only(bottom: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: SizedBox(
+          height: 56,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
             children: [
-              Transform.translate(
-                offset: const Offset(0, -8),
+              // Circular Wallet button extending above top border line of navigation bar
+              Positioned(
+                top: -24,
                 child: Container(
-                  width: 46,
-                  height: 46,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: isActive ? activeColor : const Color(0xFF16653A),
+                    color: buttonColor,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: Colors.white,
-                      width: 3.0,
+                      width: 3.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: (isActive ? activeColor : const Color(0xFF16653A))
-                            .withValues(alpha: 0.35),
+                        color: buttonColor.withValues(alpha: 0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -553,14 +560,14 @@ class _NavItem extends StatelessWidget {
                   ),
                 ),
               ),
-              Transform.translate(
-                offset: const Offset(0, -6),
+              Positioned(
+                bottom: 4,
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                    color: isActive ? activeColor : kTextSub,
+                    fontSize: 10.5,
+                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                    color: isActive ? activeColor : const Color(0xFF475569),
                     letterSpacing: -0.1,
                   ),
                   maxLines: 1,
@@ -579,23 +586,25 @@ class _NavItem extends StatelessWidget {
       child: Container(
         color: Colors.transparent,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Top active indicator bar (as in reference image)
-            Container(
-              height: 2.5,
-              width: 24,
-              decoration: BoxDecoration(
-                color: isActive ? activeColor : Colors.transparent,
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(3),
+            if (isActive)
+              Container(
+                height: 2.5,
+                width: 24,
+                decoration: BoxDecoration(
+                  color: activeColor,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(3),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 5),
+              )
+            else
+              const SizedBox(height: 2.5),
+            const SizedBox(height: 3),
             SizedBox(
               width: 32,
-              height: 26,
+              height: 24,
               child: Stack(
                 clipBehavior: Clip.none,
                 alignment: Alignment.center,
@@ -606,7 +615,7 @@ class _NavItem extends StatelessWidget {
                     curve: Curves.easeOutCubic,
                     child: Icon(
                       isActive ? activeIcon : icon,
-                      color: isActive ? activeColor : kTextSub,
+                      color: isActive ? activeColor : const Color(0xFF64748B),
                       size: isActive ? 24 : 21,
                     ),
                   ),
@@ -620,7 +629,7 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive ? activeColor : kTextSub,
+                color: isActive ? activeColor : const Color(0xFF64748B),
                 letterSpacing: -0.1,
               ),
               child: Text(label, maxLines: 1, overflow: TextOverflow.visible, softWrap: false),
