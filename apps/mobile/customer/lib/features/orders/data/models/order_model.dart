@@ -203,7 +203,10 @@ class Order {
       zoneId: json['zone_id']?.toString() ?? '',
       branchId: json['branch_id']?.toString() ?? '',
       routeId: json['route_id']?.toString() ?? '',
-      deliverySlot: json['delivery_slot']?.toString() ?? '',
+      deliverySlot: json['delivery_slot']?.toString() ??
+          json['slot']?.toString() ??
+          json['deliverySlot']?.toString() ??
+          '',
       scheduledDate: normalizedScheduledDate,
       paymentMode: json['payment_mode']?.toString() ?? '',
       paymentStatus: json['payment_status']?.toString() ?? '',

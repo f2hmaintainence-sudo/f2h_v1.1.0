@@ -49,6 +49,14 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
     if (_orders.isEmpty) {
       _fetchOrdersForDate();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final catState = context.read<CatalogBloc>().state;
+        if (catState is! CatalogLoaded) {
+          context.read<CatalogBloc>().add(const LoadCatalog());
+        }
+      }
+    });
   }
 
   Future<void> _fetchOrdersForDate() async {
@@ -229,7 +237,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
     }
   }
 
-  void _openAddProductSheet(BuildContext context) {
+  void _openAddProductSheet(BuildContext context, {String? initialSlot}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -237,6 +245,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
       builder: (_) => _AddProductDateBottomSheet(
         date: widget.date,
         dateStr: _dateStr,
+        initialSlot: initialSlot,
       ),
     );
   }
@@ -275,67 +284,45 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 20, color: Color(0xFF1E293B)),
+              size: 18, color: Color(0xFF1E293B)),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               formattedDate,
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 15.5,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF0F172A),
                 letterSpacing: -0.2,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             Text(
               subtitleText,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w500,
-                color: _orders.isNotEmpty
-                    ? const Color(0xFF0284C7)
-                    : (isEligible
-                        ? const Color(0xFF059669)
-                        : const Color(0xFF64748B)),
+                color: Color(0xFF64748B),
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
         actions: [
-          if (isEligible)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: TextButton.icon(
-                onPressed: () => _openAddProductSheet(context),
-                style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFFE0F2FE),
-                  foregroundColor: const Color(0xFF0284C7),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                icon: const Icon(Icons.add_shopping_cart_rounded, size: 15),
-                label: const Text(
-                  'Add Product',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded,
                 color: Color(0xFF64748B), size: 22),
             tooltip: 'Refresh orders',
             onPressed: _fetchOrdersForDate,
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
@@ -349,6 +336,96 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
               ? _buildEmptyState(
                   context, formattedDate, isEligible, isToday, cutoffFormatted)
               : _buildOrdersList(context, isEligible),
+      bottomNavigationBar: BlocBuilder<CartBloc, CartState>(
+        builder: (context, cartState) {
+          final cartItems = (cartState is CartLoadedState)
+              ? cartState.items
+              : <CartItemEntity>[];
+          final dateCartItems =
+              cartItems.where((i) => i.deliveryDate == _dateStr).toList();
+          if (dateCartItems.isEmpty) return const SizedBox.shrink();
+
+          final totalDateItems = dateCartItems.fold<int>(
+              0, (sum, i) => sum + (i.quantity ?? 1));
+          final totalDateAmount = dateCartItems.fold<double>(
+              0.0, (sum, i) => sum + (i.unitPrice * (i.quantity ?? 1)));
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$totalDateItems item${totalDateItems > 1 ? "s" : ""} scheduled',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '₹${totalDateAmount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CartScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.shopping_cart_checkout_rounded,
+                        size: 18),
+                    label: const Text(
+                      'View Cart & Checkout',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -517,86 +594,28 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
   }
 
   Widget _buildOrdersList(BuildContext context, bool isEligible) {
+    final preferredSlot = _orders.isNotEmpty &&
+            _orders.first.deliverySlot.isNotEmpty
+        ? (_orders.first.deliverySlot.toLowerCase().contains('even')
+            ? 'Evening'
+            : 'Morning')
+        : 'Morning';
+
     return RefreshIndicator(
       onRefresh: _fetchOrdersForDate,
       color: const Color(0xFF0284C7),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
-          if (isEligible) ...[
-            _buildAddMoreBanner(context),
-            const SizedBox(height: 16),
-          ],
           ...List.generate(_orders.length, (index) {
             final order = _orders[index];
             return Padding(
-              padding:
-                  EdgeInsets.only(bottom: index < _orders.length - 1 ? 16 : 0),
+              padding: const EdgeInsets.only(bottom: 16),
               child: _buildOrderCard(context, order),
             );
           }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddMoreBanner(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F9FF),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFBAE6FD)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0284C7),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.add_shopping_cart_rounded,
-                color: Colors.white, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Want to add more products?',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0369A1),
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Schedule extra items for this delivery date',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFF0284C7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => _openAddProductSheet(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0284C7),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
-            ),
-            child: const Text('Add',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-          ),
+          // Product Add Option Below the Card
+          _buildAddProductsBelowCard(context, isEligible, preferredSlot),
         ],
       ),
     );
@@ -627,86 +646,57 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
           // Order Header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          order.id.isNotEmpty
-                              ? (order.id.startsWith('#')
-                                  ? order.id
-                                  : '#F2H-${order.id}')
-                              : '#F2H-Order',
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF334155),
-                          ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        order.id.isNotEmpty
+                            ? (order.id.startsWith('#')
+                                ? order.id
+                                : '#F2H-${order.id}')
+                            : '#F2H-Order',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF334155),
                         ),
                       ),
-                      if (order.deliverySlot.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            order.deliverySlot.toLowerCase().contains('slot')
-                                ? order.deliverySlot
-                                : '${order.deliverySlot} Slot',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF64748B),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.3),
-                      width: 1,
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.25),
+                          width: 1,
                         ),
                       ),
-                      const SizedBox(width: 5),
-                      Text(
+                      child: Text(
                         statusText,
                         style: TextStyle(
                           fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: statusColor,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 10),
+                // Delivery Slot in Order Card
+                _buildOrderSlotBadge(context, order),
               ],
             ),
           ),
@@ -717,16 +707,38 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Icon(Icons.shopping_bag_outlined,
-                    size: 16, color: Color(0xFF64748B)),
-                const SizedBox(width: 6),
-                Text(
-                  'Products in Order (${order.items.length})',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF334155),
+                Row(
+                  children: [
+                    const Icon(Icons.shopping_bag_outlined,
+                        size: 16, color: Color(0xFF64748B)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'PRODUCTS IN ORDER (${order.items.length})',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Farm Fresh',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF059669),
+                    ),
                   ),
                 ),
               ],
@@ -737,7 +749,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             itemCount: order.items.length,
             separatorBuilder: (_, index) =>
                 const Divider(height: 16, color: Color(0xFFF1F5F9)),
@@ -759,18 +771,19 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Order Total',
+                      'ORDER TOTAL',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10.5,
                         color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
                     Text(
                       '₹${order.amount.toStringAsFixed(0)}',
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF0F172A),
                       ),
@@ -781,57 +794,88 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (isOutForDelivery) ...[
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => OrderTrackingScreen(
-                                orderId: order.id,
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF0284C7)),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => OrderTrackingScreen(
+                                    orderId: order.id,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 7),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.local_shipping_outlined,
+                                      size: 15, color: Color(0xFF0284C7)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Track',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0284C7),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0284C7),
-                          side: const BorderSide(color: Color(0xFF0284C7)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        icon: const Icon(Icons.local_shipping_outlined,
-                            size: 16),
-                        label: const Text('Track',
-                            style: TextStyle(fontSize: 12.5)),
                       ),
                       const SizedBox(width: 8),
                     ],
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => OrderDetailsScreen(order: order),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0284C7),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
+                        ],
                       ),
-                      child: const Text(
-                        'View Details',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    OrderDetailsScreen(order: order),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 7),
+                            child: Text(
+                              'View Details',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -855,11 +899,12 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Thumbnail
             Container(
-              width: 58,
-              height: 58,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
@@ -867,14 +912,11 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: buildProductImage(
-                    item.productName,
-                    imageAsset: item.imagePath,
-                    width: 58,
-                    height: 58,
-                  ),
+                child: buildProductImage(
+                  item.productName,
+                  imageAsset: item.imagePath,
+                  width: 52,
+                  height: 52,
                 ),
               ),
             ),
@@ -889,33 +931,37 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                     item.productName,
                     style: const TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Row(
                     children: [
                       if (item.variantName.isNotEmpty &&
                           item.variantName.toLowerCase() != 'standard') ...[
-                        Text(
-                          item.variantName,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w500,
+                        Flexible(
+                          child: Text(
+                            item.variantName,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
                         const Text('•',
                             style: TextStyle(color: Color(0xFFCBD5E1))),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
                       ],
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1),
+                            horizontal: 6, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(4),
@@ -942,34 +988,561 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                 Text(
                   '₹${effectivePrice.toStringAsFixed(0)}',
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                     color: Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 2),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
-                      'View',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0284C7),
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 15,
-                      color: Color(0xFF0284C7),
-                    ),
-                  ],
-                ),
+                // Row(
+                //   mainAxisSize: MainAxisSize.min,
+                //   children: const [
+                //     Text(
+                //       'View',
+                //       style: TextStyle(
+                //         fontSize: 11.5,
+                //         fontWeight: FontWeight.w600,
+                //         color: Color(0xFF0F172A),
+                //       ),
+                //     ),
+                //     Icon(
+                //       Icons.chevron_right_rounded,
+                //       size: 15,
+                //       color: Color(0xFF0F172A),
+                //     ),
+                //   ],
+                // ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildOrderSlotBadge(BuildContext context, Order order) {
+    final slotTimings = slotTimingsOf(context);
+    final rawSlot = order.deliverySlot.trim();
+    final isEvening = rawSlot.toLowerCase().contains('even');
+    final slotTitle = isEvening ? 'Evening Slot' : 'Morning Slot';
+    final window = isEvening
+        ? getEveningSlotWindow(DateTime.now(), slotTimings)
+        : getMorningSlotWindow(DateTime.now(), slotTimings);
+    final timeWindow = window.timeRangeText;
+
+    final bgColor =
+        isEvening ? const Color(0xFFF5F3FF) : const Color(0xFFFFFBEB);
+    final borderColor =
+        isEvening ? const Color(0xFFDDD6FE) : const Color(0xFFFDE68A);
+    final iconColor =
+        isEvening ? const Color(0xFF7C3AED) : const Color(0xFFD97706);
+    final textColor =
+        isEvening ? const Color(0xFF6D28D9) : const Color(0xFFB45309);
+    final subtextColor =
+        isEvening ? const Color(0xFF8B5CF6) : const Color(0xFFD97706);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isEvening
+                    ? Icons.nights_stay_rounded
+                    : Icons.wb_sunny_rounded,
+                size: 13.5,
+                color: iconColor,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                slotTitle,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
+              ),
+              if (timeWindow.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '• $timeWindow',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: subtextColor,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (order.orderSource.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Text(
+              order.orderSource.toLowerCase() == 'subscription'
+                  ? 'Subscription'
+                  : 'One-Time Order',
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAddProductsBelowCard(
+    BuildContext context,
+    bool isEligible,
+    String preferredSlot,
+  ) {
+    final formattedDate = _formatFormattedDate(widget.date);
+    final cutoffFormatted = _getCutoffTimeFormatted(context);
+    final isToday = _isToday();
+
+    if (!isEligible) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEF2F2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.access_time_filled_rounded,
+                color: Color(0xFFDC2626),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isToday ? 'Orders Closed for Today' : 'Deliveries Closed',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isToday
+                        ? 'Cutoff passed at $cutoffFormatted. Order for tomorrow or upcoming dates.'
+                        : 'This date has passed and cannot accept new orders.',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF64748B),
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final catState = context.watch<CatalogBloc>().state;
+    final cartState = context.watch<CartBloc>().state;
+    final cartItems =
+        (cartState is CartLoadedState) ? cartState.items : <CartItemEntity>[];
+
+    List<Product> quickProducts = [];
+    if (catState is CatalogLoaded) {
+      quickProducts =
+          catState.products.where((p) => p.isOneTime).take(8).toList();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Main Add Products Action Card
+        Container(
+          margin: const EdgeInsets.only(top: 8, bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFBAE6FD), width: 1.2),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFFF0F9FF),
+                Colors.white,
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0284C7).withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_shopping_cart_rounded,
+                      color: Color(0xFF0284C7),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Add Products for this Date',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Schedule more fresh milk, dairy, or groceries for $formattedDate ($preferredSlot Slot).',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _openAddProductSheet(
+                    context,
+                    initialSlot: preferredSlot,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text(
+                    '+ Browse & Add Products',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Quick Add Essentials Shelf
+        if (quickProducts.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(
+                      Icons.bolt_rounded,
+                      size: 18,
+                      color: Color(0xFF0284C7),
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Quick Add Essentials',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: () => _openAddProductSheet(
+                    context,
+                    initialSlot: preferredSlot,
+                  ),
+                  child: const Text(
+                    'View All >',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0284C7),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 195,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: quickProducts.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final prod = quickProducts[index];
+                return _buildQuickProductCard(
+                  context,
+                  prod,
+                  cartItems,
+                  preferredSlot,
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildQuickProductCard(
+    BuildContext context,
+    Product product,
+    List<CartItemEntity> cartItems,
+    String preferredSlot,
+  ) {
+    final v = product.variants.isNotEmpty ? product.variants.first : null;
+    final variantId = v?.id ?? product.id;
+    final price = v?.price ?? product.price;
+    final variantLabel = v?.label ?? (product.variantName ?? '');
+
+    CartItemEntity? matchedItem;
+    for (final item in cartItems) {
+      if ((item.productId == product.id || item.variantId == variantId) &&
+          item.deliveryDate == _dateStr &&
+          item.purchaseType == 'onetime') {
+        matchedItem = item;
+        break;
+      }
+    }
+    final quantity = matchedItem?.quantity ?? 0;
+
+    void onAdd() {
+      final cartItem = CartItemEntity(
+        productId: product.id,
+        variantId: variantId,
+        productName: product.name,
+        variantName: variantLabel,
+        unitPrice: price,
+        purchaseType: 'onetime',
+        quantity: 1,
+        deliveryDate: _dateStr,
+        deliverySlot: preferredSlot,
+        imageAsset: product.imageAsset,
+        isSubscribable: product.isSubscribable,
+        isOneTime: product.isOneTime,
+        subscriptionPrice: v?.subscriptionPrice,
+      );
+      context.read<CartBloc>().add(AddToCartEvent(cartItem));
+      F2HToast.show(
+        context,
+        'Added ${product.name} for $_dateStr ($preferredSlot)',
+      );
+    }
+
+    void onRemove() {
+      if (matchedItem != null) {
+        context.read<CartBloc>().add(RemoveFromCartEvent(matchedItem));
+      }
+    }
+
+    return Container(
+      width: 136,
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF1F5F9)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: buildProductImage(
+                  product.name,
+                  imageAsset: product.imageAsset,
+                  width: 58,
+                  height: 58,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            product.name,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+              height: 1.15,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            variantLabel.isNotEmpty && variantLabel.toLowerCase() != 'standard'
+                ? variantLabel
+                : (product.category.isNotEmpty ? product.category : 'Fresh'),
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '₹${price.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              quantity == 0
+                  ? InkWell(
+                      onTap: onAdd,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color:
+                              const Color(0xFF0284C7).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFF0284C7),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Text(
+                          '+ ADD',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0284C7),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: onRemove,
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 4),
+                              child: Icon(Icons.remove_rounded,
+                                  size: 13, color: Colors.white),
+                            ),
+                          ),
+                          Text(
+                            '$quantity',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          InkWell(
+                            onTap: onAdd,
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 4),
+                              child: Icon(Icons.add_rounded,
+                                  size: 13, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -982,10 +1555,12 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
 class _AddProductDateBottomSheet extends StatefulWidget {
   final DateTime date;
   final String dateStr;
+  final String? initialSlot;
 
   const _AddProductDateBottomSheet({
     required this.date,
     required this.dateStr,
+    this.initialSlot,
   });
 
   @override
@@ -1023,7 +1598,14 @@ class _AddProductDateBottomSheetState
 
   void _initSlotIfNeeded(List<String> availableSlots) {
     if (!_initializedSlot && availableSlots.isNotEmpty) {
-      _selectedSlot = availableSlots.first;
+      if (widget.initialSlot != null &&
+          availableSlots.any((s) =>
+              s.toLowerCase() == widget.initialSlot!.toLowerCase())) {
+        _selectedSlot = availableSlots.firstWhere((s) =>
+            s.toLowerCase() == widget.initialSlot!.toLowerCase());
+      } else {
+        _selectedSlot = availableSlots.first;
+      }
       _initializedSlot = true;
     }
   }
