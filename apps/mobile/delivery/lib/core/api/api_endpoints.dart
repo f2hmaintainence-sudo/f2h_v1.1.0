@@ -29,9 +29,6 @@ class ApiEndpoints {
       // If served by Flutter web dev server (ports 8081, 8082, 5002, 3000, 8080),
       // do not send API requests to the static web server port.
       if (port == 8081 || port == 8082 || port == 5002 || port == 3000 || port == 8080 || host == 'localhost' || host == '127.0.0.1' || origin.isEmpty || origin.startsWith('null')) {
-        if (host.startsWith('192.168.') || host.startsWith('10.') || host.startsWith('172.')) {
-          return 'http://$host:5001';
-        }
         return 'https://dev.f2hfresh.com';
       }
       return origin;
