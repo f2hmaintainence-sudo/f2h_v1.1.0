@@ -83,12 +83,141 @@
       src: url('https://fonts.gstatic.com/s/materialiconssharp/v111/oPWQ_RxloXcMoHitUZRh3695O3LcarEZfc4.woff2') format('woff2'),
            url('assets/fonts/MaterialIcons-Regular.otf') format('opentype');
     }
+    /* Modern F2H Splash Loader */
+    #f2h-web-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #F0FDF4 0%, #FFFFFF 85%);
+      z-index: 999999;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    #f2h-web-splash.f2h-fade-out {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    .f2h-splash-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 32px;
+      max-width: 320px;
+    }
+    .f2h-logo-wrap {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      border-radius: 24px;
+      background: #FFFFFF;
+      box-shadow: 0 12px 32px rgba(16, 185, 129, 0.18), 0 2px 6px rgba(0, 0, 0, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      animation: f2h-pulse 2.4s ease-in-out infinite;
+    }
+    .f2h-logo {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      border-radius: 16px;
+    }
+    .f2h-fallback-icon {
+      font-size: 42px;
+      line-height: 1;
+    }
+    .f2h-brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #065F46;
+      letter-spacing: -0.4px;
+      margin-bottom: 6px;
+    }
+    .f2h-brand-sub {
+      font-size: 13px;
+      font-weight: 500;
+      color: #059669;
+      margin-bottom: 24px;
+      letter-spacing: 0.2px;
+    }
+    .f2h-bar-container {
+      width: 170px;
+      height: 4px;
+      background: #E5E7EB;
+      border-radius: 99px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 14px;
+    }
+    .f2h-bar-value {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 50%;
+      background: linear-gradient(90deg, #10B981, #059669);
+      border-radius: 99px;
+      animation: f2h-indeterminate 1.5s ease-in-out infinite;
+    }
+    .f2h-status {
+      font-size: 12px;
+      color: #6B7280;
+      font-weight: 500;
+      min-height: 18px;
+    }
+    .f2h-reload-btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 6px 14px;
+      background: #10B981;
+      color: #FFFFFF;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+    }
+    @keyframes f2h-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes f2h-indeterminate {
+      0% { left: -50%; width: 50%; }
+      50% { left: 25%; width: 60%; }
+      100% { left: 100%; width: 50%; }
+    }
   </style>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
+  <!-- Instant HTML/CSS Brand Splash (Eliminates Blank White Screen) -->
+  <div id="f2h-web-splash">
+    <div class="f2h-splash-card">
+      <div class="f2h-logo-wrap">
+        <img src="icons/Icon-192.png" alt="F2H Fresh" class="f2h-logo" onerror="this.style.display='none'; document.getElementById('f2h-fallback-icon').style.display='block';">
+        <div id="f2h-fallback-icon" class="f2h-fallback-icon" style="display:none;">🌿</div>
+      </div>
+      <div class="f2h-brand-title">F2H Fresh</div>
+      <div class="f2h-brand-sub">Farm to Home Freshness</div>
+      <div class="f2h-bar-container">
+        <div class="f2h-bar-value"></div>
+      </div>
+      <div id="f2h-splash-status" class="f2h-status">Starting F2H Fresh...</div>
+    </div>
+  </div>
+
   <script>
-    // 1. Force unregister any existing service workers
+    // 1. Force unregister any stale service workers
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) {
@@ -96,14 +225,51 @@
         }
       });
     }
-    // 2. Wipe browser CacheStorage so new JS/WASM builds are loaded fresh
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) {
-          caches.delete(name);
-        }
-      });
+
+    // 2. Dynamic status progression for smooth user feedback
+    const statusEl = document.getElementById('f2h-splash-status');
+    const timer1 = setTimeout(() => { if (statusEl) statusEl.innerText = 'Loading modules & assets...'; }, 4000);
+    const timer2 = setTimeout(() => { if (statusEl) statusEl.innerText = 'Initializing components...'; }, 10000);
+    const timer3 = setTimeout(() => { if (statusEl) statusEl.innerText = 'Almost ready...'; }, 20000);
+    const timer4 = setTimeout(() => {
+      if (statusEl) {
+        statusEl.innerHTML = 'Taking longer than usual?<br><button class="f2h-reload-btn" onclick="location.reload()">Reload App</button>';
+      }
+    }, 35000);
+
+    // 3. Dismiss splash smoothly once Flutter mounts its view or renders first frame
+    let splashDismissed = false;
+    function dismissSplash() {
+      if (splashDismissed) return;
+      splashDismissed = true;
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
+      const splash = document.getElementById('f2h-web-splash');
+      if (splash) {
+        splash.classList.add('f2h-fade-out');
+        setTimeout(() => splash.remove(), 450);
+      }
     }
+
+    window.addEventListener('flutter-first-frame', dismissSplash);
+
+    // MutationObserver fallback to catch when Flutter DOM mounts
+    const observer = new MutationObserver(() => {
+      const flutterView = document.querySelector('flutter-view, flt-glass-pane');
+      if (flutterView) {
+        observer.disconnect();
+        // Give a frame for content to paint
+        requestAnimationFrame(() => setTimeout(dismissSplash, 120));
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // 4. Catch unexpected startup errors
+    window.addEventListener('error', function(e) {
+      console.error('[F2H Startup Error]', e);
+    });
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
