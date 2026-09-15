@@ -2360,10 +2360,9 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
 
     final normalizedDay = DateTime(day.year, day.month, day.day);
     if (normalizedDay.isAfter(maxAllowedDate)) {
-      HotToast.show(
+      F2HToast.info(
         context,
         'Booking horizon is up to $maxDays days in advance',
-        type: HotToastType.warning,
       );
       return;
     }
