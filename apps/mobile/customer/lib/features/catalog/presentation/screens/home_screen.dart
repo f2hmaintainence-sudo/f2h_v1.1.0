@@ -877,7 +877,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Select Branch • ${branchDisplay.isNotEmpty ? branchDisplay : "Indiranagar, Bengaluru"}',
+                        ' ${branchDisplay.isNotEmpty ? branchDisplay : "Indiranagar, Bengaluru"}',
                         style: const TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,

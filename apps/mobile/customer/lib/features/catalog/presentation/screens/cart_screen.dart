@@ -821,56 +821,7 @@ class _CartScreenState extends State<CartScreen> {
       child: SafeArea(
         child: Row(
           children: [
-            // Button 1 (Left): Delivery Date Button (if one-time items exist)
-            if (hasOnetimeItems) ...[
-              Expanded(
-                flex: 5,
-                child: GestureDetector(
-                  onTap: () => _selectGlobalDate(context, filteredItems),
-                  child: Container(
-                    height: 50,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: kSurface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: kBorderLt),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.calendar_today_rounded,
-                          size: 16,
-                          color: kPrimary,
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            '$dateFormatted$slotInitial',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              color: kPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.edit_rounded,
-                          size: 13,
-                          color: kPrimary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-            ],
-
-            // Button 2 (Right): Proceed to Checkout Button (without price)
+            // Button 1 (Left): Proceed to Checkout Button (without price)
             Expanded(
               flex: 6,
               child: SizedBox(
@@ -952,14 +903,17 @@ class _CartScreenState extends State<CartScreen> {
                     });
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: hasOnetimeItems ? Colors.white : kPrimary,
+                    foregroundColor: hasOnetimeItems ? kPrimary : Colors.white,
                     elevation: 0,
+                    side: hasOnetimeItems
+                        ? const BorderSide(color: kPrimary, width: 1.5)
+                        : null,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
@@ -968,15 +922,75 @@ class _CartScreenState extends State<CartScreen> {
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                           letterSpacing: 0.1,
+                          color: hasOnetimeItems ? kPrimary : Colors.white,
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, size: 18),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 18,
+                        color: hasOnetimeItems ? kPrimary : Colors.white,
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
+
+            // Button 2 (Right): Delivery Date Button (if one-time items exist)
+            if (hasOnetimeItems) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 5,
+                child: GestureDetector(
+                  onTap: () => _selectGlobalDate(context, filteredItems),
+                  child: Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: kPrimary,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kPrimary.withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '$dateFormatted$slotInitial',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.edit_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

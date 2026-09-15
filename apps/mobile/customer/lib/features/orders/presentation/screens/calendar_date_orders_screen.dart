@@ -9,14 +9,18 @@ import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_state.da
 import 'package:f2h_customer/features/catalog/presentation/bloc/catalog_event.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_state.dart';
-import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_event.dart';
 import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
 import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/cart_screen.dart';
+import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
+import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_view_screen.dart';
+import 'package:f2h_customer/features/catalog/presentation/widgets/product_grid_card.dart';
 import 'package:f2h_customer/features/orders/presentation/screens/order_details_screen.dart';
 import 'package:f2h_customer/features/orders/presentation/screens/order_tracking_screen.dart';
+import 'package:f2h_customer/app.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
+import 'package:f2h_customer/theme/app_colors.dart';
 
 class CalendarDateOrdersScreen extends StatefulWidget {
   final DateTime date;
@@ -237,17 +241,17 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
     }
   }
 
-  void _openAddProductSheet(BuildContext context, {String? initialSlot}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _AddProductDateBottomSheet(
-        date: widget.date,
-        dateStr: _dateStr,
-        initialSlot: initialSlot,
-      ),
-    );
+  void _navigateToShop(BuildContext context) {
+    final shell = AppShell.of(context);
+    if (shell != null) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      shell.setTab(AppShell.tabShop);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const BrowseScreen()),
+      );
+    }
   }
 
   @override
@@ -328,7 +332,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                color: Color(0xFF0284C7),
+                color: kPrimary,
                 strokeWidth: 2.5,
               ),
             )
@@ -401,7 +405,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0284C7),
+                      backgroundColor: kPrimary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 18, vertical: 12),
@@ -463,7 +467,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                     : Icons.event_busy_rounded,
                 size: 36,
                 color: isEligible
-                    ? const Color(0xFF0284C7)
+                    ? kPrimary
                     : const Color(0xFF94A3B8),
               ),
             ),
@@ -523,9 +527,9 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () => _openAddProductSheet(context),
+                onPressed: () => _navigateToShop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
+                  backgroundColor: kPrimary,
                   foregroundColor: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
@@ -603,7 +607,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
 
     return RefreshIndicator(
       onRefresh: _fetchOrdersForDate,
-      color: const Color(0xFF0284C7),
+      color: kPrimary,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
@@ -1173,13 +1177,24 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
 
     final catState = context.watch<CatalogBloc>().state;
     final cartState = context.watch<CartBloc>().state;
-    final cartItems =
-        (cartState is CartLoadedState) ? cartState.items : <CartItemEntity>[];
+    final cartVariantIds = (cartState is CartLoadedState)
+        ? cartState.items.map((i) => i.variantId).toSet()
+        : <String>{};
 
     List<Product> quickProducts = [];
     if (catState is CatalogLoaded) {
-      quickProducts =
-          catState.products.where((p) => p.isOneTime).take(8).toList();
+      quickProducts = catState.products
+          .where((p) =>
+              !p.isSubscribable &&
+              !cartVariantIds.contains(p.id) &&
+              !p.isOutOfStock)
+          .toList();
+      if (quickProducts.isEmpty) {
+        quickProducts = catState.products
+            .where((p) => !p.isOutOfStock)
+            .take(10)
+            .toList();
+      }
     }
 
     return Column(
@@ -1192,18 +1207,18 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFBAE6FD), width: 1.2),
+            border: Border.all(color: const Color(0xFFBBF7D0), width: 1.2),
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFFF0F9FF),
+                Color(0xFFF0FDF4),
                 Colors.white,
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0284C7).withValues(alpha: 0.05),
+                color: kPrimary.withValues(alpha: 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1219,12 +1234,12 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                      color: kPrimary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.add_shopping_cart_rounded,
-                      color: Color(0xFF0284C7),
+                      color: kPrimary,
                       size: 22,
                     ),
                   ),
@@ -1260,12 +1275,9 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _openAddProductSheet(
-                    context,
-                    initialSlot: preferredSlot,
-                  ),
+                  onPressed: () => _navigateToShop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0284C7),
+                    backgroundColor: kPrimary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -1275,7 +1287,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                   ),
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text(
-                    '+ Browse & Add Products',
+                    'Browse & Add Products',
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
@@ -1299,7 +1311,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                     Icon(
                       Icons.bolt_rounded,
                       size: 18,
-                      color: Color(0xFF0284C7),
+                      color: kPrimary,
                     ),
                     SizedBox(width: 4),
                     Text(
@@ -1313,16 +1325,13 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                   ],
                 ),
                 GestureDetector(
-                  onTap: () => _openAddProductSheet(
-                    context,
-                    initialSlot: preferredSlot,
-                  ),
+                  onTap: () => _navigateToShop(context),
                   child: const Text(
                     'View All >',
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF0284C7),
+                      color: kPrimary,
                     ),
                   ),
                 ),
@@ -1330,854 +1339,28 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            height: 195,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: quickProducts.length,
-              separatorBuilder: (_, index) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final prod = quickProducts[index];
-                return _buildQuickProductCard(
-                  context,
-                  prod,
-                  cartItems,
-                  preferredSlot,
-                );
-              },
-            ),
+          InfiniteAutoScrollList(
+            height: 285,
+            itemWidth: 165,
+            autoScrollInterval: const Duration(milliseconds: 10000),
+            scrollDuration: const Duration(milliseconds: 1000),
+            animateClockwise: false,
+            items: quickProducts
+                .map(
+                  (p) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: SizedBox(
+                      width: 165,
+                      child: ProductGridCard(p),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
         ],
       ],
     );
   }
-
-  Widget _buildQuickProductCard(
-    BuildContext context,
-    Product product,
-    List<CartItemEntity> cartItems,
-    String preferredSlot,
-  ) {
-    final v = product.variants.isNotEmpty ? product.variants.first : null;
-    final variantId = v?.id ?? product.id;
-    final price = v?.price ?? product.price;
-    final variantLabel = v?.label ?? (product.variantName ?? '');
-
-    CartItemEntity? matchedItem;
-    for (final item in cartItems) {
-      if ((item.productId == product.id || item.variantId == variantId) &&
-          item.deliveryDate == _dateStr &&
-          item.purchaseType == 'onetime') {
-        matchedItem = item;
-        break;
-      }
-    }
-    final quantity = matchedItem?.quantity ?? 0;
-
-    void onAdd() {
-      final cartItem = CartItemEntity(
-        productId: product.id,
-        variantId: variantId,
-        productName: product.name,
-        variantName: variantLabel,
-        unitPrice: price,
-        purchaseType: 'onetime',
-        quantity: 1,
-        deliveryDate: _dateStr,
-        deliverySlot: preferredSlot,
-        imageAsset: product.imageAsset,
-        isSubscribable: product.isSubscribable,
-        isOneTime: product.isOneTime,
-        subscriptionPrice: v?.subscriptionPrice,
-      );
-      context.read<CartBloc>().add(AddToCartEvent(cartItem));
-      F2HToast.show(
-        context,
-        'Added ${product.name} for $_dateStr ($preferredSlot)',
-      );
-    }
-
-    void onRemove() {
-      if (matchedItem != null) {
-        context.read<CartBloc>().add(RemoveFromCartEvent(matchedItem));
-      }
-    }
-
-    return Container(
-      width: 136,
-      padding: const EdgeInsets.all(9),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFF1F5F9)),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: buildProductImage(
-                  product.name,
-                  imageAsset: product.imageAsset,
-                  width: 58,
-                  height: 58,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            product.name,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
-              height: 1.15,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            variantLabel.isNotEmpty && variantLabel.toLowerCase() != 'standard'
-                ? variantLabel
-                : (product.category.isNotEmpty ? product.category : 'Fresh'),
-            style: const TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF64748B),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '₹${price.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              quantity == 0
-                  ? InkWell(
-                      onTap: onAdd,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF0284C7).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(0xFF0284C7),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Text(
-                          '+ ADD',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0284C7),
-                          ),
-                        ),
-                      ),
-                    )
-                  : Container(
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0284C7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: onRemove,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4),
-                              child: Icon(Icons.remove_rounded,
-                                  size: 13, color: Colors.white),
-                            ),
-                          ),
-                          Text(
-                            '$quantity',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          InkWell(
-                            onTap: onAdd,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 4),
-                              child: Icon(Icons.add_rounded,
-                                  size: 13, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// ══════════════════════════════════════════════════════════
-//  ADD PRODUCT FOR SPECIFIC DATE BOTTOM SHEET
-// ══════════════════════════════════════════════════════════
 
-class _AddProductDateBottomSheet extends StatefulWidget {
-  final DateTime date;
-  final String dateStr;
-  final String? initialSlot;
-
-  const _AddProductDateBottomSheet({
-    required this.date,
-    required this.dateStr,
-    this.initialSlot,
-  });
-
-  @override
-  State<_AddProductDateBottomSheet> createState() =>
-      _AddProductDateBottomSheetState();
-}
-
-class _AddProductDateBottomSheetState
-    extends State<_AddProductDateBottomSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-  String _selectedCategory = 'All';
-  String _selectedSlot = 'Morning';
-  bool _initializedSlot = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Ensure catalog is loaded
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final catState = context.read<CatalogBloc>().state;
-        if (catState is! CatalogLoaded) {
-          context.read<CatalogBloc>().add(const LoadCatalog());
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _initSlotIfNeeded(List<String> availableSlots) {
-    if (!_initializedSlot && availableSlots.isNotEmpty) {
-      if (widget.initialSlot != null &&
-          availableSlots.any((s) =>
-              s.toLowerCase() == widget.initialSlot!.toLowerCase())) {
-        _selectedSlot = availableSlots.firstWhere((s) =>
-            s.toLowerCase() == widget.initialSlot!.toLowerCase());
-      } else {
-        _selectedSlot = availableSlots.first;
-      }
-      _initializedSlot = true;
-    }
-  }
-
-  String _formatSheetDate(DateTime d) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    return '${weekdays[d.weekday - 1]}, ${d.day} ${months[d.month - 1]} ${d.year}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final slotTimings = slotTimingsOf(context);
-    final availableSlots =
-        getAvailableSlots(widget.date, DateTime.now(), slotTimings);
-    _initSlotIfNeeded(availableSlots);
-
-    final catState = context.watch<CatalogBloc>().state;
-    final cartState = context.watch<CartBloc>().state;
-    final List<CartItemEntity> cartItems =
-        (cartState is CartLoadedState) ? cartState.items : [];
-
-    // Filter items scheduled for this date
-    final dateCartItems =
-        cartItems.where((i) => i.deliveryDate == widget.dateStr).toList();
-    final totalDateItems = dateCartItems.fold<int>(
-        0, (sum, i) => sum + (i.quantity ?? 1));
-    final totalDateAmount = dateCartItems.fold<double>(
-        0.0, (sum, i) => sum + (i.unitPrice * (i.quantity ?? 1)));
-
-    List<Product> allProducts = [];
-    List<String> categories = ['All'];
-
-    if (catState is CatalogLoaded) {
-      allProducts = catState.products.where((p) => p.isOneTime).toList();
-      for (final p in allProducts) {
-        final cat = p.category.trim();
-        if (cat.isNotEmpty && !categories.contains(cat)) {
-          categories.add(cat);
-        }
-      }
-    }
-
-    final filteredProducts = allProducts.where((p) {
-      final matchesSearch = _searchQuery.isEmpty ||
-          p.name.toLowerCase().contains(_searchQuery) ||
-          p.category.toLowerCase().contains(_searchQuery);
-      final matchesCategory = _selectedCategory == 'All' ||
-          p.category.toLowerCase() == _selectedCategory.toLowerCase();
-      return matchesSearch && matchesCategory;
-    }).toList();
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      child: Column(
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 8),
-              width: 38,
-              height: 4.5,
-              decoration: BoxDecoration(
-                color: const Color(0xFFCBD5E1),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 4, 12, 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.add_shopping_cart_rounded,
-                              size: 18, color: Color(0xFF0284C7)),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Add Products for Delivery',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Scheduled: ${_formatSheetDate(widget.date)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded,
-                      color: Color(0xFF64748B), size: 22),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
-          // Slot Selector Bar (if slots available)
-          if (availableSlots.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFF8FAFC),
-              child: Row(
-                children: [
-                  const Icon(Icons.access_time_rounded,
-                      size: 15, color: Color(0xFF64748B)),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Delivery Slot:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF475569),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ...availableSlots.map((slot) {
-                    final isSelected = _selectedSlot.toLowerCase() ==
-                        slot.toLowerCase();
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() => _selectedSlot = slot);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFF0284C7)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF0284C7)
-                                  : const Color(0xFFCBD5E1),
-                            ),
-                          ),
-                          child: Text(
-                            slot,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? Colors.white
-                                  : const Color(0xFF334155),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-
-          // Search Field
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) =>
-                    setState(() => _searchQuery = val.trim().toLowerCase()),
-                decoration: InputDecoration(
-                  hintText: 'Search products by name...',
-                  hintStyle: const TextStyle(
-                      fontSize: 13, color: Color(0xFF94A3B8)),
-                  prefixIcon: const Icon(Icons.search_rounded,
-                      size: 19, color: Color(0xFF64748B)),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded,
-                              size: 16, color: Color(0xFF64748B)),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-          ),
-
-          // Category Pills
-          if (categories.length > 1)
-            Container(
-              height: 36,
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: categories.length,
-                separatorBuilder: (_, index) => const SizedBox(width: 6),
-                itemBuilder: (context, idx) {
-                  final cat = categories[idx];
-                  final isSelected = _selectedCategory == cat;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedCategory = cat),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF0284C7)
-                            : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF475569),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-          const SizedBox(height: 4),
-
-          // Products List
-          Expanded(
-            child: catState is! CatalogLoaded
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF0284C7),
-                      strokeWidth: 2.5,
-                    ),
-                  )
-                : filteredProducts.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchQuery.isNotEmpty
-                              ? 'No products match "$_searchQuery"'
-                              : 'No products available for this category',
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF94A3B8)),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        itemCount: filteredProducts.length,
-                        separatorBuilder: (_, index) => const Divider(
-                            height: 12, color: Color(0xFFF1F5F9)),
-                        itemBuilder: (context, index) {
-                          final product = filteredProducts[index];
-                          return _buildCatalogProductRow(
-                            context,
-                            product,
-                            cartItems,
-                          );
-                        },
-                      ),
-          ),
-
-          // Bottom Bar for Checkout
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        totalDateItems > 0
-                            ? '$totalDateItems item${totalDateItems > 1 ? "s" : ""} scheduled'
-                            : '0 items scheduled',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF475569),
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        '₹${totalDateAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: totalDateItems > 0
-                      ? () {
-                          Navigator.of(context).pop();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const CartScreen(),
-                            ),
-                          );
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0284C7),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFFCBD5E1),
-                    disabledForegroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  icon: const Icon(Icons.shopping_cart_checkout_rounded,
-                      size: 18),
-                  label: const Text(
-                    'View Cart & Checkout',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCatalogProductRow(
-    BuildContext context,
-    Product product,
-    List<CartItemEntity> cartItems,
-  ) {
-    final v = product.variants.isNotEmpty ? product.variants.first : null;
-    final variantId = v?.id ?? product.id;
-    final price = v?.price ?? product.price;
-    final variantLabel = v?.label ?? (product.variantName ?? '');
-
-    // Check quantity in cart for this delivery date
-    CartItemEntity? matchedItem;
-    for (final item in cartItems) {
-      if ((item.productId == product.id || item.variantId == variantId) &&
-          item.deliveryDate == widget.dateStr &&
-          item.purchaseType == 'onetime') {
-        matchedItem = item;
-        break;
-      }
-    }
-    final quantity = matchedItem?.quantity ?? 0;
-
-    void onAdd() {
-      final cartItem = CartItemEntity(
-        productId: product.id,
-        variantId: variantId,
-        productName: product.name,
-        variantName: variantLabel,
-        unitPrice: price,
-        purchaseType: 'onetime',
-        quantity: 1,
-        deliveryDate: widget.dateStr,
-        deliverySlot: _selectedSlot,
-        imageAsset: product.imageAsset,
-        isSubscribable: product.isSubscribable,
-        isOneTime: product.isOneTime,
-        subscriptionPrice: v?.subscriptionPrice,
-      );
-      context.read<CartBloc>().add(AddToCartEvent(cartItem));
-    }
-
-    void onRemove() {
-      if (matchedItem != null) {
-        context.read<CartBloc>().add(RemoveFromCartEvent(matchedItem));
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          // Product Thumbnail
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: buildProductImage(
-                  product.name,
-                  imageAsset: product.imageAsset,
-                  width: 52,
-                  height: 52,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Name and Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    if (variantLabel.isNotEmpty &&
-                        variantLabel.toLowerCase() != 'standard') ...[
-                      Text(
-                        variantLabel,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text('•',
-                          style: TextStyle(color: Color(0xFFCBD5E1))),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      '₹${price.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Add / Stepper controls
-          quantity == 0
-              ? OutlinedButton(
-                  onPressed: onAdd,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0284C7),
-                    side: const BorderSide(color: Color(0xFF0284C7), width: 1.2),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
-                    minimumSize: const Size(64, 32),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    '+ ADD',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                )
-              : Container(
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0284C7),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_rounded,
-                            size: 16, color: Colors.white),
-                        onPressed: onRemove,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 28),
-                      ),
-                      Text(
-                        '$quantity',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_rounded,
-                            size: 16, color: Colors.white),
-                        onPressed: onAdd,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 28),
-                      ),
-                    ],
-                  ),
-                ),
-        ],
-      ),
-    );
-  }
-}
