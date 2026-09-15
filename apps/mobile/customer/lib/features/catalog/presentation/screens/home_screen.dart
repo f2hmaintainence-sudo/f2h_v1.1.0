@@ -2162,6 +2162,7 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
   late final PageController _weekPageController;
   late DateTime _selectedDate;
   int _weekOffset = 0;
+  bool _isCollapsed = false;
 
   @override
   void initState() {
@@ -2338,7 +2339,7 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Month Header Row with Quick Date Picker
+          // Month Header Row with Quick Date Picker & Collapse Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2387,166 +2388,200 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                   ],
                 ],
               ),
-              // Quick Date Picker Icon
-              GestureDetector(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime(now.year - 1),
-                    lastDate: DateTime(now.year + 2),
-                    builder: (context, child) {
-                      return Theme(
-                        data: Theme.of(context).copyWith(
-                          colorScheme: const ColorScheme.light(
-                            primary: Color(0xFF0284C7),
-                            onPrimary: Colors.white,
-                            onSurface: Color(0xFF0F172A),
-                          ),
-                        ),
-                        child: child!,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Quick Date Picker Icon
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate,
+                        firstDate: DateTime(now.year - 1),
+                        lastDate: DateTime(now.year + 2),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFF0284C7),
+                                onPrimary: Colors.white,
+                                onSurface: Color(0xFF0F172A),
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
                       );
+                      if (picked != null) {
+                        final diff =
+                            picked.difference(currentWeekSunday).inDays;
+                        final offset = (diff / 7).floor();
+                        setState(() {
+                          _weekOffset = offset;
+                          _selectedDate = picked;
+                        });
+                        _weekPageController
+                            .jumpToPage(_kInitialWeekPage + offset);
+                        _handleDateClick(picked, allOrders);
+                      }
                     },
-                  );
-                  if (picked != null) {
-                    final diff = picked.difference(currentWeekSunday).inDays;
-                    final offset = (diff / 7).floor();
-                    setState(() {
-                      _weekOffset = offset;
-                      _selectedDate = picked;
-                    });
-                    _weekPageController.jumpToPage(_kInitialWeekPage + offset);
-                    _handleDateClick(picked, allOrders);
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFD6EAF8)),
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFD6EAF8)),
+                      ),
+                      child: const Icon(
+                        Icons.edit_calendar_rounded,
+                        size: 15,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.edit_calendar_rounded,
-                    size: 15,
-                    color: Color(0xFF0284C7),
+                  const SizedBox(width: 6),
+                  // Collapse / Expand Toggle Button
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isCollapsed = !_isCollapsed;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFD6EAF8)),
+                      ),
+                      child: Icon(
+                        _isCollapsed
+                            ? Icons.keyboard_arrow_down_rounded
+                            : Icons.keyboard_arrow_up_rounded,
+                        size: 16,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
 
-          const SizedBox(height: 10),
+          if (!_isCollapsed) ...[
+            const SizedBox(height: 10),
 
-          // 7 Days of the Week Selector (Smooth Horizontal Swipeable PageView)
-          SizedBox(
-            height: 64,
-            child: PageView.builder(
-              controller: _weekPageController,
-              onPageChanged: (pageIndex) {
-                setState(() {
-                  _weekOffset = pageIndex - _kInitialWeekPage;
-                });
-              },
-              itemBuilder: (context, pageIndex) {
-                final offset = pageIndex - _kInitialWeekPage;
-                final sunday =
-                    currentWeekSunday.add(Duration(days: offset * 7));
-                final pageDays =
-                    List.generate(7, (i) => sunday.add(Duration(days: i)));
+            // 7 Days of the Week Selector (Smooth Horizontal Swipeable PageView)
+            SizedBox(
+              height: 64,
+              child: PageView.builder(
+                controller: _weekPageController,
+                onPageChanged: (pageIndex) {
+                  setState(() {
+                    _weekOffset = pageIndex - _kInitialWeekPage;
+                  });
+                },
+                itemBuilder: (context, pageIndex) {
+                  final offset = pageIndex - _kInitialWeekPage;
+                  final sunday =
+                      currentWeekSunday.add(Duration(days: offset * 7));
+                  final pageDays =
+                      List.generate(7, (i) => sunday.add(Duration(days: i)));
 
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: pageDays.map((day) {
-                    final isToday = _isSameDay(day, now);
-                    final isSelected = _isSameDay(day, _selectedDate);
-                    final dayName = isToday
-                        ? 'Today'
-                        : const [
-                            'Sun',
-                            'Mon',
-                            'Tue',
-                            'Wed',
-                            'Thu',
-                            'Fri',
-                            'Sat'
-                          ][day.weekday % 7];
-                    final dateNum = day.day.toString().padLeft(2, '0');
-                    final statusColor =
-                        _getStatusColorForDay(day, allOrders, subState);
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: pageDays.map((day) {
+                      final isToday = _isSameDay(day, now);
+                      final isSelected = _isSameDay(day, _selectedDate);
+                      final dayName = isToday
+                          ? 'Today'
+                          : const [
+                              'Sun',
+                              'Mon',
+                              'Tue',
+                              'Wed',
+                              'Thu',
+                              'Fri',
+                              'Sat'
+                            ][day.weekday % 7];
+                      final dateNum = day.day.toString().padLeft(2, '0');
+                      final statusColor =
+                          _getStatusColorForDay(day, allOrders, subState);
 
-                    return GestureDetector(
-                      onTap: () => _handleDateClick(day, allOrders),
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            dayName,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: isSelected
-                                  ? const Color(0xFF0284C7)
-                                  : const Color(0xFF475569),
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 32,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF1E88E5) // solid vivid blue circle
-                                  : Colors.transparent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              dateNum,
+                      return GestureDetector(
+                        onTap: () => _handleDateClick(day, allOrders),
+                        behavior: HitTestBehavior.opaque,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              dayName,
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 11.5,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                                 color: isSelected
-                                    ? Colors.white
-                                    : const Color(0xFF0F172A),
+                                    ? const Color(0xFF0284C7)
+                                    : const Color(0xFF475569),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Status Indicator under each day (matching legend)
-                          Container(
-                            width: 13,
-                            height: 3.5,
-                            decoration: BoxDecoration(
-                              color: statusColor ?? Colors.transparent,
-                              borderRadius: BorderRadius.circular(2),
+                            const SizedBox(height: 5),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 32,
+                              height: 32,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(
+                                        0xFF1E88E5) // solid vivid blue circle
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                dateNum,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
+                            const SizedBox(height: 4),
+                            // Status Indicator under each day (matching legend)
+                            Container(
+                              width: 13,
+                              height: 3.5,
+                              decoration: BoxDecoration(
+                                color: statusColor ?? Colors.transparent,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
             ),
-          ),
 
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
 
-          // Status Legend Row: Delivered, Upcoming, Vacation, On Hold
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _legendItem(const Color(0xFF10B981), 'Delivered'),
-              _legendItem(const Color(0xFF38BDF8), 'Upcoming'),
-              _legendItem(const Color(0xFFF59E0B), 'Vacation'),
-              _legendItem(const Color(0xFFEF4444), 'On Hold'),
-            ],
-          ),
+            // Status Legend Row: Delivered, Upcoming, Vacation, On Hold
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _legendItem(const Color(0xFF10B981), 'Delivered'),
+                _legendItem(const Color(0xFF38BDF8), 'Upcoming'),
+                _legendItem(const Color(0xFFF59E0B), 'Vacation'),
+                _legendItem(const Color(0xFFEF4444), 'On Hold'),
+              ],
+            ),
+          ],
         ],
       ),
     );
