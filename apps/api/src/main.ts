@@ -302,7 +302,7 @@ async function bootstrap() {
         ) {
           return callback(null, true);
         }
-      } catch {}
+      } catch { }
 
       return callback(new Error(`Origin not allowed by CORS: ${origin}`));
     },
@@ -316,18 +316,10 @@ async function bootstrap() {
       'X-Plt',    // compact: ac=android_customer, ic=ios_customer, ad/id=delivery
       'X-Ver',    // compact: semver build string e.g. 1.0.3+10
       'X-Csrf',   // compact: CSRF uuid for mutations
-      'X-Integrity-Token',
-      'X-Integrity-Nonce',
-      'X-Integrity-Unavailable',
-      'X-Integrity-App',
       'x-role',
       'x-app-platform',
       'x-app-version',
       'x-csrf-token',
-      'x-integrity-token',
-      'x-integrity-nonce',
-      'x-integrity-unavailable',
-      'x-integrity-app',
       'x-requested-with',
       'accept',
       'origin',
