@@ -13,6 +13,7 @@ import '../../../../app.dart';
 import '../../../../core/session/customer_session_cubit.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import '../../../../core/widgets/app_refresh_indicator.dart';
+import '../../../../core/widgets/hot_toast.dart';
 import '../../../../core/widgets/referral_invite_card.dart';
 import '../../../../core/network/network_bloc.dart';
 import '../../../../core/network/network_state.dart';
@@ -2352,6 +2353,21 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
   }
 
   void _handleDateClick(DateTime day, List<Order> allOrders) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final maxDays = maxAdvanceDaysOf(context);
+    final maxAllowedDate = today.add(Duration(days: maxDays));
+
+    final normalizedDay = DateTime(day.year, day.month, day.day);
+    if (normalizedDay.isAfter(maxAllowedDate)) {
+      HotToast.show(
+        context,
+        'Booking horizon is up to $maxDays days in advance',
+        type: HotToastType.warning,
+      );
+      return;
+    }
+
     setState(() {
       _selectedDate = day;
     });
@@ -2526,6 +2542,9 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                 });
               },
               itemBuilder: (context, pageIndex) {
+                final maxDays = maxAdvanceDaysOf(context);
+                final maxAllowedDate = DateTime(now.year, now.month, now.day).add(Duration(days: maxDays));
+
                 final offset = pageIndex - _kInitialWeekPage;
                 final sunday =
                     currentWeekSunday.add(Duration(days: offset * 7));
@@ -2537,6 +2556,9 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                   children: pageDays.map((day) {
                     final isToday = _isSameDay(day, now);
                     final isSelected = _isSameDay(day, _selectedDate);
+                    final normalizedDay = DateTime(day.year, day.month, day.day);
+                    final isBeyondHorizon = normalizedDay.isAfter(maxAllowedDate);
+
                     final dayName = isToday
                         ? 'Today'
                         : const [
@@ -2549,8 +2571,9 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                             'Sat'
                           ][day.weekday % 7];
                     final dateNum = day.day.toString();
-                    final statusColor =
-                        _getStatusColorForDay(day, allOrders, subState);
+                    final statusColor = isBeyondHorizon
+                        ? null
+                        : _getStatusColorForDay(day, allOrders, subState);
 
                     return GestureDetector(
                       onTap: () => _handleDateClick(day, allOrders),
@@ -2565,9 +2588,11 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                               fontWeight: isToday || isSelected
                                   ? FontWeight.w800
                                   : FontWeight.w500,
-                              color: isToday
-                                  ? const Color(0xFF0EA5E9)
-                                  : const Color(0xFF64748B),
+                              color: isBeyondHorizon
+                                  ? const Color(0xFFCBD5E1)
+                                  : (isToday
+                                      ? const Color(0xFF0EA5E9)
+                                      : const Color(0xFF64748B)),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -2577,9 +2602,11 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                             height: 32,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: isToday || isSelected
-                                  ? const Color(0xFF0EA5E9)
-                                  : Colors.transparent,
+                              color: isBeyondHorizon
+                                  ? const Color(0xFFF8FAFC)
+                                  : (isToday || isSelected
+                                      ? const Color(0xFF0EA5E9)
+                                      : Colors.transparent),
                               shape: BoxShape.circle,
                             ),
                             child: Text(
@@ -2587,9 +2614,11 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: isToday || isSelected
-                                    ? Colors.white
-                                    : const Color(0xFF0F172A),
+                                color: isBeyondHorizon
+                                    ? const Color(0xFF94A3B8)
+                                    : (isToday || isSelected
+                                        ? Colors.white
+                                        : const Color(0xFF0F172A)),
                               ),
                             ),
                           ),
