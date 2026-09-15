@@ -10,7 +10,7 @@ import 'package:f2h_customer/core/widgets/popup_banner_widget.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/home_screen.dart';
 import 'package:f2h_customer/features/catalog/presentation/screens/product_detail_screen.dart'; // Contains BrowseScreen
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart'; // Contains SubsScreen
-// Wallet screen kept in codebase but removed from nav tab (accessible via other flows)
+import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -258,6 +258,7 @@ class AppShell extends StatefulWidget {
   static const int tabShop = 1;
   static const int tabSubscription = 2;
   static const int tabReferral = 3;
+  static const int tabWallet = -1;
 
   static int activeTab = tabHome;
   const AppShell({super.key});
@@ -283,6 +284,13 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int get currentTab => _i;
 
   void setTab(int index, {String? category, String? productId, String? productName}) {
+    if (index == AppShell.tabWallet || index < 0) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
+      );
+      return;
+    }
     if (index >= _tabs.length) {
       index = 0;
     }
