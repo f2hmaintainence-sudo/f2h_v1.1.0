@@ -800,7 +800,7 @@ class _HomeScreenState extends State<HomeScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Profile Avatar (replaces location icon)
+            // Profile Avatar (mint green circle with green person icon)
             MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
@@ -814,57 +814,31 @@ class _HomeScreenState extends State<HomeScreen>
                   );
                 },
                 child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE6F4EA),
                     shape: BoxShape.circle,
-                    gradient: isMember
-                        ? const LinearGradient(
-                            colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : const LinearGradient(
-                            colors: [Color(0xFFE2E8F0), Color(0xFFCBD5E1)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isMember
-                            ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
-                            : Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1.5),
-                      ),
-                    ],
                   ),
-                  padding: const EdgeInsets.all(2),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isMember ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                    ),
-                    alignment: Alignment.center,
-                    child: initials.isNotEmpty
-                        ? Text(
-                            initials,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
-                            ),
-                          )
-                        : Icon(
-                            Icons.person_rounded,
-                            size: 18,
-                            color: isMember ? const Color(0xFFFFD700) : const Color(0xFF16653A),
+                  alignment: Alignment.center,
+                  child: initials.isNotEmpty
+                      ? Text(
+                          initials,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF15803D),
                           ),
-                  ),
+                        )
+                      : const Icon(
+                          Icons.person_outline_rounded,
+                          size: 22,
+                          color: Color(0xFF15803D),
+                        ),
                 ),
               ),
             ),
-            const SizedBox(width: 7),
+            const SizedBox(width: 10),
 
             // Address & Branch (tappable to select address)
             Expanded(
@@ -884,7 +858,7 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Text(
                               hasAddress ? addressType : 'Set Location',
                               style: const TextStyle(
-                                fontSize: 13,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF0F172A),
                                 letterSpacing: -0.2,
@@ -894,21 +868,21 @@ class _HomeScreenState extends State<HomeScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 2),
+                          const SizedBox(width: 3),
                           const Icon(
                             Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFF16653A),
-                            size: 15,
+                            color: Color(0xFF0F172A),
+                            size: 18,
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        branchDisplay.isNotEmpty ? branchDisplay : 'Select Branch',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: branchDisplay.isNotEmpty ? FontWeight.w600 : FontWeight.w500,
-                          color: branchDisplay.isNotEmpty ? const Color(0xFF16653A) : const Color(0xFF64748B),
+                        'Select Branch • ${branchDisplay.isNotEmpty ? branchDisplay : "Indiranagar, Bengaluru"}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF94A3B8),
                           height: 1.1,
                         ),
                         maxLines: 1,
@@ -2418,19 +2392,26 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F8FE), // soft light blue like screenshot
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFFD6EAF8),
+          color: const Color(0xFFF1F5F9),
           width: 1.0,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Month Header Row with Quick Date Picker & Collapse Button
+          // Month Header Row with Calendar Icon
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2440,9 +2421,10 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                   Text(
                     monthYearText,
                     style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E293B),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
                     ),
                   ),
                   if (_weekOffset != 0) ...[
@@ -2479,200 +2461,157 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                   ],
                 ],
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Quick Date Picker Icon
-                  GestureDetector(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(now.year - 1),
-                        lastDate: DateTime(now.year + 2),
-                        builder: (context, child) {
-                          return Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: Color(0xFF0284C7),
-                                onPrimary: Colors.white,
-                                onSurface: Color(0xFF0F172A),
-                              ),
-                            ),
-                            child: child!,
-                          );
-                        },
+              GestureDetector(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(now.year - 1),
+                    lastDate: DateTime(now.year + 2),
+                    builder: (context, child) {
+                      return Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: const ColorScheme.light(
+                            primary: Color(0xFF0284C7),
+                            onPrimary: Colors.white,
+                            onSurface: Color(0xFF0F172A),
+                          ),
+                        ),
+                        child: child!,
                       );
-                      if (picked != null) {
-                        final diff =
-                            picked.difference(currentWeekSunday).inDays;
-                        final offset = (diff / 7).floor();
-                        setState(() {
-                          _weekOffset = offset;
-                          _selectedDate = picked;
-                        });
-                        _weekPageController
-                            .jumpToPage(_kInitialWeekPage + offset);
-                        _handleDateClick(picked, allOrders);
-                      }
                     },
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFD6EAF8)),
-                      ),
-                      child: const Icon(
-                        Icons.edit_calendar_rounded,
-                        size: 15,
-                        color: Color(0xFF0284C7),
-                      ),
-                    ),
+                  );
+                  if (picked != null) {
+                    final diff =
+                        picked.difference(currentWeekSunday).inDays;
+                    final offset = (diff / 7).floor();
+                    setState(() {
+                      _weekOffset = offset;
+                      _selectedDate = picked;
+                    });
+                    _weekPageController
+                        .jumpToPage(_kInitialWeekPage + offset);
+                    _handleDateClick(picked, allOrders);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F9FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBAE6FD)),
                   ),
-                  const SizedBox(width: 6),
-                  // Collapse / Expand Toggle Button
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isCollapsed = !_isCollapsed;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFD6EAF8)),
-                      ),
-                      child: Icon(
-                        _isCollapsed
-                            ? Icons.keyboard_arrow_down_rounded
-                            : Icons.keyboard_arrow_up_rounded,
-                        size: 16,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
+                  child: const Icon(
+                    Icons.calendar_today_rounded,
+                    size: 16,
+                    color: Color(0xFF0284C7),
                   ),
-                ],
+                ),
               ),
             ],
           ),
 
-          if (!_isCollapsed) ...[
-            const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-            // 7 Days of the Week Selector (Smooth Horizontal Swipeable PageView)
-            SizedBox(
-              height: 64,
-              child: PageView.builder(
-                controller: _weekPageController,
-                onPageChanged: (pageIndex) {
-                  setState(() {
-                    _weekOffset = pageIndex - _kInitialWeekPage;
-                  });
-                },
-                itemBuilder: (context, pageIndex) {
-                  final offset = pageIndex - _kInitialWeekPage;
-                  final sunday =
-                      currentWeekSunday.add(Duration(days: offset * 7));
-                  final pageDays =
-                      List.generate(7, (i) => sunday.add(Duration(days: i)));
+          // 7 Days of the Week Selector (Swipeable PageView matching reference UI)
+          SizedBox(
+            height: 58,
+            child: PageView.builder(
+              controller: _weekPageController,
+              onPageChanged: (pageIndex) {
+                setState(() {
+                  _weekOffset = pageIndex - _kInitialWeekPage;
+                });
+              },
+              itemBuilder: (context, pageIndex) {
+                final offset = pageIndex - _kInitialWeekPage;
+                final sunday =
+                    currentWeekSunday.add(Duration(days: offset * 7));
+                final pageDays =
+                    List.generate(7, (i) => sunday.add(Duration(days: i)));
 
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: pageDays.map((day) {
-                      final isToday = _isSameDay(day, now);
-                      final isSelected = _isSameDay(day, _selectedDate);
-                      final dayName = isToday
-                          ? 'Today'
-                          : const [
-                              'Sun',
-                              'Mon',
-                              'Tue',
-                              'Wed',
-                              'Thu',
-                              'Fri',
-                              'Sat'
-                            ][day.weekday % 7];
-                      final dateNum = day.day.toString().padLeft(2, '0');
-                      final statusColor =
-                          _getStatusColorForDay(day, allOrders, subState);
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: pageDays.map((day) {
+                    final isToday = _isSameDay(day, now);
+                    final isSelected = _isSameDay(day, _selectedDate);
+                    final dayName = isToday
+                        ? 'Today'
+                        : const [
+                            'Sun',
+                            'Mon',
+                            'Tue',
+                            'Wed',
+                            'Thu',
+                            'Fri',
+                            'Sat'
+                          ][day.weekday % 7];
+                    final dateNum = day.day.toString();
+                    final statusColor =
+                        _getStatusColorForDay(day, allOrders, subState);
 
-                      return GestureDetector(
-                        onTap: () => _handleDateClick(day, allOrders),
-                        behavior: HitTestBehavior.opaque,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              dayName,
+                    return GestureDetector(
+                      onTap: () => _handleDateClick(day, allOrders),
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            dayName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isToday || isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
+                              color: isToday
+                                  ? const Color(0xFF0EA5E9)
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isToday || isSelected
+                                  ? const Color(0xFF0EA5E9)
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              dateNum,
                               style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: isSelected
-                                    ? const Color(0xFF0284C7)
-                                    : const Color(0xFF475569),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isToday || isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                               ),
                             ),
-                            const SizedBox(height: 5),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 32,
-                              height: 32,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(
-                                        0xFF1E88E5) // solid vivid blue circle
-                                    : Colors.transparent,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                dateNum,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            // Status Indicator under each day (matching legend)
-                            Container(
-                              width: 13,
-                              height: 3.5,
-                              decoration: BoxDecoration(
-                                color: statusColor ?? Colors.transparent,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
             ),
+          ),
 
-            const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-            // Status Legend Row: Delivered, Upcoming, Vacation, On Hold
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _legendItem(const Color(0xFF10B981), 'Delivered'),
-                _legendItem(const Color(0xFF38BDF8), 'Upcoming'),
-                _legendItem(const Color(0xFFF59E0B), 'Vacation'),
-                _legendItem(const Color(0xFFEF4444), 'On Hold'),
-              ],
-            ),
-          ],
+          // Status Legend Row: Delivered, Upcoming, Vacation, On Hold
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _legendItem(const Color(0xFF10B981), 'Delivered'),
+              _legendItem(const Color(0xFF0EA5E9), 'Upcoming'),
+              _legendItem(const Color(0xFFF59E0B), 'Vacation'),
+              _legendItem(const Color(0xFFEF4444), 'On Hold'),
+            ],
+          ),
         ],
       ),
     );
@@ -2683,20 +2622,20 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 13,
+          width: 12,
           height: 3.5,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 4),
         Text(
           label,
           style: const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF334155),
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
           ),
         ),
       ],
@@ -2796,65 +2735,37 @@ class _AnimatedSearchTriggerState extends State<AnimatedSearchTrigger> {
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
         child: Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: const Color(0xFF16A34A),
-              width: 1.4,
+              color: const Color(0xFFE2E8F0),
+              width: 1.0,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF16A34A).withValues(alpha: 0.08),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
           ),
           child: Row(
             children: [
               const Icon(
                 Icons.search_rounded,
-                color: Color(0xFF16653A),
-                size: 18,
+                color: Color(0xFF94A3B8),
+                size: 20,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        displayedText.isEmpty ? ' ' : displayedText,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF334155),
-                          letterSpacing: -0.1,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      width: 1.5,
-                      height: 14,
-                      margin: const EdgeInsets.only(left: 1),
-                      color: const Color(0xFF16A34A),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: widget.onFilterTap ?? widget.onTap,
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: Color(0xFF16A34A),
-                  size: 18,
+                child: Text(
+                  displayedText.isEmpty
+                      ? 'Search pure honey, fresh milk, paneer...'
+                      : 'Search $displayedText',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF94A3B8),
+                    letterSpacing: -0.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -2903,7 +2814,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           ),
         ],
       ),
-      padding: EdgeInsets.fromLTRB(14, topPadding + 6, 14, 8),
+      padding: EdgeInsets.fromLTRB(14, topPadding + 6, 14, 10),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2917,7 +2828,7 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
               notificationWidget,
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
 
           // Row 2: Full-width Search Option ("next below search option")
           AnimatedSearchTrigger(
@@ -2930,10 +2841,10 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => topPadding + 102;
+  double get maxExtent => topPadding + 110;
 
   @override
-  double get minExtent => topPadding + 102;
+  double get minExtent => topPadding + 110;
 
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {
