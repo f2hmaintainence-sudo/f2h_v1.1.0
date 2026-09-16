@@ -597,101 +597,63 @@ export class CategoriesProductsService {
         process.env.BACKEND_URL ||
         'https://c.f2hfresh.com';
 
-      // 1. Prioritize exact variant match, fallback to product match
+      // 1. Resolve variant or product with images
       const query = `
         SELECT 
-          p.product_id,
+          COALESCE(pv.product_id, p.product_id) AS product_id,
           pv.variant_id,
-          COALESCE(NULLIF(pv.name, ''), p.name) AS name,
-          p.name AS product_name,
-          p.description,
-          p.highlights,
-          pv.price,
-          pv.original_price,
+          COALESCE(NULLIF(pv.name, ''), p.name, 'Fresh Product') AS name,
+          COALESCE(p.name, pv.name, 'Fresh Product') AS product_name,
+          COALESCE(p.description, '') AS description,
+          COALESCE(p.highlights, '') AS highlights,
+          COALESCE(pv.price, p.price, 0) AS price,
+          COALESCE(pv.original_price, pv.price, p.price, 0) AS original_price,
           c.name AS category_name,
           COALESCE(
             (
-              SELECT pi.storage_key FROM product_images pi
-              WHERE pi.variant_id = pv.variant_id
+              SELECT COALESCE(pi.storage_key, pi.image_url, pi.image_path) FROM product_images pi
+              WHERE (pi.variant_id = pv.variant_id OR (pv.variant_id IS NOT NULL AND pi.variant_id = pv.variant_id))
                 AND pi.deleted_at IS NULL
-                AND pi.storage_key IS NOT NULL
-                AND pi.storage_key <> ''
-              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) IS NOT NULL
+                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) <> ''
+              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             (
-              SELECT pi.storage_key FROM product_images pi
-              WHERE pi.product_id = p.product_id
+              SELECT COALESCE(pi.storage_key, pi.image_url, pi.image_path) FROM product_images pi
+              WHERE (pi.product_id = pv.product_id OR pi.product_id = p.product_id)
                 AND (pi.variant_id IS NULL OR pi.variant_id = '')
                 AND pi.deleted_at IS NULL
-                AND pi.storage_key IS NOT NULL
-                AND pi.storage_key <> ''
-              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) IS NOT NULL
+                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) <> ''
+              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             (
-              SELECT pi.storage_key FROM product_images pi
-              WHERE pi.product_id = p.product_id
+              SELECT COALESCE(pi.storage_key, pi.image_url, pi.image_path) FROM product_images pi
+              WHERE (pi.product_id = pv.product_id OR pi.product_id = p.product_id)
                 AND pi.deleted_at IS NULL
-                AND pi.storage_key IS NOT NULL
-                AND pi.storage_key <> ''
-              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) IS NOT NULL
+                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) <> ''
+              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             c.image_path
           ) AS image_key
         FROM product_variants pv
-        LEFT JOIN products p ON pv.product_id = p.product_id
-        LEFT JOIN categories c ON p.category_id = c.category_id
-        WHERE (pv.variant_id = $1 OR p.product_id = $1 OR p.slug = $1)
-          AND (p.deleted_at IS NULL OR p.deleted_at IS NULL)
+        FULL OUTER JOIN products p ON (p.product_id = pv.product_id OR p.id::text = pv.product_id)
+        LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
+        WHERE (
+          pv.variant_id = $1 
+          OR pv.id::text = $1 
+          OR p.product_id = $1 
+          OR p.id::text = $1 
+          OR p.slug = $1
+        )
         ORDER BY 
-          (CASE WHEN pv.variant_id = $1 THEN 0 ELSE 1 END) ASC,
+          (CASE WHEN pv.variant_id = $1 OR pv.id::text = $1 THEN 0 ELSE 1 END) ASC,
           pv.is_primary DESC NULLS LAST,
-          pv.id ASC
+          pv.id ASC NULLS LAST
         LIMIT 1
       `;
       let rows = await this.db.query(query, [productIdOrVariantId]);
-
-      // Fallback query starting from products table if not found by variant
-      if (!rows || rows.length === 0) {
-        const prodQuery = `
-          SELECT 
-            p.product_id,
-            pv.variant_id,
-            COALESCE(NULLIF(pv.name, ''), p.name) AS name,
-            p.name AS product_name,
-            p.description,
-            p.highlights,
-            pv.price,
-            pv.original_price,
-            c.name AS category_name,
-            COALESCE(
-              (
-                SELECT pi.storage_key FROM product_images pi
-                WHERE pi.variant_id = pv.variant_id
-                  AND pi.deleted_at IS NULL
-                  AND pi.storage_key IS NOT NULL
-                  AND pi.storage_key <> ''
-                ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
-              ),
-              (
-                SELECT pi.storage_key FROM product_images pi
-                WHERE pi.product_id = p.product_id
-                  AND pi.deleted_at IS NULL
-                  AND pi.storage_key IS NOT NULL
-                  AND pi.storage_key <> ''
-                ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
-              ),
-              c.image_path
-            ) AS image_key
-          FROM products p
-          LEFT JOIN product_variants pv ON pv.product_id = p.product_id
-          LEFT JOIN categories c ON p.category_id = c.category_id
-          WHERE (p.product_id = $1 OR p.slug = $1)
-            AND p.deleted_at IS NULL
-          ORDER BY pv.is_primary DESC NULLS LAST, pv.id ASC
-          LIMIT 1
-        `;
-        rows = await this.db.query(prodQuery, [productIdOrVariantId]);
-      }
 
       if (!rows || rows.length === 0) {
         return null;
