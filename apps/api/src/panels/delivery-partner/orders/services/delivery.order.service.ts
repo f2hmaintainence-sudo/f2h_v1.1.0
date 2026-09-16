@@ -826,26 +826,31 @@ export class DeliveryOrderService {
     const boy = await this.resolveDeliveryPartner(userId);
     const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam);
 
+    // Fetch ALL of today's non-cancelled runs for this partner (both morning and evening).
+    // This ensures runIds covers every slot so delivered stops from earlier slots remain visible.
     const runs = await this.db.query(
       `SELECT id, run_id, status, delivery_slot, run_date
        FROM delivery_runs
        WHERE delivery_partner_id = $1
          AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
-         AND delivery_slot = $3
          AND status != 'cancelled'
-       ORDER BY run_date DESC, created_at DESC`,
-      [String(boy.user_id), targetDate, targetSlot],
+       ORDER BY delivery_slot ASC, run_date DESC, created_at DESC`,
+      [String(boy.user_id), targetDate],
     );
 
     let activeRunId: string | null = null;
     let activeRunStatus: string | null = null;
-    let runIds: string[] = [String(boy.user_id)];
+    // Use all today's run IDs to scope the orders query — covers morning + evening slots.
+    let runIds: string[] = [];
 
     if (runs?.length) {
-      const activeRun = runs[0];
-      activeRunId = activeRun.run_id || String(activeRun.id);
-      activeRunStatus = activeRun.status;
+      // Collect all run IDs across all of today's slots.
       runIds = runs.map((r: any) => String(r.run_id || r.id));
+
+      // The "active" run is the one matching the current time-slot for status tracking.
+      const slotRun = runs.find((r: any) => r.delivery_slot === targetSlot) || runs[0];
+      activeRunId = slotRun.run_id || String(slotRun.id);
+      activeRunStatus = slotRun.status;
 
       if (activeRunStatus === 'completed') {
         if (await this.isRunHandedOver(activeRunId!)) {
@@ -858,7 +863,9 @@ export class DeliveryOrderService {
       ? [status]
       : ['confirmed', 'out_for_delivery', 'delivered', 'failed', 'assigned', 'packed'];
 
-     const orders = await this.db.query(
+    // Only fetch orders if we found runs for today — avoids a broad partner_id scan
+    // that could return unrelated orders from other slots or dates.
+    const orders = runIds.length > 0 ? await this.db.query(
       `SELECT
           o.order_id,
           o.subscription_id,
@@ -902,14 +909,13 @@ export class DeliveryOrderService {
          ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
        LEFT JOIN delivery_run_addresses dra
          ON (dra.run_id = o.delivery_run_id AND dra.address_id = o.address_id)
-        WHERE (o.delivery_partner_id = $1 OR o.delivery_run_id = ANY($4))
-          AND o.status = ANY($3)
-          AND o.scheduled_date = $2::date
+        WHERE o.delivery_run_id = ANY($3)
+          AND o.status = ANY($2)
         ORDER BY o.delivery_slot ASC,
                  COALESCE(dra.sequence_no, o.run_sequence) ASC NULLS LAST,
                  o.created_at ASC`,
-      [String(boy.user_id), targetDate, orderStatuses, runIds],
-    );
+      [orderStatuses, runIds],
+    ) : [];
 
     if (!activeRunId && orders?.length) {
       const orderWithRun = orders.find((o: any) => o.run_id);
