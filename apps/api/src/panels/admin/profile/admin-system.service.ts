@@ -3,8 +3,10 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
+import { generateId } from '../../../helpers/RandomHelper';
 import { AuditLogQueryDto } from './admin-system.dto';
 import {
   APP_VERSION_PATTERN,
@@ -35,6 +37,114 @@ export interface AuditAdminOption {
   admin_name: string;
 }
 
+const DEFAULT_ROLES = [
+  {
+    role_name: 'super_admin',
+    description: 'Full unrestricted system access across all modules and settings',
+    permissions: [
+      'dashboard.view', 'dashboard.analytics', 'reports.view', 'reports.export',
+      'orders.view', 'orders.manage', 'orders.cancel', 'subscriptions.view', 'subscriptions.manage', 'subscriptions.refunds',
+      'customers.view', 'customers.manage', 'customers.special_prices',
+      'catalog.view', 'catalog.manage', 'catalog.categories', 'catalog.pricing', 'catalog.promotions',
+      'vendors.view', 'vendors.manage', 'vendors.collections.view', 'vendors.collections.create', 'vendors.collections.manage', 'vendors.slips.send',
+      'inventory.view', 'inventory.manage', 'warehouse.view', 'warehouse.stock_movements', 'warehouse.dispatch', 'packages.containers',
+      'delivery.view', 'delivery.assign', 'delivery.partners.manage', 'delivery.logs.view', 'delivery.leave_requests', 'delivery.referrals',
+      'finance.view', 'finance.manage', 'finance.billing', 'finance.wallet', 'finance.refunds', 'finance.outstandings',
+      'branches.view', 'branches.manage', 'branches.zones', 'staff.view', 'staff.manage', 'staff.roles',
+      'system.admins', 'system.roles', 'system.notifications', 'system.audit', 'system.version_control', 'developer.api_integrations',
+    ],
+    is_active: true,
+  },
+  {
+    role_name: 'admin',
+    description: 'Administrative operations across catalog, orders, delivery, warehouse, and finance',
+    permissions: [
+      'dashboard.view', 'dashboard.analytics', 'reports.view', 'reports.export',
+      'orders.view', 'orders.manage', 'subscriptions.view', 'subscriptions.manage',
+      'customers.view', 'customers.manage', 'customers.special_prices',
+      'catalog.view', 'catalog.manage', 'catalog.categories', 'catalog.pricing', 'catalog.promotions',
+      'vendors.view', 'vendors.manage', 'vendors.collections.view', 'vendors.collections.create', 'vendors.collections.manage', 'vendors.slips.send',
+      'inventory.view', 'inventory.manage', 'warehouse.view', 'warehouse.stock_movements', 'warehouse.dispatch', 'packages.containers',
+      'delivery.view', 'delivery.assign', 'delivery.partners.manage', 'delivery.logs.view', 'delivery.leave_requests',
+      'finance.view', 'finance.billing', 'finance.wallet', 'finance.outstandings',
+      'branches.view', 'staff.view', 'staff.manage',
+      'system.notifications', 'system.audit',
+    ],
+    is_active: true,
+  },
+  {
+    role_name: 'branch_manager',
+    description: 'Branch-level operational management, local inventory, local dispatch, and delivery partner tracking',
+    permissions: [
+      'dashboard.view',
+      'orders.view', 'orders.manage', 'subscriptions.view',
+      'customers.view',
+      'catalog.view',
+      'vendors.view', 'vendors.collections.view', 'vendors.collections.create', 'vendors.collections.manage', 'vendors.slips.send',
+      'inventory.view', 'inventory.manage', 'warehouse.view', 'warehouse.dispatch',
+      'delivery.view', 'delivery.assign', 'delivery.partners.manage', 'delivery.logs.view', 'delivery.leave_requests',
+      'branches.view', 'staff.view',
+    ],
+    is_active: true,
+  },
+  {
+    role_name: 'milk_procurement_officer',
+    description: 'Manages milk and fresh produce intake, collections, fat testing, and vendor slip dispatches',
+    permissions: [
+      'dashboard.view',
+      'catalog.view',
+      'vendors.view', 'vendors.manage', 'vendors.collections.view', 'vendors.collections.create', 'vendors.collections.manage', 'vendors.slips.send',
+      'inventory.view',
+    ],
+    is_active: true,
+  },
+  {
+    role_name: 'warehouse_manager',
+    description: 'Inventory management, warehouse operations, stock transfers, and packing dispatch',
+    permissions: [
+      'dashboard.view',
+      'catalog.view',
+      'inventory.view', 'inventory.manage', 'warehouse.view', 'warehouse.stock_movements', 'warehouse.dispatch', 'packages.containers',
+    ],
+    is_active: true,
+  },
+  {
+    role_name: 'delivery_dispatcher',
+    description: 'Delivery route coordination, partner assignments, and live delivery operations',
+    permissions: [
+      'dashboard.view',
+      'orders.view',
+      'delivery.view', 'delivery.assign', 'delivery.partners.manage', 'delivery.logs.view', 'delivery.leave_requests',
+    ],
+    is_active: true,
+  },
+  {
+    role_name: 'finance_billing_staff',
+    description: 'Billing, customer outstandings, payments reconciliation, refunds, and wallet management',
+    permissions: [
+      'dashboard.view', 'reports.view', 'reports.export',
+      'orders.view',
+      'customers.view',
+      'finance.view', 'finance.manage', 'finance.billing', 'finance.wallet', 'finance.refunds', 'finance.outstandings',
+    ],
+    is_active: true,
+  },
+  {
+    role_name: 'staff',
+    description: 'General staff access for operational viewing and basic tasks',
+    permissions: [
+      'dashboard.view',
+      'orders.view',
+      'customers.view',
+      'catalog.view',
+      'vendors.collections.view',
+      'inventory.view',
+      'delivery.view',
+    ],
+    is_active: true,
+  },
+];
+
 @Injectable()
 export class AdminSystemService {
   constructor(
@@ -43,38 +153,60 @@ export class AdminSystemService {
   ) {}
 
   // ────────────────────────────────────────────────
-  // Admin Users
+  // Admin & Staff Users
   // ────────────────────────────────────────────────
   async getAdminUsers(query: any) {
     try {
-      const { page = 1, limit = 50, search } = query;
+      const { page = 1, limit = 50, search, branch_id, role_id, is_active } = query;
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
       const params: any[] = [];
-      const where: string[] = [];
+      const where: string[] = ['ms.deleted_at IS NULL'];
 
       if (search) {
         params.push(`%${search}%`);
         where.push(
-          `(ms.user_name ILIKE $${params.length} OR ms.phone ILIKE $${params.length})`,
+          `(ms.user_name ILIKE $${params.length} OR ms.phone ILIKE $${params.length} OR u.email ILIKE $${params.length} OR ms.department ILIKE $${params.length} OR ms.designation ILIKE $${params.length})`,
         );
+      }
+
+      if (branch_id) {
+        params.push(branch_id);
+        where.push(`ms.branch_id = $${params.length}`);
+      }
+
+      if (role_id) {
+        params.push(role_id);
+        where.push(`(ms.role_id = $${params.length} OR r.role_id = $${params.length} OR ar.role_name = $${params.length})`);
+      }
+
+      if (is_active !== undefined && is_active !== '') {
+        params.push(is_active === true || String(is_active) === 'true');
+        where.push(`ms.is_active = $${params.length}`);
       }
 
       const sql = `
       SELECT
+        ms.management_id,
         ms.user_id,
         ms.user_name,
         u.email,
         ms.phone,
         ms.role_id,
-        r.name AS role_name,
+        COALESCE(ar.role_name, r.name, ms.role_id) AS role_name,
+        ms.branch_id,
+        b.branch_name,
+        ms.department,
+        ms.designation,
         ms.is_active,
         ms.created_at,
         ms.updated_at
       FROM management_staff ms
-      LEFT JOIN roles r ON r.role_id = ms.role_id
       LEFT JOIN users u ON u.user_id = ms.user_id
-      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      LEFT JOIN roles r ON r.role_id = ms.role_id
+      LEFT JOIN admin_roles ar ON (ar.role_name = ms.role_id OR ar.id::text = ms.role_id)
+      LEFT JOIN branches b ON b.branch_id = ms.branch_id
+      WHERE ${where.join(' AND ')}
       ORDER BY ms.created_at DESC
       LIMIT $${params.length + 1}
       OFFSET $${params.length + 2}
@@ -87,7 +219,10 @@ export class AdminSystemService {
       const countSql = `
       SELECT COUNT(*)::int AS total
       FROM management_staff ms
-      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      LEFT JOIN users u ON u.user_id = ms.user_id
+      LEFT JOIN roles r ON r.role_id = ms.role_id
+      LEFT JOIN admin_roles ar ON (ar.role_name = ms.role_id OR ar.id::text = ms.role_id)
+      WHERE ${where.join(' AND ')}
     `;
 
       const countRows = await this.db.query(countSql, params.slice(0, -2));
@@ -106,29 +241,304 @@ export class AdminSystemService {
     }
   }
 
-  async updateAdminUser(userId: string, body: any) {
+  async createAdminUser(body: any, adminId: string = 'system') {
     try {
-      const updateFields: string[] = ['updated_at = NOW()'];
-      const params: any[] = [userId];
+      const {
+        user_name,
+        email,
+        phone,
+        password,
+        role_id,
+        role,
+        branch_id,
+        department,
+        designation,
+        is_active,
+      } = body;
+      const targetRole = role_id || role || 'admin';
 
-      if (body.role) {
-        params.push(body.role);
-        updateFields.push(`role_id = $${params.length}`);
+      if (!user_name?.trim()) {
+        throw new BadRequestException('Staff username / name is required');
       }
-      if (body.is_active !== undefined) {
-        params.push(body.is_active);
-        updateFields.push(`is_active = $${params.length}`);
+      if (!email?.trim()) {
+        throw new BadRequestException('Email address is required');
+      }
+      if (!phone?.trim()) {
+        throw new BadRequestException('Phone number is required');
+      }
+      if (!password?.trim() || password.trim().length < 6) {
+        throw new BadRequestException('Password must be at least 6 characters');
       }
 
-      await this.db.query(
-        `UPDATE management_staff SET ${updateFields.join(', ')} WHERE user_id = $1`,
-        params,
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanPhone = phone.trim();
+      const cleanUserName = user_name.trim();
+
+      // Check duplicate email
+      const emailRows = await this.db.query(
+        'SELECT user_id FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1',
+        [cleanEmail],
+      );
+      if (emailRows.length > 0) {
+        throw new BadRequestException('An account with this email already exists');
+      }
+
+      // Check duplicate phone
+      const phoneRows = await this.db.query(
+        'SELECT user_id FROM users WHERE phone = $1 AND deleted_at IS NULL LIMIT 1',
+        [cleanPhone],
+      );
+      if (phoneRows.length > 0) {
+        throw new BadRequestException('An account with this phone number already exists');
+      }
+
+      const userId = generateId('F2H', 9);
+      const managementId = generateId('MNG', 12);
+      const hashedPassword = bcrypt.hashSync(password.trim(), 10);
+      const now = new Date().toISOString();
+
+      await this.db.transaction(async (client) => {
+        // Insert into users
+        await client.query(
+          `INSERT INTO users (user_id, email, phone, user_name, password, role_id, account_status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $7)`,
+          [userId, cleanEmail, cleanPhone, cleanUserName, hashedPassword, targetRole, now],
+        );
+
+        // Insert into role_assignments
+        await client.query(
+          `INSERT INTO role_assignments (id, user_id, role_id, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, 1, $4, $4)`,
+          [Date.now() + Math.floor(Math.random() * 1000), userId, targetRole, now],
+        );
+
+        // Insert into management_staff
+        await client.query(
+          `INSERT INTO management_staff (
+             management_id, user_id, branch_id, role_id, user_name,
+             department, designation, phone, is_active, created_at, updated_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
+          [
+            managementId,
+            userId,
+            branch_id?.trim() || null,
+            targetRole,
+            cleanUserName,
+            department?.trim() || null,
+            designation?.trim() || null,
+            cleanPhone,
+            is_active !== false && String(is_active) !== 'false',
+            now,
+          ],
+        );
+      });
+
+      await this.createAuditLog({
+        admin_id: adminId,
+        action: 'staff_create',
+        target_type: 'management_staff',
+        target_id: managementId,
+        details: { username: cleanUserName, email: cleanEmail, role: targetRole, branch_id },
+      });
+
+      return {
+        status: true,
+        message: 'Staff member created successfully',
+        data: { user_id: userId, management_id: managementId },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('createAdminUser error', { error });
+      throw new InternalServerErrorException(error.message || 'Failed to create staff member');
+    }
+  }
+
+  async updateAdminUser(identifier: string, body: any, adminId: string = 'system') {
+    try {
+      const staffRows = await this.db.query(
+        `SELECT ms.*, u.email, u.phone AS user_phone
+         FROM management_staff ms
+         JOIN users u ON u.user_id = ms.user_id
+         WHERE (ms.user_id = $1 OR ms.management_id = $1) AND ms.deleted_at IS NULL
+         LIMIT 1`,
+        [identifier],
       );
 
-      return { status: true, message: 'Admin user updated' };
+      if (!staffRows.length) {
+        throw new BadRequestException('Staff member not found');
+      }
+
+      const current = staffRows[0];
+      const userId = current.user_id;
+      const managementId = current.management_id;
+
+      // Validate duplicate email if changed
+      if (body.email && body.email.toLowerCase().trim() !== current.email?.toLowerCase().trim()) {
+        const cleanEmail = body.email.toLowerCase().trim();
+        const existingEmail = await this.db.query(
+          'SELECT user_id FROM users WHERE email = $1 AND user_id <> $2 AND deleted_at IS NULL LIMIT 1',
+          [cleanEmail, userId],
+        );
+        if (existingEmail.length > 0) {
+          throw new BadRequestException('This email is already registered to another user');
+        }
+      }
+
+      // Validate duplicate phone if changed
+      if (body.phone && body.phone.trim() !== current.phone?.trim()) {
+        const cleanPhone = body.phone.trim();
+        const existingPhone = await this.db.query(
+          'SELECT user_id FROM users WHERE phone = $1 AND user_id <> $2 AND deleted_at IS NULL LIMIT 1',
+          [cleanPhone, userId],
+        );
+        if (existingPhone.length > 0) {
+          throw new BadRequestException('This phone number is already registered to another user');
+        }
+      }
+
+      const newRole = body.role_id || body.role;
+
+      await this.db.transaction(async (client) => {
+        // Update users table
+        const userUpdates: string[] = ['updated_at = NOW()'];
+        const userParams: any[] = [userId];
+
+        if (body.email) {
+          userParams.push(body.email.toLowerCase().trim());
+          userUpdates.push(`email = $${userParams.length}`);
+        }
+        if (body.phone) {
+          userParams.push(body.phone.trim());
+          userUpdates.push(`phone = $${userParams.length}`);
+        }
+        if (body.user_name) {
+          userParams.push(body.user_name.trim());
+          userUpdates.push(`user_name = $${userParams.length}`);
+        }
+        if (newRole) {
+          userParams.push(newRole);
+          userUpdates.push(`role_id = $${userParams.length}`);
+        }
+        if (body.password && body.password.trim()) {
+          const hashedPassword = bcrypt.hashSync(body.password.trim(), 10);
+          userParams.push(hashedPassword);
+          userUpdates.push(`password = $${userParams.length}`);
+        }
+
+        await client.query(
+          `UPDATE users SET ${userUpdates.join(', ')} WHERE user_id = $1`,
+          userParams,
+        );
+
+        // Update role_assignments if role changed
+        if (newRole && newRole !== current.role_id) {
+          await client.query(
+            'UPDATE role_assignments SET is_active = 0, updated_at = NOW() WHERE user_id = $1',
+            [userId],
+          );
+          await client.query(
+            `INSERT INTO role_assignments (id, user_id, role_id, is_active, created_at, updated_at)
+             VALUES ($1, $2, $3, 1, NOW(), NOW())`,
+            [Date.now() + Math.floor(Math.random() * 1000), userId, newRole],
+          );
+        }
+
+        // Update management_staff table
+        const msUpdates: string[] = ['updated_at = NOW()'];
+        const msParams: any[] = [managementId];
+
+        if (body.user_name) {
+          msParams.push(body.user_name.trim());
+          msUpdates.push(`user_name = $${msParams.length}`);
+        }
+        if (body.phone) {
+          msParams.push(body.phone.trim());
+          msUpdates.push(`phone = $${msParams.length}`);
+        }
+        if (newRole) {
+          msParams.push(newRole);
+          msUpdates.push(`role_id = $${msParams.length}`);
+        }
+        if (body.branch_id !== undefined) {
+          msParams.push(body.branch_id?.trim() || null);
+          msUpdates.push(`branch_id = $${msParams.length}`);
+        }
+        if (body.department !== undefined) {
+          msParams.push(body.department?.trim() || null);
+          msUpdates.push(`department = $${msParams.length}`);
+        }
+        if (body.designation !== undefined) {
+          msParams.push(body.designation?.trim() || null);
+          msUpdates.push(`designation = $${msParams.length}`);
+        }
+        if (body.is_active !== undefined) {
+          const isActive = body.is_active === true || String(body.is_active) === 'true';
+          msParams.push(isActive);
+          msUpdates.push(`is_active = $${msParams.length}`);
+        }
+
+        await client.query(
+          `UPDATE management_staff SET ${msUpdates.join(', ')} WHERE management_id = $1`,
+          msParams,
+        );
+      });
+
+      await this.createAuditLog({
+        admin_id: adminId,
+        action: 'staff_update',
+        target_type: 'management_staff',
+        target_id: managementId,
+        details: { changes: Object.keys(body), identifier },
+      });
+
+      return { status: true, message: 'Staff member updated successfully' };
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       this.developer.error('updateAdminUser error', { error });
-      throw new InternalServerErrorException('Failed to update admin user');
+      throw new InternalServerErrorException('Failed to update staff member');
+    }
+  }
+
+  async deleteAdminUser(identifier: string, adminId: string = 'system') {
+    try {
+      const staffRows = await this.db.query(
+        `SELECT ms.management_id, ms.user_id, ms.user_name
+         FROM management_staff ms
+         WHERE (ms.user_id = $1 OR ms.management_id = $1) AND ms.deleted_at IS NULL
+         LIMIT 1`,
+        [identifier],
+      );
+
+      if (!staffRows.length) {
+        throw new BadRequestException('Staff member not found');
+      }
+
+      const staff = staffRows[0];
+
+      await this.db.transaction(async (client) => {
+        await client.query(
+          'UPDATE management_staff SET deleted_at = NOW(), is_active = false WHERE management_id = $1',
+          [staff.management_id],
+        );
+        await client.query(
+          `UPDATE users SET deleted_at = NOW(), account_status = 'deleted' WHERE user_id = $1`,
+          [staff.user_id],
+        );
+      });
+
+      await this.createAuditLog({
+        admin_id: adminId,
+        action: 'staff_delete',
+        target_type: 'management_staff',
+        target_id: staff.management_id,
+        details: { username: staff.user_name },
+      });
+
+      return { status: true, message: 'Staff member deleted successfully' };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('deleteAdminUser error', { error });
+      throw new InternalServerErrorException('Failed to delete staff member');
     }
   }
 
@@ -137,8 +547,31 @@ export class AdminSystemService {
   // ────────────────────────────────────────────────
   async getRoles() {
     try {
+      await this.db.query(`
+        CREATE TABLE IF NOT EXISTS admin_roles (
+          id SERIAL PRIMARY KEY,
+          role_name VARCHAR(50) NOT NULL UNIQUE,
+          description TEXT DEFAULT NULL,
+          permissions JSONB DEFAULT '[]'::jsonb,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `, []);
+
+      const existing = await this.db.query('SELECT COUNT(*)::int AS count FROM admin_roles', []);
+      if ((existing[0]?.count ?? 0) === 0) {
+        for (const role of DEFAULT_ROLES) {
+          await this.db.query(`
+            INSERT INTO admin_roles (role_name, description, permissions, is_active)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (role_name) DO NOTHING
+          `, [role.role_name, role.description, JSON.stringify(role.permissions), role.is_active]);
+        }
+      }
+
       const rows = await this.db.query(
-        'SELECT * FROM admin_roles ORDER BY created_at ASC',
+        'SELECT * FROM admin_roles ORDER BY id ASC',
         [],
       );
       return { status: true, data: rows, message: 'Roles fetched' };
@@ -150,19 +583,24 @@ export class AdminSystemService {
 
   async createRole(body: any) {
     try {
+      if (!body.role_name?.trim()) {
+        throw new BadRequestException('Role name is required');
+      }
+
       const sql = `
         INSERT INTO admin_roles (role_name, description, permissions, is_active)
         VALUES ($1, $2, $3, $4)
         RETURNING *
       `;
       const rows = await this.db.query(sql, [
-        body.role_name,
-        body.description,
+        body.role_name.trim(),
+        body.description?.trim() || null,
         JSON.stringify(body.permissions || []),
-        body.is_active !== false,
+        body.is_active !== false && String(body.is_active) !== 'false',
       ]);
       return { status: true, data: rows[0], message: 'Role created' };
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       this.developer.error('createRole error', { error });
       throw new InternalServerErrorException('Failed to create role');
     }
@@ -174,11 +612,11 @@ export class AdminSystemService {
       const params: any[] = [id];
 
       if (body.role_name) {
-        params.push(body.role_name);
+        params.push(body.role_name.trim());
         updateFields.push(`role_name = $${params.length}`);
       }
       if (body.description !== undefined) {
-        params.push(body.description);
+        params.push(body.description?.trim() || null);
         updateFields.push(`description = $${params.length}`);
       }
       if (body.permissions) {
@@ -186,7 +624,7 @@ export class AdminSystemService {
         updateFields.push(`permissions = $${params.length}`);
       }
       if (body.is_active !== undefined) {
-        params.push(body.is_active);
+        params.push(body.is_active === true || String(body.is_active) === 'true');
         updateFields.push(`is_active = $${params.length}`);
       }
 
@@ -198,6 +636,16 @@ export class AdminSystemService {
     } catch (error) {
       this.developer.error('updateRole error', { error });
       throw new InternalServerErrorException('Failed to update role');
+    }
+  }
+
+  async deleteRole(id: string) {
+    try {
+      await this.db.query('DELETE FROM admin_roles WHERE id = $1', [id]);
+      return { status: true, message: 'Role deleted successfully' };
+    } catch (error) {
+      this.developer.error('deleteRole error', { error });
+      throw new InternalServerErrorException('Failed to delete role');
     }
   }
 

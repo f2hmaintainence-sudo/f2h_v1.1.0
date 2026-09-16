@@ -87,6 +87,7 @@ const adminNav = [
         icon: Settings,
         subItems: [
           { name: "Branches", href: "/admin/branches/branch-config", icon: Building },
+          { name: "Staff Members", href: "/admin/staffs", icon: UserCog },
           { name: "Partner Allocation", href: "/admin/branches/partners", icon: UserCheck },
           { name: "Branch Analytics", href: "/admin/branches/analytics", icon: BarChart },
           { name: "Zone Requests", href: "/admin/branches/zone-expansion", icon: Radio },
@@ -147,9 +148,11 @@ const adminNav = [
     label: "SYSTEM",
     items: [
       { name: "Company Profile", href: "/admin/profile/company", icon: Shield },
+      { name: "Staff Management", href: "/admin/staffs", icon: Users },
+      { name: "Roles & Permissions", href: "/admin/system/roles", icon: Shield },
+      { name: "Admin Users", href: "/admin/profile/admins", icon: UserCheck },
       { name: "App Version Control", href: "/admin/system/app-version", icon: Smartphone },
       { name: "Audit Logs", href: "/admin/system/audit", icon: FileText },
-
     ],
   },
 ];

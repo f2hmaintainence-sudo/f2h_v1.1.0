@@ -13,6 +13,7 @@ describe('DeliveryManagementService tracking detail contract', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await service.getDeliveryTracking({ date: '2026-08-19' });

@@ -12,6 +12,8 @@ describe('OrdersService order detail contract', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
 
     await service.getOrderItems('ORD_TEST');

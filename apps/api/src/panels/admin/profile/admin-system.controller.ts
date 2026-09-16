@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Query, Body, Param, Req, UseGuards,
+import { Controller, Get, Post, Patch, Delete, Query, Body, Param, Req, UseGuards,
   Logger,
 } from '@nestjs/common';
 import { AdminSystemService } from './admin-system.service';
@@ -14,16 +14,29 @@ export class AdminSystemController {
 
   constructor(private readonly systemService: AdminSystemService) {}
 
-  // ── Admin Users ──
+  // ── Admin & Staff Users ──
 
   @Get('admins')
   async getAdminUsers(@Query() query: any) {
     return this.systemService.getAdminUsers(query);
   }
 
+  @Post('admins')
+  async createAdminUser(@Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.systemService.createAdminUser(body, adminId);
+  }
+
   @Patch('admins/:id')
-  async updateAdminUser(@Param('id') id: string, @Body() body: any) {
-    return this.systemService.updateAdminUser(id, body);
+  async updateAdminUser(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.systemService.updateAdminUser(id, body, adminId);
+  }
+
+  @Delete('admins/:id')
+  async deleteAdminUser(@Param('id') id: string, @Req() req: any) {
+    const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
+    return this.systemService.deleteAdminUser(id, adminId);
   }
 
   // ── Roles & Permissions ──
@@ -41,6 +54,11 @@ export class AdminSystemController {
   @Patch('roles/:id')
   async updateRole(@Param('id') id: string, @Body() body: any) {
     return this.systemService.updateRole(id, body);
+  }
+
+  @Delete('roles/:id')
+  async deleteRole(@Param('id') id: string) {
+    return this.systemService.deleteRole(id);
   }
 
   // ── Notification Settings ──
