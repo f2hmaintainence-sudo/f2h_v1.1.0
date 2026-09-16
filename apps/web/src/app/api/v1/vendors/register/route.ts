@@ -1,4 +1,14 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : route.ts (Vendor Registration)
+// Description : Handles vendor and supplier registration for F2H Fresh
+// ============================================================================
+
 import { NextResponse } from 'next/server';
+import { addRegisteredVendor } from '@/lib/vendors.store';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +26,7 @@ function getDefaultImage(category: string): string {
   if (cat.includes('oil') || cat.includes('spice')) {
     return 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80';
   }
-  if (cat.includes('egg') || cat.includes('honey')) {
+  if (cat.includes('egg') || cat.includes('honey') || cat.includes('poultry')) {
     return 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=600&q=80';
   }
   if (cat.includes('pack') || cat.includes('box')) {
@@ -48,8 +58,7 @@ export async function POST(request: Request) {
     const category = body.category || 'Dairy & Milk';
     const imageUrl = body.imageUrl || getDefaultImage(category);
 
-    const vendorProfile = {
-      id: Date.now(),
+    const vendorProfile = addRegisteredVendor({
       vendor_id: vendorId,
       business_name: businessName,
       contact_person: contactPerson,
@@ -63,15 +72,15 @@ export async function POST(request: Request) {
       pincode: body.pincode?.trim() || null,
       gstin: body.gstin?.trim() || null,
       fssai_license: body.fssaiLicense?.trim() || null,
-      supply_capacity: body.supplyCapacity?.trim() || 'Regular Daily Harvest',
+      supply_capacity: body.supplyCapacity?.trim() || 'Regular Batch Supply',
       experience_years: body.experienceYears || '1-2 Years',
       rating: 4.85,
+      total_products_supplied: 0,
       is_verified: true,
       is_active: true,
       status: 'approved',
       image_url: imageUrl,
-      created_at: new Date().toISOString(),
-    };
+    });
 
     return NextResponse.json({
       success: true,

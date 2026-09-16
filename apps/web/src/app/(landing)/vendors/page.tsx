@@ -58,111 +58,6 @@ interface VendorItem {
   image_url?: string | null;
 }
 
-const INITIAL_FALLBACK_VENDORS: VendorItem[] = [
-  {
-    id: 1,
-    vendor_id: "VND_DAIRY_001",
-    business_name: "Malnad Pure Organic Dairy",
-    contact_person: "Ramesh Hegde",
-    phone: "9845012341",
-    email: "ramesh@malnaddairy.in",
-    category: "Dairy & Milk",
-    description: "Direct source of pure A2 Desi Cow Milk, Buffalo Milk, and traditional Bilona Cow Ghee from grass-fed cattle in the Western Ghats.",
-    city: "Shimoga",
-    state: "Karnataka",
-    supply_capacity: "1,200 Liters / Day",
-    experience_years: "10+ Years",
-    rating: 4.92,
-    is_verified: true,
-    image_url: "https://images.unsplash.com/photo-1527153857715-3908f2ae5e81?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: 2,
-    vendor_id: "VND_FARMS_002",
-    business_name: "Kaveri River Fresh Farms",
-    contact_person: "Siddaraju M.",
-    phone: "9886023452",
-    email: "orders@kaverifarms.co",
-    category: "Fresh Produce & Greens",
-    description: "Daily harvested organic greens, hydroponic spinach, coriander, and pesticide-free country vegetables grown along the fertile Kaveri basin.",
-    city: "Mandya",
-    state: "Karnataka",
-    supply_capacity: "3.5 Tons / Week",
-    experience_years: "7+ Years",
-    rating: 4.88,
-    is_verified: true,
-    image_url: "https://images.unsplash.com/photo-1595855759920-86582396756a?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: 3,
-    vendor_id: "VND_ORCH_003",
-    business_name: "Nilgiri Crest Organic Orchards",
-    contact_person: "Anand Kurup",
-    phone: "9944034563",
-    email: "anand@nilgiricrest.org",
-    category: "Organic Fruits",
-    description: "Freshly plucked high-altitude avocados, sweet papayas, hill bananas, and seasonal pomegranates certified 100% natural and residue-free.",
-    city: "Nilgiris",
-    state: "Tamil Nadu",
-    supply_capacity: "2 Tons / Week",
-    experience_years: "5+ Years",
-    rating: 4.85,
-    is_verified: true,
-    image_url: "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: 4,
-    vendor_id: "VND_SPICE_004",
-    business_name: "Deccan Heritage Cold Pressed Oils",
-    contact_person: "Venkatesh Rao",
-    phone: "9731045674",
-    email: "venkat@deccanoils.com",
-    category: "Oils & Native Spices",
-    description: "Traditional wood-pressed (Marachekku) sesame, groundnut, and coconut oils alongside authentic single-origin organic turmeric and pepper.",
-    city: "Ramanagara",
-    state: "Karnataka",
-    supply_capacity: "800 Liters / Week",
-    experience_years: "8+ Years",
-    rating: 4.90,
-    is_verified: true,
-    image_url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: 5,
-    vendor_id: "VND_POULTRY_005",
-    business_name: "Nandi Foothills Free-Range Farm",
-    contact_person: "Pradeep Reddy",
-    phone: "9620056785",
-    email: "pradeep@nandifarms.in",
-    category: "Farm Eggs & Honey",
-    description: "Pasture-raised country chicken eggs (Nati Koli Motte) and raw unprocessed multifloral forest honey with batch lab testing.",
-    city: "Chikkaballapur",
-    state: "Karnataka",
-    supply_capacity: "5,000 Eggs / Day",
-    experience_years: "4+ Years",
-    rating: 4.86,
-    is_verified: true,
-    image_url: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: 6,
-    vendor_id: "VND_PKG_006",
-    business_name: "EcoPack Biodegradable Solutions",
-    contact_person: "Sujatha Narayanan",
-    phone: "9448067896",
-    email: "contact@ecopacksolutions.in",
-    category: "Eco Packaging",
-    description: "100% compostable PLA dairy pouches, paper bottles, biodegradable delivery boxes, and eco-friendly temperature-controlled insulation pouches.",
-    city: "Bengaluru",
-    state: "Karnataka",
-    supply_capacity: "50,000 Units / Month",
-    experience_years: "6+ Years",
-    rating: 4.80,
-    is_verified: true,
-    image_url: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80",
-  },
-];
-
 const CATEGORIES = [
   "All",
   "Dairy & Milk",
@@ -174,7 +69,7 @@ const CATEGORIES = [
 ];
 
 export default function VendorsPage() {
-  const [vendors, setVendors] = useState<VendorItem[]>(INITIAL_FALLBACK_VENDORS);
+  const [vendors, setVendors] = useState<VendorItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingVendors, setLoadingVendors] = useState(false);
@@ -210,18 +105,19 @@ export default function VendorsPage() {
         const res = await fetch("/api/v1/vendors/public");
         if (res.ok) {
           const json = await res.json();
-          if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+          if (json && json.success && Array.isArray(json.data)) {
             setVendors(json.data);
           }
         }
       } catch (e) {
-        // Fallback to initial seeds
+        // Handled gracefully
       } finally {
         setLoadingVendors(false);
       }
     }
     loadVendors();
   }, []);
+
 
   // Filtered list
   const filteredVendors = useMemo(() => {
@@ -398,20 +294,20 @@ export default function VendorsPage() {
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
               >
                 <Users size={16} />
-                Browse Certified Producers ({vendors.length})
+                Browse Registered Producers {vendors.length > 0 ? `(${vendors.length})` : ""}
               </a>
             </div>
           </div>
 
-          {/* 4 Stats Pills */}
+          {/* 4 Value Proposition Stats Pills */}
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 pt-6 border-t border-emerald-100/80">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
                 <Leaf size={18} />
               </div>
               <div>
-                <p className="text-base sm:text-lg font-bold text-slate-900">50+ Farms</p>
-                <p className="text-[11px] text-slate-500 font-medium">Certified Organic &amp; Pure</p>
+                <p className="text-base sm:text-lg font-bold text-slate-900">Direct Sourcing</p>
+                <p className="text-[11px] text-slate-500 font-medium">100% Farm Pure Quality</p>
               </div>
             </div>
 
@@ -420,8 +316,8 @@ export default function VendorsPage() {
                 <TrendingUp size={18} />
               </div>
               <div>
-                <p className="text-base sm:text-lg font-bold text-slate-900">10,000+ L</p>
-                <p className="text-[11px] text-slate-500 font-medium">Daily Direct Intake</p>
+                <p className="text-base sm:text-lg font-bold text-slate-900">Daily Demand</p>
+                <p className="text-[11px] text-slate-500 font-medium">Consistent Subscriptions</p>
               </div>
             </div>
 
@@ -431,7 +327,7 @@ export default function VendorsPage() {
               </div>
               <div>
                 <p className="text-base sm:text-lg font-bold text-slate-900">Zero Middlemen</p>
-                <p className="text-[11px] text-slate-500 font-medium">100% Farmgate Value</p>
+                <p className="text-[11px] text-slate-500 font-medium">100% Direct Settlement</p>
               </div>
             </div>
 
@@ -499,17 +395,44 @@ export default function VendorsPage() {
           </div>
 
           {/* Vendor Cards Grid */}
-          {filteredVendors.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-12 text-center">
-              <Store size={36} className="mx-auto text-slate-300 mb-3" />
-              <p className="text-sm font-semibold text-slate-700">No matching vendor partners found</p>
-              <p className="text-xs text-slate-500 mt-1">Try clearing your search query or selecting a different category.</p>
-              <button
-                onClick={() => { setSelectedCategory("All"); setSearchQuery(""); }}
-                className="mt-4 px-4 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-semibold hover:bg-emerald-200 transition"
-              >
-                Reset Filters
-              </button>
+          {loadingVendors ? (
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-12 text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent mb-3" />
+              <p className="text-sm font-semibold text-slate-700">Loading registered vendor network...</p>
+            </div>
+          ) : filteredVendors.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white/80 p-10 sm:p-14 text-center">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                <Store size={32} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">
+                {vendors.length === 0
+                  ? "No Registered Vendors Found Yet"
+                  : "No matching vendor partners found"}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-md mx-auto">
+                {vendors.length === 0
+                  ? "Be the first farm, dairy, or producer partner to join the F2H Fresh network! Fill out the registration form below to get listed."
+                  : "Try clearing your search query or selecting a different category filter to view partners."}
+              </p>
+              <div className="mt-5 flex items-center justify-center gap-3">
+                {vendors.length === 0 ? (
+                  <a
+                    href="#register-vendor"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition shadow-sm shadow-emerald-700/20"
+                  >
+                    <Store size={14} />
+                    Register as Vendor
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => { setSelectedCategory("All"); setSearchQuery(""); }}
+                    className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-semibold hover:bg-emerald-200 transition"
+                  >
+                    Reset Filters
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -659,9 +582,9 @@ export default function VendorsPage() {
 
               {/* Direct Support Card */}
               <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-6 shadow-sm">
-                <h3 className="text-sm font-bold text-emerald-950">Procurement &amp; Sourcing Helpdesk</h3>
+                <h3 className="text-sm font-bold text-emerald-950">Partner &amp; Sourcing Helpdesk</h3>
                 <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
-                  Have an urgent supply inquiry or high-capacity harvest ready for dispatch? Connect with our Head of Procurement.
+                  Have an urgent supply inquiry or high-capacity harvest ready for dispatch? Connect with our Partner Support.
                 </p>
                 <div className="mt-4 flex flex-col sm:flex-row gap-2">
                   <a
@@ -672,11 +595,11 @@ export default function VendorsPage() {
                     <span>+91 91487 73591</span>
                   </a>
                   <a
-                    href="mailto:procurement@f2hfresh.com"
+                    href="mailto:support@f2hfresh.com"
                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 transition"
                   >
                     <Mail size={14} />
-                    <span>procurement@f2hfresh.com</span>
+                    <span>support@f2hfresh.com</span>
                   </a>
                 </div>
               </div>
