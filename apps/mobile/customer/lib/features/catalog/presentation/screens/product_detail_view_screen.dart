@@ -1,6 +1,12 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
@@ -18,7 +24,6 @@ import '../../../../core/widgets/custom_button.dart';
 import '../widgets/cart_widgets.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
 import '../helpers/cart_helpers.dart';
-import 'product_detail_screen.dart';
 
 // ══════════════════════════════════════════════════════════
 //  PRODUCT DETAIL VIEW SCREEN — Blinkit / Zepto Style
@@ -34,7 +39,7 @@ class ProductDetailViewScreen extends StatefulWidget {
 }
 
 class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin {
   bool _detailsExpanded = false;
   int _currentImageIndex = 0;
   late final ScrollController _scrollController;
@@ -96,6 +101,341 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     }
   }
 
+  String _sanitizeFilename(String input) {
+    return input.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+  }
+
+  Future<XFile?> _resolveAndFetchProductImage(
+    Product p,
+    ProductVariant? v,
+    String targetId,
+    String displayName,
+  ) async {
+    try {
+      // 1. Determine raw image path/URL from variant or product
+      String? rawImage;
+      if (v != null && v.images.isNotEmpty) {
+        rawImage = v.images.first;
+      } else if (v != null && v.imagePath != null && v.imagePath!.trim().isNotEmpty) {
+        rawImage = v.imagePath;
+      } else if (p.images.isNotEmpty) {
+        rawImage = p.images.first;
+      } else if (p.imageAsset != null && p.imageAsset!.trim().isNotEmpty) {
+        rawImage = p.imageAsset;
+      }
+
+      if (rawImage == null || rawImage.trim().isEmpty) {
+        return null;
+      }
+      rawImage = rawImage.trim();
+
+      // 2. If it's a local flutter asset
+      if (rawImage.startsWith('assets/')) {
+        try {
+          final byteData = await rootBundle.load(rawImage);
+          final bytes = byteData.buffer.asUint8List();
+          if (kIsWeb) {
+            return XFile.fromData(bytes, mimeType: 'image/jpeg', name: '${_sanitizeFilename(displayName)}.jpg');
+          }
+          final tempDir = await getTemporaryDirectory();
+          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.jpg';
+          final file = File(filePath);
+          await file.writeAsBytes(bytes);
+          return XFile(file.path, mimeType: 'image/jpeg');
+        } catch (_) {
+          // If asset load fails, try URL fallback below
+          rawImage = AppAssetService.getAssetUrl(rawImage);
+        }
+      }
+
+      // 3. Resolve relative server path to full HTTP URL
+      String resolvedUrl = rawImage;
+      final activeHost = ApiEndpoints.host.replaceAll(RegExp(r'/+$'), '');
+      if (resolvedUrl.startsWith('/uploads/') || resolvedUrl.startsWith('uploads/')) {
+        final clean = resolvedUrl.startsWith('/') ? resolvedUrl : '/$resolvedUrl';
+        resolvedUrl = '$activeHost$clean';
+      } else if (resolvedUrl.startsWith('products/') ||
+          resolvedUrl.startsWith('categories/') ||
+          resolvedUrl.startsWith('variants/')) {
+        resolvedUrl = '$activeHost/uploads/$resolvedUrl';
+      } else if (resolvedUrl.startsWith('/products/') ||
+          resolvedUrl.startsWith('/categories/') ||
+          resolvedUrl.startsWith('/variants/')) {
+        resolvedUrl = '$activeHost/uploads$resolvedUrl';
+      }
+
+      if (resolvedUrl.startsWith('https://192.168.') ||
+          resolvedUrl.startsWith('https://localhost') ||
+          resolvedUrl.startsWith('https://127.0.0.1') ||
+          resolvedUrl.startsWith('https://10.0.2.2')) {
+        resolvedUrl = resolvedUrl.replaceFirst('https://', 'http://');
+      }
+
+      try {
+        final uri = Uri.parse(resolvedUrl);
+        if ((uri.host.startsWith('192.168.') ||
+                uri.host == 'localhost' ||
+                uri.host == '127.0.0.1' ||
+                uri.host == '10.0.2.2') &&
+            !activeHost.contains(uri.host)) {
+          final activeUri = Uri.parse(activeHost);
+          resolvedUrl = uri
+              .replace(
+                scheme: activeUri.scheme,
+                host: activeUri.host,
+                port: activeUri.port,
+              )
+              .toString();
+        }
+      } catch (_) {}
+
+      // 4. Download image bytes over HTTP
+      if (resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://')) {
+        final response = await http
+            .get(Uri.parse(resolvedUrl))
+            .timeout(const Duration(seconds: 4));
+
+        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          final bytes = response.bodyBytes;
+          if (kIsWeb) {
+            return XFile.fromData(bytes, mimeType: 'image/jpeg', name: '${_sanitizeFilename(displayName)}.jpg');
+          }
+          final tempDir = await getTemporaryDirectory();
+          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.jpg';
+          final file = File(filePath);
+          await file.writeAsBytes(bytes);
+          return XFile(file.path, mimeType: 'image/jpeg');
+        }
+      }
+    } catch (e) {
+      debugPrint('[ShareProduct] Error resolving image for share: $e');
+    }
+    return null;
+  }
+
+  void _showWebShareSheet(
+    BuildContext context,
+    Product p,
+    ProductVariant? v,
+    String displayName,
+    String shareUrl,
+    String shareText,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: buildProductImage(
+                        p.name,
+                        imageAsset: v?.images.isNotEmpty == true
+                            ? v!.images.first
+                            : (p.images.isNotEmpty ? p.images.first : p.imageAsset),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Share Product',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF17211B),
+                            ),
+                          ),
+                          Text(
+                            '₹${(v?.price ?? p.price).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF16653A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    // WhatsApp Option
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final waUrl = Uri.parse(
+                            'https://api.whatsapp.com/send?text=${Uri.encodeComponent(shareText)}',
+                          );
+                          try {
+                            await launchUrl(waUrl, mode: LaunchMode.externalApplication);
+                          } catch (_) {
+                            await launchUrl(waUrl);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFC8E6C9)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.chat_bubble_rounded, color: Color(0xFF2E7D32), size: 26),
+                              SizedBox(height: 6),
+                              Text(
+                                'WhatsApp',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1B5E20),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Copy Link Option
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          Clipboard.setData(ClipboardData(text: shareText));
+                          if (mounted) {
+                            F2HToast.success(context, 'Product link & message copied!');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.copy_rounded, color: Color(0xFF475569), size: 26),
+                              SizedBox(height: 6),
+                              Text(
+                                'Copy Link',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // System Share Option
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          try {
+                            await SharePlus.instance.share(
+                              ShareParams(
+                                text: shareText,
+                                subject: 'Buy $displayName from F2H Fresh!',
+                              ),
+                            );
+                          } catch (_) {
+                            Clipboard.setData(ClipboardData(text: shareText));
+                            if (mounted) {
+                              F2HToast.success(context, 'Product link copied!');
+                            }
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.share_rounded, color: Color(0xFF64748B), size: 26),
+                              SizedBox(height: 6),
+                              Text(
+                                'More',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _shareProduct(Product p) async {
     HapticFeedback.lightImpact();
     final v = _selectedVariant;
@@ -109,36 +449,39 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     final priceVal = (v != null && v.price > 0) ? v.price : p.price;
     final priceStr = priceVal > 0 ? '₹${priceVal.toStringAsFixed(0)}' : '';
 
-    // Small description from highlights or first line of description
-    String shortDesc = '';
-    if (p.highlights != null && p.highlights!.trim().isNotEmpty) {
-      shortDesc = p.highlights!.replaceAll(RegExp(r'<[^>]*>'), '').trim();
-    } else if (p.description != null && p.description!.trim().isNotEmpty) {
-      final clean = p.description!.replaceAll(RegExp(r'<[^>]*>'), '').trim();
-      final dotIdx = clean.indexOf('.');
-      shortDesc = dotIdx != -1 ? clean.substring(0, dotIdx + 1).trim() : clean;
-    }
-    if (shortDesc.length > 100) {
-      shortDesc = '${shortDesc.substring(0, 97)}...';
+    final shareUrl = 'https://c.f2hfresh.com/p/$targetId';
+    final shareText =
+        'Buy $displayName from F2H Fresh!\n\nCheck this out on F2H Fresh!\n\n$shareUrl';
+
+    // On Web / local browser testing, Web Share API is blocked over unencrypted HTTP (http://192.168.x.x)
+    // So we show the interactive Share Sheet with WhatsApp, Copy Link & Native Share!
+    if (kIsWeb) {
+      _showWebShareSheet(context, p, v, displayName, shareUrl, shareText);
+      return;
     }
 
-    final shareUrl = 'https://c.f2hfresh.com/p/$targetId';
-    final priceLine = priceStr.isNotEmpty ? 'Price: $priceStr\n' : '';
-    final descLine = shortDesc.isNotEmpty ? '$shortDesc\n' : '';
-    final shareText =
-        '🛒 Buy $displayName from F2H Fresh!\n$priceLine$descLine\n👉 Order now on F2H Fresh App:\n$shareUrl';
     try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: shareText,
-          subject: 'Buy $displayName from F2H Fresh!',
-        ),
-      );
-    } catch (_) {
-      Clipboard.setData(ClipboardData(text: shareText));
-      if (mounted) {
-        F2HToast.success(context, 'Product link copied to clipboard!');
+      final XFile? imageXFile = await _resolveAndFetchProductImage(p, v, targetId, displayName);
+
+      if (imageXFile != null) {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [imageXFile],
+            text: shareText,
+            subject: 'Buy $displayName from F2H Fresh!',
+          ),
+        );
+      } else {
+        await SharePlus.instance.share(
+          ShareParams(
+            text: shareText,
+            subject: 'Buy $displayName from F2H Fresh!',
+          ),
+        );
       }
+    } catch (err) {
+      debugPrint('[ShareProduct] Native share error, showing share sheet fallback: $err');
+      _showWebShareSheet(context, p, v, displayName, shareUrl, shareText);
     }
   }
 
