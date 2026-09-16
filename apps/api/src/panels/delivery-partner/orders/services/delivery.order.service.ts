@@ -858,7 +858,7 @@ export class DeliveryOrderService {
       ? [status]
       : ['confirmed', 'out_for_delivery', 'delivered', 'failed', 'assigned', 'packed'];
 
-    const orders = await this.db.query(
+     const orders = await this.db.query(
       `SELECT
           o.order_id,
           o.subscription_id,
@@ -902,13 +902,13 @@ export class DeliveryOrderService {
          ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
        LEFT JOIN delivery_run_addresses dra
          ON (dra.run_id = o.delivery_run_id AND dra.address_id = o.address_id)
-        WHERE (o.delivery_partner_id = $1 OR o.delivery_run_id = ANY($5))
+        WHERE (o.delivery_partner_id = $1 OR o.delivery_run_id = ANY($4))
           AND o.status = ANY($3)
           AND o.scheduled_date = $2::date
-          AND o.delivery_slot = $4
-        ORDER BY COALESCE(dra.sequence_no, o.run_sequence) ASC NULLS LAST,
+        ORDER BY o.delivery_slot ASC,
+                 COALESCE(dra.sequence_no, o.run_sequence) ASC NULLS LAST,
                  o.created_at ASC`,
-      [String(boy.user_id), targetDate, orderStatuses, targetSlot, runIds],
+      [String(boy.user_id), targetDate, orderStatuses, runIds],
     );
 
     if (!activeRunId && orders?.length) {

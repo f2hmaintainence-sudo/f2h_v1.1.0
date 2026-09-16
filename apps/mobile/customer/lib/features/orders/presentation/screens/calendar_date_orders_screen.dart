@@ -525,196 +525,135 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
     bool isToday,
     String cutoffFormatted,
   ) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: isEligible
-                    ? const Color(0xFFEFF6FF)
-                    : const Color(0xFFF1F5F9),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isEligible
-                      ? const Color(0xFFDBEAFE)
-                      : const Color(0xFFE2E8F0),
-                  width: 1.5,
+    return RefreshIndicator(
+      onRefresh: () => _fetchOrdersForDate(showLoading: true),
+      color: kPrimary,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+        children: [
+          // Empty State Information Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              child: Icon(
-                isEligible
-                    ? Icons.calendar_today_rounded
-                    : Icons.event_busy_rounded,
-                size: 36,
-                color: isEligible
-                    ? kPrimary
-                    : const Color(0xFF94A3B8),
-              ),
+              ],
             ),
-            const SizedBox(height: 20),
-            Text(
-              isEligible ? 'No Orders Scheduled' : 'No Orders for this Date',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isEligible
-                  ? (isToday
-                      ? 'You have no deliveries scheduled for today yet. You can order fresh products until $cutoffFormatted.'
-                      : 'You have no deliveries scheduled for $formattedDate yet. You can schedule items for delivery on this day.')
-                  : (isToday
-                      ? 'Orders for today closed at $cutoffFormatted (Customer Cutoff Time). You can schedule deliveries for tomorrow or upcoming dates.'
-                      : 'There were no orders or deliveries scheduled on $formattedDate.'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13.5,
-                color: Color(0xFF64748B),
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (isEligible) ...[
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded,
-                        size: 15, color: Color(0xFF059669)),
-                    const SizedBox(width: 6),
-                    Text(
-                      isToday
-                          ? 'Orders open until $cutoffFormatted today'
-                          : 'Available for scheduled delivery',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF059669),
-                      ),
+            child: Column(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: isEligible
+                        ? const Color(0xFFEFF6FF)
+                        : const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isEligible
+                          ? const Color(0xFFDBEAFE)
+                          : const Color(0xFFE2E8F0),
+                      width: 1.5,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => _navigateToShop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 0,
+                  child: Icon(
+                    isEligible
+                        ? Icons.calendar_today_rounded
+                        : Icons.event_busy_rounded,
+                    size: 28,
+                    color: isEligible
+                        ? kPrimary
+                        : const Color(0xFF94A3B8),
+                  ),
                 ),
-                icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
-                label: const Text(
-                  'Add Products for this Date',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                const SizedBox(height: 12),
+                Text(
+                  isEligible ? 'No Orders Scheduled' : 'No Orders for this Date',
+                  style: const TextStyle(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
                 ),
-              ),
-              BlocBuilder<CartBloc, CartState>(
-                builder: (context, cartState) {
-                  final cartItems = (cartState is CartLoadedState)
-                      ? cartState.items
-                      : <CartItemEntity>[];
-                  final totalCount = cartItems.fold<int>(
-                    0,
-                    (sum, i) =>
-                        sum +
-                        (i.purchaseType == 'subscription'
-                            ? 1
-                            : (i.quantity ?? 1)),
-                  );
-                  if (totalCount == 0) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: OutlinedButton.icon(
-                      onPressed: () => _openCartForDate(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kPrimary,
-                        side: const BorderSide(color: kPrimary, width: 1.5),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 6),
+                Text(
+                  isEligible
+                      ? (isToday
+                          ? 'You have no deliveries scheduled for today yet. You can order fresh products until $cutoffFormatted.'
+                          : 'You have no deliveries scheduled for $formattedDate yet. You can schedule items for delivery on this day.')
+                      : (isToday
+                          ? 'Orders for today closed at $cutoffFormatted (Customer Cutoff Time).'
+                          : 'There were no orders or deliveries scheduled on $formattedDate.'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF64748B),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isEligible
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isEligible
+                          ? const Color(0xFFA7F3D0)
+                          : const Color(0xFFFECACA),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isEligible
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.access_time_filled_rounded,
+                        size: 14,
+                        color: isEligible
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFDC2626),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        isEligible
+                            ? (isToday
+                                ? 'Orders open until $cutoffFormatted today'
+                                : 'Available for scheduled delivery')
+                            : (isToday
+                                ? 'Cutoff Passed ($cutoffFormatted)'
+                                : 'Past Date • Orders Closed'),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: isEligible
+                              ? const Color(0xFF059669)
+                              : const Color(0xFFDC2626),
                         ),
                       ),
-                      icon: const Icon(Icons.shopping_cart_outlined, size: 18),
-                      label: Text(
-                        'View Cart ($totalCount ${totalCount == 1 ? "item" : "items"})',
-                        style: const TextStyle(
-                            fontSize: 13.5, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ] else ...[
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFFECACA)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.access_time_filled_rounded,
-                        size: 15, color: Color(0xFFDC2626)),
-                    const SizedBox(width: 6),
-                    Text(
-                      isToday
-                          ? 'Cutoff Passed ($cutoffFormatted)'
-                          : 'Past Date',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFDC2626),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF475569),
-                  side: const BorderSide(color: Color(0xFFCBD5E1)),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    ],
                   ),
                 ),
-                icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                label: const Text(
-                  'Back to Calendar',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ],
-        ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Show the two product add sections: "Add Products for this Date" card + "Quick Add Essentials" shelf
+          _buildAddProductsBelowCard(context, isEligible, 'Morning'),
+        ],
       ),
     );
   }
