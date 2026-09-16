@@ -152,7 +152,6 @@ export const adminNav: NavGroup[] = [
     items: [
       { name: "Staff Members", href: "/admin/staffs", icon: Users, permissions: ["staff.view", "staff.manage"] },
       { name: "Roles & Permissions", href: "/admin/system/roles", icon: Shield, permissions: ["system.roles", "staff.roles"] },
-      { name: "Admin Users", href: "/admin/profile/admins", icon: UserCheck, permissions: ["system.admins", "staff.view", "staff.manage"] },
     ],
   },
   {
