@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
@@ -95,14 +96,45 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     }
   }
 
-  void _shareProduct(Product p) {
+  Future<void> _shareProduct(Product p) async {
     HapticFeedback.lightImpact();
-    Clipboard.setData(
-      ClipboardData(
-        text: 'Check out ${p.name} on F2H Fresh: https://customer.f2hfresh.com',
-      ),
-    );
-    F2HToast.success(context, 'Product link copied to clipboard!');
+    final v = _selectedVariant;
+    final targetId = (v != null && v.id.isNotEmpty) ? v.id : p.id;
+    final variantLabel = (v != null && v.label.isNotEmpty && v.label.toLowerCase() != 'standard')
+        ? v.label
+        : '';
+    final displayName = variantLabel.isNotEmpty && !p.name.contains(variantLabel)
+        ? '${p.name}-$variantLabel'
+        : p.name;
+
+    // Small description from highlights or first line of description
+    String shortDesc = '';
+    if (p.highlights != null && p.highlights!.trim().isNotEmpty) {
+      shortDesc = p.highlights!.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+    } else if (p.description != null && p.description!.trim().isNotEmpty) {
+      final clean = p.description!.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+      final dotIdx = clean.indexOf('.');
+      shortDesc = dotIdx != -1 ? clean.substring(0, dotIdx + 1).trim() : clean;
+    }
+    if (shortDesc.length > 100) {
+      shortDesc = '${shortDesc.substring(0, 97)}...';
+    }
+
+    final shareUrl = 'https://c.f2hfresh.com/p/$targetId';
+    final descLine = shortDesc.isNotEmpty ? '$shortDesc\n' : 'Check this out on F2H Fresh!\n';
+    final shareText =
+        'Buy $displayName from F2H Fresh!\n\n$descLine$shareUrl';
+    try {
+      await SharePlus.instance.share(
+        shareText,
+        subject: 'Buy $displayName from F2H Fresh!',
+      );
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: shareText));
+      if (mounted) {
+        F2HToast.success(context, 'Product link copied to clipboard!');
+      }
+    }
   }
 
   // [ADDED BY ANTIGRAVITY FOR SUBSCRIPTION & PRODUCT UI UPDATE]
@@ -315,11 +347,40 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                             ),
                           ),
 
-                          // Floating top-right cart button over hero
-                          const Positioned(
+                          // Floating top-right share & cart buttons over hero
+                          Positioned(
                             top: 8,
                             right: 12,
-                            child: CartBtn(),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => _shareProduct(p),
+                                  child: Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.share_outlined,
+                                      color: kText,
+                                      size: 19,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const CartBtn(),
+                              ],
+                            ),
                           ),
 
                           // Green subscription banner overlay on product image
@@ -1189,8 +1250,39 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
                           ),
                           const SizedBox(width: 8),
 
-                          // 3. Right Action: Cart
-                          const CartBtn(),
+                          // 3. Right Action: Share + Cart
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: () => _shareProduct(p),
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: const Color(0xFFE2E8F0)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.04),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.share_outlined,
+                                    color: kText,
+                                    size: 19,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const CartBtn(),
+                            ],
+                          ),
                         ],
                       ),
                     ),

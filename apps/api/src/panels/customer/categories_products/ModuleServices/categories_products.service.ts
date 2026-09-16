@@ -585,5 +585,146 @@ export class CategoriesProductsService {
       return { status: false, available: false, reason: 'internal_error' };
     }
   }
+
+  /**
+   * Returns metadata (name, description, image, price) for rich link preview.
+   */
+  async getProductShareMeta(productIdOrVariantId: string, baseUrl?: string) {
+    try {
+      const publicBaseUrl =
+        baseUrl ||
+        process.env.MOBILE_BACKEND_URL ||
+        process.env.BACKEND_URL ||
+        'https://c.f2hfresh.com';
+
+      // 1. Prioritize exact variant match, fallback to product match
+      const query = `
+        SELECT 
+          p.product_id,
+          pv.variant_id,
+          COALESCE(NULLIF(pv.name, ''), p.name) AS name,
+          p.name AS product_name,
+          p.description,
+          p.highlights,
+          pv.price,
+          pv.original_price,
+          c.name AS category_name,
+          COALESCE(
+            (
+              SELECT pi.storage_key FROM product_images pi
+              WHERE pi.variant_id = pv.variant_id
+                AND pi.deleted_at IS NULL
+                AND pi.storage_key IS NOT NULL
+                AND pi.storage_key <> ''
+              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+            ),
+            (
+              SELECT pi.storage_key FROM product_images pi
+              WHERE pi.product_id = p.product_id
+                AND (pi.variant_id IS NULL OR pi.variant_id = '')
+                AND pi.deleted_at IS NULL
+                AND pi.storage_key IS NOT NULL
+                AND pi.storage_key <> ''
+              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+            ),
+            (
+              SELECT pi.storage_key FROM product_images pi
+              WHERE pi.product_id = p.product_id
+                AND pi.deleted_at IS NULL
+                AND pi.storage_key IS NOT NULL
+                AND pi.storage_key <> ''
+              ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+            ),
+            c.image_path
+          ) AS image_key
+        FROM product_variants pv
+        LEFT JOIN products p ON pv.product_id = p.product_id
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        WHERE (pv.variant_id = $1 OR p.product_id = $1 OR p.slug = $1)
+          AND (p.deleted_at IS NULL OR p.deleted_at IS NULL)
+        ORDER BY 
+          (CASE WHEN pv.variant_id = $1 THEN 0 ELSE 1 END) ASC,
+          pv.is_primary DESC NULLS LAST,
+          pv.id ASC
+        LIMIT 1
+      `;
+      let rows = await this.db.query(query, [productIdOrVariantId]);
+
+      // Fallback query starting from products table if not found by variant
+      if (!rows || rows.length === 0) {
+        const prodQuery = `
+          SELECT 
+            p.product_id,
+            pv.variant_id,
+            COALESCE(NULLIF(pv.name, ''), p.name) AS name,
+            p.name AS product_name,
+            p.description,
+            p.highlights,
+            pv.price,
+            pv.original_price,
+            c.name AS category_name,
+            COALESCE(
+              (
+                SELECT pi.storage_key FROM product_images pi
+                WHERE pi.variant_id = pv.variant_id
+                  AND pi.deleted_at IS NULL
+                  AND pi.storage_key IS NOT NULL
+                  AND pi.storage_key <> ''
+                ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+              ),
+              (
+                SELECT pi.storage_key FROM product_images pi
+                WHERE pi.product_id = p.product_id
+                  AND pi.deleted_at IS NULL
+                  AND pi.storage_key IS NOT NULL
+                  AND pi.storage_key <> ''
+                ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST LIMIT 1
+              ),
+              c.image_path
+            ) AS image_key
+          FROM products p
+          LEFT JOIN product_variants pv ON pv.product_id = p.product_id
+          LEFT JOIN categories c ON p.category_id = c.category_id
+          WHERE (p.product_id = $1 OR p.slug = $1)
+            AND p.deleted_at IS NULL
+          ORDER BY pv.is_primary DESC NULLS LAST, pv.id ASC
+          LIMIT 1
+        `;
+        rows = await this.db.query(prodQuery, [productIdOrVariantId]);
+      }
+
+      if (!rows || rows.length === 0) {
+        return null;
+      }
+      const item = rows[0];
+      const imageUrl = resolveImageUrl(item.image_key, publicBaseUrl);
+
+      // Clean small product description
+      let smallDescription = '';
+      if (item.highlights && typeof item.highlights === 'string' && item.highlights.trim()) {
+        smallDescription = item.highlights.replace(/<[^>]*>?/gm, '').trim();
+      } else if (item.description && typeof item.description === 'string' && item.description.trim()) {
+        const clean = item.description.replace(/<[^>]*>?/gm, '').trim();
+        const sentence = clean.split('.')[0] || clean;
+        smallDescription = sentence.length > 120 ? sentence.substring(0, 117) + '...' : sentence;
+      }
+      if (!smallDescription) {
+        smallDescription = 'Farm-fresh dairy, fruits, vegetables and daily essentials delivered to your doorstep.';
+      }
+
+      return {
+        id: item.product_id || productIdOrVariantId,
+        variantId: item.variant_id,
+        name: item.name || item.product_name || 'Fresh Product',
+        description: smallDescription,
+        price: item.price,
+        originalPrice: item.original_price,
+        imageUrl: imageUrl || `${publicBaseUrl}/uploads/banners/app_logo.png`,
+      };
+    } catch (err) {
+      this.developer.error('getProductShareMeta failed', { error: err, productIdOrVariantId });
+      return null;
+    }
+  }
 }
 

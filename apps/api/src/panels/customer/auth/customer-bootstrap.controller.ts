@@ -397,9 +397,9 @@ export class CustomerBootstrapController {
           dra.sequence_no,
           COALESCE(dra.delivery_status, 'pending') AS address_delivery_status,
           dra.delivered_at,
-          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.user_name, 'Delivery Partner') AS partner_name,
+          COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
-          dp.profile_photo_url AS partner_photo,
+          COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
           ca.address_type,
           ca.address_line,
           ca.flat_no,
@@ -410,17 +410,17 @@ export class CustomerBootstrapController {
         FROM delivery_run_addresses dra
         JOIN delivery_runs dr ON (dr.run_id = dra.run_id OR dr.id::varchar = dra.run_id)
         LEFT JOIN customer_addresses ca ON (ca.address_id = dra.address_id OR ca.id::varchar = dra.address_id)
-        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id )
-        LEFT JOIN users u ON ( u.user_id = dr.delivery_partner_id)
+        LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = dr.delivery_partner_id)
+        LEFT JOIN users u ON (u.user_id = dp.delivery_partner_id OR u.user_id = dr.delivery_partner_id)
         WHERE (
           dra.customer_id = $1 
           OR dra.address_id IN (
-            SELECT address_id FROM customer_addresses WHERE customer_id = $1 OR user_id = $1
+            SELECT address_id FROM customer_addresses WHERE customer_id = $1
             UNION
-            SELECT id::varchar FROM customer_addresses WHERE customer_id = $1 OR user_id = $1
+            SELECT id::varchar FROM customer_addresses WHERE customer_id = $1
           )
         )
-        AND dr.run_date = $2
+        AND (dr.run_date = $2 OR dr.run_date = CURRENT_DATE)
         AND dr.status != 'cancelled'
         AND dra.deleted_at IS NULL
         ORDER BY 
@@ -428,7 +428,7 @@ export class CustomerBootstrapController {
           dra.sequence_no ASC
       `;
 
-      const rows = await this.db.query(sql, [customerId, todayDate, currentSlot]);
+      let rows = await this.db.query(sql, [customerId, todayDate, currentSlot]);
       this.Developer.log('[CustomerBootstrapController] getTodayDeliveryPartners', {
         customerId,
         todayDate,
@@ -487,6 +487,134 @@ export class CustomerBootstrapController {
         } else if (row.address_delivery_status === 'delivered' && partner.delivery_status === 'pending') {
           partner.delivery_status = 'delivered';
         }
+      }
+
+      // Fallback 1: If no delivery run exists today, check today's assigned orders
+      if (partnerMap.size === 0) {
+        try {
+          const orderSql = `
+            SELECT 
+              o.delivery_partner_id,
+              o.order_id,
+              o.delivery_date,
+              COALESCE(o.delivery_slot, 'morning') AS delivery_slot,
+              COALESCE(o.order_status, 'pending') AS order_status,
+              COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
+              COALESCE(u.phone, '') AS partner_phone,
+              COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              ca.address_id,
+              ca.address_type,
+              ca.address_line,
+              ca.flat_no,
+              ca.building_name,
+              ca.area,
+              ca.city
+            FROM orders o
+            LEFT JOIN customer_addresses ca ON (ca.address_id = o.delivery_address_id OR ca.id::varchar = o.delivery_address_id)
+            LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = o.delivery_partner_id)
+            LEFT JOIN users u ON (u.user_id = dp.delivery_partner_id OR u.user_id = o.delivery_partner_id)
+            WHERE (o.customer_id = $1)
+              AND (o.delivery_date = $2 OR o.delivery_date = CURRENT_DATE OR o.order_status IN ('out_for_delivery', 'assigned', 'in_transit'))
+              AND o.order_status NOT IN ('cancelled', 'rejected')
+              AND o.delivery_partner_id IS NOT NULL
+              AND o.delivery_partner_id != ''
+            ORDER BY 
+              CASE WHEN o.delivery_slot = $3 THEN 0 ELSE 1 END,
+              o.id DESC
+          `;
+          const orderRows = await this.db.query(orderSql, [customerId, todayDate, currentSlot]);
+          for (const row of orderRows || []) {
+            const partnerId = row.delivery_partner_id;
+            if (!partnerId || partnerMap.has(partnerId)) continue;
+            const slotLabel = row.delivery_slot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
+            let status = 'pending';
+            if (row.order_status === 'out_for_delivery' || row.order_status === 'in_transit') {
+              status = 'out_for_delivery';
+            } else if (row.order_status === 'delivered') {
+              status = 'delivered';
+            }
+            partnerMap.set(partnerId, {
+              partner_id: partnerId,
+              partner_name: row.partner_name || 'Delivery Partner',
+              phone: row.partner_phone || '',
+              profile_photo: row.partner_photo || null,
+              delivery_slot: row.delivery_slot || currentSlot,
+              slot_label: slotLabel,
+              is_current_slot: (row.delivery_slot || '').toLowerCase() === currentSlot.toLowerCase(),
+              run_status: status === 'delivered' ? 'completed' : 'in_progress',
+              delivery_status: status,
+              run_date: row.delivery_date || todayDate,
+              addresses: row.address_id ? [{
+                address_id: row.address_id,
+                address_type: row.address_type || 'home',
+                address_line: row.address_line || [row.flat_no, row.building_name, row.area, row.city].filter(Boolean).join(', '),
+                area: row.area || '',
+                delivery_status: status,
+                delivered_at: null,
+                sequence_no: 1,
+              }] : [],
+            });
+          }
+        } catch (_) { }
+      }
+
+      // Fallback 2: If still no partner, check customer branch / sector assigned delivery partner
+      if (partnerMap.size === 0) {
+        try {
+          const branchPartnerSql = `
+            SELECT 
+              COALESCE(bs.delivery_partner_id, dp.delivery_partner_id) AS delivery_partner_id,
+              COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
+              COALESCE(u.phone, '') AS partner_phone,
+              COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              ca.address_id,
+              ca.address_type,
+              ca.address_line,
+              ca.flat_no,
+              ca.building_name,
+              ca.area,
+              ca.city
+            FROM customer_addresses ca
+            LEFT JOIN branch_sectors bs ON (bs.branch_id = ca.branch_id AND bs.is_active = true AND bs.delivery_partner_id IS NOT NULL)
+            JOIN delivery_partners dp ON (
+              dp.delivery_partner_id = bs.delivery_partner_id 
+              OR (bs.delivery_partner_id IS NULL AND dp.branch_id = ca.branch_id AND dp.is_active = true)
+            )
+            JOIN users u ON (u.user_id = dp.delivery_partner_id)
+            WHERE ca.customer_id = $1
+              AND ca.status = true
+              AND ca.deleted_at IS NULL
+              AND dp.is_active = true
+            ORDER BY ca.is_default DESC, dp.total_deliveries DESC NULLS LAST
+            LIMIT 1
+          `;
+          const branchPartnerRows = await this.db.query(branchPartnerSql, [customerId]);
+          const bp = branchPartnerRows?.[0];
+          if (bp && bp.delivery_partner_id) {
+            const slotLabel = currentSlot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
+            partnerMap.set(bp.delivery_partner_id, {
+              partner_id: bp.delivery_partner_id,
+              partner_name: bp.partner_name || 'Delivery Partner',
+              phone: bp.partner_phone || '',
+              profile_photo: bp.partner_photo || null,
+              delivery_slot: currentSlot === 'evening' ? 'evening' : 'morning',
+              slot_label: slotLabel,
+              is_current_slot: true,
+              run_status: 'assigned',
+              delivery_status: 'pending',
+              run_date: todayDate,
+              addresses: bp.address_id ? [{
+                address_id: bp.address_id,
+                address_type: bp.address_type || 'home',
+                address_line: bp.address_line || [bp.flat_no, bp.building_name, bp.area, bp.city].filter(Boolean).join(', '),
+                area: bp.area || '',
+                delivery_status: 'pending',
+                delivered_at: null,
+                sequence_no: 1,
+              }] : [],
+            });
+          }
+        } catch (_) { }
       }
 
       const deliveryPartners = Array.from(partnerMap.values());

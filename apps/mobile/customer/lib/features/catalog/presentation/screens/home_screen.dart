@@ -105,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen>
         final customerId = session.profile?.customerId;
         if (customerId != null) {
           context.read<NotificationsBloc>().add(LoadNotifications());
+          context.read<CustomerSessionCubit>().refreshSilently();
         }
         // Show popup banner on HomeScreen
         PopupBannerWidget.checkAndShowPopupBanner(context);

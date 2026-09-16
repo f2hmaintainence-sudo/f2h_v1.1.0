@@ -386,38 +386,21 @@ class TodayDeliveryPartnersSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (partners.isEmpty) return const SizedBox.shrink();
 
-    final slotTimings = slotTimingsOf(context);
-    final now = DateTime.now();
-    final nowMinutes = now.hour * 60 + now.minute;
-    final morningEnd = parseTimeToMinutes(
-      slotTimings?['morning_slot']?['delivery_window_end'],
-      8 * 60 + 30,
-    );
-    final eveningEnd = parseTimeToMinutes(
-      slotTimings?['evening_slot']?['delivery_window_end'],
-      20 * 60,
-    );
+    // Sort partners so that active or current slot partner is placed first
+    final sortedPartners = List<TodayDeliveryPartner>.from(partners);
+    sortedPartners.sort((a, b) {
+      if (a.isCurrentSlot && !b.isCurrentSlot) return -1;
+      if (!a.isCurrentSlot && b.isCurrentSlot) return 1;
+      return 0;
+    });
 
-    final activePartners = partners.where((p) {
-      final slot = p.deliverySlot.toLowerCase();
-      if (slot == 'morning' && nowMinutes > morningEnd) {
-        return false;
-      }
-      if (slot == 'evening' && nowMinutes > eveningEnd) {
-        return false;
-      }
-      return true;
-    }).toList();
-
-    if (activePartners.isEmpty) return const SizedBox.shrink();
-
-    if (activePartners.length == 1) {
-      return TodayDeliveryPartnerCard(partner: activePartners.first);
+    if (sortedPartners.length == 1) {
+      return TodayDeliveryPartnerCard(partner: sortedPartners.first);
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: activePartners
+      children: sortedPartners
           .map((partner) => TodayDeliveryPartnerCard(partner: partner))
           .toList(),
     );

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
-import { Request } from 'express';
+import { Body, Controller, Get, Post, Query, Req, Res } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { Public } from 'src/auth/decorators/public.decorator';
@@ -354,6 +354,257 @@ export class CategoriesController {
       req.params.productId as string,
       warehouseId,
     );
+  }
+
+  /**
+   * Public Product Share & Link Preview Endpoint
+   * GET /customer/share/product/:productId
+   * Serves Open Graph tags for WhatsApp/Telegram/social previews
+   * and auto-deep links or redirects to the Play Store app / web.
+   */
+  @Public()
+  @Get('share/product/:productId')
+  async getProductSharePage(
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const productId = (req.params as any).productId;
+    const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+    const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'c.f2hfresh.com';
+    const baseUrl = `${protocol}://${host}`;
+
+    const meta = await this.service.getProductShareMeta(productId, baseUrl);
+    const title = meta ? `Buy ${meta.name} from F2H Fresh!` : 'Buy Fresh Groceries from F2H Fresh!';
+    const rawDesc = meta?.description || 'Order fresh farm-to-home milk, dairy, vegetables, and daily essentials online at best prices.';
+    const description = rawDesc.length > 160 ? rawDesc.substring(0, 157) + '...' : rawDesc;
+    const imageUrl = meta?.imageUrl || `${baseUrl}/uploads/banners/app_logo.png`;
+    const shareUrl = `https://c.f2hfresh.com/p/${productId}`;
+    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
+    const intentUrl = `intent://c.f2hfresh.com/p/${encodeURIComponent(productId)}#Intent;scheme=https;package=com.f2h.customer;S.browser_fallback_url=${encodeURIComponent(playStoreUrl)};end;`;
+    const priceText = meta?.price ? `₹${meta.price}` : '';
+    const origPriceText = meta?.originalPrice && meta.originalPrice > (meta.price || 0) ? `₹${meta.originalPrice}` : '';
+
+    const userAgent = (req.headers['user-agent'] as string) || '';
+    const isBot = /bot|crawl|spider|whatsapp|facebookexternalhit|telegrambot|twitterbot|linkedinbot|embedly|quora|slackbot/i.test(userAgent);
+
+    const escape = (s: string) => (s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escape(title)}</title>
+  <meta name="description" content="${escape(description)}">
+
+  <!-- Open Graph / WhatsApp / Facebook / Telegram -->
+  <meta property="og:type" content="product">
+  <meta property="og:site_name" content="F2H Fresh">
+  <meta property="og:url" content="${escape(shareUrl)}">
+  <meta property="og:title" content="${escape(title)}">
+  <meta property="og:description" content="${escape(description)}">
+  <meta property="og:image" content="${escape(imageUrl)}">
+  <meta property="og:image:secure_url" content="${escape(imageUrl)}">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="600">
+  <meta property="og:image:height" content="600">
+  <meta property="og:image:alt" content="${escape(meta?.name || 'F2H Fresh')}">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="${escape(shareUrl)}">
+  <meta name="twitter:title" content="${escape(title)}">
+  <meta name="twitter:description" content="${escape(description)}">
+  <meta name="twitter:image" content="${escape(imageUrl)}">
+
+  <!-- App Deep Link Meta -->
+  <meta property="al:android:url" content="f2hfresh://product/${escape(productId)}">
+  <meta property="al:android:package" content="com.f2h.customer">
+  <meta property="al:android:app_name" content="F2H Fresh">
+
+  <link rel="icon" type="image/png" href="${baseUrl}/favicon.ico">
+  <style>
+    :root {
+      --primary: #15803d;
+      --primary-dark: #166534;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 24px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+      max-width: 440px;
+      width: 100%;
+      overflow: hidden;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .img-wrap {
+      width: 100%;
+      height: 280px;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .img-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+    .content {
+      padding: 24px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .price {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .orig-price {
+      font-size: 15px;
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+    .desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(21, 128, 61, 0.3);
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #334155;
+    }
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+  </style>
+  <script>
+    const isBot = ${isBot};
+    const intentUrl = ${JSON.stringify(intentUrl)};
+    const playStoreUrl = ${JSON.stringify(playStoreUrl)};
+    if (!isBot) {
+      if (/Android/i.test(navigator.userAgent)) {
+        // Attempt to open in app or fallback to Play Store
+        setTimeout(function() {
+          window.location.href = intentUrl;
+        }, 100);
+      } else {
+        // Non-Android or desktop fallback directly to Play Store
+        setTimeout(function() {
+          window.location.href = playStoreUrl;
+        }, 300);
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="img-wrap">
+      <img src="${escape(imageUrl)}" alt="${escape(meta?.name || 'Product Image')}">
+    </div>
+    <div class="content">
+      <div class="brand">🌱 F2H Fresh</div>
+      <h1 class="title">${escape(meta?.name || 'Fresh Product')}</h1>
+      ${priceText ? `<div class="price-row"><span class="price">${priceText}</span>${origPriceText ? `<span class="orig-price">${origPriceText}</span>` : ''}</div>` : ''}
+      <p class="desc">${escape(description)}</p>
+
+      <div class="btn-group">
+        <a href="${escape(intentUrl)}" class="btn btn-primary" id="openAppBtn">
+          <span>📱 Open in F2H Fresh App</span>
+        </a>
+        <a href="${escape(playStoreUrl)}" class="btn btn-secondary" target="_blank" rel="noopener">
+          <span>🛒 Download on Google Play</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.send(html);
   }
 }
 
