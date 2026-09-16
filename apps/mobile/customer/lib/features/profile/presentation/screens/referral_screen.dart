@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
@@ -136,19 +139,39 @@ class _ReferralScreenState extends State<ReferralScreen>
     }
   }
 
-  // ── WHATSAPP SHARING ──────────────────────────────────────
-  Future<void> _shareOnWhatsApp() async {
-    final message = _isLocked
+  // ── MULTI-OPTION SHARING ──────────────────────────────────
+  String _getShareMessage() {
+    final link = _isLocked
+        ? _playStoreUrl
+        : 'https://c.f2hfresh.com/r/$_activeCode';
+    return _isLocked
         ? 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🥛\n\n'
           'Fresh farm products, delivered to your doorstep.\n'
-          '$_playStoreUrl'
+          '$link'
         : 'Your F2H Invite is Ready 🥬🥛\n\n'
           'Fresh farm products, delivered to your doorstep.\n\n'
           'Use Referral Code: $_activeCode\n'
-          'Download App: $_playStoreUrl\n\n'
+          'Download App: $link\n\n'
           'F2H — Farm To Home\n'
           'Fresh. Smart. Rewarding.';
+  }
 
+  Future<void> _shareGeneral() async {
+    final message = _getShareMessage();
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: message,
+          subject: 'F2H — Farm To Home Referral Invite',
+        ),
+      );
+    } catch (_) {
+      if (mounted) _showShareBottomSheet();
+    }
+  }
+
+  Future<void> _shareWhatsApp() async {
+    final message = _getShareMessage();
     final encodedMsg = Uri.encodeComponent(message);
     final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
 
@@ -156,63 +179,323 @@ class _ReferralScreenState extends State<ReferralScreen>
       if (await canLaunchUrl(whatsappUri)) {
         await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
       } else {
-        final webWhatsapp =
-            Uri.parse('https://api.whatsapp.com/send?text=$encodedMsg');
+        final webWhatsapp = Uri.parse('https://api.whatsapp.com/send?text=$encodedMsg');
         if (await canLaunchUrl(webWhatsapp)) {
           await launchUrl(webWhatsapp, mode: LaunchMode.externalApplication);
         } else {
-          // WhatsApp not installed – show error dialog
-          if (mounted) _showWhatsAppNotInstalled(message);
+          if (mounted) _showShareBottomSheet();
         }
       }
     } catch (_) {
-      Clipboard.setData(ClipboardData(text: message));
-      if (mounted) {
-        F2HToast.success(context, 'Referral message copied to clipboard!');
-      }
+      if (mounted) _showShareBottomSheet();
     }
   }
 
-  void _showWhatsAppNotInstalled(String message) {
-    showDialog(
+  void _showShareBottomSheet() {
+    final message = _getShareMessage();
+    final encoded = Uri.encodeComponent(message);
+    final link = _isLocked ? _playStoreUrl : 'https://c.f2hfresh.com/r/$_activeCode';
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706)),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                "WhatsApp isn't installed on this device.",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(3),
+                ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.share_rounded, color: Color(0xFF16A34A), size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Share Invite With Friends',
+                    style: GoogleFonts.roboto(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Invite your friends & family to order farm-fresh produce and earn ₹100 rewards!',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.roboto(
+                  fontSize: 12,
+                  color: const Color(0xFF64748B),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildShareOption(
+                    icon: Icons.chat_rounded,
+                    label: 'WhatsApp',
+                    color: const Color(0xFF25D366),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _shareWhatsApp();
+                    },
+                  ),
+                  _buildShareOption(
+                    icon: Icons.send_rounded,
+                    label: 'Telegram',
+                    color: const Color(0xFF0088CC),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final url = Uri.parse('https://t.me/share/url?url=${Uri.encodeComponent(link)}&text=$encoded');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        _copyToClipboard(_activeCode, 'Referral copied to clipboard!');
+                      }
+                    },
+                  ),
+                  _buildShareOption(
+                    icon: Icons.sms_rounded,
+                    label: 'SMS',
+                    color: const Color(0xFFEA580C),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final url = Uri.parse('sms:?body=$encoded');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        _copyToClipboard(_activeCode, 'Referral copied to clipboard!');
+                      }
+                    },
+                  ),
+                  _buildShareOption(
+                    icon: Icons.email_rounded,
+                    label: 'Email',
+                    color: const Color(0xFF4F46E5),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final url = Uri.parse('mailto:?subject=${Uri.encodeComponent('F2H Referral Invite')}&body=$encoded');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        _copyToClipboard(_activeCode, 'Referral copied to clipboard!');
+                      }
+                    },
+                  ),
+                  _buildShareOption(
+                    icon: Icons.copy_rounded,
+                    label: 'Copy',
+                    color: const Color(0xFF2563EB),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _copyToClipboard(message, 'Referral message copied!');
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              // Share via system share sheet
-              Clipboard.setData(ClipboardData(text: message));
-              F2HToast.success(
-                  context, 'Referral message copied! Share using any app.');
-            },
-            icon: const Icon(Icons.share_rounded, size: 16),
-            label: const Text('Share Using Another App'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _kGreenDark,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withOpacity(0.25)),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: GoogleFonts.roboto(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF334155),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showQrCodeDialog(String code) {
+    final effectiveCode = code.isEmpty ? 'F2H' : code;
+    final qrData = 'https://play.google.com/store/apps/details?id=com.f2h.customer&referrer=$effectiveCode';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF16A34A), size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Customer QR Code',
+                        style: GoogleFonts.roboto(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x0F000000),
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: QrImageView(
+                        data: qrData,
+                        version: QrVersions.auto,
+                        size: 190.0,
+                        gapless: false,
+                        backgroundColor: Colors.white,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'CODE: $effectiveCode',
+                        style: GoogleFonts.roboto(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          letterSpacing: 1.5,
+                          color: const Color(0xFF15803D),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Scan using any Camera, Google Lens, or Scanner to download app with your referral tag applied!',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.roboto(
+                        fontSize: 11,
+                        color: const Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _shareGeneral();
+                  },
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: const Text('Share Referral Link'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    textStyle: GoogleFonts.roboto(fontWeight: FontWeight.w800, fontSize: 13.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -421,6 +704,20 @@ class _ReferralScreenState extends State<ReferralScreen>
               ],
             ),
           ),
+          IconButton(
+            onPressed: () => _showQrCodeDialog(_isLocked ? 'F2H' : _activeCode),
+            tooltip: 'View QR Code',
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFDCFCE7)),
+              ),
+              child: const Icon(Icons.qr_code_2_rounded,
+                  color: Color(0xFF16A34A), size: 20),
+            ),
+          ),
         ],
       ),
     );
@@ -449,7 +746,7 @@ class _ReferralScreenState extends State<ReferralScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Headline + Pill Badge
+          // Top Row: Headline + Pill Badge & QR Code button
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -478,28 +775,8 @@ class _ReferralScreenState extends State<ReferralScreen>
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.25)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.card_giftcard_rounded, color: _kGold, size: 16),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Refer & Earn ₹100',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+              GestureCarbonQrButton(
+                onTap: () => _showQrCodeDialog(_isLocked ? 'F2H' : _activeCode),
               ),
             ],
           ),
@@ -631,29 +908,53 @@ class _ReferralScreenState extends State<ReferralScreen>
           ),
           const SizedBox(height: 16),
 
-          // Primary WhatsApp Share Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _shareOnWhatsApp,
-              icon: const Icon(Icons.chat_rounded, size: 20),
-              label: const Text('Share on WhatsApp'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF25D366),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+          // Instant Multi-Option Share Action Buttons (WhatsApp + More)
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: ElevatedButton.icon(
+                  onPressed: _shareWhatsApp,
+                  icon: const Icon(Icons.chat_rounded, size: 18),
+                  label: const Text('WhatsApp'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
                 ),
-                textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _shareGeneral,
+                  icon: const Icon(Icons.share_rounded, size: 17),
+                  label: const Text('More'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.18),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: Colors.white.withOpacity(0.35)),
+                    ),
+                    textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6),
           const Center(
             child: Text(
-              'Share effortlessly with your friends',
+              'Share effortlessly with your friends on any platform',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -973,7 +1274,7 @@ class _ReferralScreenState extends State<ReferralScreen>
     );
   }
 
-  // ── WHATSAPP CTA CARD (in-body) ───────────────────────────
+  // ── INSTANT MULTI-SHARE CTA CARD (in-body) ───────────────
   Widget _buildWhatsAppCTACard() {
     return Container(
       width: double.infinity,
@@ -998,9 +1299,9 @@ class _ReferralScreenState extends State<ReferralScreen>
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 22),
+              Icon(Icons.bolt_rounded, color: Color(0xFF4ADE80), size: 22),
               SizedBox(width: 8),
-              Text('Share on WhatsApp',
+              Text('Instant One-Tap Share',
                   style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
@@ -1008,30 +1309,54 @@ class _ReferralScreenState extends State<ReferralScreen>
             ],
           ),
           const SizedBox(height: 4),
-          const Text('Invite friends and earn together!',
+          const Text('Invite friends and earn ₹100 rewards together!',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: Colors.white70)),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _shareOnWhatsApp,
-              icon: const Icon(Icons.chat_rounded,
-                  color: Color(0xFF25D366), size: 18),
-              label: const Text('SHARE NOW'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: _kGreenDark,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-                textStyle:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: ElevatedButton.icon(
+                  onPressed: _shareWhatsApp,
+                  icon: const Icon(Icons.chat_rounded,
+                      color: Colors.white, size: 18),
+                  label: const Text('WhatsApp'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    textStyle:
+                        const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _shareGeneral,
+                  icon: const Icon(Icons.share_rounded,
+                      color: _kGreenDark, size: 18),
+                  label: const Text('More'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _kGreenDark,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    textStyle:
+                        const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1145,28 +1470,32 @@ class _ReferralScreenState extends State<ReferralScreen>
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: _shareOnWhatsApp,
+            ElevatedButton.icon(
+              onPressed: _shareWhatsApp,
+              icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 16),
+              label: const Text('WhatsApp'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: _kGreenDark,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24)),
+                    borderRadius: BorderRadius.circular(20)),
+                textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900),
               ),
-              child: const Row(
-                children: [
-                  Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 16),
-                  SizedBox(width: 6),
-                  Text('Share Now',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
-                  SizedBox(width: 2),
-                  Icon(Icons.chevron_right_rounded, size: 16),
-                ],
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: _shareGeneral,
+              tooltip: 'More sharing options',
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                ),
+                child: const Icon(Icons.share_rounded, color: Colors.white, size: 18),
               ),
             ),
           ],
@@ -1259,6 +1588,42 @@ class _ReferralScreenState extends State<ReferralScreen>
                 ),
                 child: const Text('Close',
                     style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GestureCarbonQrButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const GestureCarbonQrButton({super.key, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.qr_code_rounded, color: Colors.white, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              'QR Code',
+              style: GoogleFonts.roboto(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 11.5,
               ),
             ),
           ],

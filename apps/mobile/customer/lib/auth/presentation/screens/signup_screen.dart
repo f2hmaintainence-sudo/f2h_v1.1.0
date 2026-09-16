@@ -22,8 +22,12 @@ import 'package:f2h_customer/features/profile/presentation/screens/privacy_scree
 import 'package:f2h_customer/features/profile/presentation/screens/terms_conditions_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  final String? initialReferralCode;
+
+  const SignupScreen({super.key, this.initialReferralCode});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -48,6 +52,32 @@ class _SignupScreenState extends State<SignupScreen> {
     super.initState();
     _referralCodeController.addListener(_onReferralChanged);
     _checkAlreadyAuthenticated();
+    _checkPendingReferralCode();
+  }
+
+  Future<void> _checkPendingReferralCode() async {
+    try {
+      if (widget.initialReferralCode != null && widget.initialReferralCode!.trim().isNotEmpty) {
+        _referralCodeController.text = widget.initialReferralCode!.trim().toUpperCase();
+        return;
+      }
+      final uri = Uri.base;
+      String? code = uri.queryParameters['ref'] ?? uri.queryParameters['referral'] ?? uri.queryParameters['code'];
+      if (code == null || code.isEmpty) {
+        final segments = uri.pathSegments;
+        final rIdx = segments.indexOf('r');
+        if (rIdx != -1 && rIdx + 1 < segments.length) {
+          code = segments[rIdx + 1];
+        }
+      }
+      if (code == null || code.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        code = prefs.getString('pending_referral_code') ?? prefs.getString('referral_code');
+      }
+      if (code != null && code.trim().isNotEmpty && mounted) {
+        _referralCodeController.text = code.trim().toUpperCase();
+      }
+    } catch (_) {}
   }
 
   void _checkAlreadyAuthenticated() async {

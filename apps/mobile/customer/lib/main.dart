@@ -18,6 +18,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:f2h_customer/app.dart';
 import 'package:f2h_customer/firebase_options.dart';
 import 'package:f2h_customer/core/services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:f2h_customer/core/di/injection.dart' as di;
 import 'package:f2h_customer/core/di/injection.dart';
 
@@ -36,6 +37,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 0. Extract referral code from deep link / web URI if present
+  try {
+    final uri = Uri.base;
+    String? ref = uri.queryParameters['ref'] ?? uri.queryParameters['referral'] ?? uri.queryParameters['code'];
+    if (ref == null || ref.isEmpty) {
+      final segs = uri.pathSegments;
+      final rIdx = segs.indexOf('r');
+      if (rIdx != -1 && rIdx + 1 < segs.length) {
+        ref = segs[rIdx + 1];
+      }
+    }
+    if (ref != null && ref.trim().isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pending_referral_code', ref.trim().toUpperCase());
+    }
+  } catch (_) {}
 
   // 1. Boot DI container
   await di.init();
