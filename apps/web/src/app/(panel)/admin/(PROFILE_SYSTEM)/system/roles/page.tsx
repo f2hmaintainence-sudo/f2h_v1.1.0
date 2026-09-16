@@ -229,6 +229,17 @@ const PRESETS = [
     ],
   },
   {
+    name: 'Milk Collector',
+    desc: 'Dedicated daily milk intake and produce collections only',
+    color: 'bg-teal-50 text-teal-700 border-teal-200',
+    keys: [
+      'vendors.collections.view',
+      'vendors.collections.create',
+      'vendors.collections.manage',
+      'vendors.slips.send',
+    ],
+  },
+  {
     name: 'Billing & Finance',
     desc: 'Invoices, outstandings, wallets and payment refunds',
     color: 'bg-emerald-50 text-emerald-700 border-emerald-200',

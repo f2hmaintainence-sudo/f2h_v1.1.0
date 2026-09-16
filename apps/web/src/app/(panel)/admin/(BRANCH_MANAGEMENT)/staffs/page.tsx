@@ -78,6 +78,7 @@ const DESIGNATIONS = [
   'Branch Manager',
   'Operations Lead',
   'Procurement Officer',
+  'Milk Collector',
   'Quality Control Supervisor',
   'Warehouse Executive',
   'Delivery Dispatcher',

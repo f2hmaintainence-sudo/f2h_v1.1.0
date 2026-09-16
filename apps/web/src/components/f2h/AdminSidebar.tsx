@@ -13,7 +13,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, ClipboardCheck, Receipt, TicketPercent, RotateCcw, ArrowLeftRight, CalendarCheck, Boxes, AlignLeft, TriangleAlert, Users, Package, Truck, BarChart3, Menu, X, ShoppingCart, Wallet, Settings, ClipboardList, UserCog, Shield, RefreshCw, AlertTriangle, PieChart, ChevronDown, MapPin, Banknote, LineChart, BookOpen, Box, Archive, Factory, Clipboard, Building, Building2, ArrowRightLeft, Container, CreditCard, FileText, ShieldAlert, Ticket, Percent, Gift, TrendingUp, Bell, Layers, Calendar, AlertOctagon, ShoppingBag, Clock, Orbit, Activity, IndianRupee, Target, Zap, Eye, UserCheck, BarChart, Gauge, CalendarOff, Tag, Globe, UserPlus, Sliders, Smartphone, Radio } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 const adminNav = [
   {
@@ -164,11 +165,31 @@ const adminNav = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { user, activeRole } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const userRoleNames = (user?.roles || []).map((r: any) => (r.role_name || r.role_id || '').toUpperCase().replace(/\s+/g, '_'));
+  const isMilkCollector = (activeRole?.toUpperCase().replace(/\s+/g, '_') === 'MILK_COLLECTOR' || userRoleNames.includes('MILK_COLLECTOR')) &&
+    !userRoleNames.includes('ADMIN') && !userRoleNames.includes('SUPER_ADMIN');
+
+  const visibleNav = useMemo(() => {
+    if (isMilkCollector) {
+      return [
+        {
+          label: "MILK PROCUREMENT",
+          items: [
+            { name: "Daily Collections", href: "/admin/catalog/collections", icon: ClipboardCheck },
+          ],
+        },
+      ];
+    }
+    return adminNav;
+  }, [isMilkCollector]);
+
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    adminNav.forEach(group => {
+    visibleNav.forEach(group => {
       group.items.forEach((item: any) => {
         if (item.subItems) {
           const isParentActive = item.subItems.some((sub: any) =>
@@ -186,7 +207,7 @@ export function AdminSidebar() {
     setExpandedMenus(prev => {
       const next = { ...prev };
       let changed = false;
-      adminNav.forEach(group => {
+      visibleNav.forEach(group => {
         group.items.forEach((item: any) => {
           if (item.subItems) {
             const isParentActive = item.subItems.some((sub: any) =>
@@ -211,7 +232,7 @@ export function AdminSidebar() {
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [pathname]);
+  }, [pathname, visibleNav]);
   const toggleMenu = (menuName: string) => {
     setExpandedMenus((prev) => ({
       ...prev,
@@ -236,7 +257,7 @@ export function AdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-5 pb-24 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
-        {adminNav.map((group) => (
+        {visibleNav.map((group) => (
           <div key={group.label}>
             {!collapsed && (
               <p className="px-3 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">

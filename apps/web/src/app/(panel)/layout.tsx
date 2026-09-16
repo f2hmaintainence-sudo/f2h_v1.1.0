@@ -37,14 +37,26 @@ function PanelGuard({ children }: { children: React.ReactNode }) {
     }
 
     // Strict role-based route guard
+    const userRoleNames = (user.roles || []).map((r: any) => (r.role_name || r.role_id || '').toUpperCase().replace(/\s+/g, '_'));
+    const isMilkCollector = activeRole === 'MILK_COLLECTOR' || (userRoleNames.includes('MILK_COLLECTOR') && !userRoleNames.includes('ADMIN') && !userRoleNames.includes('SUPER_ADMIN'));
     const userHasAdmin = user.roles?.some((r: any) => (r.role_name || r.role_id || '').toUpperCase() === 'ADMIN');
-    const role = activeRole || (userHasAdmin ? "ADMIN" : "CUSTOMER");
+    const role = activeRole || (isMilkCollector ? "MILK_COLLECTOR" : userHasAdmin ? "ADMIN" : "CUSTOMER");
     const home = getHomeForRole(role);
     const isAdminPath = pathname.startsWith("/admin");
     const isDeliveryPath = pathname.startsWith("/delivery");
     const isCustomerPath = pathname.startsWith("/customer");
 
-    if (role === "ADMIN" && !isAdminPath) {
+    if (isMilkCollector) {
+      const allowedMilkPaths = ['/admin/catalog/collections', '/admin/profile'];
+      const isAllowed = allowedMilkPaths.some(p => pathname === p || pathname.startsWith(p + '/'));
+      if (!isAllowed) {
+        router.replace('/admin/catalog/collections');
+        return;
+      }
+      return;
+    }
+
+    if ((role === "ADMIN" || role === "SUPER_ADMIN") && !isAdminPath) {
       router.replace(home);
       return;
     }

@@ -57,7 +57,7 @@ export function AdminHeader() {
       {/* Left: Page breadcrumb area */}
       <div className="flex items-center gap-4 pl-8 lg:pl-0">
         <h1 className="text-lg font-bold text-slate-800 tracking-tight">
-          {activeRole === "ADMIN" ? "Admin Panel" : activeRole === "DELIVERY_PARTNER" ? "Delivery" : "Dashboard"}
+          {activeRole === "ADMIN" ? "Admin Panel" : activeRole === "MILK_COLLECTOR" ? "Milk Collector Portal" : activeRole === "DELIVERY_PARTNER" ? "Delivery" : "Dashboard"}
         </h1>
       </div>
 

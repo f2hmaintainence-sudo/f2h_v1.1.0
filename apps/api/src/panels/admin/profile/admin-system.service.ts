@@ -143,6 +143,17 @@ const DEFAULT_ROLES = [
     ],
     is_active: true,
   },
+  {
+    role_name: 'milk_collector',
+    description: 'Milk collector role with dedicated access exclusively for daily milk and produce collections logging',
+    permissions: [
+      'vendors.collections.view',
+      'vendors.collections.create',
+      'vendors.collections.manage',
+      'vendors.slips.send',
+    ],
+    is_active: true,
+  },
 ];
 
 @Injectable()
@@ -559,15 +570,12 @@ export class AdminSystemService {
         )
       `, []);
 
-      const existing = await this.db.query('SELECT COUNT(*)::int AS count FROM admin_roles', []);
-      if ((existing[0]?.count ?? 0) === 0) {
-        for (const role of DEFAULT_ROLES) {
-          await this.db.query(`
-            INSERT INTO admin_roles (role_name, description, permissions, is_active)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (role_name) DO NOTHING
-          `, [role.role_name, role.description, JSON.stringify(role.permissions), role.is_active]);
-        }
+      for (const role of DEFAULT_ROLES) {
+        await this.db.query(`
+          INSERT INTO admin_roles (role_name, description, permissions, is_active)
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (role_name) DO NOTHING
+        `, [role.role_name, role.description, JSON.stringify(role.permissions), role.is_active]);
       }
 
       const rows = await this.db.query(

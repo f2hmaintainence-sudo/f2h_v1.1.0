@@ -54,12 +54,15 @@ export const useAuth = () => useContext(AuthContext);
 // Role → default landing page mapping
 const ROLE_HOME: Record<string, string> = {
   ADMIN: "/admin/dashboard",
+  SUPER_ADMIN: "/admin/dashboard",
+  MILK_COLLECTOR: "/admin/catalog/collections",
   DELIVERY_PARTNER: "/delivery/today",
   CUSTOMER: "/customer/home",
 };
 
 export function getHomeForRole(role: string): string {
-  return ROLE_HOME[role] || "/admin/dashboard";
+  const normalized = (role || "").toUpperCase().replace(/\s+/g, "_");
+  return ROLE_HOME[normalized] || "/admin/dashboard";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
