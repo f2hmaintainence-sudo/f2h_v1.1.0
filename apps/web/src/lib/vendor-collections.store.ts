@@ -4,12 +4,13 @@
 //
 // Project     : F2H Fresh
 // File        : vendor-collections.store.ts
-// Description : Daily vendor procurement & milk collection data store
+// Description : Daily vendor procurement store for Milk & Other Produce (Ghee, Fruits, Veggies, etc.)
 // ============================================================================
 
 export interface VendorCollectionRecord {
   id: number;
   collection_id: string;
+  collection_type: 'MILK' | 'OTHERS';
   collection_date: string; // YYYY-MM-DD
   shift: 'MORNING' | 'EVENING' | 'AFTERNOON' | 'GENERAL';
   vendor_id: string;
@@ -20,11 +21,11 @@ export interface VendorCollectionRecord {
   product_name: string;
   category: string;
   quantity: number;
-  unit: string; // 'Liters', 'Kg', 'Units', 'Crates'
+  unit: string; // 'Liters', 'Kg', 'Grams', 'Units', 'Crates', 'Boxes', 'Jars', 'Tins', 'Trays'
   rate_per_unit: number;
   total_amount: number;
 
-  // Dairy & Milk Quality
+  // Dairy & Milk Quality Parameters (for collection_type === 'MILK')
   fat_percentage?: number | null; // e.g. 4.5
   snf_percentage?: number | null; // e.g. 8.5
   clr_reading?: number | null;    // Lactometer reading e.g. 28.5
@@ -32,6 +33,16 @@ export interface VendorCollectionRecord {
   acidity?: number | null;        // pH e.g. 6.6
   quality_grade?: string | null;  // 'Grade A', 'Grade B', 'Premium', etc.
   container_can_no?: string | null; // e.g. 'CAN-01'
+
+  // Produce, Ghee, Fruits & Others Parameters (for collection_type === 'OTHERS')
+  batch_lot_no?: string | null;     // e.g. 'LOT-20260916-GHEE01'
+  packaging_type?: string | null;   // e.g. 'Glass Jar', 'Tin', 'Crate', 'Box', 'Tray'
+  purity_percentage?: number | null;// Purity % (for Ghee/Oil/Honey) or Sugar Brix (Fruits)
+  storage_location?: string | null; // e.g. 'Cold Storage (0-4°C)', 'Dry Warehouse'
+  harvest_date?: string | null;
+  expiry_date?: string | null;
+  gross_quantity?: number | null;
+  defect_quantity?: number | null;
 
   // Payment & Tracking
   payment_status: 'PENDING' | 'PAID' | 'PARTIAL';
@@ -46,13 +57,16 @@ export interface VendorCollectionRecord {
 }
 
 export interface CollectionSummary {
-  totalQuantity: number;
-  morningQuantity: number;
-  eveningQuantity: number;
+  totalMilkQuantity: number;
+  totalOthersQuantity: number;
+  morningMilkQuantity: number;
+  eveningMilkQuantity: number;
   totalAmount: number;
   avgFat: number;
   avgSnf: number;
   totalCollections: number;
+  milkCollectionsCount: number;
+  othersCollectionsCount: number;
   activeVendorsCount: number;
 }
 
@@ -69,6 +83,7 @@ export function getVendorCollections(filters?: {
   date?: string | null;
   startDate?: string | null;
   endDate?: string | null;
+  type?: 'ALL' | 'MILK' | 'OTHERS' | null;
   shift?: string | null;
   vendorId?: string | null;
   category?: string | null;
@@ -83,6 +98,10 @@ export function getVendorCollections(filters?: {
     list = list.filter(
       (c) => c.collection_date >= filters.startDate! && c.collection_date <= filters.endDate!,
     );
+  }
+
+  if (filters?.type && filters.type !== 'ALL') {
+    list = list.filter((c) => c.collection_type === filters.type);
   }
 
   if (filters?.shift && filters.shift !== 'ALL') {
@@ -109,7 +128,9 @@ export function getVendorCollections(filters?: {
         c.vendor_name.toLowerCase().includes(q) ||
         c.collector_name.toLowerCase().includes(q) ||
         c.product_name.toLowerCase().includes(q) ||
+        c.category.toLowerCase().includes(q) ||
         c.collection_id.toLowerCase().includes(q) ||
+        (c.batch_lot_no && c.batch_lot_no.toLowerCase().includes(q)) ||
         (c.container_can_no && c.container_can_no.toLowerCase().includes(q)),
     );
   }
@@ -127,9 +148,10 @@ export function addVendorCollection(
   const now = new Date();
   const dateStr = data.collection_date || now.toISOString().split('T')[0];
   const compactDate = dateStr.replace(/-/g, '');
+  const prefix = data.collection_type === 'OTHERS' ? 'COL-PROD' : 'COL-MILK';
   const countToday = store.filter((c) => c.collection_date === dateStr).length + 1;
   const generatedId =
-    data.collection_id || `COL-${compactDate}-${String(countToday).padStart(3, '0')}`;
+    data.collection_id || `${prefix}-${compactDate}-${String(countToday).padStart(3, '0')}`;
 
   const quantity = Number(data.quantity) || 0;
   const rate = Number(data.rate_per_unit) || 0;
@@ -139,12 +161,13 @@ export function addVendorCollection(
     ...data,
     id: Date.now(),
     collection_id: generatedId,
+    collection_type: data.collection_type || 'MILK',
     collection_date: dateStr,
     quantity,
     rate_per_unit: rate,
     total_amount,
     shift: data.shift || 'MORNING',
-    unit: data.unit || 'Liters',
+    unit: data.unit || (data.collection_type === 'OTHERS' ? 'Kg' : 'Liters'),
     payment_status: data.payment_status || 'PENDING',
     status: data.status || 'RECORDED',
     created_at: now.toISOString(),
@@ -203,47 +226,59 @@ export function getCollectionSummary(date?: string | null): CollectionSummary {
   const targetDate = date || new Date().toISOString().split('T')[0];
   const collections = getVendorCollections({ date: targetDate });
 
-  let totalQuantity = 0;
-  let morningQuantity = 0;
-  let eveningQuantity = 0;
+  let totalMilkQuantity = 0;
+  let totalOthersQuantity = 0;
+  let morningMilkQuantity = 0;
+  let eveningMilkQuantity = 0;
   let totalAmount = 0;
   let fatSum = 0;
   let fatCount = 0;
   let snfSum = 0;
   let snfCount = 0;
+  let milkCollectionsCount = 0;
+  let othersCollectionsCount = 0;
   const vendorsSet = new Set<string>();
 
   for (const c of collections) {
     const qty = Number(c.quantity) || 0;
-    totalQuantity += qty;
     totalAmount += Number(c.total_amount) || 0;
     vendorsSet.add(c.vendor_id);
 
-    if (c.shift === 'MORNING') {
-      morningQuantity += qty;
-    } else if (c.shift === 'EVENING') {
-      eveningQuantity += qty;
-    }
+    if (c.collection_type === 'MILK' || !c.collection_type) {
+      totalMilkQuantity += qty;
+      milkCollectionsCount++;
+      if (c.shift === 'MORNING') {
+        morningMilkQuantity += qty;
+      } else if (c.shift === 'EVENING') {
+        eveningMilkQuantity += qty;
+      }
 
-    if (c.fat_percentage && c.fat_percentage > 0) {
-      fatSum += Number(c.fat_percentage) * qty;
-      fatCount += qty;
-    }
+      if (c.fat_percentage && c.fat_percentage > 0) {
+        fatSum += Number(c.fat_percentage) * qty;
+        fatCount += qty;
+      }
 
-    if (c.snf_percentage && c.snf_percentage > 0) {
-      snfSum += Number(c.snf_percentage) * qty;
-      snfCount += qty;
+      if (c.snf_percentage && c.snf_percentage > 0) {
+        snfSum += Number(c.snf_percentage) * qty;
+        snfCount += qty;
+      }
+    } else {
+      totalOthersQuantity += qty;
+      othersCollectionsCount++;
     }
   }
 
   return {
-    totalQuantity: Number(totalQuantity.toFixed(2)),
-    morningQuantity: Number(morningQuantity.toFixed(2)),
-    eveningQuantity: Number(eveningQuantity.toFixed(2)),
+    totalMilkQuantity: Number(totalMilkQuantity.toFixed(2)),
+    totalOthersQuantity: Number(totalOthersQuantity.toFixed(2)),
+    morningMilkQuantity: Number(morningMilkQuantity.toFixed(2)),
+    eveningMilkQuantity: Number(eveningMilkQuantity.toFixed(2)),
     totalAmount: Number(totalAmount.toFixed(2)),
     avgFat: fatCount > 0 ? Number((fatSum / fatCount).toFixed(2)) : 0,
     avgSnf: snfCount > 0 ? Number((snfSum / snfCount).toFixed(2)) : 0,
     totalCollections: collections.length,
+    milkCollectionsCount,
+    othersCollectionsCount,
     activeVendorsCount: vendorsSet.size,
   };
 }

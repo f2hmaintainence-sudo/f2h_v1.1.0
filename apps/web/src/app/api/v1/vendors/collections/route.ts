@@ -3,8 +3,8 @@
 // © 2026 ChronoSparkSolutions. All rights reserved.
 //
 // Project     : F2H Fresh
-// File        : route.ts (Vendor Collections & Procurement API)
-// Description : Daily vendor procurement and milk collection endpoints
+// File        : route.ts (Vendor Collections API with Milk & Others support)
+// Description : Daily vendor procurement and intake endpoints for Milk, Ghee, Fruits & Produce
 // ============================================================================
 
 import { NextResponse } from 'next/server';
@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     const date = searchParams.get('date');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const type = searchParams.get('type') as 'ALL' | 'MILK' | 'OTHERS' | null;
     const shift = searchParams.get('shift');
     const vendorId = searchParams.get('vendorId');
     const category = searchParams.get('category');
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
       date,
       startDate,
       endDate,
+      type,
       shift,
       vendorId,
       category,
@@ -96,7 +98,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const collectionType = body.collection_type === 'OTHERS' ? 'OTHERS' : 'MILK';
+
     const record = addVendorCollection({
+      collection_type: collectionType,
       collection_date: body.collection_date || new Date().toISOString().split('T')[0],
       shift: body.shift || 'MORNING',
       vendor_id: body.vendor_id,
@@ -105,10 +110,12 @@ export async function POST(request: Request) {
       collector_phone: body.collector_phone || null,
       product_id: body.product_id || null,
       product_name: body.product_name,
-      category: body.category || 'Dairy & Milk',
+      category: body.category || (collectionType === 'MILK' ? 'Dairy & Milk' : 'Fresh Produce'),
       quantity: Number(body.quantity),
-      unit: body.unit || 'Liters',
+      unit: body.unit || (collectionType === 'MILK' ? 'Liters' : 'Kg'),
       rate_per_unit: Number(body.rate_per_unit) || 0,
+      
+      // Milk Quality
       fat_percentage: body.fat_percentage ? Number(body.fat_percentage) : null,
       snf_percentage: body.snf_percentage ? Number(body.snf_percentage) : null,
       clr_reading: body.clr_reading ? Number(body.clr_reading) : null,
@@ -116,6 +123,17 @@ export async function POST(request: Request) {
       acidity: body.acidity ? Number(body.acidity) : null,
       quality_grade: body.quality_grade || 'Grade A',
       container_can_no: body.container_can_no || null,
+
+      // Others / Produce & Ghee parameters
+      batch_lot_no: body.batch_lot_no || null,
+      packaging_type: body.packaging_type || null,
+      purity_percentage: body.purity_percentage ? Number(body.purity_percentage) : null,
+      storage_location: body.storage_location || null,
+      harvest_date: body.harvest_date || null,
+      expiry_date: body.expiry_date || null,
+      gross_quantity: body.gross_quantity ? Number(body.gross_quantity) : null,
+      defect_quantity: body.defect_quantity ? Number(body.defect_quantity) : 0,
+
       payment_status: body.payment_status || 'PENDING',
       payment_mode: body.payment_mode || 'CASH',
       payment_reference: body.payment_reference || null,
@@ -127,7 +145,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: 'Collection recorded successfully',
+        message: `${collectionType === 'MILK' ? 'Milk' : 'Produce'} collection recorded successfully`,
         data: record,
       },
       { status: 201 },
