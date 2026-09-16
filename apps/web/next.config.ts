@@ -18,7 +18,7 @@ function getTurbopackRoot(): string {
  * Image Optimization runs server-side: resizes, converts to WebP/AVIF, generates srcset.
  * For static export only, set output: "export" and images.unoptimized: true (images served raw).
  */
-const internalApiUrl = process.env.INTERNAL_API_URL || 'http://localhost:5001';
+const internalApiUrl = (process.env.INTERNAL_API_URL || 'https://dev.f2hfresh.com').replace(/\/+$/, '');
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['f2hfresh.com', '*.f2hfresh.com', 'localhost'],
@@ -47,6 +47,11 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'api.f2hfresh.com',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'dev.f2hfresh.com',
         pathname: '/uploads/**',
       },
     ],

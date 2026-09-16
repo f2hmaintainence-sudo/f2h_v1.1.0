@@ -33,6 +33,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 5002,
+        INTERNAL_API_URL: 'http://localhost:5001',
         NEXT_TELEMETRY_DISABLED: '1',
         PATH: `${MONOREPO}/node_modules/.bin:${process.env.PATH}`,
       },

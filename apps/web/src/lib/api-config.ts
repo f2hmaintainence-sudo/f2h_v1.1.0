@@ -16,5 +16,9 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/api/v1`;
   }
-  return 'http://127.0.0.1:5001/api/v1';
+  if (process.env.INTERNAL_API_URL) {
+    const raw = process.env.INTERNAL_API_URL.replace(/\/+$/, '');
+    return raw.endsWith('/api/v1') ? raw : `${raw}/api/v1`;
+  }
+  return 'https://dev.f2hfresh.com/api/v1';
 }

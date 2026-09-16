@@ -71,14 +71,15 @@ class ApiClient {
   private errorInterceptors: ErrorInterceptor[] = [];
 
   private getBaseUrl(): string {
-    // If we're on the server (SSR/RSC), use the internal Docker network name
+    // If we're on the server (SSR/RSC), use the internal API URL or dev backend
     if (typeof window === 'undefined') {
-      return process.env.INTERNAL_API_URL || 'http://api:5001/api/v1';
+      const internal = (process.env.INTERNAL_API_URL || 'https://dev.f2hfresh.com').replace(/\/+$/, '');
+      return internal.endsWith('/api/v1') ? internal : `${internal}/api/v1`;
     }
 
-    // If we're on the client (Browser), use the public URL
+    // If we're on the client (Browser), use the public URL if set
     if (process.env.NEXT_PUBLIC_API_URL) {
-      const raw = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
+      const raw = process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
       return raw.endsWith('/api/v1') ? raw : `${raw}/api/v1`;
     }
 
