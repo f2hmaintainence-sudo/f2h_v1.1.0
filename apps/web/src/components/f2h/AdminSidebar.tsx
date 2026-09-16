@@ -67,7 +67,8 @@ const adminNav = [
     items: [
       // { name: "Categories", href: "/admin/catalog/categories", icon: Layers },
       { name: "Products", href: "/admin/catalog/products", icon: Package },
-      { name: "Registered Vendors", href: "/admin/catalog/vendors", icon: Building2 },
+      { name: "Vendors", href: "/admin/catalog/vendors", icon: Building2 },
+      { name: "Daily Collections", href: "/admin/catalog/collections", icon: ClipboardCheck },
       // { name: "Offers", href: "/admin/catalog/offers", icon: Tag },
       { name: "Promotions Coupons", href: "/admin/catalog/promotions-coupons", icon: TicketPercent },
       {
