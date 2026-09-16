@@ -178,6 +178,13 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
 
   @override
   Widget build(BuildContext context) {
+    // After stop is delivered, don't show partner details
+    if (_partner.deliveryStatus.toLowerCase() == 'delivered' ||
+        (_partner.addresses.isNotEmpty &&
+            _partner.addresses.every((a) => a.deliveryStatus.toLowerCase() == 'delivered'))) {
+      return const SizedBox.shrink();
+    }
+
     final hasPhone = _partner.phone.trim().isNotEmpty;
     final targetPoint = _effectiveCoordinates;
     final hasLive = _hasLiveCoordinates;
@@ -901,8 +908,20 @@ class TodayDeliveryPartnersSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (partners.isEmpty) return const SizedBox.shrink();
 
+    // After stop is delivered, don't show partner details
+    final undeliveredPartners = partners.where((p) {
+      if (p.deliveryStatus.toLowerCase() == 'delivered') return false;
+      if (p.addresses.isNotEmpty &&
+          p.addresses.every((a) => a.deliveryStatus.toLowerCase() == 'delivered')) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    if (undeliveredPartners.isEmpty) return const SizedBox.shrink();
+
     // Sort partners so that active or current slot partner is placed first
-    final sortedPartners = List<TodayDeliveryPartner>.from(partners);
+    final sortedPartners = List<TodayDeliveryPartner>.from(undeliveredPartners);
     sortedPartners.sort((a, b) {
       if (a.isCurrentSlot && !b.isCurrentSlot) return -1;
       if (!a.isCurrentSlot && b.isCurrentSlot) return 1;

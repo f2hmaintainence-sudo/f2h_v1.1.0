@@ -216,13 +216,21 @@ class _HomeScreenState extends State<HomeScreen>
                     SliverToBoxAdapter(
                       child: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
                         builder: (context, session) {
-                          if (session.todayDeliveryPartners.isEmpty) {
+                          final activePartners = session.todayDeliveryPartners.where((p) {
+                            if (p.deliveryStatus.toLowerCase() == 'delivered') return false;
+                            if (p.addresses.isNotEmpty &&
+                                p.addresses.every((a) => a.deliveryStatus.toLowerCase() == 'delivered')) {
+                              return false;
+                            }
+                            return true;
+                          }).toList();
+                          if (activePartners.isEmpty) {
                             return const SizedBox.shrink();
                           }
                           return Padding(
                             padding: const EdgeInsets.only(top: 4, bottom: 4),
                             child: TodayDeliveryPartnersSection(
-                              partners: session.todayDeliveryPartners,
+                              partners: activePartners,
                             ),
                           );
                         },

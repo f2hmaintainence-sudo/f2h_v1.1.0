@@ -503,6 +503,7 @@ export class CustomerBootstrapController {
       });
 
       const partnerMap = new Map<string, any>();
+      const hasRunsToday = Array.isArray(rows) && rows.length > 0;
 
       for (const row of rows || []) {
         const partnerId = row.delivery_partner_id;
@@ -553,13 +554,18 @@ export class CustomerBootstrapController {
           partner.delivery_status = 'in_transit';
         } else if (row.address_delivery_status === 'arrived' && partner.delivery_status !== 'in_transit') {
           partner.delivery_status = 'arrived';
-        } else if (row.address_delivery_status === 'delivered' && partner.delivery_status === 'pending') {
-          partner.delivery_status = 'delivered';
+        } else if (row.address_delivery_status === 'delivered') {
+          const allDelivered = partner.addresses.length > 0 &&
+            partner.addresses.every((a: any) => a.delivery_status === 'delivered');
+          if (allDelivered) {
+            partner.delivery_status = 'delivered';
+          }
         }
       }
 
+      let hasOrdersToday = false;
       // Fallback 1: If no delivery run exists today, check today's assigned orders
-      if (partnerMap.size === 0) {
+      if (!hasRunsToday && partnerMap.size === 0) {
         try {
           const orderSql = `
             SELECT 
@@ -595,6 +601,7 @@ export class CustomerBootstrapController {
               o.id DESC
           `;
           const orderRows = await this.db.query(orderSql, [customerId, todayDate, currentSlot]);
+          hasOrdersToday = Array.isArray(orderRows) && orderRows.length > 0;
           for (const row of orderRows || []) {
             const partnerId = row.delivery_partner_id;
             if (!partnerId || partnerMap.has(partnerId)) continue;
@@ -633,8 +640,8 @@ export class CustomerBootstrapController {
         } catch (_) { }
       }
 
-      // Fallback 2: If still no partner, check customer branch / sector assigned delivery partner
-      if (partnerMap.size === 0) {
+      // Fallback 2: If no run and no orders exist today, check customer branch / sector assigned delivery partner
+      if (!hasRunsToday && !hasOrdersToday && partnerMap.size === 0) {
         try {
           const branchPartnerSql = `
             SELECT 
@@ -698,8 +705,8 @@ export class CustomerBootstrapController {
         } catch (_) { }
       }
 
-      // Fallback 3: If still no partner, retrieve default available delivery partner
-      if (partnerMap.size === 0) {
+      // Fallback 3: If still no partner and no runs/orders exist today, retrieve default available delivery partner
+      if (!hasRunsToday && !hasOrdersToday && partnerMap.size === 0) {
         try {
           const generalPartnerSql = `
             SELECT 
@@ -740,8 +747,23 @@ export class CustomerBootstrapController {
         } catch (_) { }
       }
 
-      // Enrich all partners with fresh real-time GPS telemetry from Redis if available
-      for (const partner of partnerMap.values()) {
+      // After stop is delivered, do not return or show partner details
+      const activePartners = Array.from(partnerMap.values()).filter((partner) => {
+        if ((partner.delivery_status || '').toLowerCase() === 'delivered') {
+          return false;
+        }
+        if (
+          Array.isArray(partner.addresses) &&
+          partner.addresses.length > 0 &&
+          partner.addresses.every((a: any) => (a.delivery_status || '').toLowerCase() === 'delivered')
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      // Enrich all active partners with fresh real-time GPS telemetry from Redis if available
+      for (const partner of activePartners) {
         try {
           const redisLoc: any = await this.redisService.fetch(`delivery_partner_location:${partner.partner_id}`);
           if (redisLoc && redisLoc.latitude && redisLoc.longitude) {
@@ -754,7 +776,7 @@ export class CustomerBootstrapController {
         } catch (_) {}
       }
 
-      const deliveryPartners = Array.from(partnerMap.values());
+      const deliveryPartners = activePartners;
 
       return {
         status: true,
