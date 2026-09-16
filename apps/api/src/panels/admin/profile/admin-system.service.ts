@@ -554,52 +554,152 @@ export class AdminSystemService {
   }
 
   // ────────────────────────────────────────────────
-  // Roles & Permissions
+  // Roles & Permissions Master Tables
   // ────────────────────────────────────────────────
+  private async ensureRoleAndPermissionTables() {
+    // 1. Master roles table schema check & unique index
+    await this.db.query(`
+      CREATE TABLE IF NOT EXISTS roles (
+        id BIGINT NOT NULL,
+        sno VARCHAR(10) NOT NULL,
+        role_id VARCHAR(50) NOT NULL,
+        name VARCHAR(255) DEFAULT NULL,
+        description TEXT,
+        parent_role_id VARCHAR(30) DEFAULT NULL,
+        is_system_role SMALLINT DEFAULT 0,
+        is_active SMALLINT DEFAULT 1,
+        created_by VARCHAR(30) DEFAULT NULL,
+        updated_by VARCHAR(30) DEFAULT NULL,
+        delete_on TIMESTAMP WITHOUT TIME ZONE,
+        restored_at TIMESTAMP WITHOUT TIME ZONE,
+        deleted_at TIMESTAMP WITHOUT TIME ZONE,
+        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `, []);
+    await this.db.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_roles_role_id_unique ON roles(role_id)`, []).catch(() => {});
+
+    // 2. Structured role_permissions table
+    await this.db.query(`
+      CREATE TABLE IF NOT EXISTS role_permissions (
+        id BIGSERIAL PRIMARY KEY,
+        role_id VARCHAR(50) NOT NULL,
+        permission_key VARCHAR(100) NOT NULL,
+        module VARCHAR(50) DEFAULT NULL,
+        can_view BOOLEAN DEFAULT TRUE,
+        can_create BOOLEAN DEFAULT FALSE,
+        can_edit BOOLEAN DEFAULT FALSE,
+        can_delete BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT uq_role_permissions_role_key UNIQUE (role_id, permission_key)
+      )
+    `, []);
+    await this.db.query(`CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions(role_id)`, []).catch(() => {});
+    await this.db.query(`CREATE INDEX IF NOT EXISTS idx_role_permissions_permission_key ON role_permissions(permission_key)`, []).catch(() => {});
+
+    // 3. Admin roles table (JSONB cache / backward compatibility)
+    await this.db.query(`
+      CREATE TABLE IF NOT EXISTS admin_roles (
+        id SERIAL PRIMARY KEY,
+        role_name VARCHAR(50) NOT NULL UNIQUE,
+        description TEXT DEFAULT NULL,
+        permissions JSONB DEFAULT '[]'::jsonb,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `, []);
+  }
+
   async getRoles() {
     try {
-      await this.db.query(`
-        CREATE TABLE IF NOT EXISTS admin_roles (
-          id SERIAL PRIMARY KEY,
-          role_name VARCHAR(50) NOT NULL UNIQUE,
-          description TEXT DEFAULT NULL,
-          permissions JSONB DEFAULT '[]'::jsonb,
-          is_active BOOLEAN DEFAULT TRUE,
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-      `, []);
+      await this.ensureRoleAndPermissionTables();
 
-      for (const role of DEFAULT_ROLES) {
+      // Seed DEFAULT_ROLES into roles table FIRST, then seed role_permissions
+      for (const defaultRole of DEFAULT_ROLES) {
+        const roleIdUpper = defaultRole.role_name.toUpperCase().replace(/\s+/g, '_');
+        const roleNameDisplay = defaultRole.role_name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+        // Step 1: Store role in master roles table FIRST
+        await this.db.query(`
+          INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
+          VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 1), '1', $1, $2, $3, 1, 1, NOW(), NOW())
+          ON CONFLICT (role_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            is_active = EXCLUDED.is_active,
+            updated_at = NOW()
+        `, [roleIdUpper, roleNameDisplay, defaultRole.description]).catch(async () => {
+          const exists = await this.db.query(`SELECT 1 FROM roles WHERE UPPER(role_id) = $1 LIMIT 1`, [roleIdUpper]);
+          if (!exists?.length) {
+            await this.db.query(`
+              INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
+              VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 1), '1', $1, $2, $3, 1, 1, NOW(), NOW())
+            `, [roleIdUpper, roleNameDisplay, defaultRole.description]);
+          }
+        });
+
+        // Step 2: Store permissions in role_permissions table
+        for (const permKey of defaultRole.permissions) {
+          const moduleName = permKey.split('.')[0] || 'general';
+          await this.db.query(`
+            INSERT INTO role_permissions (role_id, permission_key, module, can_view, can_create, can_edit, can_delete, created_at, updated_at)
+            VALUES ($1, $2, $3, TRUE, TRUE, TRUE, FALSE, NOW(), NOW())
+            ON CONFLICT (role_id, permission_key) DO NOTHING
+          `, [roleIdUpper, permKey, moduleName]).catch(() => {});
+        }
+
+        // Maintain admin_roles as well
         await this.db.query(`
           INSERT INTO admin_roles (role_name, description, permissions, is_active)
           VALUES ($1, $2, $3, $4)
-          ON CONFLICT (role_name) DO NOTHING
-        `, [role.role_name, role.description, JSON.stringify(role.permissions), role.is_active]);
+          ON CONFLICT (role_name) DO UPDATE SET
+            description = EXCLUDED.description,
+            permissions = EXCLUDED.permissions,
+            is_active = EXCLUDED.is_active,
+            updated_at = NOW()
+        `, [defaultRole.role_name, defaultRole.description, JSON.stringify(defaultRole.permissions), defaultRole.is_active]);
       }
 
-      // Ensure MILK_COLLECTOR exists in core roles table for auth token lookups
-      try {
-        const existingCoreRole = await this.db.query(
-          `SELECT role_id FROM roles WHERE UPPER(role_id) = 'MILK_COLLECTOR' LIMIT 1`,
-          [],
-        );
-        if (!existingCoreRole?.length) {
-          await this.db.query(
-            `INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
-             VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 10), '10', 'MILK_COLLECTOR', 'Milk Collector', 'Dedicated milk collector with restricted access exclusively to daily collections', 1, 1, NOW(), NOW())`,
-            [],
-          );
-        }
-      } catch (err) {
-        this.developer.warn('Core roles table sync non-fatal:', err);
-      }
+      // Fetch from roles + role_permissions
+      const rolesWithPerms = await this.db.query(`
+        SELECT 
+          r.id,
+          r.role_id,
+          r.name AS role_name_display,
+          r.description,
+          r.is_active,
+          r.is_system_role,
+          r.created_at,
+          r.updated_at,
+          COALESCE(
+            (
+              SELECT json_agg(rp.permission_key)
+              FROM role_permissions rp
+              WHERE UPPER(rp.role_id) = UPPER(r.role_id)
+            ),
+            '[]'::json
+          ) AS permissions
+        FROM roles r
+        WHERE r.deleted_at IS NULL
+        ORDER BY r.id ASC
+      `, []);
 
-      const rows = await this.db.query(
-        'SELECT * FROM admin_roles ORDER BY id ASC',
-        [],
-      );
-      return { status: true, data: rows, message: 'Roles fetched' };
+      // Format response with role_name matching frontend contracts
+      const formatted = rolesWithPerms.map((row: any) => ({
+        id: row.id,
+        role_name: row.role_id,
+        name: row.role_name_display || row.role_id,
+        description: row.description,
+        permissions: Array.isArray(row.permissions) ? row.permissions : (typeof row.permissions === 'string' ? JSON.parse(row.permissions || '[]') : []),
+        is_active: row.is_active === 1 || row.is_active === true,
+        is_system_role: row.is_system_role === 1 || row.is_system_role === true,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }));
+
+      return { status: true, data: formatted, message: 'Roles fetched successfully' };
     } catch (error) {
       this.developer.error('getRoles error', { error });
       throw new InternalServerErrorException('Failed to retrieve roles');
@@ -611,19 +711,68 @@ export class AdminSystemService {
       if (!body.role_name?.trim()) {
         throw new BadRequestException('Role name is required');
       }
+      await this.ensureRoleAndPermissionTables();
 
-      const sql = `
+      const rawRoleName = body.role_name.trim();
+      const roleId = rawRoleName.toUpperCase().replace(/\s+/g, '_');
+      const roleNameDisplay = rawRoleName.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+      const description = body.description?.trim() || null;
+      const isActive = body.is_active !== false && String(body.is_active) !== 'false';
+      const permissions: string[] = Array.isArray(body.permissions) ? body.permissions : [];
+
+      // Step 1: FIRST store role in master roles table
+      let insertedRole: any = null;
+      try {
+        const rows = await this.db.query(`
+          INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
+          VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 10), '10', $1, $2, $3, 0, $4, NOW(), NOW())
+          ON CONFLICT (role_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            is_active = EXCLUDED.is_active,
+            updated_at = NOW()
+          RETURNING *
+        `, [roleId, roleNameDisplay, description, isActive ? 1 : 0]);
+        insertedRole = rows?.[0];
+      } catch {
+        const existing = await this.db.query(`SELECT * FROM roles WHERE UPPER(role_id) = $1 LIMIT 1`, [roleId]);
+        insertedRole = existing?.[0];
+      }
+
+      // Step 2: Store permissions in role_permissions table
+      await this.db.query(`DELETE FROM role_permissions WHERE UPPER(role_id) = $1`, [roleId]);
+      for (const permKey of permissions) {
+        const moduleName = permKey.split('.')[0] || 'general';
+        await this.db.query(`
+          INSERT INTO role_permissions (role_id, permission_key, module, can_view, can_create, can_edit, can_delete, created_at, updated_at)
+          VALUES ($1, $2, $3, TRUE, TRUE, TRUE, FALSE, NOW(), NOW())
+          ON CONFLICT (role_id, permission_key) DO NOTHING
+        `, [roleId, permKey, moduleName]).catch(() => {});
+      }
+
+      // Also sync admin_roles table
+      await this.db.query(`
         INSERT INTO admin_roles (role_name, description, permissions, is_active)
         VALUES ($1, $2, $3, $4)
-        RETURNING *
-      `;
-      const rows = await this.db.query(sql, [
-        body.role_name.trim(),
-        body.description?.trim() || null,
-        JSON.stringify(body.permissions || []),
-        body.is_active !== false && String(body.is_active) !== 'false',
-      ]);
-      return { status: true, data: rows[0], message: 'Role created' };
+        ON CONFLICT (role_name) DO UPDATE SET
+          description = EXCLUDED.description,
+          permissions = EXCLUDED.permissions,
+          is_active = EXCLUDED.is_active,
+          updated_at = NOW()
+      `, [roleId.toLowerCase(), description, JSON.stringify(permissions), isActive]);
+
+      return {
+        status: true,
+        data: {
+          id: insertedRole?.id || Date.now(),
+          role_name: roleId,
+          name: roleNameDisplay,
+          description,
+          permissions,
+          is_active: isActive,
+        },
+        message: 'Role and permissions stored successfully',
+      };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('createRole error', { error });
@@ -631,43 +780,105 @@ export class AdminSystemService {
     }
   }
 
-  async updateRole(id: string, body: any) {
+  async updateRole(idOrRoleId: string, body: any) {
     try {
-      const updateFields: string[] = ['updated_at = NOW()'];
-      const params: any[] = [id];
+      await this.ensureRoleAndPermissionTables();
 
-      if (body.role_name) {
-        params.push(body.role_name.trim());
-        updateFields.push(`role_name = $${params.length}`);
+      // Find current role
+      const isNumeric = /^\d+$/.test(idOrRoleId);
+      const roleRows = await this.db.query(
+        isNumeric
+          ? `SELECT * FROM roles WHERE id = $1 LIMIT 1`
+          : `SELECT * FROM roles WHERE UPPER(role_id) = UPPER($1) LIMIT 1`,
+        [idOrRoleId],
+      );
+
+      const current = roleRows?.[0];
+      const roleId = current?.role_id || idOrRoleId;
+
+      // Update master roles table FIRST
+      const updates: string[] = ['updated_at = NOW()'];
+      const params: any[] = [roleId];
+
+      if (body.role_name || body.name) {
+        const nameVal = (body.name || body.role_name).trim();
+        params.push(nameVal);
+        updates.push(`name = $${params.length}`);
       }
       if (body.description !== undefined) {
         params.push(body.description?.trim() || null);
-        updateFields.push(`description = $${params.length}`);
-      }
-      if (body.permissions) {
-        params.push(JSON.stringify(body.permissions));
-        updateFields.push(`permissions = $${params.length}`);
+        updates.push(`description = $${params.length}`);
       }
       if (body.is_active !== undefined) {
-        params.push(body.is_active === true || String(body.is_active) === 'true');
-        updateFields.push(`is_active = $${params.length}`);
+        const activeNum = (body.is_active === true || String(body.is_active) === 'true' || body.is_active === 1) ? 1 : 0;
+        params.push(activeNum);
+        updates.push(`is_active = $${params.length}`);
       }
 
       await this.db.query(
-        `UPDATE admin_roles SET ${updateFields.join(', ')} WHERE id = $1`,
+        `UPDATE roles SET ${updates.join(', ')} WHERE UPPER(role_id) = UPPER($1)`,
         params,
       );
-      return { status: true, message: 'Role updated' };
+
+      // Update role_permissions table
+      if (body.permissions && Array.isArray(body.permissions)) {
+        await this.db.query(`DELETE FROM role_permissions WHERE UPPER(role_id) = UPPER($1)`, [roleId]);
+        for (const permKey of body.permissions) {
+          const moduleName = permKey.split('.')[0] || 'general';
+          await this.db.query(`
+            INSERT INTO role_permissions (role_id, permission_key, module, can_view, can_create, can_edit, can_delete, created_at, updated_at)
+            VALUES ($1, $2, $3, TRUE, TRUE, TRUE, FALSE, NOW(), NOW())
+            ON CONFLICT (role_id, permission_key) DO NOTHING
+          `, [roleId, permKey, moduleName]).catch(() => {});
+        }
+      }
+
+      // Sync admin_roles
+      const adminRoleUpdates: string[] = ['updated_at = NOW()'];
+      const adminRoleParams: any[] = [roleId.toLowerCase()];
+      if (body.description !== undefined) {
+        adminRoleParams.push(body.description?.trim() || null);
+        adminRoleUpdates.push(`description = $${adminRoleParams.length}`);
+      }
+      if (body.permissions) {
+        adminRoleParams.push(JSON.stringify(body.permissions));
+        adminRoleUpdates.push(`permissions = $${adminRoleParams.length}`);
+      }
+      if (body.is_active !== undefined) {
+        adminRoleParams.push(body.is_active === true || String(body.is_active) === 'true');
+        adminRoleUpdates.push(`is_active = $${adminRoleParams.length}`);
+      }
+      await this.db.query(
+        `UPDATE admin_roles SET ${adminRoleUpdates.join(', ')} WHERE LOWER(role_name) = $1`,
+        adminRoleParams,
+      ).catch(() => {});
+
+      return { status: true, message: 'Role and permissions updated successfully' };
     } catch (error) {
       this.developer.error('updateRole error', { error });
       throw new InternalServerErrorException('Failed to update role');
     }
   }
 
-  async deleteRole(id: string) {
+  async deleteRole(idOrRoleId: string) {
     try {
-      await this.db.query('DELETE FROM admin_roles WHERE id = $1', [id]);
-      return { status: true, message: 'Role deleted successfully' };
+      await this.ensureRoleAndPermissionTables();
+      const isNumeric = /^\d+$/.test(idOrRoleId);
+
+      let roleId = idOrRoleId;
+      if (isNumeric) {
+        const rows = await this.db.query(`SELECT role_id FROM roles WHERE id = $1 LIMIT 1`, [idOrRoleId]);
+        if (rows?.[0]?.role_id) roleId = rows[0].role_id;
+      }
+
+      // 1. Delete permissions first
+      await this.db.query(`DELETE FROM role_permissions WHERE UPPER(role_id) = UPPER($1)`, [roleId]);
+      // 2. Delete from admin_roles
+      await this.db.query(`DELETE FROM admin_roles WHERE LOWER(role_name) = LOWER($1) OR id::text = $2`, [roleId, idOrRoleId]).catch(() => {});
+      // 3. Mark deleted / remove from master roles table
+      await this.db.query(`UPDATE roles SET deleted_at = NOW(), is_active = 0 WHERE UPPER(role_id) = UPPER($1) OR id::text = $2`, [roleId, idOrRoleId]);
+
+      return { status: true, message: 'Role and permissions deleted successfully' };
     } catch (error) {
       this.developer.error('deleteRole error', { error });
       throw new InternalServerErrorException('Failed to delete role');
