@@ -53,11 +53,11 @@ export class UsersController {
          COALESCE(r.role_id, UPPER(sub.role_id)) AS role_id,
          COALESCE(r.name, sub.role_id) AS role_name
        FROM (
-         SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
+         SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
          UNION
          SELECT u.role_id FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
          UNION
-         SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $1 AND ms.is_active = TRUE AND ms.deleted_at IS NULL
+         SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
        ) sub
        LEFT JOIN roles r ON UPPER(r.role_id) = UPPER(sub.role_id)
        WHERE sub.role_id IS NOT NULL AND sub.role_id != ''
@@ -86,22 +86,51 @@ export class UsersController {
       const permRows = await this.db.query(
         `SELECT DISTINCT rp.permission_key
          FROM role_permissions rp
-         JOIN roles r ON UPPER(r.role_id) = UPPER(rp.role_id)
-         WHERE r.is_active = 1
+         LEFT JOIN roles r ON UPPER(r.role_id) = UPPER(rp.role_id)
+         WHERE (r.is_active IS NULL OR r.is_active::text = '1' OR r.is_active::text = 'true')
            AND (
              UPPER(rp.role_id) IN (
                SELECT UPPER(ra.role_id) FROM role_assignments ra
-               WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
+               WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
                UNION
                SELECT UPPER(u.role_id) FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
                UNION
-               SELECT UPPER(ms.role_id) FROM management_staff ms WHERE ms.user_id = $1 AND ms.is_active = TRUE AND ms.deleted_at IS NULL
+               SELECT UPPER(ms.role_id) FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
              )
              OR ($2 IS NOT NULL AND UPPER(rp.role_id) = UPPER($2))
            )`,
         [userId, activeRole],
       );
       permissions = (permRows || []).map((p: any) => p.permission_key);
+
+      // Fallback: check admin_roles if role_permissions is empty
+      if (permissions.length === 0) {
+        const adminRoleRows = await this.db.query(
+          `SELECT permissions FROM admin_roles 
+           WHERE (
+             LOWER(role_name) IN (
+               SELECT LOWER(ra.role_id) FROM role_assignments ra
+               WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
+               UNION
+               SELECT LOWER(u.role_id) FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
+               UNION
+               SELECT LOWER(ms.role_id) FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
+             )
+             OR ($2 IS NOT NULL AND LOWER(role_name) = LOWER($2))
+           ) AND (is_active = TRUE OR is_active::text = '1')`,
+          [userId, activeRole],
+        );
+        const set = new Set<string>();
+        for (const row of adminRoleRows || []) {
+          const list = Array.isArray(row.permissions)
+            ? row.permissions
+            : typeof row.permissions === 'string'
+            ? JSON.parse(row.permissions || '[]')
+            : [];
+          list.forEach((p: string) => set.add(p));
+        }
+        permissions = Array.from(set);
+      }
     } catch {
       permissions = [];
     }
