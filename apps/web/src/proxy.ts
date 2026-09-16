@@ -26,6 +26,7 @@ const PUBLIC_ROUTES = [
   '/pricing',
   '/become-a-partner',
   '/partner',
+  '/vendors',
 ];
 
 const PUBLIC_PREFIXES = [

@@ -136,7 +136,7 @@ class ApiClient {
 
       // Don't redirect if we're on public pages (no auth required)
       if (typeof window !== 'undefined') {
-        const publicPages = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
+        const publicPages = ['/', '/login', '/register', '/forgot-password', '/reset-password', '/vendors', '/become-a-partner', '/pricing', '/contact-us'];
         const isPublicPage =
           publicPages.includes(window.location.pathname) ||
           window.location.pathname.startsWith('/landing') ||

@@ -9,6 +9,7 @@ import { FiPhone, FiMail, FiMapPin } from "react-icons/fi";
 const quickLinks = [
   { name: "Home", href: "/#home" },
   { name: "Pricing & Plans", href: "/pricing" },
+  { name: "Vendors & Suppliers", href: "/vendors" },
   { name: "Become a Partner", href: "/become-a-partner" },
   { name: "Delivery Policy", href: "/delivery-policy" },
   { name: "Refund Policy", href: "/refund-policy" },
