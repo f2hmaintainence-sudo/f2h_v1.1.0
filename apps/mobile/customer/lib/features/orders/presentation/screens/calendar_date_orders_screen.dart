@@ -50,9 +50,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
   void initState() {
     super.initState();
     _orders = widget.initialOrders ?? [];
-    if (_orders.isEmpty) {
-      _fetchOrdersForDate();
-    }
+    _fetchOrdersForDate(showLoading: _orders.isEmpty);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final catState = context.read<CatalogBloc>().state;
@@ -63,10 +61,21 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
     });
   }
 
-  Future<void> _fetchOrdersForDate() async {
-    setState(() {
-      _isLoading = true;
-    });
+  void _openCartForDate(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CartScreen(initialDeliveryDate: widget.date),
+      ),
+    );
+  }
+
+  Future<void> _fetchOrdersForDate({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final repo = sl<OrdersRepository>();
@@ -168,17 +177,29 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
       case 'completed':
         return const Color(0xFF10B981); // Emerald green
       case 'out_for_delivery':
-      case 'dispatched':
+      case 'in_transit':
         return const Color(0xFF0284C7); // Vivid sky blue
+      case 'dispatched':
+        return const Color(0xFF0284C7); // Sky blue
+      case 'assigned':
+        return const Color(0xFF6366F1); // Indigo
       case 'confirmed':
+        return const Color(0xFF0EA5E9); // Ocean blue
       case 'placed':
-      case 'pending':
-      case 'processing':
         return const Color(0xFF38BDF8); // Soft cyan blue
+      case 'pending':
+        return const Color(0xFFD97706); // Amber
+      case 'processing':
+        return const Color(0xFFF59E0B); // Warm amber
       case 'cancelled':
-      case 'failed':
-      case 'on_hold':
         return const Color(0xFFEF4444); // Red
+      case 'failed':
+        return const Color(0xFFDC2626); // Crimson
+      case 'on_hold':
+        return const Color(0xFFF43F5E); // Rose
+      case 'refunded':
+      case 'returned':
+        return const Color(0xFF8B5CF6); // Violet
       default:
         return const Color(0xFF64748B);
     }
@@ -191,16 +212,30 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
         return 'Delivered';
       case 'out_for_delivery':
         return 'Out for Delivery';
+      case 'in_transit':
+        return 'In Transit';
+      case 'dispatched':
+        return 'Dispatched';
+      case 'assigned':
+        return 'Partner Assigned';
       case 'confirmed':
         return 'Order Confirmed';
       case 'placed':
         return 'Order Placed';
       case 'processing':
         return 'Processing';
+      case 'pending':
+        return 'Pending';
       case 'cancelled':
         return 'Cancelled';
+      case 'failed':
+        return 'Failed';
       case 'on_hold':
         return 'On Hold';
+      case 'refunded':
+        return 'Refunded';
+      case 'returned':
+        return 'Returned';
       default:
         return status.replaceAll('_', ' ').toUpperCase();
     }
@@ -324,7 +359,59 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
             icon: const Icon(Icons.refresh_rounded,
                 color: Color(0xFF64748B), size: 22),
             tooltip: 'Refresh orders',
-            onPressed: _fetchOrdersForDate,
+            onPressed: () => _fetchOrdersForDate(showLoading: true),
+          ),
+          BlocBuilder<CartBloc, CartState>(
+            builder: (context, cartState) {
+              final items = (cartState is CartLoadedState)
+                  ? cartState.items
+                  : <CartItemEntity>[];
+              final totalCount = items.fold<int>(
+                0,
+                (sum, i) =>
+                    sum +
+                    (i.purchaseType == 'subscription'
+                        ? 1
+                        : (i.quantity ?? 1)),
+              );
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart_outlined,
+                        color: Color(0xFF1E293B), size: 22),
+                    tooltip: 'Cart for this date',
+                    onPressed: () => _openCartForDate(context),
+                  ),
+                  if (totalCount > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3.5),
+                        decoration: const BoxDecoration(
+                          color: kPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 17,
+                          minHeight: 17,
+                        ),
+                        child: Text(
+                          totalCount > 99 ? '99+' : '$totalCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(width: 4),
         ],
@@ -345,13 +432,16 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
           final cartItems = (cartState is CartLoadedState)
               ? cartState.items
               : <CartItemEntity>[];
+          if (cartItems.isEmpty) return const SizedBox.shrink();
+
           final dateCartItems =
               cartItems.where((i) => i.deliveryDate == _dateStr).toList();
-          if (dateCartItems.isEmpty) return const SizedBox.shrink();
+          final isSameDate = dateCartItems.isNotEmpty;
 
-          final totalDateItems = dateCartItems.fold<int>(
-              0, (sum, i) => sum + (i.quantity ?? 1));
-          final totalDateAmount = dateCartItems.fold<double>(
+          final displayItems = isSameDate ? dateCartItems : cartItems;
+          final totalDisplayItems = displayItems.fold<int>(
+              0, (sum, i) => sum + (i.purchaseType == 'subscription' ? 1 : (i.quantity ?? 1)));
+          final totalDisplayAmount = displayItems.fold<double>(
               0.0, (sum, i) => sum + (i.unitPrice * (i.quantity ?? 1)));
 
           return Container(
@@ -376,7 +466,9 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '$totalDateItems item${totalDateItems > 1 ? "s" : ""} scheduled',
+                          isSameDate
+                              ? '$totalDisplayItems item${totalDisplayItems > 1 ? "s" : ""} scheduled'
+                              : '$totalDisplayItems item${totalDisplayItems > 1 ? "s" : ""} in cart',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -385,7 +477,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '₹${totalDateAmount.toStringAsFixed(0)}',
+                          '₹${totalDisplayAmount.toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
@@ -396,14 +488,7 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                     ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const CartScreen(),
-                        ),
-                      );
-                    },
+                    onPressed: () => _openCartForDate(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kPrimary,
                       foregroundColor: Colors.white,
@@ -543,6 +628,43 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
                   'Add Products for this Date',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
+              ),
+              BlocBuilder<CartBloc, CartState>(
+                builder: (context, cartState) {
+                  final cartItems = (cartState is CartLoadedState)
+                      ? cartState.items
+                      : <CartItemEntity>[];
+                  final totalCount = cartItems.fold<int>(
+                    0,
+                    (sum, i) =>
+                        sum +
+                        (i.purchaseType == 'subscription'
+                            ? 1
+                            : (i.quantity ?? 1)),
+                  );
+                  if (totalCount == 0) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openCartForDate(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kPrimary,
+                        side: const BorderSide(color: kPrimary, width: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.shopping_cart_outlined, size: 18),
+                      label: Text(
+                        'View Cart ($totalCount ${totalCount == 1 ? "item" : "items"})',
+                        style: const TextStyle(
+                            fontSize: 13.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  );
+                },
               ),
             ] else ...[
               Container(

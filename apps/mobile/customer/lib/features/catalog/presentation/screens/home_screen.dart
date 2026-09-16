@@ -2271,11 +2271,13 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
   List<Order> _getOrdersForDate(DateTime date, List<Order> allOrders) {
     final key = _dateKey(date);
     return allOrders.where((o) {
-      if (o.scheduledDate == key) return true;
+      if (o.scheduledDate == key || o.scheduledDate.startsWith(key)) return true;
       try {
-        if (o.createdAt.isNotEmpty) {
-          final cd = DateTime.parse(o.createdAt).toLocal();
-          if (cd.year == date.year && cd.month == date.month && cd.day == date.day) {
+        if (o.scheduledDate.isNotEmpty) {
+          final cleanDate = o.scheduledDate.split('T')[0].trim();
+          if (cleanDate == key) return true;
+          final sd = DateTime.parse(cleanDate);
+          if (sd.year == date.year && sd.month == date.month && sd.day == date.day) {
             return true;
           }
         }
@@ -2293,11 +2295,23 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
           o.status.toLowerCase() == 'completed')) {
         return const Color(0xFF10B981); // Green - Delivered
       }
+      if (ordersForDay.any((o) => [
+            'out_for_delivery',
+            'in_transit',
+            'dispatched',
+            'assigned',
+            'confirmed',
+            'placed',
+            'processing',
+            'pending'
+          ].contains(o.status.toLowerCase()))) {
+        return const Color(0xFF0284C7); // Vivid Blue - Active / Upcoming
+      }
       if (ordersForDay.any((o) =>
           ['cancelled', 'on_hold', 'failed'].contains(o.status.toLowerCase()))) {
-        return const Color(0xFFEF4444); // Red - On Hold
+        return const Color(0xFFEF4444); // Red - Cancelled / On Hold
       }
-      return const Color(0xFF38BDF8); // Cyan - Upcoming
+      return const Color(0xFF38BDF8); // Cyan - Other orders
     }
 
     // Check vacation from subscriptions

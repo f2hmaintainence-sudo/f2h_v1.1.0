@@ -88,7 +88,8 @@ Product? _findCatalogProduct(BuildContext context, String variantId, {String? pr
 }
 
 class CartScreen extends StatefulWidget {
-  const CartScreen({super.key});
+  final DateTime? initialDeliveryDate;
+  const CartScreen({super.key, this.initialDeliveryDate});
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -110,6 +111,13 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialDeliveryDate != null) {
+      _globalOnetimeDate = DateTime(
+        widget.initialDeliveryDate!.year,
+        widget.initialDeliveryDate!.month,
+        widget.initialDeliveryDate!.day,
+      );
+    }
     // Load cart on first build and ALWAYS refresh catalog & branch inventory for live stock check
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CustomerSessionCubit>().refreshSilently();
@@ -225,37 +233,59 @@ class _CartScreenState extends State<CartScreen> {
                 //   Before noon → Today (Evening only)
                 //   After noon → Tomorrow (both slots)
                 final now = DateTime.now();
+                final todayNormalized = DateTime(now.year, now.month, now.day);
                 final firstAllowedDate = getFirstAllowedDate(now, sessionState.slotTimings);
+                final firstAllowedDateNormalized = DateTime(
+                  firstAllowedDate.year,
+                  firstAllowedDate.month,
+                  firstAllowedDate.day,
+                );
 
                 if (_globalOnetimeDate == null) {
-                  CartItemEntity? firstOnetime;
-                  try {
-                    firstOnetime = state.items.firstWhere(
-                      (item) => item.purchaseType == 'onetime',
+                  if (widget.initialDeliveryDate != null) {
+                    _globalOnetimeDate = DateTime(
+                      widget.initialDeliveryDate!.year,
+                      widget.initialDeliveryDate!.month,
+                      widget.initialDeliveryDate!.day,
                     );
-                  } catch (_) {}
-                  if (firstOnetime != null &&
-                      firstOnetime.deliveryDate != null) {
-                    _globalOnetimeDate = DateTime.tryParse(
-                      firstOnetime.deliveryDate!,
-                    );
-                  }
-                  if (firstOnetime != null &&
-                      firstOnetime.deliverySlot != null &&
-                      firstOnetime.deliverySlot!.trim().isNotEmpty) {
-                    final raw = firstOnetime.deliverySlot!.trim();
-                    _globalOnetimeSlot = raw.toLowerCase() == 'evening' ? 'Evening' : 'Morning';
+                  } else {
+                    CartItemEntity? firstOnetime;
+                    try {
+                      firstOnetime = state.items.firstWhere(
+                        (item) => item.purchaseType == 'onetime',
+                      );
+                    } catch (_) {}
+                    if (firstOnetime != null &&
+                        firstOnetime.deliveryDate != null) {
+                      _globalOnetimeDate = DateTime.tryParse(
+                        firstOnetime.deliveryDate!,
+                      );
+                    }
+                    if (firstOnetime != null &&
+                        firstOnetime.deliverySlot != null &&
+                        firstOnetime.deliverySlot!.trim().isNotEmpty) {
+                      final raw = firstOnetime.deliverySlot!.trim();
+                      _globalOnetimeSlot = raw.toLowerCase() == 'evening' ? 'Evening' : 'Morning';
+                    }
                   }
                 }
 
                 final maxDays = maxAdvanceDaysOf(context);
-                final maxAllowedDate = DateTime(now.year, now.month, now.day).add(Duration(days: maxDays));
+                final maxAllowedDate = todayNormalized.add(Duration(days: maxDays));
 
                 // If selected date is before firstAllowedDate or after maxAllowedDate, reset to firstAllowedDate
                 if (_globalOnetimeDate == null ||
-                    _globalOnetimeDate!.isBefore(firstAllowedDate) ||
-                    _globalOnetimeDate!.isAfter(maxAllowedDate)) {
+                    DateTime(_globalOnetimeDate!.year, _globalOnetimeDate!.month, _globalOnetimeDate!.day)
+                        .isBefore(firstAllowedDateNormalized) ||
+                    DateTime(_globalOnetimeDate!.year, _globalOnetimeDate!.month, _globalOnetimeDate!.day)
+                        .isAfter(maxAllowedDate)) {
                   _globalOnetimeDate = firstAllowedDate;
+                } else {
+                  _globalOnetimeDate = DateTime(
+                    _globalOnetimeDate!.year,
+                    _globalOnetimeDate!.month,
+                    _globalOnetimeDate!.day,
+                  );
                 }
 
                 // Ensure slot is valid for the selected date

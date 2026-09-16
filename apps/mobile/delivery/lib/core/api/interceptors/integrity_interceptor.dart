@@ -24,6 +24,7 @@
 // ============================================================================
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:f2h_delivery/core/security/integrity_protected_routes.dart';
 import 'package:f2h_delivery/core/security/play_integrity_service.dart';
 
@@ -54,6 +55,10 @@ class IntegrityInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    if (kIsWeb) {
+      return handler.next(options);
+    }
+
     final path = _apiPath(options);
     if (!IntegrityProtectedRoutes.requiresIntegrity(options.method, path)) {
       // The overwhelming majority of traffic lands here and pays nothing.
@@ -75,7 +80,8 @@ class IntegrityInterceptor extends Interceptor {
     final isIntegrityRejection = err.response?.statusCode == 403 &&
         _errorCodeOf(err.response?.data) == integrityErrorCode;
 
-    if (!isIntegrityRejection ||
+    if (kIsWeb ||
+        !isIntegrityRejection ||
         options.extra[_retriedFlag] == true ||
         !IntegrityProtectedRoutes.requiresIntegrity(options.method, path)) {
       return handler.next(err);

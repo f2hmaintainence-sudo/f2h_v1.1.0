@@ -142,18 +142,30 @@ class Order {
     String displayDate = scheduledDateStr;
     String normalizedScheduledDate = '';
 
-    try {
-      final d = DateTime.parse(scheduledDateStr).toLocal();
-
-      normalizedScheduledDate =
-          '${d.year.toString().padLeft(4, '0')}-'
-          '${d.month.toString().padLeft(2, '0')}-'
-          '${d.day.toString().padLeft(2, '0')}';
-    } catch (_) {
-      normalizedScheduledDate = scheduledDateStr;
+    if (scheduledDateStr.isNotEmpty) {
+      final cleanDateStr = scheduledDateStr.split('T')[0].trim();
+      final dateParts = cleanDateStr.split('-');
+      if (dateParts.length == 3 &&
+          dateParts[0].length == 4 &&
+          dateParts[1].length == 2 &&
+          dateParts[2].length == 2) {
+        normalizedScheduledDate = cleanDateStr;
+      } else {
+        try {
+          final d = DateTime.parse(cleanDateStr);
+          normalizedScheduledDate =
+              '${d.year.toString().padLeft(4, '0')}-'
+              '${d.month.toString().padLeft(2, '0')}-'
+              '${d.day.toString().padLeft(2, '0')}';
+        } catch (_) {
+          normalizedScheduledDate = cleanDateStr;
+        }
+      }
     }
+
     try {
-      final parsedDate = DateTime.parse(scheduledDateStr);
+      final cleanDateStr = scheduledDateStr.split('T')[0].trim();
+      final parsedDate = DateTime.parse(cleanDateStr);
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final tomorrow = today.add(const Duration(days: 1));
