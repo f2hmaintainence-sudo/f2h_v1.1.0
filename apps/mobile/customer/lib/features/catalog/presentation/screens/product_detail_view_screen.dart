@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/services/app_asset_service.dart';
 import 'package:flutter/material.dart';
@@ -212,6 +213,229 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     return null;
   }
 
+  void _showWebShareSheet(
+    BuildContext context,
+    Product p,
+    ProductVariant? v,
+    String displayName,
+    String shareUrl,
+    String shareText,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: buildProductImage(
+                        p.name,
+                        imageAsset: v?.images.isNotEmpty == true
+                            ? v!.images.first
+                            : (p.images.isNotEmpty ? p.images.first : p.imageAsset),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Share Product',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF17211B),
+                            ),
+                          ),
+                          Text(
+                            '₹${(v?.price ?? p.price).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF16653A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    // WhatsApp Option
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final waUrl = Uri.parse(
+                            'https://api.whatsapp.com/send?text=${Uri.encodeComponent(shareText)}',
+                          );
+                          try {
+                            await launchUrl(waUrl, mode: LaunchMode.externalApplication);
+                          } catch (_) {
+                            await launchUrl(waUrl);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFC8E6C9)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.chat_bubble_rounded, color: Color(0xFF2E7D32), size: 26),
+                              SizedBox(height: 6),
+                              Text(
+                                'WhatsApp',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1B5E20),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Copy Link Option
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          Clipboard.setData(ClipboardData(text: shareText));
+                          if (mounted) {
+                            F2HToast.success(context, 'Product link & message copied!');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.copy_rounded, color: Color(0xFF475569), size: 26),
+                              SizedBox(height: 6),
+                              Text(
+                                'Copy Link',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // System Share Option
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          try {
+                            await SharePlus.instance.share(
+                              ShareParams(
+                                text: shareText,
+                                subject: 'Buy $displayName from F2H Fresh!',
+                              ),
+                            );
+                          } catch (_) {
+                            Clipboard.setData(ClipboardData(text: shareText));
+                            if (mounted) {
+                              F2HToast.success(context, 'Product link copied!');
+                            }
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.share_rounded, color: Color(0xFF64748B), size: 26),
+                              SizedBox(height: 6),
+                              Text(
+                                'More',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _shareProduct(Product p) async {
     HapticFeedback.lightImpact();
     final v = _selectedVariant;
@@ -226,6 +450,13 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     final shareUrl = 'https://c.f2hfresh.com/p/$targetId';
     final shareText =
         'Buy $displayName from F2H Fresh!\n\nCheck this out on F2H Fresh!\n\n$shareUrl';
+
+    // On Web / local browser testing, Web Share API is blocked over unencrypted HTTP (http://192.168.x.x)
+    // So we show the interactive Share Sheet with WhatsApp, Copy Link & Native Share!
+    if (kIsWeb) {
+      _showWebShareSheet(context, p, v, displayName, shareUrl, shareText);
+      return;
+    }
 
     try {
       final XFile? imageXFile = await _resolveAndFetchProductImage(p, v, targetId, displayName);
@@ -247,11 +478,8 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         );
       }
     } catch (err) {
-      debugPrint('[ShareProduct] Native share error, falling back to clipboard: $err');
-      Clipboard.setData(ClipboardData(text: shareText));
-      if (mounted) {
-        F2HToast.success(context, 'Product link copied to clipboard!');
-      }
+      debugPrint('[ShareProduct] Native share error, showing share sheet fallback: $err');
+      _showWebShareSheet(context, p, v, displayName, shareUrl, shareText);
     }
   }
 
