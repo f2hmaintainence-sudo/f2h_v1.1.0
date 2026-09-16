@@ -88,3 +88,31 @@ export function addRegisteredVendor(vendor: Omit<VendorRecord, 'id' | 'created_a
   global.__F2H_REGISTERED_VENDORS__ = store;
   return record;
 }
+
+export function updateRegisteredVendor(idOrVendorId: string, updates: Partial<VendorRecord>): VendorRecord | null {
+  const store = global.__F2H_REGISTERED_VENDORS__ || [];
+  const index = store.findIndex(
+    (v) => String(v.id) === String(idOrVendorId) || v.vendor_id.toLowerCase() === idOrVendorId.toLowerCase(),
+  );
+
+  if (index === -1) return null;
+
+  store[index] = {
+    ...store[index],
+    ...updates,
+  };
+  global.__F2H_REGISTERED_VENDORS__ = store;
+  return store[index];
+}
+
+export function deleteRegisteredVendor(idOrVendorId: string): boolean {
+  const store = global.__F2H_REGISTERED_VENDORS__ || [];
+  const initialLength = store.length;
+  const filtered = store.filter(
+    (v) => String(v.id) !== String(idOrVendorId) && v.vendor_id.toLowerCase() !== idOrVendorId.toLowerCase(),
+  );
+
+  global.__F2H_REGISTERED_VENDORS__ = filtered;
+  return filtered.length < initialLength;
+}
+

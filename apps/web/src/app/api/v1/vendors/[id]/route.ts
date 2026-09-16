@@ -8,7 +8,7 @@
 // ============================================================================
 
 import { NextResponse } from 'next/server';
-import { getRegisteredVendors } from '@/lib/vendors.store';
+import { getRegisteredVendors, updateRegisteredVendor, deleteRegisteredVendor } from '@/lib/vendors.store';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,3 +42,61 @@ export async function GET(
     );
   }
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    const updated = updateRegisteredVendor(id, body);
+
+    if (!updated) {
+      return NextResponse.json(
+        { success: false, message: `Vendor profile '${id}' not found` },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Vendor profile updated successfully',
+      data: updated,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err?.message || 'Failed to update vendor profile' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const deleted = deleteRegisteredVendor(id);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, message: `Vendor profile '${id}' not found` },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Vendor removed successfully',
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err?.message || 'Failed to remove vendor' },
+      { status: 500 },
+    );
+  }
+}
+
