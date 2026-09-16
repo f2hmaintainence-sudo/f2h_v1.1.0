@@ -124,8 +124,9 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         rawImage = p.imageAsset;
       }
 
+      // If no product image, fallback to a guaranteed farm banner
       if (rawImage == null || rawImage.trim().isEmpty) {
-        return null;
+        rawImage = 'https://dev.f2hfresh.com/uploads/banners/sub_banner_1.png';
       }
       rawImage = rawImage.trim();
 
@@ -134,14 +135,16 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         try {
           final byteData = await rootBundle.load(rawImage);
           final bytes = byteData.buffer.asUint8List();
+          final mime = rawImage.endsWith('.png') ? 'image/png' : rawImage.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+          final ext = rawImage.endsWith('.png') ? 'png' : rawImage.endsWith('.webp') ? 'webp' : 'jpg';
           if (kIsWeb) {
-            return XFile.fromData(bytes, mimeType: 'image/jpeg', name: '${_sanitizeFilename(displayName)}.jpg');
+            return XFile.fromData(bytes, mimeType: mime, name: '${_sanitizeFilename(displayName)}.$ext');
           }
           final tempDir = await getTemporaryDirectory();
-          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.jpg';
+          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.$ext';
           final file = File(filePath);
           await file.writeAsBytes(bytes);
-          return XFile(file.path, mimeType: 'image/jpeg');
+          return XFile(file.path, mimeType: mime);
         } catch (_) {
           // If asset load fails, try URL fallback below
           rawImage = AppAssetService.getAssetUrl(rawImage);
@@ -193,18 +196,20 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
       if (resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://')) {
         final response = await http
             .get(Uri.parse(resolvedUrl))
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 6));
 
         if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
           final bytes = response.bodyBytes;
+          final mime = resolvedUrl.endsWith('.png') ? 'image/png' : resolvedUrl.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+          final ext = resolvedUrl.endsWith('.png') ? 'png' : resolvedUrl.endsWith('.webp') ? 'webp' : 'jpg';
           if (kIsWeb) {
-            return XFile.fromData(bytes, mimeType: 'image/jpeg', name: '${_sanitizeFilename(displayName)}.jpg');
+            return XFile.fromData(bytes, mimeType: mime, name: '${_sanitizeFilename(displayName)}.$ext');
           }
           final tempDir = await getTemporaryDirectory();
-          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.jpg';
+          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.$ext';
           final file = File(filePath);
           await file.writeAsBytes(bytes);
-          return XFile(file.path, mimeType: 'image/jpeg');
+          return XFile(file.path, mimeType: mime);
         }
       }
     } catch (e) {

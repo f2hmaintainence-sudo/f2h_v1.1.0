@@ -372,17 +372,21 @@ export class CategoriesController {
     const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
     const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || 'c.f2hfresh.com';
     const baseUrl = `${protocol}://${host}`;
+    const assetBaseUrl = process.env.BACKEND_URL || process.env.MOBILE_BACKEND_URL || 'https://dev.f2hfresh.com';
 
-    const meta = await this.service.getProductShareMeta(productId, baseUrl);
+    const meta = await this.service.getProductShareMeta(productId, assetBaseUrl);
     const title = meta ? `Buy ${meta.name} from F2H Fresh!` : 'Buy Fresh Groceries from F2H Fresh!';
     const rawDesc = meta?.description || 'Order fresh farm-to-home milk, dairy, vegetables, and daily essentials online at best prices.';
     const description = rawDesc.length > 160 ? rawDesc.substring(0, 157) + '...' : rawDesc;
-    const imageUrl = meta?.imageUrl || `${baseUrl}/uploads/banners/app_logo.png`;
+    const imageUrl = meta?.imageUrl || `${assetBaseUrl}/uploads/banners/sub_banner_1.png`;
     const shareUrl = `https://c.f2hfresh.com/p/${productId}`;
     const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
     const intentUrl = `intent://c.f2hfresh.com/p/${encodeURIComponent(productId)}#Intent;scheme=https;package=com.f2h.customer;S.browser_fallback_url=${encodeURIComponent(playStoreUrl)};end;`;
     const priceText = meta?.price ? `₹${meta.price}` : '';
     const origPriceText = meta?.originalPrice && meta.originalPrice > (meta.price || 0) ? `₹${meta.originalPrice}` : '';
+
+    const imgExt = imageUrl.split('.').pop()?.toLowerCase();
+    const mimeType = imgExt === 'png' ? 'image/png' : imgExt === 'webp' ? 'image/webp' : 'image/jpeg';
 
     const userAgent = (req.headers['user-agent'] as string) || '';
     const isBot = /bot|crawl|spider|whatsapp|facebookexternalhit|telegrambot|twitterbot|linkedinbot|embedly|quora|slackbot/i.test(userAgent);
@@ -410,9 +414,9 @@ export class CategoriesController {
   <meta property="og:description" content="${escape(description)}">
   <meta property="og:image" content="${escape(imageUrl)}">
   <meta property="og:image:secure_url" content="${escape(imageUrl)}">
-  <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:width" content="600">
-  <meta property="og:image:height" content="600">
+  <meta property="og:image:type" content="${mimeType}">
+  <meta property="og:image:width" content="800">
+  <meta property="og:image:height" content="800">
   <meta property="og:image:alt" content="${escape(meta?.name || 'F2H Fresh')}">
 
   <!-- Twitter -->
@@ -422,12 +426,18 @@ export class CategoriesController {
   <meta name="twitter:description" content="${escape(description)}">
   <meta name="twitter:image" content="${escape(imageUrl)}">
 
+  <!-- Schema.org / Search Crawlers -->
+  <meta itemprop="name" content="${escape(title)}">
+  <meta itemprop="description" content="${escape(description)}">
+  <meta itemprop="image" content="${escape(imageUrl)}">
+  <link rel="image_src" href="${escape(imageUrl)}">
+
   <!-- App Deep Link Meta -->
   <meta property="al:android:url" content="f2hfresh://product/${escape(productId)}">
   <meta property="al:android:package" content="com.f2h.customer">
   <meta property="al:android:app_name" content="F2H Fresh">
 
-  <link rel="icon" type="image/png" href="${baseUrl}/favicon.ico">
+  <link rel="icon" type="image/png" href="${assetBaseUrl}/favicon.ico">
   <style>
     :root {
       --primary: #15803d;

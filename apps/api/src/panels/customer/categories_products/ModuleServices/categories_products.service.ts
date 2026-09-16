@@ -593,9 +593,9 @@ export class CategoriesProductsService {
     try {
       const publicBaseUrl =
         baseUrl ||
-        process.env.MOBILE_BACKEND_URL ||
         process.env.BACKEND_URL ||
-        'https://c.f2hfresh.com';
+        process.env.MOBILE_BACKEND_URL ||
+        'https://dev.f2hfresh.com';
 
       // 1. Resolve variant or product with images
       const query = `
@@ -611,28 +611,25 @@ export class CategoriesProductsService {
           c.name AS category_name,
           COALESCE(
             (
-              SELECT COALESCE(pi.storage_key, pi.image_url, pi.image_path) FROM product_images pi
+              SELECT COALESCE(NULLIF(pi.storage_key, ''), pi.url, pi.image_url, pi.image_path) FROM product_images pi
               WHERE (pi.variant_id = pv.variant_id OR (pv.variant_id IS NOT NULL AND pi.variant_id = pv.variant_id))
                 AND pi.deleted_at IS NULL
-                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) IS NOT NULL
-                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) <> ''
+                AND (pi.storage_key IS NOT NULL OR pi.url IS NOT NULL OR pi.image_url IS NOT NULL OR pi.image_path IS NOT NULL)
               ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             (
-              SELECT COALESCE(pi.storage_key, pi.image_url, pi.image_path) FROM product_images pi
+              SELECT COALESCE(NULLIF(pi.storage_key, ''), pi.url, pi.image_url, pi.image_path) FROM product_images pi
               WHERE (pi.product_id = pv.product_id OR pi.product_id = p.product_id)
                 AND (pi.variant_id IS NULL OR pi.variant_id = '')
                 AND pi.deleted_at IS NULL
-                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) IS NOT NULL
-                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) <> ''
+                AND (pi.storage_key IS NOT NULL OR pi.url IS NOT NULL OR pi.image_url IS NOT NULL OR pi.image_path IS NOT NULL)
               ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             (
-              SELECT COALESCE(pi.storage_key, pi.image_url, pi.image_path) FROM product_images pi
+              SELECT COALESCE(NULLIF(pi.storage_key, ''), pi.url, pi.image_url, pi.image_path) FROM product_images pi
               WHERE (pi.product_id = pv.product_id OR pi.product_id = p.product_id)
                 AND pi.deleted_at IS NULL
-                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) IS NOT NULL
-                AND COALESCE(pi.storage_key, pi.image_url, pi.image_path) <> ''
+                AND (pi.storage_key IS NOT NULL OR pi.url IS NOT NULL OR pi.image_url IS NOT NULL OR pi.image_path IS NOT NULL)
               ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             c.image_path
@@ -647,9 +644,10 @@ export class CategoriesProductsService {
           OR p.id::text = $1 
           OR p.slug = $1
         )
+        AND (p.deleted_at IS NULL OR pv.deleted_at IS NULL)
         ORDER BY 
           (CASE WHEN pv.variant_id = $1 OR pv.id::text = $1 THEN 0 ELSE 1 END) ASC,
-          pv.is_primary DESC NULLS LAST,
+          pv.sort_order ASC NULLS LAST,
           pv.id ASC NULLS LAST
         LIMIT 1
       `;
@@ -681,7 +679,7 @@ export class CategoriesProductsService {
         description: smallDescription,
         price: item.price,
         originalPrice: item.original_price,
-        imageUrl: imageUrl || `${publicBaseUrl}/uploads/banners/app_logo.png`,
+        imageUrl: imageUrl || `${publicBaseUrl}/uploads/banners/sub_banner_1.png`,
       };
     } catch (err) {
       this.developer.error('getProductShareMeta failed', { error: err, productIdOrVariantId });
