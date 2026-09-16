@@ -79,9 +79,9 @@ export class CustomerBootstrapController {
     const resolvedId = String(addr.address_id || addr.id || addr.action_id || '');
     const branchIsActive = addr.branch_id
       ? (addr.branch_is_active === true ||
-         addr.branch_is_active === 'true' ||
-         addr.branch_is_active === 1 ||
-         String(addr.branch_status || '').toUpperCase() === 'ACTIVE')
+        addr.branch_is_active === 'true' ||
+        addr.branch_is_active === 1 ||
+        String(addr.branch_status || '').toUpperCase() === 'ACTIVE')
       : false;
     const isServiceable = Boolean(addr.branch_id && branchIsActive);
 
@@ -578,14 +578,14 @@ export class CustomerBootstrapController {
             LEFT JOIN branch_sectors bs ON (bs.branch_id = ca.branch_id AND bs.is_active = true AND bs.delivery_partner_id IS NOT NULL)
             JOIN delivery_partners dp ON (
               dp.delivery_partner_id = bs.delivery_partner_id 
-              OR (bs.delivery_partner_id IS NULL AND dp.branch_id = ca.branch_id AND dp.is_active = true)
+              OR (bs.delivery_partner_id IS NULL AND (dp.branch_id = ca.branch_id OR ca.branch_id IS NULL))
             )
             JOIN users u ON (u.user_id = dp.delivery_partner_id)
             WHERE ca.customer_id = $1
               AND ca.status = true
               AND ca.deleted_at IS NULL
-              AND dp.is_active = true
-            ORDER BY ca.is_default DESC, dp.total_deliveries DESC NULLS LAST
+              AND dp.deleted_at IS NULL
+            ORDER BY ca.is_default DESC, dp.is_active DESC, dp.total_deliveries DESC NULLS LAST
             LIMIT 1
           `;
           const branchPartnerRows = await this.db.query(branchPartnerSql, [customerId]);
@@ -612,6 +612,42 @@ export class CustomerBootstrapController {
                 delivered_at: null,
                 sequence_no: 1,
               }] : [],
+            });
+          }
+        } catch (_) { }
+      }
+
+      // Fallback 3: If still no partner, retrieve default available delivery partner
+      if (partnerMap.size === 0) {
+        try {
+          const generalPartnerSql = `
+            SELECT 
+              dp.delivery_partner_id,
+              COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
+              COALESCE(u.phone, '') AS partner_phone,
+              COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo
+            FROM delivery_partners dp
+            JOIN users u ON u.user_id = dp.delivery_partner_id
+            WHERE dp.deleted_at IS NULL
+            ORDER BY dp.is_active DESC, dp.is_online DESC, dp.total_deliveries DESC NULLS LAST
+            LIMIT 1
+          `;
+          const gpRows = await this.db.query(generalPartnerSql);
+          const gp = gpRows?.[0];
+          if (gp && gp.delivery_partner_id) {
+            const slotLabel = currentSlot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
+            partnerMap.set(gp.delivery_partner_id, {
+              partner_id: gp.delivery_partner_id,
+              partner_name: gp.partner_name || 'Delivery Partner',
+              phone: gp.partner_phone || '',
+              profile_photo: gp.partner_photo || null,
+              delivery_slot: currentSlot === 'evening' ? 'evening' : 'morning',
+              slot_label: slotLabel,
+              is_current_slot: true,
+              run_status: 'assigned',
+              delivery_status: 'pending',
+              run_date: todayDate,
+              addresses: [],
             });
           }
         } catch (_) { }

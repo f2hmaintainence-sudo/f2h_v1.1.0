@@ -125,10 +125,7 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     final shareText =
         'Buy $displayName from F2H Fresh!\n\n$descLine$shareUrl';
     try {
-      await SharePlus.instance.share(
-        shareText,
-        subject: 'Buy $displayName from F2H Fresh!',
-      );
+      await SharePlus.instance.share(ShareParams(text: shareText));
     } catch (_) {
       Clipboard.setData(ClipboardData(text: shareText));
       if (mounted) {
