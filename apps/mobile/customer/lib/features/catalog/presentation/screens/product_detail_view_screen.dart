@@ -1,6 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:f2h_customer/core/api/api_endpoints.dart';
+import 'package:f2h_customer/core/services/app_asset_service.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:f2h_customer/core/session/customer_session_cubit.dart';
 import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
@@ -18,7 +23,6 @@ import '../../../../core/widgets/custom_button.dart';
 import '../widgets/cart_widgets.dart';
 import '../../../subscription/presentation/widgets/subscription_button.dart';
 import '../helpers/cart_helpers.dart';
-import 'product_detail_screen.dart';
 
 // ══════════════════════════════════════════════════════════
 //  PRODUCT DETAIL VIEW SCREEN — Blinkit / Zepto Style
@@ -34,7 +38,7 @@ class ProductDetailViewScreen extends StatefulWidget {
 }
 
 class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin {
   bool _detailsExpanded = false;
   int _currentImageIndex = 0;
   late final ScrollController _scrollController;
@@ -96,6 +100,118 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     }
   }
 
+  String _sanitizeFilename(String input) {
+    return input.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+  }
+
+  Future<XFile?> _resolveAndFetchProductImage(
+    Product p,
+    ProductVariant? v,
+    String targetId,
+    String displayName,
+  ) async {
+    try {
+      // 1. Determine raw image path/URL from variant or product
+      String? rawImage;
+      if (v != null && v.images.isNotEmpty) {
+        rawImage = v.images.first;
+      } else if (v != null && v.imagePath != null && v.imagePath!.trim().isNotEmpty) {
+        rawImage = v.imagePath;
+      } else if (p.images.isNotEmpty) {
+        rawImage = p.images.first;
+      } else if (p.imageAsset != null && p.imageAsset!.trim().isNotEmpty) {
+        rawImage = p.imageAsset;
+      }
+
+      if (rawImage == null || rawImage.trim().isEmpty) {
+        return null;
+      }
+      rawImage = rawImage.trim();
+
+      // 2. If it's a local flutter asset
+      if (rawImage.startsWith('assets/')) {
+        try {
+          final byteData = await rootBundle.load(rawImage);
+          final bytes = byteData.buffer.asUint8List();
+          if (kIsWeb) {
+            return XFile.fromData(bytes, mimeType: 'image/jpeg', name: '${_sanitizeFilename(displayName)}.jpg');
+          }
+          final tempDir = await getTemporaryDirectory();
+          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.jpg';
+          final file = File(filePath);
+          await file.writeAsBytes(bytes);
+          return XFile(file.path, mimeType: 'image/jpeg');
+        } catch (_) {
+          // If asset load fails, try URL fallback below
+          rawImage = AppAssetService.getAssetUrl(rawImage);
+        }
+      }
+
+      // 3. Resolve relative server path to full HTTP URL
+      String resolvedUrl = rawImage;
+      final activeHost = ApiEndpoints.host.replaceAll(RegExp(r'/+$'), '');
+      if (resolvedUrl.startsWith('/uploads/') || resolvedUrl.startsWith('uploads/')) {
+        final clean = resolvedUrl.startsWith('/') ? resolvedUrl : '/$resolvedUrl';
+        resolvedUrl = '$activeHost$clean';
+      } else if (resolvedUrl.startsWith('products/') ||
+          resolvedUrl.startsWith('categories/') ||
+          resolvedUrl.startsWith('variants/')) {
+        resolvedUrl = '$activeHost/uploads/$resolvedUrl';
+      } else if (resolvedUrl.startsWith('/products/') ||
+          resolvedUrl.startsWith('/categories/') ||
+          resolvedUrl.startsWith('/variants/')) {
+        resolvedUrl = '$activeHost/uploads$resolvedUrl';
+      }
+
+      if (resolvedUrl.startsWith('https://192.168.') ||
+          resolvedUrl.startsWith('https://localhost') ||
+          resolvedUrl.startsWith('https://127.0.0.1') ||
+          resolvedUrl.startsWith('https://10.0.2.2')) {
+        resolvedUrl = resolvedUrl.replaceFirst('https://', 'http://');
+      }
+
+      try {
+        final uri = Uri.parse(resolvedUrl);
+        if ((uri.host.startsWith('192.168.') ||
+                uri.host == 'localhost' ||
+                uri.host == '127.0.0.1' ||
+                uri.host == '10.0.2.2') &&
+            !activeHost.contains(uri.host)) {
+          final activeUri = Uri.parse(activeHost);
+          resolvedUrl = uri
+              .replace(
+                scheme: activeUri.scheme,
+                host: activeUri.host,
+                port: activeUri.port,
+              )
+              .toString();
+        }
+      } catch (_) {}
+
+      // 4. Download image bytes over HTTP
+      if (resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://')) {
+        final response = await http
+            .get(Uri.parse(resolvedUrl))
+            .timeout(const Duration(seconds: 4));
+
+        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          final bytes = response.bodyBytes;
+          if (kIsWeb) {
+            return XFile.fromData(bytes, mimeType: 'image/jpeg', name: '${_sanitizeFilename(displayName)}.jpg');
+          }
+          final tempDir = await getTemporaryDirectory();
+          final filePath = '${tempDir.path}/f2h_share_${_sanitizeFilename(targetId)}.jpg';
+          final file = File(filePath);
+          await file.writeAsBytes(bytes);
+          return XFile(file.path, mimeType: 'image/jpeg');
+        }
+      }
+    } catch (e) {
+      debugPrint('[ShareProduct] Error resolving image for share: $e');
+    }
+    return null;
+  }
+
   Future<void> _shareProduct(Product p) async {
     HapticFeedback.lightImpact();
     final v = _selectedVariant;
@@ -107,31 +223,31 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         ? '${p.name}-$variantLabel'
         : p.name;
 
-    // Small description from highlights or first line of description
-    String shortDesc = '';
-    if (p.highlights != null && p.highlights!.trim().isNotEmpty) {
-      shortDesc = p.highlights!.replaceAll(RegExp(r'<[^>]*>'), '').trim();
-    } else if (p.description != null && p.description!.trim().isNotEmpty) {
-      final clean = p.description!.replaceAll(RegExp(r'<[^>]*>'), '').trim();
-      final dotIdx = clean.indexOf('.');
-      shortDesc = dotIdx != -1 ? clean.substring(0, dotIdx + 1).trim() : clean;
-    }
-    if (shortDesc.length > 100) {
-      shortDesc = '${shortDesc.substring(0, 97)}...';
-    }
-
     final shareUrl = 'https://c.f2hfresh.com/p/$targetId';
-    final descLine = shortDesc.isNotEmpty ? '$shortDesc\n' : 'Check this out on F2H Fresh!\n';
     final shareText =
-        'Buy $displayName from F2H Fresh!\n\n$descLine$shareUrl';
+        'Buy $displayName from F2H Fresh!\n\nCheck this out on F2H Fresh!\n\n$shareUrl';
+
     try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: shareText,
-          subject: 'Buy $displayName from F2H Fresh!',
-        ),
-      );
-    } catch (_) {
+      final XFile? imageXFile = await _resolveAndFetchProductImage(p, v, targetId, displayName);
+
+      if (imageXFile != null) {
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [imageXFile],
+            text: shareText,
+            subject: 'Buy $displayName from F2H Fresh!',
+          ),
+        );
+      } else {
+        await SharePlus.instance.share(
+          ShareParams(
+            text: shareText,
+            subject: 'Buy $displayName from F2H Fresh!',
+          ),
+        );
+      }
+    } catch (err) {
+      debugPrint('[ShareProduct] Native share error, falling back to clipboard: $err');
       Clipboard.setData(ClipboardData(text: shareText));
       if (mounted) {
         F2HToast.success(context, 'Product link copied to clipboard!');
