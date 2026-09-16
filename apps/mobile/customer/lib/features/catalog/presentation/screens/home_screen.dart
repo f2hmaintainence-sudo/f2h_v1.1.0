@@ -2416,16 +2416,7 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
     final maxAllowedDate = DateTime(now.year, now.month, now.day).add(Duration(days: maxDays));
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F6F0),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFEAE8E0),
-          width: 1.0,
-        ),
-      ),
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
