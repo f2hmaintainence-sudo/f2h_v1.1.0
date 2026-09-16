@@ -24,6 +24,7 @@ class TodayDeliveryPartnerCard extends StatefulWidget {
 
 class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
   late TodayDeliveryPartner _partner;
+  late bool _isOnline;
   late final MapController _mapController;
   Timer? _pollingTimer;
   double? _currentLat;
@@ -38,26 +39,41 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
   void initState() {
     super.initState();
     _partner = widget.partner;
+    _isOnline = widget.partner.isOnline;
     _mapController = MapController();
-    _currentLat = widget.partner.latitude;
-    _currentLng = widget.partner.longitude;
-    _lastUpdatedTime = widget.partner.lastLocationAt;
+    _currentLat = _isOnline ? widget.partner.latitude : null;
+    _currentLng = _isOnline ? widget.partner.longitude : null;
+    _lastUpdatedTime = _isOnline ? widget.partner.lastLocationAt : null;
 
-    _startLocationPolling();
+    if (_isOnline) {
+      _startLocationPolling();
+    }
   }
 
   @override
   void didUpdateWidget(TodayDeliveryPartnerCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.partner.partnerId != oldWidget.partner.partnerId ||
+        widget.partner.isOnline != oldWidget.partner.isOnline ||
         widget.partner.latitude != oldWidget.partner.latitude ||
         widget.partner.longitude != oldWidget.partner.longitude) {
       _partner = widget.partner;
-      if (widget.partner.latitude != null && widget.partner.longitude != null) {
-        _currentLat = widget.partner.latitude;
-        _currentLng = widget.partner.longitude;
-        _lastUpdatedTime = widget.partner.lastLocationAt;
-        _animateToCurrentLocation();
+      _isOnline = widget.partner.isOnline;
+      if (!_isOnline) {
+        _pollingTimer?.cancel();
+        _currentLat = null;
+        _currentLng = null;
+        _lastUpdatedTime = null;
+      } else {
+        if (widget.partner.latitude != null && widget.partner.longitude != null) {
+          _currentLat = widget.partner.latitude;
+          _currentLng = widget.partner.longitude;
+          _lastUpdatedTime = widget.partner.lastLocationAt;
+          _animateToCurrentLocation();
+        }
+        if (_pollingTimer == null || !_pollingTimer!.isActive) {
+          _startLocationPolling();
+        }
       }
     }
   }
@@ -70,6 +86,8 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
   }
 
   void _startLocationPolling() {
+    if (!_isOnline) return;
+
     // Initial fetch if coordinates not loaded yet
     if (_currentLat == null || _currentLng == null) {
       _fetchLiveLocation();
@@ -82,6 +100,7 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
   }
 
   Future<void> _fetchLiveLocation() async {
+    if (!_isOnline) return;
     final partnerId = _partner.partnerId.trim();
     if (partnerId.isEmpty || _isLocating) return;
 
@@ -94,6 +113,20 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
 
       if (response.statusCode == 200 && response.data != null) {
         final body = response.data;
+        // If partner went offline or location unavailable, stop polling and clear coordinates
+        if (body['is_online'] == false || body['status'] == false) {
+          if (mounted) {
+            setState(() {
+              _isOnline = false;
+              _currentLat = null;
+              _currentLng = null;
+              _lastUpdatedTime = null;
+            });
+            _pollingTimer?.cancel();
+          }
+          return;
+        }
+
         if (body['status'] == true && body['data'] != null) {
           final data = body['data'];
           final lat = double.tryParse(data['latitude']?.toString() ?? '');
@@ -102,6 +135,7 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
           if (lat != null && lng != null && mounted) {
             final hasChanged = lat != _currentLat || lng != _currentLng;
             setState(() {
+              _isOnline = true;
               _currentLat = lat;
               _currentLng = lng;
               _lastUpdatedTime = data['last_location_at']?.toString();
@@ -162,6 +196,7 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
       _currentLng != 0;
 
   void _openLiveTrackingSheet(BuildContext context) {
+    if (!_isOnline) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -190,17 +225,39 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
     final hasLive = _hasLiveCoordinates;
 
     return Container(
-      margin: widget.margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── Partner Profile Header (Avatar, Name, Phone & Call Button) ──
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
+      margin: widget.margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF16A34A).withValues(alpha: 0.22),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF16A34A).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Partner Profile Header (Avatar, Name, Phone & Call Button) ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
                   // Partner Avatar / Icon
                   Container(
                     width: 46,
@@ -263,16 +320,41 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _partner.partnerName,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: kText,
-                            letterSpacing: -0.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _partner.partnerName,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: kText,
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: _isOnline
+                                    ? const Color(0xFF16A34A).withValues(alpha: 0.12)
+                                    : const Color(0xFF94A3B8).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _isOnline ? 'ONLINE' : 'OFFLINE',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: _isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 3),
                         if (hasPhone)
@@ -295,9 +377,9 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
                             ],
                           )
                         else
-                          const Text(
-                            'Delivery Partner Assigned',
-                            style: TextStyle(
+                          Text(
+                            _isOnline ? 'Delivery Partner Assigned' : 'Delivery Partner (Offline)',
+                            style: const TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
                               color: kTextSub,
@@ -364,159 +446,217 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
 
             // ── Partner Real-Time Location Map ──
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Container(
-                height: 155,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
-                    children: [
-                      // Embedded FlutterMap
-                      FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          initialCenter: targetPoint,
-                          initialZoom: 15.5,
-                          interactionOptions: const InteractionOptions(
-                            flags: InteractiveFlag.none,
-                          ),
+              padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+              child: _isOnline
+                  ? Container(
+                      height: 155,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1,
                         ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                            subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
-                            userAgentPackageName: 'com.f2h.customer',
-                            maxZoom: 20,
-                          ),
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: targetPoint,
-                                width: 50,
-                                height: 50,
-                                child: _DeliveryPartnerMarker(isLive: hasLive),
-                              ),
-                            ],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-
-                      // Transparent Tap Area to open full interactive sheet
-                      Positioned.fill(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () => _openLiveTrackingSheet(context),
-                          ),
-                        ),
-                      ),
-
-                      // Floating Live Status Badge (Top-Left)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: IgnorePointer(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 4.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.94),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: hasLive
-                                    ? const Color(0xFF16A34A).withValues(alpha: 0.3)
-                                    : const Color(0xFFD97706).withValues(alpha: 0.3),
-                                width: 0.8,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          children: [
+                            // Embedded FlutterMap
+                            FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter: targetPoint,
+                                initialZoom: 15.5,
+                                interactionOptions: const InteractionOptions(
+                                  flags: InteractiveFlag.none,
                                 ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                              ),
                               children: [
-                                Container(
-                                  width: 7,
-                                  height: 7,
+                                TileLayer(
+                                  urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                                  subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
+                                  userAgentPackageName: 'com.f2h.customer',
+                                  maxZoom: 20,
+                                ),
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: targetPoint,
+                                      width: 50,
+                                      height: 50,
+                                      child: _DeliveryPartnerMarker(isLive: hasLive),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+
+                            // Transparent Tap Area to open full interactive sheet
+                            Positioned.fill(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => _openLiveTrackingSheet(context),
+                                ),
+                              ),
+                            ),
+
+                            // Floating Live Status Badge (Top-Left)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: IgnorePointer(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 4.5,
+                                  ),
                                   decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: hasLive
-                                        ? const Color(0xFF16A34A)
-                                        : const Color(0xFFD97706),
-                                    boxShadow: hasLive
-                                        ? [
-                                            BoxShadow(
-                                              color: const Color(0xFF16A34A).withValues(alpha: 0.6),
-                                              blurRadius: 4,
-                                              spreadRadius: 1,
-                                            ),
-                                          ]
-                                        : null,
+                                    color: Colors.white.withValues(alpha: 0.94),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: hasLive
+                                          ? const Color(0xFF16A34A).withValues(alpha: 0.3)
+                                          : const Color(0xFFD97706).withValues(alpha: 0.3),
+                                      width: 0.8,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.06),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: hasLive
+                                              ? const Color(0xFF16A34A)
+                                              : const Color(0xFFD97706),
+                                          boxShadow: hasLive
+                                              ? [
+                                                  BoxShadow(
+                                                    color: const Color(0xFF16A34A).withValues(alpha: 0.6),
+                                                    blurRadius: 4,
+                                                    spreadRadius: 1,
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        hasLive ? 'Live Partner Location' : 'Locating Partner...',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: hasLive
+                                              ? const Color(0xFF15803D)
+                                              : const Color(0xFFB45309),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 5),
+                              ),
+                            ),
+
+                            // Floating Expand Fullscreen Button (Bottom-Right)
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: Material(
+                                color: Colors.white.withValues(alpha: 0.94),
+                                shape: const CircleBorder(),
+                                elevation: 2,
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () => _openLiveTrackingSheet(context),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(7.5),
+                                    child: Icon(
+                                      Icons.fullscreen_rounded,
+                                      size: 18,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF94A3B8).withValues(alpha: 0.16),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_off_rounded,
+                              size: 18,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  hasLive ? 'Live Partner Location' : 'Locating Partner...',
+                                  'Partner is currently offline',
                                   style: TextStyle(
-                                    fontSize: 10.5,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: hasLive
-                                        ? const Color(0xFF15803D)
-                                        : const Color(0xFFB45309),
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Live location tracking will resume when partner goes on duty.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF64748B),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                        ],
                       ),
-
-                      // Floating Expand Fullscreen Button (Bottom-Right)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: Material(
-                          color: Colors.white.withValues(alpha: 0.94),
-                          shape: const CircleBorder(),
-                          elevation: 2,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () => _openLiveTrackingSheet(context),
-                            child: const Padding(
-                              padding: EdgeInsets.all(7.5),
-                              child: Icon(
-                                Icons.fullscreen_rounded,
-                                size: 18,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
           ],
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -599,6 +739,7 @@ class _PartnerLiveTrackingSheetState extends State<_PartnerLiveTrackingSheet> {
   late final MapController _sheetMapController;
   double? _liveLat;
   double? _liveLng;
+  late bool _isOnline;
   Timer? _pollingTimer;
 
   static const LatLng _defaultCenter = LatLng(12.9716, 77.5946);
@@ -607,13 +748,16 @@ class _PartnerLiveTrackingSheetState extends State<_PartnerLiveTrackingSheet> {
   void initState() {
     super.initState();
     _sheetMapController = MapController();
-    _liveLat = widget.currentLat;
-    _liveLng = widget.currentLng;
+    _isOnline = widget.partner.isOnline;
+    _liveLat = _isOnline ? widget.currentLat : null;
+    _liveLng = _isOnline ? widget.currentLng : null;
 
-    // Refresh every 8 seconds while sheet is open
-    _pollingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      _pollLocation();
-    });
+    // Refresh every 8 seconds while sheet is open ONLY IF partner is online
+    if (_isOnline) {
+      _pollingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+        _pollLocation();
+      });
+    }
   }
 
   @override
@@ -625,20 +769,35 @@ class _PartnerLiveTrackingSheetState extends State<_PartnerLiveTrackingSheet> {
 
   Future<void> _pollLocation() async {
     final partnerId = widget.partner.partnerId.trim();
-    if (partnerId.isEmpty) return;
+    if (partnerId.isEmpty || !_isOnline) return;
 
     try {
       final dio = sl<DioClient>().dio;
       final res = await dio.get('/customer/today-delivery-partners/$partnerId/location');
-      if (res.statusCode == 200 && res.data != null && res.data['status'] == true) {
+      if (res.statusCode == 200 && res.data != null) {
+        final isOnline = res.data['is_online'] == true;
+        if (!isOnline || res.data['status'] == false) {
+          if (mounted) {
+            setState(() {
+              _isOnline = false;
+              _liveLat = null;
+              _liveLng = null;
+            });
+            _pollingTimer?.cancel();
+          }
+          return;
+        }
+
         final loc = res.data['data'];
-        final lat = double.tryParse(loc['latitude']?.toString() ?? '');
-        final lng = double.tryParse(loc['longitude']?.toString() ?? '');
-        if (lat != null && lng != null && mounted) {
-          setState(() {
-            _liveLat = lat;
-            _liveLng = lng;
-          });
+        if (loc != null) {
+          final lat = double.tryParse(loc['latitude']?.toString() ?? '');
+          final lng = double.tryParse(loc['longitude']?.toString() ?? '');
+          if (lat != null && lng != null && mounted) {
+            setState(() {
+              _liveLat = lat;
+              _liveLng = lng;
+            });
+          }
         }
       }
     } catch (_) {}
@@ -687,9 +846,11 @@ class _PartnerLiveTrackingSheetState extends State<_PartnerLiveTrackingSheet> {
                 Container(
                   width: 44,
                   height: 44,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+                      colors: _isOnline
+                          ? const [Color(0xFF15803D), Color(0xFF16A34A)]
+                          : const [Color(0xFF64748B), Color(0xFF94A3B8)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -715,15 +876,40 @@ class _PartnerLiveTrackingSheetState extends State<_PartnerLiveTrackingSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.partner.partnerName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: kText,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.partner.partnerName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: kText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: _isOnline
+                                  ? const Color(0xFF16A34A).withValues(alpha: 0.12)
+                                  : const Color(0xFF94A3B8).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              _isOnline ? 'ONLINE' : 'OFFLINE',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: _isOnline ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Row(
@@ -731,18 +917,20 @@ class _PartnerLiveTrackingSheetState extends State<_PartnerLiveTrackingSheet> {
                           Container(
                             width: 6.5,
                             height: 6.5,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Color(0xFF16A34A),
+                              color: _isOnline ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Text(
-                            'Real-Time Partner Tracking',
+                          Text(
+                            _isOnline
+                                ? 'Real-Time Partner Tracking'
+                                : 'Partner Offline · Tracking Disabled',
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF16A34A),
+                              color: _isOnline ? const Color(0xFF16A34A) : const Color(0xFF64748B),
                             ),
                           ),
                         ],
@@ -772,95 +960,138 @@ class _PartnerLiveTrackingSheetState extends State<_PartnerLiveTrackingSheet> {
           const SizedBox(height: 12),
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-          // Map Area
+          // Map Area or Offline Message
           Expanded(
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _sheetMapController,
-                  options: MapOptions(
-                    initialCenter: point,
-                    initialZoom: 16.0,
-                    minZoom: 4.0,
-                    maxZoom: 19.5,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                      subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
-                      userAgentPackageName: 'com.f2h.customer',
-                      maxZoom: 20,
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: point,
-                          width: 54,
-                          height: 54,
-                          child: _DeliveryPartnerMarker(isLive: hasCoords),
+            child: _isOnline
+                ? Stack(
+                    children: [
+                      FlutterMap(
+                        mapController: _sheetMapController,
+                        options: MapOptions(
+                          initialCenter: point,
+                          initialZoom: 16.0,
+                          minZoom: 4.0,
+                          maxZoom: 19.5,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                            subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
+                            userAgentPackageName: 'com.f2h.customer',
+                            maxZoom: 20,
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: point,
+                                width: 54,
+                                height: 54,
+                                child: _DeliveryPartnerMarker(isLive: hasCoords),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
 
-                // Floating Re-Center Button
-                Positioned(
-                  bottom: 20,
-                  right: 18,
-                  child: FloatingActionButton.small(
-                    onPressed: _recenterMap,
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF0F172A),
-                    elevation: 3,
-                    child: const Icon(Icons.my_location_rounded, size: 20),
-                  ),
-                ),
+                      // Floating Re-Center Button
+                      Positioned(
+                        bottom: 20,
+                        right: 18,
+                        child: FloatingActionButton.small(
+                          onPressed: _recenterMap,
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF0F172A),
+                          elevation: 3,
+                          child: const Icon(Icons.my_location_rounded, size: 20),
+                        ),
+                      ),
 
-                // Top Info Bar
-                Positioned(
-                  top: 12,
-                  left: 14,
-                  right: 14,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.95),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.radar_rounded,
-                          size: 16,
-                          color: Color(0xFF16A34A),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            hasCoords
-                                ? 'Live GPS telemetry active · Updates continuously'
-                                : 'Partner GPS signal locating...',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF334155),
-                            ),
+                      // Top Info Bar
+                      Positioned(
+                        top: 12,
+                        left: 14,
+                        right: 14,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.radar_rounded,
+                                size: 16,
+                                color: Color(0xFF16A34A),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  hasCoords
+                                      ? 'Live GPS telemetry active · Updates continuously'
+                                      : 'Partner GPS signal locating...',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF334155),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  )
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF94A3B8).withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_off_rounded,
+                              size: 40,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          const Text(
+                            'Partner is Currently Offline',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Live location tracking is paused while the delivery partner is offline. Coordinates will not be tracked or retrieved until they go back on duty.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),

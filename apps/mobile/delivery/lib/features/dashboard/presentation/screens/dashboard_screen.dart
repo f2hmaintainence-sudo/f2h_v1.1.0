@@ -79,6 +79,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _getCurrentLocation() async {
     try {
+      final sessionState = context.read<DeliverySessionBloc>().state;
+      if (sessionState is DeliverySessionLoaded && !sessionState.isOnline) {
+        if (_currentPosition != null && mounted) {
+          setState(() => _currentPosition = null);
+        }
+        return;
+      }
       final pos = await _locationService.getCurrentPosition();
       if (mounted) setState(() => _currentPosition = pos);
     } catch (_) {}

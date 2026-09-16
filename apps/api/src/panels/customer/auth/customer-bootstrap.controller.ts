@@ -308,7 +308,22 @@ export class CustomerBootstrapController {
   @UseGuards(AuthGuard('jwt'))
   async getPartnerLiveLocation(@Param('partnerId') partnerId: string) {
     if (!partnerId) {
-      return { status: false, message: 'Partner ID is required', data: null };
+      return { status: false, message: 'Partner ID is required', data: null, is_online: false };
+    }
+
+    // When partner is offline, do not get or return location details
+    const partnerStatusRes = await this.db.query(
+      `SELECT is_online, is_active FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+      [partnerId],
+    );
+    const isOnline = Boolean(partnerStatusRes?.[0]?.is_online && partnerStatusRes?.[0]?.is_active !== false);
+    if (!isOnline) {
+      return {
+        status: false,
+        is_online: false,
+        message: 'Delivery partner is currently offline',
+        data: null,
+      };
     }
 
     let lat: number | null = null;
@@ -330,7 +345,7 @@ export class CustomerBootstrapController {
 
     if (lat === null || lng === null) {
       const dbRows = await this.db.query(
-        `SELECT current_lat, current_lng, last_location_at FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+        `SELECT current_lat, current_lng, last_location_at FROM delivery_partners WHERE delivery_partner_id = $1 AND is_online = true LIMIT 1`,
         [partnerId],
       );
       if (dbRows?.length && dbRows[0].current_lat != null && dbRows[0].current_lng != null) {
@@ -343,6 +358,7 @@ export class CustomerBootstrapController {
     if (lat !== null && lng !== null) {
       return {
         status: true,
+        is_online: true,
         data: {
           partner_id: partnerId,
           latitude: lat,
@@ -356,6 +372,7 @@ export class CustomerBootstrapController {
 
     return {
       status: false,
+      is_online: true,
       message: 'Location unavailable for delivery partner',
       data: null,
     };
@@ -463,6 +480,7 @@ export class CustomerBootstrapController {
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
           COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+          COALESCE(dp.is_online, false) AS is_online,
           dp.current_lat,
           dp.current_lng,
           dp.last_location_at,
@@ -513,6 +531,7 @@ export class CustomerBootstrapController {
 
         if (!partnerMap.has(partnerId)) {
           const slotLabel = row.delivery_slot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
+          const isOnline = Boolean(row.is_online);
           partnerMap.set(partnerId, {
             partner_id: partnerId,
             partner_name: row.partner_name || 'Delivery Partner',
@@ -521,12 +540,13 @@ export class CustomerBootstrapController {
             delivery_slot: row.delivery_slot || currentSlot,
             slot_label: slotLabel,
             is_current_slot: isCurrentSlot,
+            is_online: isOnline,
             run_status: row.run_status || 'planned',
             delivery_status: row.address_delivery_status || 'pending',
             run_date: row.run_date,
-            latitude: row.current_lat != null ? Number(row.current_lat) : null,
-            longitude: row.current_lng != null ? Number(row.current_lng) : null,
-            last_location_at: row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
+            latitude: isOnline && row.current_lat != null ? Number(row.current_lat) : null,
+            longitude: isOnline && row.current_lng != null ? Number(row.current_lng) : null,
+            last_location_at: isOnline && row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
             addresses: [],
           });
         }
@@ -577,6 +597,7 @@ export class CustomerBootstrapController {
               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
               COALESCE(u.phone, '') AS partner_phone,
               COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              COALESCE(dp.is_online, false) AS is_online,
               dp.current_lat,
               dp.current_lng,
               dp.last_location_at,
@@ -612,6 +633,7 @@ export class CustomerBootstrapController {
             } else if (row.order_status === 'delivered') {
               status = 'delivered';
             }
+            const isOnline = Boolean(row.is_online);
             partnerMap.set(partnerId, {
               partner_id: partnerId,
               partner_name: row.partner_name || 'Delivery Partner',
@@ -620,12 +642,13 @@ export class CustomerBootstrapController {
               delivery_slot: row.delivery_slot || currentSlot,
               slot_label: slotLabel,
               is_current_slot: (row.delivery_slot || '').toLowerCase() === currentSlot.toLowerCase(),
+              is_online: isOnline,
               run_status: status === 'delivered' ? 'completed' : 'in_progress',
               delivery_status: status,
               run_date: row.delivery_date || todayDate,
-              latitude: row.current_lat != null ? Number(row.current_lat) : null,
-              longitude: row.current_lng != null ? Number(row.current_lng) : null,
-              last_location_at: row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
+              latitude: isOnline && row.current_lat != null ? Number(row.current_lat) : null,
+              longitude: isOnline && row.current_lng != null ? Number(row.current_lng) : null,
+              last_location_at: isOnline && row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
               addresses: row.address_id ? [{
                 address_id: row.address_id,
                 address_type: row.address_type || 'home',
@@ -649,6 +672,7 @@ export class CustomerBootstrapController {
               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
               COALESCE(u.phone, '') AS partner_phone,
               COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              COALESCE(dp.is_online, false) AS is_online,
               dp.current_lat,
               dp.current_lng,
               dp.last_location_at,
@@ -677,6 +701,7 @@ export class CustomerBootstrapController {
           const bp = branchPartnerRows?.[0];
           if (bp && bp.delivery_partner_id) {
             const slotLabel = currentSlot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
+            const isOnline = Boolean(bp.is_online);
             partnerMap.set(bp.delivery_partner_id, {
               partner_id: bp.delivery_partner_id,
               partner_name: bp.partner_name || 'Delivery Partner',
@@ -685,12 +710,13 @@ export class CustomerBootstrapController {
               delivery_slot: currentSlot === 'evening' ? 'evening' : 'morning',
               slot_label: slotLabel,
               is_current_slot: true,
+              is_online: isOnline,
               run_status: 'assigned',
               delivery_status: 'pending',
               run_date: todayDate,
-              latitude: bp.current_lat != null ? Number(bp.current_lat) : null,
-              longitude: bp.current_lng != null ? Number(bp.current_lng) : null,
-              last_location_at: bp.last_location_at ? new Date(bp.last_location_at).toISOString() : null,
+              latitude: isOnline && bp.current_lat != null ? Number(bp.current_lat) : null,
+              longitude: isOnline && bp.current_lng != null ? Number(bp.current_lng) : null,
+              last_location_at: isOnline && bp.last_location_at ? new Date(bp.last_location_at).toISOString() : null,
               addresses: bp.address_id ? [{
                 address_id: bp.address_id,
                 address_type: bp.address_type || 'home',
@@ -714,6 +740,7 @@ export class CustomerBootstrapController {
               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
               COALESCE(u.phone, '') AS partner_phone,
               COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              COALESCE(dp.is_online, false) AS is_online,
               dp.current_lat,
               dp.current_lng,
               dp.last_location_at
@@ -727,6 +754,7 @@ export class CustomerBootstrapController {
           const gp = gpRows?.[0];
           if (gp && gp.delivery_partner_id) {
             const slotLabel = currentSlot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
+            const isOnline = Boolean(gp.is_online);
             partnerMap.set(gp.delivery_partner_id, {
               partner_id: gp.delivery_partner_id,
               partner_name: gp.partner_name || 'Delivery Partner',
@@ -735,12 +763,13 @@ export class CustomerBootstrapController {
               delivery_slot: currentSlot === 'evening' ? 'evening' : 'morning',
               slot_label: slotLabel,
               is_current_slot: true,
+              is_online: isOnline,
               run_status: 'assigned',
               delivery_status: 'pending',
               run_date: todayDate,
-              latitude: gp.current_lat != null ? Number(gp.current_lat) : null,
-              longitude: gp.current_lng != null ? Number(gp.current_lng) : null,
-              last_location_at: gp.last_location_at ? new Date(gp.last_location_at).toISOString() : null,
+              latitude: isOnline && gp.current_lat != null ? Number(gp.current_lat) : null,
+              longitude: isOnline && gp.current_lng != null ? Number(gp.current_lng) : null,
+              last_location_at: isOnline && gp.last_location_at ? new Date(gp.last_location_at).toISOString() : null,
               addresses: [],
             });
           }
@@ -762,8 +791,14 @@ export class CustomerBootstrapController {
         return true;
       });
 
-      // Enrich all active partners with fresh real-time GPS telemetry from Redis if available
+      // Enrich all active partners with fresh real-time GPS telemetry from Redis ONLY if they are online
       for (const partner of activePartners) {
+        if (!partner.is_online) {
+          partner.latitude = null;
+          partner.longitude = null;
+          partner.last_location_at = null;
+          continue;
+        }
         try {
           const redisLoc: any = await this.redisService.fetch(`delivery_partner_location:${partner.partner_id}`);
           if (redisLoc && redisLoc.latitude && redisLoc.longitude) {

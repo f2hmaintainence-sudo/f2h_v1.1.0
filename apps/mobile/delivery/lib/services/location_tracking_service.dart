@@ -95,9 +95,22 @@ class LocationTrackingService {
         },
       );
 
+      if (response.data != null && (response.data['is_online'] == false || response.data['status'] == false)) {
+        print('LocationTrackingService: Partner is offline, stopping tracking immediately');
+        await stopTracking();
+        return;
+      }
+
       print('LocationTrackingService: Location updated - ${position.latitude}, ${position.longitude}, Battery: $batteryLevel%, Speed: ${speedKmh.round()} km/h');
     } catch (e) {
       print('LocationTrackingService: Error sending location update - $e');
+      try {
+        final resData = (e as dynamic).response?.data;
+        if (resData is Map && resData['is_online'] == false) {
+          print('LocationTrackingService: Received offline status from error, stopping tracking');
+          await stopTracking();
+        }
+      } catch (_) {}
     }
   }
 

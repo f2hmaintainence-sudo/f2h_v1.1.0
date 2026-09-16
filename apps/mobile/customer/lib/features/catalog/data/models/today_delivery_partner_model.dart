@@ -50,6 +50,7 @@ class TodayDeliveryPartner {
   final String deliverySlot;
   final String slotLabel;
   final bool isCurrentSlot;
+  final bool isOnline;
   final String runStatus;
   final String deliveryStatus;
   final String runDate;
@@ -66,6 +67,7 @@ class TodayDeliveryPartner {
     this.deliverySlot = 'morning',
     this.slotLabel = 'Morning Delivery',
     this.isCurrentSlot = true,
+    this.isOnline = true,
     this.runStatus = 'planned',
     this.deliveryStatus = 'pending',
     this.runDate = '',
@@ -89,6 +91,11 @@ class TodayDeliveryPartner {
               : 'Morning Delivery'),
       isCurrentSlot: json['is_current_slot'] == true ||
           json['is_current_slot']?.toString() == 'true',
+      isOnline: json['is_online'] == null
+          ? true
+          : (json['is_online'] == true ||
+              json['is_online']?.toString() == '1' ||
+              json['is_online']?.toString() == 'true'),
       runStatus: json['run_status']?.toString() ?? 'planned',
       deliveryStatus: json['delivery_status']?.toString() ?? 'pending',
       runDate: json['run_date']?.toString() ?? '',
@@ -110,6 +117,7 @@ class TodayDeliveryPartner {
     String? deliverySlot,
     String? slotLabel,
     bool? isCurrentSlot,
+    bool? isOnline,
     String? runStatus,
     String? deliveryStatus,
     String? runDate,
@@ -126,6 +134,7 @@ class TodayDeliveryPartner {
       deliverySlot: deliverySlot ?? this.deliverySlot,
       slotLabel: slotLabel ?? this.slotLabel,
       isCurrentSlot: isCurrentSlot ?? this.isCurrentSlot,
+      isOnline: isOnline ?? this.isOnline,
       runStatus: runStatus ?? this.runStatus,
       deliveryStatus: deliveryStatus ?? this.deliveryStatus,
       runDate: runDate ?? this.runDate,
@@ -145,6 +154,7 @@ class TodayDeliveryPartner {
       'delivery_slot': deliverySlot,
       'slot_label': slotLabel,
       'is_current_slot': isCurrentSlot,
+      'is_online': isOnline,
       'run_status': runStatus,
       'delivery_status': deliveryStatus,
       'run_date': runDate,

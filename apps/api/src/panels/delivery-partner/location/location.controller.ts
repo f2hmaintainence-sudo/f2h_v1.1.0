@@ -53,6 +53,22 @@ export class LocationController {
       return { status: false, message: 'Latitude and longitude are required' };
     }
 
+    // Verify partner is online before tracking location
+    const partnerStatusRes = await this.db.query(
+      `SELECT is_online, is_active FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+      [userId],
+    );
+    const isOnline = Boolean(partnerStatusRes?.[0]?.is_online && partnerStatusRes?.[0]?.is_active !== false);
+    if (!isOnline) {
+      // Offline: clean up any stale cached telemetry and do not track location
+      await this.redisService.delete(`delivery_partner_location:${userId}`);
+      return {
+        status: false,
+        is_online: false,
+        message: 'Partner is currently offline. Location tracking is disabled.',
+      };
+    }
+
     // Fetch previous cached location to throttle DB writes
     const redisKey = `delivery_partner_location:${userId}`;
     const prevLocation: any = await this.redisService.fetch(redisKey);
@@ -98,10 +114,8 @@ export class LocationController {
              SET current_lat = $1,
                  current_lng = $2,
                  last_location_at = NOW(),
-                 is_online = true,
-                 is_available = true,
                  updated_at = NOW()
-             WHERE delivery_partner_id = $3`,
+             WHERE delivery_partner_id = $3 AND is_online = true`,
             [Number(body.latitude), Number(body.longitude), userId]
           );
 
@@ -200,6 +214,7 @@ export class LocationController {
 
     return {
       status: true,
+      is_online: true,
       message: 'Location updated and broadcasted successfully',
     };
   }

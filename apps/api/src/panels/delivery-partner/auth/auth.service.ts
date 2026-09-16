@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../../shared/database/Database.service';
+import { RedisService } from 'src/shared/redis/redis.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly db: DatabaseService) { }
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly redisService: RedisService,
+  ) { }
 
   async toggleShiftStatus(userId: string, requestedActiveState?: boolean) {
     if (!userId) {
@@ -68,14 +72,32 @@ export class AuthService {
       }
     }
 
-    await this.db.query(
-      `UPDATE delivery_partners
-       SET is_online = $1,
-           is_available = $1,
-           updated_at = NOW()
-       WHERE delivery_partner_id = $2`,
-      [newStatus, boyRes[0].delivery_partner_id],
-    );
+    if (newStatus === false) {
+      try {
+        await this.redisService.delete(`delivery_partner_location:${boyRes[0].delivery_partner_id}`);
+      } catch (_) {}
+
+      await this.db.query(
+        `UPDATE delivery_partners
+         SET is_online = false,
+             is_available = false,
+             current_lat = NULL,
+             current_lng = NULL,
+             last_location_at = NULL,
+             updated_at = NOW()
+         WHERE delivery_partner_id = $1`,
+        [boyRes[0].delivery_partner_id],
+      );
+    } else {
+      await this.db.query(
+        `UPDATE delivery_partners
+         SET is_online = true,
+             is_available = true,
+             updated_at = NOW()
+         WHERE delivery_partner_id = $1`,
+        [boyRes[0].delivery_partner_id],
+      );
+    }
 
     return {
       success: true,
