@@ -190,39 +190,17 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
     final hasLive = _hasLiveCoordinates;
 
     return Container(
-      margin: widget.margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF16A34A).withValues(alpha: 0.22),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF16A34A).withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Partner Profile Header (Avatar, Name, Phone & Call Button) ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+      margin: widget.margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Partner Profile Header (Avatar, Name, Phone & Call Button) ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 2, 0, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
                   // Partner Avatar / Icon
                   Container(
                     width: 46,
@@ -386,18 +364,14 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
 
             // ── Partner Real-Time Location Map ──
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+              padding: const EdgeInsets.only(bottom: 6),
               child: Container(
                 height: 155,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFFE2E8F0),
-                    width: 1,
-                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -542,8 +516,7 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 
