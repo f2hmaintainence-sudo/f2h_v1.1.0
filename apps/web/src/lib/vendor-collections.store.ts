@@ -15,6 +15,7 @@ export interface VendorCollectionRecord {
   shift: 'MORNING' | 'EVENING' | 'AFTERNOON' | 'GENERAL';
   vendor_id: string;
   vendor_name: string;
+  vendor_phone?: string | null;
   collector_name: string;
   collector_phone?: string | null;
   product_id?: string | null;

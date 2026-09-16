@@ -71,6 +71,7 @@ interface VendorCollectionRecord {
   shift: "MORNING" | "EVENING" | "AFTERNOON" | "GENERAL";
   vendor_id: string;
   vendor_name: string;
+  vendor_phone?: string | null;
   collector_name: string;
   collector_phone?: string | null;
   product_id?: string | null;
@@ -209,6 +210,7 @@ export default function DailyCollectionsPage() {
     shift: "MORNING" as "MORNING" | "EVENING" | "AFTERNOON" | "GENERAL",
     vendor_id: "",
     vendor_name: "",
+    vendor_phone: "",
     collector_name: "",
     collector_phone: "",
     product_name: "Fresh Cow Milk",
@@ -306,6 +308,7 @@ export default function DailyCollectionsPage() {
             ...prev,
             vendor_id: data.data[0].vendor_id,
             vendor_name: data.data[0].business_name,
+            vendor_phone: data.data[0].phone || "",
             product_name: data.data[0].products_supplied?.[0]?.name || "Fresh Cow Milk"
           }));
         }
@@ -357,6 +360,7 @@ export default function DailyCollectionsPage() {
         ...prev,
         vendor_id: found.vendor_id,
         vendor_name: found.business_name,
+        vendor_phone: found.phone || "",
         category: found.category || (intakeMode === "MILK" ? "Dairy & Milk" : "Fresh Produce"),
         product_name: defaultProduct
       }));
@@ -498,40 +502,63 @@ export default function DailyCollectionsPage() {
     }
   };
 
+  // Helper to standardize phone number for WhatsApp wa.me links with India country code 91
+  const formatWhatsAppPhone = (phone?: string | null): string => {
+    if (!phone) return "";
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 10) return `91${digits}`;
+    if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`;
+    if (digits.length === 12 && digits.startsWith("91")) return digits;
+    return digits;
+  };
+
   // WhatsApp Share Slip text builder
-  const getWhatsAppSlipUrl = (c: VendorCollectionRecord, vendorPhone?: string) => {
+  const getWhatsAppSlipUrl = (c: VendorCollectionRecord, vendorPhoneOverride?: string | null) => {
     const isMilk = c.collection_type === "MILK" || !c.collection_type;
     let extraDetails = "";
 
     if (isMilk) {
-      if (c.fat_percentage) extraDetails += `Fat %: ${c.fat_percentage}%\n`;
-      if (c.snf_percentage) extraDetails += `SNF %: ${c.snf_percentage}%\n`;
-      if (c.container_can_no) extraDetails += `Can No: ${c.container_can_no}\n`;
+      if (c.fat_percentage != null) extraDetails += `• *Fat %:* ${c.fat_percentage}%\n`;
+      if (c.snf_percentage != null) extraDetails += `• *SNF %:* ${c.snf_percentage}%\n`;
+      if (c.clr_reading != null) extraDetails += `• *CLR Reading:* ${c.clr_reading}\n`;
+      if (c.temperature != null) extraDetails += `• *Temperature:* ${c.temperature} °C\n`;
+      if (c.container_can_no) extraDetails += `• *Can No:* ${c.container_can_no}\n`;
+      if (c.quality_grade) extraDetails += `• *Grade:* ${c.quality_grade}\n`;
     } else {
-      if (c.batch_lot_no) extraDetails += `Batch No: ${c.batch_lot_no}\n`;
-      if (c.packaging_type) extraDetails += `Packaging: ${c.packaging_type}\n`;
-      if (c.purity_percentage) extraDetails += `Purity / Brix: ${c.purity_percentage}%\n`;
-      if (c.storage_location) extraDetails += `Storage: ${c.storage_location}\n`;
+      if (c.batch_lot_no) extraDetails += `• *Batch/Lot No:* ${c.batch_lot_no}\n`;
+      if (c.packaging_type) extraDetails += `• *Packaging:* ${c.packaging_type}\n`;
+      if (c.purity_percentage != null) extraDetails += `• *Purity/Brix:* ${c.purity_percentage}%\n`;
+      if (c.storage_location) extraDetails += `• *Storage Location:* ${c.storage_location}\n`;
+      if (c.harvest_date) extraDetails += `• *Harvest Date:* ${c.harvest_date}\n`;
     }
 
+    const resolvedVendorPhone =
+      vendorPhoneOverride ||
+      c.vendor_phone ||
+      registeredVendors.find((v) => v.vendor_id === c.vendor_id)?.phone ||
+      "";
+    const cleanPhone = formatWhatsAppPhone(resolvedVendorPhone);
+
     const text = encodeURIComponent(
-      `*F2H FRESH - INTAKE RECEIPT*\n` +
+      `*🥛 F2H FRESH - INTAKE RECEIPT / రసీదు*\n` +
       `------------------------------------\n` +
-      `Date: ${c.collection_date} (${c.shift})\n` +
-      `Slip No: ${c.collection_id}\n` +
-      `Type: ${isMilk ? "🥛 Milk Procurement" : "🍎 Produce / Ghee Intake"}\n` +
-      `Vendor: ${c.vendor_name}\n` +
-      `Product: ${c.product_name}\n` +
-      `Quantity: ${c.quantity} ${c.unit}\n` +
-      `Rate: Rs ${c.rate_per_unit}/${c.unit}\n` +
-      `Total Amount: Rs ${c.total_amount}\n` +
-      extraDetails +
-      `Payment: ${c.payment_status}\n` +
-      `Collector: ${c.collector_name}\n` +
+      `📋 *Slip No:* ${c.collection_id}\n` +
+      `📅 *Date:* ${c.collection_date} (${c.shift})\n` +
+      `🏷️ *Intake Type:* ${isMilk ? "Milk Procurement" : "Produce & Ghee Intake"}\n` +
+      `👨‍🌾 *Vendor:* ${c.vendor_name}${resolvedVendorPhone ? ` (+91 ${resolvedVendorPhone.replace(/^(\+91|91|0)/, '')})` : ""}\n` +
+      `📦 *Product:* ${c.product_name}\n` +
+      `⚖️ *Quantity:* ${c.quantity} ${c.unit}\n` +
+      `💵 *Rate:* ₹${c.rate_per_unit} / ${c.unit}\n` +
+      `💰 *Total Amount:* ₹${c.total_amount.toLocaleString("en-IN")}\n` +
+      (extraDetails ? `\n*Quality & Batch Specs:*\n${extraDetails}` : "") +
+      `\n💳 *Payment:* ${c.payment_status} (${c.payment_mode || "CASH"})\n` +
+      `👤 *Received By:* ${c.collector_name}${c.collector_phone ? ` (${c.collector_phone})` : ""}\n` +
       `------------------------------------\n` +
-      `Thank you for supplying pure fresh produce to F2H!`
+      `🌾 *Farm to Home Fresh (F2H)*\n` +
+      `Pure • Direct • Farm Fresh Procurements`
     );
-    const cleanPhone = (vendorPhone || "").replace(/[^0-9]/g, "");
+
     return cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
   };
 
@@ -991,6 +1018,8 @@ export default function DailyCollectionsPage() {
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {collections.map((item) => {
                   const isMilk = item.collection_type === "MILK" || !item.collection_type;
+                  const vendor = registeredVendors.find((v) => v.vendor_id === item.vendor_id);
+                  const vendorPhone = item.vendor_phone || vendor?.phone;
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
@@ -1010,10 +1039,17 @@ export default function DailyCollectionsPage() {
 
                       <td className="py-3 px-4">
                         <p className="font-bold text-slate-900">{item.vendor_name}</p>
-                        <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <ShieldCheck size={11} className="text-emerald-600 shrink-0" />
-                          <span>{item.collector_name}</span>
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                            <ShieldCheck size={11} className="text-emerald-600 shrink-0" />
+                            <span>{item.collector_name}</span>
+                          </span>
+                          {vendorPhone && (
+                            <span className="text-[10px] text-emerald-700 font-mono font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              +91 {vendorPhone.replace(/^(\+91|91|0)/, '')}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-3 px-4">
@@ -1072,15 +1108,38 @@ export default function DailyCollectionsPage() {
 
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {vendorPhone && (
+                            <a
+                              href={`tel:${vendorPhone}`}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                              title={`Call ${item.vendor_name} (+91 ${vendorPhone.replace(/^(\+91|91|0)/, '')})`}
+                            >
+                              <PhoneCall size={14} />
+                            </a>
+                          )}
+
+                          <a
+                            href={getWhatsAppSlipUrl(item, vendorPhone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                            title={`Send WhatsApp Slip to ${item.vendor_name} (${vendorPhone ? `+91 ${vendorPhone.replace(/^(\+91|91|0)/, '')}` : 'Vendor'})`}
+                          >
+                            <MessageSquare size={15} />
+                          </a>
+
                           <button
                             onClick={() => setSelectedCollection(item)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                            title="View Slip"
                           >
                             <Eye size={15} />
                           </button>
+
                           <button
                             onClick={() => setCollectionToDelete(item)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                            title="Delete Slip"
                           >
                             <Trash2 size={15} />
                           </button>
@@ -1218,13 +1277,21 @@ export default function DailyCollectionsPage() {
                   {registeredVendors.length > 0 ? (
                     registeredVendors.map((v) => (
                       <option key={v.vendor_id} value={v.vendor_id}>
-                        {v.business_name} ({v.contact_person})
+                        {v.business_name} ({v.contact_person}) {v.phone ? `— +91 ${v.phone.replace(/^(\+91|91|0)/, '')}` : ''}
                       </option>
                     ))
                   ) : (
                     <option value="">No vendors registered</option>
                   )}
                 </select>
+                {formData.vendor_phone && (
+                  <div className="flex items-center justify-between text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
+                    <span className="flex items-center gap-1 font-medium">
+                      <MessageSquare size={12} className="text-emerald-600" /> Vendor WhatsApp:
+                    </span>
+                    <span className="font-mono font-bold">+91 {formData.vendor_phone.replace(/^(\+91|91|0)/, '')}</span>
+                  </div>
+                )}
               </div>
 
               {/* ========================================================= */}
@@ -1607,163 +1674,204 @@ export default function DailyCollectionsPage() {
       {/* ========================================================================= */}
       {/* COLLECTION DETAIL MODAL / RECEIPT VIEW */}
       {/* ========================================================================= */}
-      {selectedCollection && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 rounded-t-3xl">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <ClipboardCheck size={20} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">Intake Receipt</h2>
-                  <p className="text-[10px] text-slate-500 font-mono">{selectedCollection.collection_id}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedCollection(null)}
-                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {selectedCollection && (() => {
+        const modalVendor = registeredVendors.find((v) => v.vendor_id === selectedCollection.vendor_id);
+        const modalVendorPhone = selectedCollection.vendor_phone || modalVendor?.phone || "";
 
-            <div className="p-4 sm:p-5 space-y-4">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 font-mono text-xs">
-                <div className="text-center pb-2 border-b border-dashed border-slate-300">
-                  <h3 className="font-bold text-xs sm:text-sm text-slate-900 uppercase">F2H Fresh Intake</h3>
-                  <p className="text-[10px] text-slate-500 font-sans">
-                    {selectedCollection.collection_type === "MILK" ? "Milk Procurement Slip" : "Produce & Ghee Intake Slip"}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <span className="text-slate-400 block font-sans">Date:</span>
-                    <strong className="text-slate-800">
-                      {selectedCollection.collection_date} ({selectedCollection.shift})
-                    </strong>
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 rounded-t-3xl">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                    <ClipboardCheck size={20} />
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-sans">Vendor:</span>
-                    <strong className="text-slate-800">{selectedCollection.vendor_name}</strong>
-                  </div>
-                  <div className="col-span-2 pt-1 border-t border-slate-200/60 flex items-center justify-between">
-                    <span className="text-slate-400 font-sans">Collector:</span>
-                    <span className="font-semibold text-slate-800 flex items-center gap-1">
-                      <ShieldCheck size={12} className="text-emerald-600" />
-                      {selectedCollection.collector_name}
-                      {selectedCollection.collector_phone ? ` (${selectedCollection.collector_phone})` : ""}
-                    </span>
+                    <h2 className="text-sm font-bold text-slate-900">Intake Receipt</h2>
+                    <p className="text-[10px] text-slate-500 font-mono">{selectedCollection.collection_id}</p>
                   </div>
                 </div>
-
-                {/* Quality / Specs Box */}
-                <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-sans text-slate-600">Product:</span>
-                    <span className="font-bold text-slate-900">{selectedCollection.product_name}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-sans text-slate-600">Quantity:</span>
-                    <span className="font-bold text-slate-900">
-                      {selectedCollection.quantity} {selectedCollection.unit}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-sans text-slate-600">Rate:</span>
-                    <span className="font-bold text-slate-900">₹{selectedCollection.rate_per_unit}/{selectedCollection.unit}</span>
-                  </div>
-
-                  {selectedCollection.collection_type === "MILK" ? (
-                    <>
-                      {selectedCollection.fat_percentage && (
-                        <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100">
-                          <span className="font-sans text-slate-600">Fat % / SNF %:</span>
-                          <span className="font-bold text-blue-700">
-                            {selectedCollection.fat_percentage}% / {selectedCollection.snf_percentage || "--"}%
-                          </span>
-                        </div>
-                      )}
-                      {selectedCollection.container_can_no && (
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-sans text-slate-600">Can No:</span>
-                          <span className="font-bold text-slate-900">{selectedCollection.container_can_no}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {selectedCollection.batch_lot_no && (
-                        <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100">
-                          <span className="font-sans text-slate-600">Batch Lot:</span>
-                          <span className="font-bold text-purple-700">{selectedCollection.batch_lot_no}</span>
-                        </div>
-                      )}
-                      {selectedCollection.packaging_type && (
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-sans text-slate-600">Packaging:</span>
-                          <span className="font-bold text-slate-900">{selectedCollection.packaging_type}</span>
-                        </div>
-                      )}
-                      {selectedCollection.purity_percentage && (
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-sans text-slate-600">Purity / Brix:</span>
-                          <span className="font-bold text-emerald-700">{selectedCollection.purity_percentage}%</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Total Payout */}
-                <div className="flex items-center justify-between pt-1 border-t border-dashed border-slate-300 text-sm">
-                  <span className="font-bold text-slate-800 uppercase">Payout Total:</span>
-                  <span className="font-bold text-base text-emerald-800">
-                    ₹{selectedCollection.total_amount.toLocaleString("en-IN")}
-                  </span>
-                </div>
-
-                <div className="text-center pt-1 text-[10px] text-slate-400 font-sans">
-                  Status: <strong className="text-slate-700">{selectedCollection.payment_status}</strong> (Mode:{" "}
-                  {selectedCollection.payment_mode || "CASH"})
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 bg-slate-50/80 rounded-b-3xl flex items-center justify-between gap-2">
-              <a
-                href={getWhatsAppSlipUrl(selectedCollection)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-xs"
-              >
-                <MessageSquare size={14} /> WhatsApp Slip
-              </a>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => handleTogglePayment(selectedCollection)}
-                  className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                    selectedCollection.payment_status === "PAID"
-                      ? "bg-amber-50 text-amber-800 border-amber-200"
-                      : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                  }`}
-                >
-                  {selectedCollection.payment_status === "PAID" ? "Mark Pending" : "Mark Paid"}
-                </button>
-
                 <button
                   onClick={() => setSelectedCollection(null)}
-                  className="px-3.5 py-2 bg-white text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100"
+                  className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                 >
-                  Close
+                  <X size={18} />
                 </button>
+              </div>
+
+              <div className="p-4 sm:p-5 space-y-4">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 font-mono text-xs">
+                  <div className="text-center pb-2 border-b border-dashed border-slate-300">
+                    <h3 className="font-bold text-xs sm:text-sm text-slate-900 uppercase">F2H Fresh Intake</h3>
+                    <p className="text-[10px] text-slate-500 font-sans">
+                      {selectedCollection.collection_type === "MILK" ? "Milk Procurement Slip" : "Produce & Ghee Intake Slip"}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block font-sans">Date:</span>
+                      <strong className="text-slate-800">
+                        {selectedCollection.collection_date} ({selectedCollection.shift})
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-sans">Vendor:</span>
+                      <strong className="text-slate-800">{selectedCollection.vendor_name}</strong>
+                      {modalVendorPhone && (
+                        <span className="text-[10px] text-emerald-700 font-mono font-semibold block">
+                          +91 {modalVendorPhone.replace(/^(\+91|91|0)/, '')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="col-span-2 pt-1 border-t border-slate-200/60 flex items-center justify-between">
+                      <span className="text-slate-400 font-sans">Collector:</span>
+                      <span className="font-semibold text-slate-800 flex items-center gap-1">
+                        <ShieldCheck size={12} className="text-emerald-600" />
+                        {selectedCollection.collector_name}
+                        {selectedCollection.collector_phone ? ` (${selectedCollection.collector_phone})` : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Quality / Specs Box */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-sans text-slate-600">Product:</span>
+                      <span className="font-bold text-slate-900">{selectedCollection.product_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-sans text-slate-600">Quantity:</span>
+                      <span className="font-bold text-slate-900">
+                        {selectedCollection.quantity} {selectedCollection.unit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-sans text-slate-600">Rate:</span>
+                      <span className="font-bold text-slate-900">₹{selectedCollection.rate_per_unit}/{selectedCollection.unit}</span>
+                    </div>
+
+                    {selectedCollection.collection_type === "MILK" ? (
+                      <>
+                        {selectedCollection.fat_percentage && (
+                          <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100">
+                            <span className="font-sans text-slate-600">Fat % / SNF %:</span>
+                            <span className="font-bold text-blue-700">
+                              {selectedCollection.fat_percentage}% / {selectedCollection.snf_percentage || "--"}%
+                            </span>
+                          </div>
+                        )}
+                        {selectedCollection.container_can_no && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-sans text-slate-600">Can No:</span>
+                            <span className="font-bold text-slate-900">{selectedCollection.container_can_no}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {selectedCollection.batch_lot_no && (
+                          <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100">
+                            <span className="font-sans text-slate-600">Batch Lot:</span>
+                            <span className="font-bold text-purple-700">{selectedCollection.batch_lot_no}</span>
+                          </div>
+                        )}
+                        {selectedCollection.packaging_type && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-sans text-slate-600">Packaging:</span>
+                            <span className="font-bold text-slate-900">{selectedCollection.packaging_type}</span>
+                          </div>
+                        )}
+                        {selectedCollection.purity_percentage && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-sans text-slate-600">Purity / Brix:</span>
+                            <span className="font-bold text-emerald-700">{selectedCollection.purity_percentage}%</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Total Payout */}
+                  <div className="flex items-center justify-between pt-1 border-t border-dashed border-slate-300 text-sm">
+                    <span className="font-bold text-slate-800 uppercase">Payout Total:</span>
+                    <span className="font-bold text-base text-emerald-800">
+                      ₹{selectedCollection.total_amount.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <div className="text-center pt-1 text-[10px] text-slate-400 font-sans">
+                    Status: <strong className="text-slate-700">{selectedCollection.payment_status}</strong> (Mode:{" "}
+                    {selectedCollection.payment_mode || "CASH"})
+                  </div>
+                </div>
+
+                {/* Direct Vendor WhatsApp Action Strip */}
+                <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                      <MessageSquare size={14} className="text-emerald-700" /> Send Slip to Vendor WhatsApp
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded-lg border border-emerald-200">
+                      {modalVendorPhone ? `+91 ${modalVendorPhone.replace(/^(\+91|91|0)/, '')}` : "No number"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={getWhatsAppSlipUrl(selectedCollection, modalVendorPhone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-[#16a34a] text-white hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-sm shadow-emerald-700/20 active:scale-95"
+                    >
+                      <MessageSquare size={15} /> Send WhatsApp Slip
+                    </a>
+                    {modalVendorPhone && (
+                      <a
+                        href={`tel:${modalVendorPhone}`}
+                        className="p-2.5 rounded-xl text-xs font-bold bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition-colors flex items-center justify-center"
+                        title="Call Vendor"
+                      >
+                        <PhoneCall size={15} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-100 bg-slate-50/80 rounded-b-3xl flex items-center justify-between gap-2">
+                <a
+                  href={getWhatsAppSlipUrl(selectedCollection, modalVendorPhone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-xs"
+                >
+                  <MessageSquare size={14} /> WhatsApp Slip
+                </a>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleTogglePayment(selectedCollection)}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                      selectedCollection.payment_status === "PAID"
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                    }`}
+                  >
+                    {selectedCollection.payment_status === "PAID" ? "Mark Pending" : "Mark Paid"}
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedCollection(null)}
+                    className="px-3.5 py-2 bg-white text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* DELETE CONFIRMATION MODAL */}

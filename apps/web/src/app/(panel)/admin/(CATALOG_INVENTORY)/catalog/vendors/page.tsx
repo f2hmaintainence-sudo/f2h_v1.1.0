@@ -102,6 +102,16 @@ const CATEGORY_OPTIONS = [
   "Hydroponics & Greens"
 ];
 
+function formatWhatsAppPhone(phone?: string | null): string {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith("91")) return digits;
+  return digits;
+}
+
 export default function RegisteredVendorsPage() {
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -748,7 +758,7 @@ export default function RegisteredVendorsPage() {
 
                     {/* WhatsApp */}
                     <a
-                      href={`https://wa.me/${vendor.phone.replace(/[^0-9]/g, "")}`}
+                      href={`https://wa.me/${formatWhatsAppPhone(vendor.phone)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
@@ -1079,7 +1089,7 @@ export default function RegisteredVendorsPage() {
                   <PhoneCall size={14} /> Call Vendor
                 </a>
                 <a
-                  href={`https://wa.me/${selectedVendor.phone.replace(/[^0-9]/g, "")}`}
+                  href={`https://wa.me/${formatWhatsAppPhone(selectedVendor.phone)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold hover:bg-slate-900 transition-colors flex items-center gap-1.5 shadow-xs"

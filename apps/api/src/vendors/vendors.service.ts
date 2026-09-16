@@ -352,71 +352,76 @@ export class VendorsService {
     try {
       let query = `
         SELECT 
-          id, collection_id, COALESCE(collection_type, 'MILK') as collection_type,
-          collection_date, shift, vendor_id, vendor_name, collector_name, collector_phone,
-          product_id, product_name, category, quantity, unit, rate_per_unit, total_amount,
-          fat_percentage, snf_percentage, clr_reading, temperature, acidity, quality_grade,
-          container_can_no, batch_lot_no, packaging_type, purity_percentage, storage_location,
-          harvest_date, expiry_date, gross_quantity, defect_quantity, payment_status,
-          payment_mode, payment_reference, notes, extra_attributes, status, created_at
-        FROM public.vendor_collections
-        WHERE deleted_at IS NULL
+          c.id, c.collection_id, COALESCE(c.collection_type, 'MILK') as collection_type,
+          c.collection_date, c.shift, c.vendor_id, c.vendor_name,
+          COALESCE(c.vendor_phone, v.phone) as vendor_phone,
+          c.collector_name, c.collector_phone,
+          c.product_id, c.product_name, c.category, c.quantity, c.unit, c.rate_per_unit, c.total_amount,
+          c.fat_percentage, c.snf_percentage, c.clr_reading, c.temperature, c.acidity, c.quality_grade,
+          c.container_can_no, c.batch_lot_no, c.packaging_type, c.purity_percentage, c.storage_location,
+          c.harvest_date, c.expiry_date, c.gross_quantity, c.defect_quantity, c.payment_status,
+          c.payment_mode, c.payment_reference, c.notes, c.extra_attributes, c.status, c.created_at
+        FROM public.vendor_collections c
+        LEFT JOIN public.vendors v ON v.vendor_id = c.vendor_id
+        WHERE c.deleted_at IS NULL
       `;
       const params: any[] = [];
       let idx = 1;
 
       if (filter.date && filter.date.trim()) {
-        query += ` AND collection_date = $${idx}`;
+        query += ` AND c.collection_date = $${idx}`;
         params.push(filter.date.trim());
         idx++;
       } else if (filter.startDate && filter.endDate) {
-        query += ` AND collection_date BETWEEN $${idx} AND $${idx + 1}`;
+        query += ` AND c.collection_date BETWEEN $${idx} AND $${idx + 1}`;
         params.push(filter.startDate.trim(), filter.endDate.trim());
         idx += 2;
       }
 
       if (filter.type && filter.type !== 'ALL') {
-        query += ` AND collection_type = $${idx}`;
+        query += ` AND c.collection_type = $${idx}`;
         params.push(filter.type.trim());
         idx++;
       }
 
       if (filter.shift && filter.shift !== 'ALL') {
-        query += ` AND shift = $${idx}`;
+        query += ` AND c.shift = $${idx}`;
         params.push(filter.shift.trim());
         idx++;
       }
 
       if (filter.vendorId && filter.vendorId.trim()) {
-        query += ` AND vendor_id = $${idx}`;
+        query += ` AND c.vendor_id = $${idx}`;
         params.push(filter.vendorId.trim());
         idx++;
       }
 
       if (filter.category && filter.category.trim()) {
-        query += ` AND category ILIKE $${idx}`;
+        query += ` AND c.category ILIKE $${idx}`;
         params.push(`%${filter.category.trim()}%`);
         idx++;
       }
 
       if (filter.status && filter.status.trim()) {
-        query += ` AND status = $${idx}`;
+        query += ` AND c.status = $${idx}`;
         params.push(filter.status.trim());
         idx++;
       }
 
       if (filter.search && filter.search.trim()) {
         query += ` AND (
-          vendor_name ILIKE $${idx}
-          OR product_name ILIKE $${idx}
-          OR collection_id ILIKE $${idx}
-          OR collector_name ILIKE $${idx}
+          c.vendor_name ILIKE $${idx}
+          OR c.product_name ILIKE $${idx}
+          OR c.collection_id ILIKE $${idx}
+          OR c.collector_name ILIKE $${idx}
+          OR c.vendor_phone ILIKE $${idx}
+          OR v.phone ILIKE $${idx}
         )`;
         params.push(`%${filter.search.trim()}%`);
         idx++;
       }
 
-      query += ` ORDER BY created_at DESC LIMIT 200`;
+      query += ` ORDER BY c.created_at DESC LIMIT 200`;
 
       const rows = (await this.db.query<any>(query, params)) || [];
 
@@ -494,10 +499,11 @@ export class VendorsService {
     try {
       const isNumeric = /^\d+$/.test(id);
       const query = `
-        SELECT *
-        FROM public.vendor_collections
-        WHERE deleted_at IS NULL
-          AND (${isNumeric ? 'id = $1 OR ' : ''}collection_id = $1)
+        SELECT c.*, COALESCE(c.vendor_phone, v.phone) as vendor_phone
+        FROM public.vendor_collections c
+        LEFT JOIN public.vendors v ON v.vendor_id = c.vendor_id
+        WHERE c.deleted_at IS NULL
+          AND (${isNumeric ? 'c.id = $1 OR ' : ''}c.collection_id = $1)
         LIMIT 1
       `;
       const rows = await this.db.query<any>(query, [isNumeric ? Number(id) : id]);
@@ -535,9 +541,18 @@ export class VendorsService {
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const collectionId = `COL-${dateStr}-${randomSuffix}`;
 
+      // Resolve vendor phone from body or vendor profile
+      let vendorPhone = body.vendor_phone || body.vendorPhone || null;
+      if (!vendorPhone && body.vendor_id) {
+        const vRes = await this.getVendorById(body.vendor_id);
+        if (vRes.success && vRes.data?.phone) {
+          vendorPhone = vRes.data.phone;
+        }
+      }
+
       const insertQuery = `
         INSERT INTO public.vendor_collections (
-          collection_id, collection_type, collection_date, shift, vendor_id, vendor_name,
+          collection_id, collection_type, collection_date, shift, vendor_id, vendor_name, vendor_phone,
           collector_name, collector_phone, product_id, product_name, category, quantity, unit,
           rate_per_unit, total_amount, fat_percentage, snf_percentage, clr_reading, temperature,
           acidity, quality_grade, container_can_no, batch_lot_no, packaging_type,
@@ -547,7 +562,7 @@ export class VendorsService {
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
           $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
-          $29, $30, $31, $32, $33, $34, $35, $36, NOW(), NOW()
+          $29, $30, $31, $32, $33, $34, $35, $36, $37, NOW(), NOW()
         )
         RETURNING *;
       `;
@@ -559,6 +574,7 @@ export class VendorsService {
         body.shift || 'MORNING',
         body.vendor_id,
         body.vendor_name,
+        vendorPhone,
         body.collector_name,
         body.collector_phone || null,
         body.product_id || null,
