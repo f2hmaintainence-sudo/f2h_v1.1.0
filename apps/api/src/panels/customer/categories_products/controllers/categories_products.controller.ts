@@ -565,15 +565,14 @@ export class CategoriesController {
     const playStoreUrl = ${JSON.stringify(playStoreUrl)};
     if (!isBot) {
       if (/Android/i.test(navigator.userAgent)) {
-        // Attempt to open in app or fallback to Play Store
+        // Try to open in installed app via Android intent, fallback immediately to Play Store
+        window.location.replace(intentUrl);
         setTimeout(function() {
-          window.location.href = intentUrl;
-        }, 100);
+          window.location.replace(playStoreUrl);
+        }, 1200);
       } else {
-        // Non-Android or desktop fallback directly to Play Store
-        setTimeout(function() {
-          window.location.href = playStoreUrl;
-        }, 300);
+        // Direct redirect to Google Play Store app
+        window.location.replace(playStoreUrl);
       }
     }
   </script>

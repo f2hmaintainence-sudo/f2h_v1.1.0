@@ -104,8 +104,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
         ? v.label
         : '';
     final displayName = variantLabel.isNotEmpty && !p.name.contains(variantLabel)
-        ? '${p.name}-$variantLabel'
+        ? '${p.name} ($variantLabel)'
         : p.name;
+    final priceVal = (v != null && v.price > 0) ? v.price : p.price;
+    final priceStr = priceVal > 0 ? '₹${priceVal.toStringAsFixed(0)}' : '';
 
     // Small description from highlights or first line of description
     String shortDesc = '';
@@ -121,9 +123,10 @@ class _ProductDetailViewScreenState extends State<ProductDetailViewScreen>
     }
 
     final shareUrl = 'https://c.f2hfresh.com/p/$targetId';
-    final descLine = shortDesc.isNotEmpty ? '$shortDesc\n' : 'Check this out on F2H Fresh!\n';
+    final priceLine = priceStr.isNotEmpty ? 'Price: $priceStr\n' : '';
+    final descLine = shortDesc.isNotEmpty ? '$shortDesc\n' : '';
     final shareText =
-        'Buy $displayName from F2H Fresh!\n\n$descLine$shareUrl';
+        '🛒 Buy $displayName from F2H Fresh!\n$priceLine$descLine\n👉 Order now on F2H Fresh App:\n$shareUrl';
     try {
       await SharePlus.instance.share(ShareParams(text: shareText));
     } catch (_) {
