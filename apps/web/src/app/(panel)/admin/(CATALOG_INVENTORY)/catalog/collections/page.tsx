@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import {
   ClipboardCheck,
   Home,
@@ -56,7 +57,9 @@ import {
   Milk,
   Boxes,
   Tag,
-  Warehouse
+  Warehouse,
+  UserCheck,
+  User
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
@@ -151,7 +154,18 @@ const PACKAGING_PRESETS = [
 ];
 
 export default function DailyCollectionsPage() {
+  const { user } = useAuth();
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  const authenticatedCollectorName = useMemo(() => {
+    if (!user) return "Collection Officer";
+    const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+    return fullName || user.user_name || user.email?.split("@")[0] || "Authenticated Officer";
+  }, [user]);
+
+  const authenticatedCollectorPhone = useMemo(() => {
+    return (user as any)?.phone || (user as any)?.phone_number || (user as any)?.mobile || "";
+  }, [user]);
 
   const [collections, setCollections] = useState<VendorCollectionRecord[]>([]);
   const [summary, setSummary] = useState<CollectionSummary>({
@@ -189,14 +203,14 @@ export default function DailyCollectionsPage() {
   // Intake Mode in Add Modal ('MILK' vs 'OTHERS')
   const [intakeMode, setIntakeMode] = useState<"MILK" | "OTHERS">("MILK");
 
-  // Form State for Recording Collection
+  // Form State for Recording Collection (Auto-populated with Authenticated Collector)
   const [formData, setFormData] = useState({
     collection_date: todayStr,
     shift: "MORNING" as "MORNING" | "EVENING" | "AFTERNOON" | "GENERAL",
     vendor_id: "",
     vendor_name: "",
-    collector_name: "Collection Officer",
-    collector_phone: "+91 98765 00001",
+    collector_name: "",
+    collector_phone: "",
     product_name: "Fresh Cow Milk",
     category: "Dairy & Milk",
     quantity: "",
@@ -223,6 +237,27 @@ export default function DailyCollectionsPage() {
     payment_mode: "CASH" as "CASH" | "UPI" | "BANK_TRANSFER" | "CREDIT",
     notes: ""
   });
+
+  // Keep collector name & phone synchronized with authenticated session
+  useEffect(() => {
+    if (authenticatedCollectorName) {
+      setFormData((prev) => ({
+        ...prev,
+        collector_name: prev.collector_name && prev.collector_name !== "Collection Officer" ? prev.collector_name : authenticatedCollectorName,
+        collector_phone: prev.collector_phone || authenticatedCollectorPhone
+      }));
+    }
+  }, [authenticatedCollectorName, authenticatedCollectorPhone]);
+
+  const openAddModal = (mode?: "MILK" | "OTHERS") => {
+    if (mode) setIntakeMode(mode);
+    setFormData((prev) => ({
+      ...prev,
+      collector_name: authenticatedCollectorName,
+      collector_phone: authenticatedCollectorPhone || prev.collector_phone
+    }));
+    setIsAddModalOpen(true);
+  };
 
   // Date Navigation Helpers
   const navigateDay = (offset: number) => {
@@ -335,7 +370,8 @@ export default function DailyCollectionsPage() {
       showErrorToast("Please select a vendor");
       return;
     }
-    if (!formData.collector_name.trim()) {
+    const collectorNameFinal = formData.collector_name.trim() || authenticatedCollectorName;
+    if (!collectorNameFinal) {
       showErrorToast("Collector person name is required");
       return;
     }
@@ -348,6 +384,8 @@ export default function DailyCollectionsPage() {
     try {
       const payload = {
         ...formData,
+        collector_name: collectorNameFinal,
+        collector_phone: formData.collector_phone || authenticatedCollectorPhone || null,
         collection_type: intakeMode,
         quantity: Number(formData.quantity),
         rate_per_unit: Number(formData.rate_per_unit) || 0,
@@ -377,6 +415,8 @@ export default function DailyCollectionsPage() {
             ...prev,
             quantity: "",
             notes: "",
+            collector_name: authenticatedCollectorName,
+            collector_phone: authenticatedCollectorPhone || prev.collector_phone,
             container_can_no: `CAN-${String(Math.floor(Math.random() * 20) + 1).padStart(2, "0")}`,
             batch_lot_no: `LOT-${todayStr.replace(/-/g, "")}-${String(Math.floor(Math.random() * 90) + 10)}`
           }));
@@ -385,7 +425,9 @@ export default function DailyCollectionsPage() {
           setFormData((prev) => ({
             ...prev,
             quantity: "",
-            notes: ""
+            notes: "",
+            collector_name: authenticatedCollectorName,
+            collector_phone: authenticatedCollectorPhone || prev.collector_phone
           }));
         }
       } else {
@@ -536,7 +578,7 @@ export default function DailyCollectionsPage() {
 
             {/* Desktop Add Button */}
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => openAddModal()}
               className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#16a34a] hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <Plus size={15} />
@@ -758,7 +800,7 @@ export default function DailyCollectionsPage() {
             </p>
           </div>
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => openAddModal()}
             className="px-5 py-2.5 bg-[#16a34a] text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-600/20 inline-flex items-center gap-1.5 active:scale-95"
           >
             <Plus size={15} /> Record Intake
@@ -874,6 +916,17 @@ export default function DailyCollectionsPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Collector Info */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
+                      Collector: <strong className="text-slate-700">{item.collector_name}</strong>
+                    </span>
+                    {item.collector_phone && (
+                      <span className="text-[10px] text-slate-400 font-mono">{item.collector_phone}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Footer Quick Action Bar */}
@@ -957,7 +1010,10 @@ export default function DailyCollectionsPage() {
 
                       <td className="py-3 px-4">
                         <p className="font-bold text-slate-900">{item.vendor_name}</p>
-                        <p className="text-[11px] text-slate-500">{item.collector_name}</p>
+                        <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                          <ShieldCheck size={11} className="text-emerald-600 shrink-0" />
+                          <span>{item.collector_name}</span>
+                        </p>
                       </td>
 
                       <td className="py-3 px-4">
@@ -1044,7 +1100,7 @@ export default function DailyCollectionsPage() {
       {/* ========================================================================= */}
       <div className="fixed bottom-4 right-4 sm:hidden z-30">
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => openAddModal()}
           className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-[#16a34a] text-white font-extrabold text-sm shadow-xl shadow-emerald-700/40 active:scale-95 transition-all"
         >
           <Plus size={18} />
@@ -1454,29 +1510,62 @@ export default function DailyCollectionsPage() {
                 </div>
               )}
 
-              {/* Collector & Payment Status */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-700">Collector Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.collector_name}
-                    onChange={(e) => setFormData({ ...formData, collector_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
-                  />
+              {/* Authenticated Collector & Payment Status */}
+              <div className="space-y-2.5">
+                {/* Authenticated User Profile Strip */}
+                <div className="p-2.5 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/40 border border-emerald-200/80 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                      {authenticatedCollectorName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-slate-800 truncate">
+                          {authenticatedCollectorName}
+                        </span>
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold tracking-tight">
+                          <CheckCircle2 size={10} className="text-emerald-600" /> Logged In
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {user?.email || "Authenticated Session"} {authenticatedCollectorPhone ? `• ${authenticatedCollectorPhone}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-white/90 px-2 py-1 rounded-lg border border-emerald-200/60 shrink-0">
+                    {user?.active_role || "ADMIN"}
+                  </span>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-700">Payment Status</label>
-                  <select
-                    value={formData.payment_status}
-                    onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none"
-                  >
-                    <option value="PENDING">Pending (Weekly Settlement)</option>
-                    <option value="PAID">Paid Instant</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-700 flex items-center justify-between">
+                      <span>Collector Name</span>
+                      <span className="text-[9px] font-semibold text-emerald-700 flex items-center gap-0.5">
+                        <ShieldCheck size={10} /> Auth Collector
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.collector_name}
+                      onChange={(e) => setFormData({ ...formData, collector_name: e.target.value })}
+                      placeholder="Collector Name"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-700">Payment Status</label>
+                    <select
+                      value={formData.payment_status}
+                      onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="PENDING">Pending (Weekly Settlement)</option>
+                      <option value="PAID">Paid Instant</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1558,6 +1647,14 @@ export default function DailyCollectionsPage() {
                   <div>
                     <span className="text-slate-400 block font-sans">Vendor:</span>
                     <strong className="text-slate-800">{selectedCollection.vendor_name}</strong>
+                  </div>
+                  <div className="col-span-2 pt-1 border-t border-slate-200/60 flex items-center justify-between">
+                    <span className="text-slate-400 font-sans">Collector:</span>
+                    <span className="font-semibold text-slate-800 flex items-center gap-1">
+                      <ShieldCheck size={12} className="text-emerald-600" />
+                      {selectedCollection.collector_name}
+                      {selectedCollection.collector_phone ? ` (${selectedCollection.collector_phone})` : ""}
+                    </span>
                   </div>
                 </div>
 
