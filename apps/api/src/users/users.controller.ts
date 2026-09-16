@@ -49,11 +49,19 @@ export class UsersController {
     const user = this.fieldEncryption.decryptRow('users', rawUser);
 
     let rawRoles = await this.db.query(
-      `SELECT ra.role_id, r.name as role_name
-       FROM role_assignments ra
-       JOIN roles r ON UPPER(ra.role_id) = UPPER(r.role_id) 
-       WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
-       ORDER BY CASE UPPER(ra.role_id) WHEN 'ADMIN' THEN 1 WHEN 'DELIVERY_PARTNER' THEN 2 WHEN 'CUSTOMER' THEN 3 ELSE 4 END`,
+      `SELECT DISTINCT 
+         COALESCE(r.role_id, UPPER(sub.role_id)) AS role_id,
+         COALESCE(r.name, sub.role_id) AS role_name
+       FROM (
+         SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
+         UNION
+         SELECT u.role_id FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
+         UNION
+         SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $1 AND ms.is_active = TRUE AND ms.deleted_at IS NULL
+       ) sub
+       LEFT JOIN roles r ON UPPER(r.role_id) = UPPER(sub.role_id)
+       WHERE sub.role_id IS NOT NULL AND sub.role_id != ''
+       ORDER BY CASE UPPER(COALESCE(r.role_id, UPPER(sub.role_id))) WHEN 'SUPER_ADMIN' THEN 1 WHEN 'ADMIN' THEN 2 WHEN 'DELIVERY_PARTNER' THEN 3 WHEN 'CUSTOMER' THEN 4 ELSE 5 END`,
       [userId],
     );
 
@@ -72,6 +80,36 @@ export class UsersController {
     const activeRole =
       storedRole && validRoleIds.includes(storedRole) ? storedRole : validRoleIds[0] || null;
 
+    // Fetch dynamic permissions from role_permissions table for this user's roles
+    let permissions: string[] = [];
+    try {
+      const permRows = await this.db.query(
+        `SELECT DISTINCT rp.permission_key
+         FROM role_permissions rp
+         JOIN roles r ON UPPER(r.role_id) = UPPER(rp.role_id)
+         WHERE r.is_active = 1
+           AND (
+             UPPER(rp.role_id) IN (
+               SELECT UPPER(ra.role_id) FROM role_assignments ra
+               WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
+               UNION
+               SELECT UPPER(u.role_id) FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
+               UNION
+               SELECT UPPER(ms.role_id) FROM management_staff ms WHERE ms.user_id = $1 AND ms.is_active = TRUE AND ms.deleted_at IS NULL
+             )
+             OR ($2 IS NOT NULL AND UPPER(rp.role_id) = UPPER($2))
+           )`,
+        [userId, activeRole],
+      );
+      permissions = (permRows || []).map((p: any) => p.permission_key);
+    } catch {
+      permissions = [];
+    }
+
+    const isAdmin = roles.some((r: any) =>
+      ['ADMIN', 'SUPER_ADMIN'].includes((r.role_id || '').toUpperCase())
+    ) || (activeRole && ['ADMIN', 'SUPER_ADMIN'].includes(activeRole.toUpperCase()));
+
     return {
       user_id: user.user_id,
       email: user.email,
@@ -83,6 +121,8 @@ export class UsersController {
         role_name: r.role_name,
       })),
       active_role: activeRole,
+      permissions,
+      is_admin: isAdmin,
     };
   }
 

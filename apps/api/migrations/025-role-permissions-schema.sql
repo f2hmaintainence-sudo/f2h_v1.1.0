@@ -38,15 +38,13 @@ CREATE INDEX IF NOT EXISTS idx_role_permissions_module ON public.role_permission
 -- 2. Seed / Backfill Default Roles in master 'roles' table first
 INSERT INTO public.roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
 VALUES 
-  (1, '1', 'SUPER_ADMIN', 'Super Admin', 'Full unrestricted system access across all modules and settings', 1, 1, NOW(), NOW()),
-  (2, '2', 'ADMIN', 'Admin', 'Administrative operations across catalog, orders, delivery, warehouse, and finance', 1, 1, NOW(), NOW()),
-  (3, '3', 'BRANCH_MANAGER', 'Branch Manager', 'Branch-level operational management, local inventory, dispatch, and delivery partner tracking', 1, 1, NOW(), NOW()),
-  (4, '4', 'MILK_PROCUREMENT_OFFICER', 'Procurement Officer', 'Manages milk and fresh produce intake, collections, fat testing, and vendor slips', 1, 1, NOW(), NOW()),
-  (5, '5', 'MILK_COLLECTOR', 'Milk Collector', 'Dedicated milk collector with restricted access exclusively to daily collections', 1, 1, NOW(), NOW()),
-  (6, '6', 'WAREHOUSE_MANAGER', 'Warehouse Manager', 'Inventory management, warehouse operations, stock transfers, and packing dispatch', 1, 1, NOW(), NOW()),
-  (7, '7', 'DELIVERY_DISPATCHER', 'Delivery Dispatcher', 'Delivery route coordination, partner assignments, and live delivery operations', 1, 1, NOW(), NOW()),
-  (8, '8', 'FINANCE_BILLING_STAFF', 'Finance & Billing Staff', 'Billing, customer outstandings, payments reconciliation, refunds, and wallet management', 1, 1, NOW(), NOW()),
-  (9, '9', 'STAFF', 'Staff Member', 'General staff access for operational viewing and basic tasks', 1, 1, NOW(), NOW())
+  (10, '10', 'BRANCH_MANAGER', 'Branch Manager', 'Branch-level operational management, local inventory, dispatch, and delivery partner tracking', 1, 1, NOW(), NOW()),
+  (11, '11', 'MILK_PROCUREMENT_OFFICER', 'Procurement Officer', 'Manages milk and fresh produce intake, collections, fat testing, and vendor slips', 1, 1, NOW(), NOW()),
+  (12, '12', 'MILK_COLLECTOR', 'Milk Collector', 'Dedicated milk collector with restricted access exclusively to daily collections', 1, 1, NOW(), NOW()),
+  (13, '13', 'WAREHOUSE_MANAGER', 'Warehouse Manager', 'Inventory management, warehouse operations, stock transfers, and packing dispatch', 1, 1, NOW(), NOW()),
+  (14, '14', 'DELIVERY_DISPATCHER', 'Delivery Dispatcher', 'Delivery route coordination, partner assignments, and live delivery operations', 1, 1, NOW(), NOW()),
+  (15, '15', 'FINANCE_BILLING_STAFF', 'Finance & Billing Staff', 'Billing, customer outstandings, payments reconciliation, refunds, and wallet management', 1, 1, NOW(), NOW()),
+  (16, '16', 'STAFF', 'Staff Member', 'General staff access for operational viewing and basic tasks', 1, 1, NOW(), NOW())
 ON CONFLICT (role_id) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,

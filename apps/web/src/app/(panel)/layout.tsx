@@ -4,7 +4,7 @@
 //
 // Project     : F2H Fresh
 // File        : layout.tsx
-// Description : Panel layout guard for web application
+// Description : Panel layout guard for web application with dynamic DB permission validation
 //
 // ============================================================================
 
@@ -13,11 +13,10 @@
 import dynamic from "next/dynamic";
 import { AuthProvider, useAuth, getHomeForRole } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
-import { AdminSidebar } from "@/components/f2h/AdminSidebar";
+import { AdminSidebar, adminNav } from "@/components/f2h/AdminSidebar";
 import { AdminHeader } from "@/components/f2h/AdminHeader";
-import { DeliveryHeader } from "@/components/f2h/Deliveryheader";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 const RealtimeNotifications = dynamic(
   () => import("@/components/f2h/RealtimeNotifications").then((mod) => mod.RealtimeNotifications),
@@ -25,9 +24,29 @@ const RealtimeNotifications = dynamic(
 );
 
 function PanelGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, activeRole } = useAuth();
+  const { user, loading, activeRole, isAdmin, hasPermission } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Compute all permitted hrefs for the current user based on database role_permissions
+  const permittedHrefs = useMemo(() => {
+    if (isAdmin) return []; // Admin has full unrestricted access
+    const hrefs: string[] = [];
+    adminNav.forEach((group) => {
+      group.items.forEach((item) => {
+        if (item.subItems) {
+          item.subItems.forEach((sub) => {
+            if (hasPermission(sub.permissions || [])) {
+              hrefs.push(sub.href);
+            }
+          });
+        } else if (hasPermission(item.permissions || [])) {
+          if (item.href) hrefs.push(item.href);
+        }
+      });
+    });
+    return hrefs;
+  }, [isAdmin, hasPermission]);
 
   useEffect(() => {
     if (loading) return;
@@ -36,28 +55,17 @@ function PanelGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Strict role-based route guard
-    const userRoleNames = (user.roles || []).map((r: any) => (r.role_name || r.role_id || '').toUpperCase().replace(/\s+/g, '_'));
-    const isMilkCollector = activeRole === 'MILK_COLLECTOR' || (userRoleNames.includes('MILK_COLLECTOR') && !userRoleNames.includes('ADMIN') && !userRoleNames.includes('SUPER_ADMIN'));
-    const userHasAdmin = user.roles?.some((r: any) => (r.role_name || r.role_id || '').toUpperCase() === 'ADMIN');
-    const role = activeRole || (isMilkCollector ? "MILK_COLLECTOR" : userHasAdmin ? "ADMIN" : "CUSTOMER");
+    const role = activeRole || (isAdmin ? "ADMIN" : "CUSTOMER");
     const home = getHomeForRole(role);
     const isAdminPath = pathname.startsWith("/admin");
     const isDeliveryPath = pathname.startsWith("/delivery");
     const isCustomerPath = pathname.startsWith("/customer");
 
-    if (isMilkCollector) {
-      const allowedMilkPaths = ['/admin/catalog/collections', '/admin/profile'];
-      const isAllowed = allowedMilkPaths.some(p => pathname === p || pathname.startsWith(p + '/'));
-      if (!isAllowed) {
-        router.replace('/admin/catalog/collections');
-        return;
+    // Admin / Super Admin bypass
+    if (isAdmin) {
+      if (!isAdminPath) {
+        router.replace(home);
       }
-      return;
-    }
-
-    if ((role === "ADMIN" || role === "SUPER_ADMIN") && !isAdminPath) {
-      router.replace(home);
       return;
     }
 
@@ -70,7 +78,24 @@ function PanelGuard({ children }: { children: React.ReactNode }) {
       router.replace(home);
       return;
     }
-  }, [user, loading, activeRole, pathname, router]);
+
+    // Dynamic database permission route checking for all non-admin panel roles
+    if (isAdminPath) {
+      // Profile and settings pages are always accessible to logged-in users
+      if (pathname === '/admin/profile' || pathname.startsWith('/admin/profile/')) {
+        return;
+      }
+
+      const isCurrentAllowed = permittedHrefs.some(
+        (href) => pathname === href || pathname.startsWith(href + '/')
+      );
+
+      if (!isCurrentAllowed && permittedHrefs.length > 0) {
+        // Redirect to the user's first permitted route
+        router.replace(permittedHrefs[0]);
+      }
+    }
+  }, [user, loading, activeRole, isAdmin, permittedHrefs, pathname, router]);
 
   if (loading) {
     return (
@@ -86,60 +111,6 @@ function PanelGuard({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  // Determine which layout to show
-  const isDelivery = pathname.startsWith("/delivery");
-  const isAdmin = pathname.startsWith("/admin");
-  const isCustomer = pathname.startsWith("/customer");
-
-  if (isAdmin && activeRole === "ADMIN") {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <AdminSidebar />
-        <div className="lg:ml-64 transition-all duration-300">
-          <AdminHeader />
-          <main className="p-4 md:p-6">{children}</main>
-        </div>
-      </div>
-    );
-  }
-
-  // if (isDelivery && activeRole === "DELIVERY_PARTNER") {
-  //   return (
-  //     <div className="min-h-screen bg-slate-50">
-  //       {/* Sidebar — hidden on mobile, shown on lg+ */}
-  //       <DeliverySidebar />
-  //       {/* Main content area shifted right on desktop to account for sidebar */}
-  //       <div className="lg:ml-64 transition-all duration-300 flex flex-col min-h-screen">
-  //         <DeliveryHeader />
-  //         {/* pb-20 on mobile so bottom nav doesn't overlap content */}
-  //         <main className="flex-1 p-4 md:p-6 pb-24 lg:pb-6">{children}</main>
-  //       </div>
-  //       {/* Bottom nav — mobile only */}
-  //     </div>
-  //   );
-  // }
-
-  // if (isCustomer && activeRole === "CUSTOMER") {
-  //   return (
-  //     <div className="min-h-screen bg-slate-50">
-  //       <header className="h-16 bg-white/75 backdrop-blur-xl border-b border-gray-200 flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
-  //         <div className="flex items-center gap-3">
-  //           <img src="/assets/log1.webp" alt="F2H" className="h-8 w-auto" />
-  //           <h1 className="text-base font-semibold text-[#2e7d32]">Customer Panel</h1>
-  //         </div>
-  //         <button
-  //           onClick={() => router.replace("/login")}
-  //           className="text-xs font-medium text-brand-blue hover:text-green-800 transition-colors"
-  //         >
-  //           Switch Account
-  //         </button>
-  //       </header>
-  //       <main className="p-4 md:p-6 max-w-4xl mx-auto">{children}</main>
-  //     </div>
-  //   );
-  // }
-
-  // Default: show with admin sidebar for any other case
   return (
     <div className="min-h-screen bg-slate-50">
       <AdminSidebar />
@@ -150,38 +121,6 @@ function PanelGuard({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-// function DeliveryBottomNav() {
-//   const pathname = usePathname();
-//   const navItems = [
-//     { name: "List", href: "/delivery/today", icon: "📋" },
-//     { name: "Map", href: "/delivery/map", icon: "🗺️" },
-//     { name: "Profile", href: "/delivery/profile", icon: "👤" },
-//   ];
-
-//   return (
-//     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
-//       <div className="max-w-lg mx-auto flex items-center justify-around py-2">
-//         {navItems.map((item) => {
-//           const isActive = pathname === item.href;
-//           return (
-//             <a
-//               key={item.href}
-//               href={item.href}
-//               className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl text-xs font-medium transition-all ${
-//                 isActive ? "text-blue-600" : "text-gray-500"
-//               }`}
-//             >
-//               <span className="text-lg">{item.icon}</span>
-//               <span>{item.name}</span>
-//               {isActive && <span className="w-1 h-1 rounded-full bg-blue-600" />}
-//             </a>
-//           );
-//         })}
-//       </div>
-//     </nav>
-//   );
-// }
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
   return (

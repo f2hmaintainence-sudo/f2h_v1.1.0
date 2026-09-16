@@ -616,50 +616,41 @@ export class AdminSystemService {
     try {
       await this.ensureRoleAndPermissionTables();
 
-      // Seed DEFAULT_ROLES into roles table FIRST, then seed role_permissions
+      // Seed DEFAULT_ROLES into roles table ONLY if the role does not exist at all
       for (const defaultRole of DEFAULT_ROLES) {
         const roleIdUpper = defaultRole.role_name.toUpperCase().replace(/\s+/g, '_');
         const roleNameDisplay = defaultRole.role_name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-        // Step 1: Store role in master roles table FIRST
-        await this.db.query(`
-          INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
-          VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 1), '1', $1, $2, $3, 1, 1, NOW(), NOW())
-          ON CONFLICT (role_id) DO UPDATE SET
-            name = EXCLUDED.name,
-            description = EXCLUDED.description,
-            is_active = EXCLUDED.is_active,
-            updated_at = NOW()
-        `, [roleIdUpper, roleNameDisplay, defaultRole.description]).catch(async () => {
-          const exists = await this.db.query(`SELECT 1 FROM roles WHERE UPPER(role_id) = $1 LIMIT 1`, [roleIdUpper]);
-          if (!exists?.length) {
-            await this.db.query(`
-              INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
-              VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 1), '1', $1, $2, $3, 1, 1, NOW(), NOW())
-            `, [roleIdUpper, roleNameDisplay, defaultRole.description]);
-          }
-        });
+        const existing = await this.db.query(
+          `SELECT id FROM roles WHERE UPPER(role_id) = UPPER($1) LIMIT 1`,
+          [roleIdUpper],
+        ).catch(() => []);
 
-        // Step 2: Store permissions in role_permissions table
-        for (const permKey of defaultRole.permissions) {
-          const moduleName = permKey.split('.')[0] || 'general';
+        if (!existing || existing.length === 0) {
+          // Step 1: Store role in master roles table FIRST
           await this.db.query(`
-            INSERT INTO role_permissions (role_id, permission_key, module, can_view, can_create, can_edit, can_delete, created_at, updated_at)
-            VALUES ($1, $2, $3, TRUE, TRUE, TRUE, FALSE, NOW(), NOW())
-            ON CONFLICT (role_id, permission_key) DO NOTHING
-          `, [roleIdUpper, permKey, moduleName]).catch(() => {});
-        }
+            INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
+            VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 1), '1', $1, $2, $3, 1, 1, NOW(), NOW())
+            ON CONFLICT (role_id) DO NOTHING
+          `, [roleIdUpper, roleNameDisplay, defaultRole.description]).catch(() => {});
 
-        // Maintain admin_roles as well
-        await this.db.query(`
-          INSERT INTO admin_roles (role_name, description, permissions, is_active)
-          VALUES ($1, $2, $3, $4)
-          ON CONFLICT (role_name) DO UPDATE SET
-            description = EXCLUDED.description,
-            permissions = EXCLUDED.permissions,
-            is_active = EXCLUDED.is_active,
-            updated_at = NOW()
-        `, [defaultRole.role_name, defaultRole.description, JSON.stringify(defaultRole.permissions), defaultRole.is_active]);
+          // Step 2: Store permissions in role_permissions table
+          for (const permKey of defaultRole.permissions) {
+            const moduleName = permKey.split('.')[0] || 'general';
+            await this.db.query(`
+              INSERT INTO role_permissions (role_id, permission_key, module, can_view, can_create, can_edit, can_delete, created_at, updated_at)
+              VALUES ($1, $2, $3, TRUE, TRUE, TRUE, FALSE, NOW(), NOW())
+              ON CONFLICT (role_id, permission_key) DO NOTHING
+            `, [roleIdUpper, permKey, moduleName]).catch(() => {});
+          }
+
+          // Maintain admin_roles as well
+          await this.db.query(`
+            INSERT INTO admin_roles (role_name, description, permissions, is_active)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (role_name) DO NOTHING
+          `, [defaultRole.role_name, defaultRole.description, JSON.stringify(defaultRole.permissions), defaultRole.is_active]).catch(() => {});
+        }
       }
 
       // Fetch from roles + role_permissions

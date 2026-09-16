@@ -29,12 +29,17 @@ export interface AuthUser {
   profile: string | null;
   roles: UserRole[];
   active_role: string;
+  permissions?: string[];
+  is_admin?: boolean;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   activeRole: string | null;
+  permissions: string[];
+  isAdmin: boolean;
+  hasPermission: (requiredPerms: string | string[]) => boolean;
   switchRole: (roleId: string) => Promise<void>;
   refresh: () => Promise<AuthUser | null | void>;
   logout: () => Promise<void>;
@@ -44,6 +49,9 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   activeRole: null,
+  permissions: [],
+  isAdmin: false,
+  hasPermission: () => false,
   switchRole: async () => { },
   refresh: async () => { },
   logout: async () => { },
@@ -145,12 +153,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [router]);
 
+  const activeRole = user?.active_role || (user?.roles?.some(r => (r.role_name || r.role_id || '').toUpperCase() === 'ADMIN') ? 'ADMIN' : (user?.roles?.[0]?.role_id || 'CUSTOMER'));
+  const userRoleNames = (user?.roles || []).map((r) => (r.role_name || r.role_id || '').toUpperCase().replace(/\s+/g, '_'));
+  const isAdmin = Boolean(user?.is_admin) || activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || userRoleNames.includes('ADMIN') || userRoleNames.includes('SUPER_ADMIN');
+  const permissions = user?.permissions || [];
+
+  const hasPermission = useCallback((requiredPerms: string | string[]): boolean => {
+    if (isAdmin) return true;
+    const reqList = Array.isArray(requiredPerms) ? requiredPerms : [requiredPerms];
+    if (reqList.length === 0) return true;
+    return reqList.some((p) => permissions.includes(p));
+  }, [isAdmin, permissions]);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
-        activeRole: user?.active_role || (user?.roles?.some(r => (r.role_name || r.role_id || '').toUpperCase() === 'ADMIN') ? 'ADMIN' : 'CUSTOMER'),
+        activeRole,
+        permissions,
+        isAdmin,
+        hasPermission,
         switchRole,
         refresh: fetchUser,
         logout,
