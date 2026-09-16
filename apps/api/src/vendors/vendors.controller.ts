@@ -17,9 +17,16 @@ export class VendorsController {
   }
 
   @Public()
+  @Get('products')
+  async getProductsList() {
+    return this.vendorsService.getProductsList();
+  }
+
+  @Public()
   @Post('register')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async registerVendor(@Body() dto: RegisterVendorDto) {
     return this.vendorsService.registerVendor(dto);
   }
 }
+

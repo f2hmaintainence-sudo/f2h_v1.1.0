@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     supply_capacity VARCHAR(100),
     experience_years VARCHAR(50) DEFAULT '1-2 Years',
     rating NUMERIC(3,2) DEFAULT 4.85,
+    products_supplied JSONB DEFAULT '[]'::jsonb,
     total_products_supplied INTEGER DEFAULT 0,
     is_verified BOOLEAN DEFAULT true,
     is_active BOOLEAN DEFAULT true,

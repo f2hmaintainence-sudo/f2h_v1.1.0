@@ -20,6 +20,7 @@ export interface VendorProfile {
   supply_capacity: string | null;
   experience_years: string | null;
   rating: number;
+  products_supplied?: any[];
   total_products_supplied: number;
   is_verified: boolean;
   is_active: boolean;
@@ -60,6 +61,29 @@ export class VendorsService {
     return 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=600&q=80';
   }
 
+  async getProductsList(): Promise<{ success: boolean; data: any[] }> {
+    try {
+      const rows = await this.db.query<any>(
+        `SELECT DISTINCT ON (p.product_id)
+          p.product_id,
+          p.name,
+          COALESCE(c.name, p.category_id, 'General') AS category,
+          p.unit_type
+        FROM public.products p
+        LEFT JOIN public.categories c ON c.category_id = p.category_id
+        WHERE p.is_active = true AND p.deleted_at IS NULL
+        ORDER BY p.product_id, p.name ASC`,
+      );
+      return {
+        success: true,
+        data: rows || [],
+      };
+    } catch (err) {
+      this.logger.error('Failed to fetch products for vendor registry', err);
+      return { success: false, data: [] };
+    }
+  }
+
   async getPublicVendors(category?: string, search?: string): Promise<{ success: boolean; data: VendorProfile[]; total: number }> {
     try {
       let query = `
@@ -67,7 +91,7 @@ export class VendorsService {
           id, vendor_id, business_name, contact_person, phone, email,
           category, description, address, city, state, pincode,
           gstin, fssai_license, supply_capacity, experience_years,
-          rating, total_products_supplied, is_verified, is_active,
+          rating, products_supplied, total_products_supplied, is_verified, is_active,
           status, image_url, logo_url, website_url, source, created_at
         FROM public.vendors
         WHERE is_active = true 
@@ -135,15 +159,20 @@ export class VendorsService {
     const city = dto.city?.trim() || 'Bengaluru';
     const state = dto.state?.trim() || 'Karnataka';
 
+    // Normalize products supplied array
+    const productsSupplied = Array.isArray(dto.products)
+      ? dto.products.map((p) => (typeof p === 'string' ? { name: p } : p))
+      : [];
+
     const insertQuery = `
       INSERT INTO public.vendors (
         vendor_id, business_name, contact_person, phone, email, category,
         description, address, city, state, pincode, gstin, fssai_license,
-        supply_capacity, experience_years, rating, is_verified, is_active,
-        status, image_url, source, created_at, updated_at
+        supply_capacity, experience_years, rating, products_supplied, total_products_supplied,
+        is_verified, is_active, status, image_url, source, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        4.85, true, true, 'approved', $16, 'website', NOW(), NOW()
+        4.85, $16, $17, true, true, 'approved', $18, 'website', NOW(), NOW()
       )
       RETURNING *;
     `;
@@ -164,6 +193,8 @@ export class VendorsService {
       dto.fssaiLicense?.trim() || null,
       dto.supplyCapacity?.trim() || 'Regular Batch Supply',
       dto.experienceYears?.trim() || '1-2 Years',
+      JSON.stringify(productsSupplied),
+      productsSupplied.length,
       imageUrl,
     ]);
 
@@ -171,7 +202,7 @@ export class VendorsService {
       throw new BadRequestException('Failed to register vendor profile. Please try again.');
     }
 
-    this.logger.log(`New vendor registered: ${dto.businessName} (${vendorId})`);
+    this.logger.log(`New vendor registered: ${dto.businessName} (${vendorId}) supplying ${productsSupplied.length} products`);
 
     return {
       success: true,

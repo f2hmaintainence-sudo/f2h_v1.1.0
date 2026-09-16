@@ -7,6 +7,12 @@
 // Description : Real vendor registry store for Next.js web application
 // ============================================================================
 
+export interface SuppliedProduct {
+  product_id?: string;
+  name: string;
+  category?: string;
+}
+
 export interface VendorRecord {
   id: number;
   vendor_id: string;
@@ -25,6 +31,7 @@ export interface VendorRecord {
   supply_capacity?: string | null;
   experience_years?: string | null;
   rating?: number;
+  products_supplied?: SuppliedProduct[];
   total_products_supplied?: number;
   is_verified?: boolean;
   is_active?: boolean;
@@ -59,7 +66,8 @@ export function getRegisteredVendors(category?: string | null, search?: string |
         v.contact_person.toLowerCase().includes(q) ||
         v.city.toLowerCase().includes(q) ||
         v.category.toLowerCase().includes(q) ||
-        (v.description && v.description.toLowerCase().includes(q)),
+        (v.description && v.description.toLowerCase().includes(q)) ||
+        (v.products_supplied && v.products_supplied.some((p) => p.name.toLowerCase().includes(q))),
     );
   }
 

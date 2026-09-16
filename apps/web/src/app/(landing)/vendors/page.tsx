@@ -4,7 +4,7 @@
 //
 // Project     : F2H Fresh
 // File        : page.tsx (Vendors & Producers Network)
-// Description : Verified producer showcase, category filtering, and vendor registration
+// Description : Verified producer showcase, multi-product supply, vendor profile modal & registration
 // ============================================================================
 
 "use client";
@@ -32,10 +32,25 @@ import {
   Store,
   ExternalLink,
   Filter,
+  Check,
+  Plus,
+  X,
+  Package,
+  ChevronDown,
+  FileText,
+  BadgeCheck,
+  MessageSquare,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
-interface VendorItem {
+export interface SuppliedProduct {
+  product_id?: string;
+  name: string;
+  category?: string;
+  unit_type?: string;
+}
+
+export interface VendorItem {
   id: number | string;
   vendor_id: string;
   business_name: string;
@@ -53,6 +68,7 @@ interface VendorItem {
   supply_capacity?: string | null;
   experience_years?: string | null;
   rating?: number | string;
+  products_supplied?: SuppliedProduct[];
   total_products_supplied?: number;
   is_verified?: boolean;
   image_url?: string | null;
@@ -73,6 +89,18 @@ export default function VendorsPage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingVendors, setLoadingVendors] = useState(false);
+
+  // Available Products from database table
+  const [availableProducts, setAvailableProducts] = useState<SuppliedProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<SuppliedProduct[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [customProductName, setCustomProductName] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Profile Modal State
+  const [activeProfileModal, setActiveProfileModal] = useState<VendorItem | null>(null);
 
   // Form State
   const [submitted, setSubmitted] = useState(false);
@@ -97,7 +125,7 @@ export default function VendorsPage() {
     description: "",
   });
 
-  // Fetch vendors from backend on mount
+  // Fetch vendors and products on mount
   useEffect(() => {
     async function loadVendors() {
       try {
@@ -115,11 +143,101 @@ export default function VendorsPage() {
         setLoadingVendors(false);
       }
     }
+
+    async function loadProducts() {
+      try {
+        setLoadingProducts(true);
+        const res = await fetch("/api/v1/vendors/products");
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.success && Array.isArray(json.data)) {
+            setAvailableProducts(json.data);
+          }
+        }
+      } catch (e) {
+        // Handled gracefully
+      } finally {
+        setLoadingProducts(false);
+      }
+    }
+
     loadVendors();
+    loadProducts();
   }, []);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsProductDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  // Filtered list
+  // Filtered available products for dropdown
+  const filteredAvailableProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return availableProducts;
+    return availableProducts.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.category && p.category.toLowerCase().includes(q))
+    );
+  }, [availableProducts, productSearch]);
+
+  const toggleProduct = (prod: SuppliedProduct) => {
+    const exists = selectedProducts.some(
+      (p) =>
+        (p.product_id && prod.product_id && p.product_id === prod.product_id) ||
+        p.name.toLowerCase() === prod.name.toLowerCase()
+    );
+
+    if (exists) {
+      setSelectedProducts((prev) =>
+        prev.filter(
+          (p) =>
+            !(
+              (p.product_id && prod.product_id && p.product_id === prod.product_id) ||
+              p.name.toLowerCase() === prod.name.toLowerCase()
+            )
+        )
+      );
+    } else {
+      setSelectedProducts((prev) => [...prev, prod]);
+    }
+  };
+
+  const removeProduct = (prod: SuppliedProduct) => {
+    setSelectedProducts((prev) =>
+      prev.filter(
+        (p) =>
+          !(
+            (p.product_id && prod.product_id && p.product_id === prod.product_id) ||
+            p.name.toLowerCase() === prod.name.toLowerCase()
+          )
+      )
+    );
+  };
+
+  const addCustomProduct = () => {
+    const trimmed = customProductName.trim();
+    if (!trimmed) return;
+    const exists = selectedProducts.some((p) => p.name.toLowerCase() === trimmed.toLowerCase());
+    if (!exists) {
+      setSelectedProducts((prev) => [
+        ...prev,
+        {
+          name: trimmed,
+          category: formData.category,
+        },
+      ]);
+    }
+    setCustomProductName("");
+  };
+
+  // Filtered vendor list
   const filteredVendors = useMemo(() => {
     return vendors.filter((v) => {
       const matchCat =
@@ -132,7 +250,8 @@ export default function VendorsPage() {
         v.contact_person.toLowerCase().includes(query) ||
         v.city.toLowerCase().includes(query) ||
         v.category.toLowerCase().includes(query) ||
-        (v.description && v.description.toLowerCase().includes(query));
+        (v.description && v.description.toLowerCase().includes(query)) ||
+        (v.products_supplied && v.products_supplied.some((p) => p.name.toLowerCase().includes(query)));
       return matchCat && matchSearch;
     });
   }, [vendors, selectedCategory, searchQuery]);
@@ -176,6 +295,7 @@ export default function VendorsPage() {
           phone: phoneDigits,
           email: formData.email.trim() || undefined,
           category: formData.category,
+          products: selectedProducts,
           supplyCapacity: formData.supplyCapacity.trim() || undefined,
           experienceYears: formData.experienceYears,
           city: formData.city.trim() || "Bengaluru",
@@ -198,6 +318,8 @@ export default function VendorsPage() {
           phone: phoneDigits,
           email: formData.email.trim() || null,
           category: formData.category,
+          products_supplied: selectedProducts,
+          total_products_supplied: selectedProducts.length,
           description: formData.description.trim() || `Verified partner farm supplying ${formData.category}.`,
           city: formData.city || "Bengaluru",
           state: formData.state || "Karnataka",
@@ -215,7 +337,7 @@ export default function VendorsPage() {
         setErrorMessage(data.message || "Failed to register vendor profile. Please check details.");
       }
     } catch (err) {
-      // Fallback local optimistic registration
+      // Local registration
       const created: VendorItem = {
         id: Date.now(),
         vendor_id: `VND_${Date.now().toString().slice(-6)}`,
@@ -224,6 +346,8 @@ export default function VendorsPage() {
         phone: phoneDigits,
         email: formData.email.trim() || null,
         category: formData.category,
+        products_supplied: selectedProducts,
+        total_products_supplied: selectedProducts.length,
         description: formData.description.trim() || `Verified producer farm supplying ${formData.category}.`,
         city: formData.city || "Bengaluru",
         state: formData.state || "Karnataka",
@@ -278,7 +402,7 @@ export default function VendorsPage() {
               Verified Farmers &amp; Producer Partners
             </h1>
             <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-600">
-              F2H Fresh partners directly with ethical dairies, fruit orchards, organic vegetable growers, and artisan millers across Karnataka and South India. Zero middlemen, guaranteed fair price realization, and timely payouts.
+              F2H Fresh partners directly with ethical dairies, fruit orchards, organic vegetable growers, and artisan millers across Karnataka and South India. Zero middlemen, guaranteed fair price realization, and multi-product supply agreements.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -360,7 +484,7 @@ export default function VendorsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search farm, district, specialty..."
+                placeholder="Search farm, crop, district..."
                 className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-sm"
               />
               {searchQuery && (
@@ -427,7 +551,7 @@ export default function VendorsPage() {
                 ) : (
                   <button
                     onClick={() => { setSelectedCategory("All"); setSearchQuery(""); }}
-                    className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-semibold hover:bg-emerald-200 transition"
+                    className="px-4 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-semibold hover:bg-emerald-200 transition cursor-pointer"
                   >
                     Reset Filters
                   </button>
@@ -442,7 +566,7 @@ export default function VendorsPage() {
                   className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col hover:-translate-y-1"
                 >
                   {/* Card Image Banner */}
-                  <div className="relative h-44 w-full overflow-hidden bg-slate-100">
+                  <div className="relative h-44 w-full overflow-hidden bg-slate-100 cursor-pointer" onClick={() => setActiveProfileModal(vendor)}>
                     <img
                       src={vendor.image_url || "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=600&q=80"}
                       alt={vendor.business_name}
@@ -473,7 +597,10 @@ export default function VendorsPage() {
                   <div className="p-5 flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-bold text-slate-900 text-base leading-snug group-hover:text-emerald-700 transition-colors">
+                        <h3
+                          onClick={() => setActiveProfileModal(vendor)}
+                          className="font-bold text-slate-900 text-base leading-snug group-hover:text-emerald-700 transition-colors cursor-pointer"
+                        >
                           {vendor.business_name}
                         </h3>
                         {vendor.is_verified !== false && (
@@ -488,13 +615,38 @@ export default function VendorsPage() {
                         <strong className="text-slate-700 font-semibold">{vendor.contact_person}</strong>
                       </p>
 
-                      <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed mt-3">
+                      <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed mt-2.5">
                         {vendor.description || "Certified local producer supplying fresh organic harvest to F2H Fresh customers."}
                       </p>
+
+                      {/* Multiple Supplied Products Tags */}
+                      {vendor.products_supplied && vendor.products_supplied.length > 0 && (
+                        <div className="mt-3.5 pt-3 border-t border-slate-100">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                            <Package size={12} className="text-emerald-600" />
+                            <span>Supplied Products ({vendor.products_supplied.length})</span>
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {vendor.products_supplied.slice(0, 4).map((p, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80"
+                              >
+                                {p.name}
+                              </span>
+                            ))}
+                            {vendor.products_supplied.length > 4 && (
+                              <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md font-semibold">
+                                +{vendor.products_supplied.length - 4} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-5 pt-4 border-t border-slate-100">
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 mb-3">
+                    <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
                         <div>
                           <span className="block text-slate-400 font-medium uppercase tracking-wider text-[10px]">Supply Capacity</span>
                           <span className="font-semibold text-slate-800">{vendor.supply_capacity || "Daily Harvest"}</span>
@@ -505,13 +657,24 @@ export default function VendorsPage() {
                         </div>
                       </div>
 
-                      <a
-                        href={`tel:${vendor.phone}`}
-                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-200 transition"
-                      >
-                        <Phone size={13} className="text-emerald-600" />
-                        <span>Inquire Partnership (+91 {vendor.phone.slice(-10)})</span>
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveProfileModal(vendor)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                        >
+                          <FileText size={13} />
+                          <span>View Profile</span>
+                        </button>
+                        <a
+                          href={`tel:${vendor.phone}`}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-800 transition"
+                          title={`Call +91 ${vendor.phone.slice(-10)}`}
+                        >
+                          <Phone size={13} />
+                          <span>Call</span>
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -553,8 +716,8 @@ export default function VendorsPage() {
                       <CheckCircle2 size={14} />
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">Guaranteed Daily Offtake</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Consistent subscription volumes ensure zero distress crop dumping or unsold perishable stock.</p>
+                      <p className="font-bold text-slate-900">Multi-Product Offtake</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Supply multiple crops, dairy items, and oils under a single consolidated vendor partnership account.</p>
                     </div>
                   </div>
 
@@ -564,7 +727,7 @@ export default function VendorsPage() {
                     </div>
                     <div>
                       <p className="font-bold text-slate-900">Cold Chain &amp; Logistics Support</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Central warehouse intake hubs across Whitefield, Mandya, and Channapatna with quality testing.</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Central warehouse intake hubs across Whitefield, Mandya, and Channapatna with batch quality testing.</p>
                     </div>
                   </div>
 
@@ -611,7 +774,7 @@ export default function VendorsPage() {
                 <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Vendor &amp; Supplier Registration</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">Register your farm or production unit to start supplying to F2H Fresh.</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Register your farm or production unit to start supplying single or multiple products.</p>
                   </div>
                   <span className="h-9 w-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                     <Store size={18} />
@@ -628,18 +791,46 @@ export default function VendorsPage() {
                       Congratulations <strong>{newVendorProfile.business_name}</strong>! Your vendor profile (<strong>{newVendorProfile.vendor_id}</strong>) has been registered in the F2H Fresh supplier directory.
                     </p>
 
-                    {/* Preview Card */}
-                    <div className="mt-5 max-w-sm mx-auto rounded-xl border border-emerald-300 bg-white p-4 text-left shadow-sm">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Your Live Profile Card</p>
-                      <p className="text-sm font-bold text-slate-900 mt-1">{newVendorProfile.business_name}</p>
+                    {/* Live Profile Card */}
+                    <div className="mt-5 max-w-sm mx-auto rounded-2xl border border-emerald-300 bg-white p-5 text-left shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                          {newVendorProfile.vendor_id}
+                        </span>
+                        <span className="flex items-center gap-1 text-emerald-700 text-xs font-semibold">
+                          <ShieldCheck size={14} /> Verified Partner
+                        </span>
+                      </div>
+                      <p className="text-base font-bold text-slate-900 mt-2">{newVendorProfile.business_name}</p>
                       <p className="text-xs text-slate-500">{newVendorProfile.category} • {newVendorProfile.city}, {newVendorProfile.state}</p>
                       <p className="text-xs text-slate-600 mt-2 line-clamp-2">{newVendorProfile.description}</p>
+                      
+                      {newVendorProfile.products_supplied && newVendorProfile.products_supplied.length > 0 && (
+                        <div className="mt-3 pt-2.5 border-t border-emerald-100">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 mb-1">
+                            Supplied Products ({newVendorProfile.products_supplied.length})
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {newVendorProfile.products_supplied.map((p, i) => (
+                              <span key={i} className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                {p.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                        <span>Capacity: <strong>{newVendorProfile.supply_capacity}</strong></span>
+                        <span>Exp: <strong>{newVendorProfile.experience_years}</strong></span>
+                      </div>
                     </div>
 
                     <button
                       onClick={() => {
                         setSubmitted(false);
                         setNewVendorProfile(null);
+                        setSelectedProducts([]);
                         setFormData({
                           businessName: "",
                           contactPerson: "",
@@ -657,7 +848,7 @@ export default function VendorsPage() {
                           description: "",
                         });
                       }}
-                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition"
+                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-semibold text-white hover:bg-emerald-800 transition cursor-pointer"
                     >
                       Register Another Supplier / Farm
                     </button>
@@ -777,6 +968,147 @@ export default function VendorsPage() {
                       </div>
                     </div>
 
+                    {/* ── Multi-Product Supply Selection (from products table) ── */}
+                    <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/30 p-4 relative" ref={dropdownRef}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Package size={14} className="text-emerald-700" />
+                          <span>Products You Can Supply</span>
+                          <span className="text-emerald-700 font-normal text-[11px]">(Single or Multiple Products)</span>
+                        </label>
+                        {selectedProducts.length > 0 && (
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            {selectedProducts.length} selected
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mb-2.5">
+                        Choose products from F2H Fresh catalog or add custom farm items that you can harvest and supply.
+                      </p>
+
+                      {/* Selected Product Badges */}
+                      {selectedProducts.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {selectedProducts.map((prod, idx) => (
+                            <span
+                              key={prod.product_id || `${prod.name}-${idx}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-700 text-white shadow-xs"
+                            >
+                              <Check size={12} className="text-emerald-200" />
+                              <span>{prod.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeProduct(prod)}
+                                className="ml-1 hover:bg-emerald-800 rounded p-0.5 text-emerald-100 hover:text-white"
+                                title="Remove product"
+                              >
+                                <X size={12} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Dropdown Toggle Button */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsProductDropdownOpen(!isProductDropdownOpen)}
+                          className="w-full flex items-center justify-between rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-700 hover:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        >
+                          <span className={selectedProducts.length === 0 ? "text-slate-400" : "text-slate-900 font-medium"}>
+                            {selectedProducts.length === 0
+                              ? "Select products from catalog table..."
+                              : `${selectedProducts.length} products selected (Click to add/modify)`}
+                          </span>
+                          <ChevronDown size={16} className={`text-slate-400 transition-transform ${isProductDropdownOpen ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {/* Floating Dropdown List */}
+                        {isProductDropdownOpen && (
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-30 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl animate-fadeIn">
+                            {/* Inner Search */}
+                            <div className="relative mb-2.5">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                              <input
+                                type="text"
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                                placeholder="Filter products from table..."
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-500 focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Product Items */}
+                            {loadingProducts ? (
+                              <div className="py-4 text-center text-xs text-slate-500">Loading products from table...</div>
+                            ) : filteredAvailableProducts.length === 0 ? (
+                              <div className="py-3 text-center text-xs text-slate-500">
+                                No catalog product matching &quot;{productSearch}&quot;
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {filteredAvailableProducts.map((p) => {
+                                  const isSelected = selectedProducts.some(
+                                    (sp) =>
+                                      (sp.product_id && p.product_id && sp.product_id === p.product_id) ||
+                                      sp.name.toLowerCase() === p.name.toLowerCase()
+                                  );
+                                  return (
+                                    <div
+                                      key={p.product_id || p.name}
+                                      onClick={() => toggleProduct(p)}
+                                      className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition ${
+                                        isSelected
+                                          ? "bg-emerald-50 text-emerald-950 font-semibold border border-emerald-200"
+                                          : "hover:bg-slate-50 text-slate-700"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className={`h-4 w-4 rounded flex items-center justify-center border ${
+                                            isSelected
+                                              ? "bg-emerald-700 border-emerald-700 text-white"
+                                              : "border-slate-300 bg-white"
+                                          }`}
+                                        >
+                                          {isSelected && <Check size={11} />}
+                                        </div>
+                                        <span>{p.name}</span>
+                                      </div>
+                                      {p.category && (
+                                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                          {p.category}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Add Custom Item */}
+                            <div className="mt-3 pt-2.5 border-t border-slate-100 flex gap-2">
+                              <input
+                                type="text"
+                                value={customProductName}
+                                onChange={(e) => setCustomProductName(e.target.value)}
+                                placeholder="+ Add custom crop / product"
+                                className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={addCustomProduct}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition cursor-pointer"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <label className="mb-1 block text-xs font-semibold text-slate-700">
@@ -882,7 +1214,7 @@ export default function VendorsPage() {
                         )}
                       </button>
                       <p className="mt-2 text-center text-[11px] text-slate-400">
-                        Upon submission, your supplier profile is immediately indexed in the F2H Fresh producer network.
+                        Upon submission, your supplier profile and selected product lines are immediately indexed in the F2H Fresh producer network.
                       </p>
                     </div>
                   </form>
@@ -892,6 +1224,191 @@ export default function VendorsPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Vendor Detailed Profile Modal / Card Dialog ── */}
+      {activeProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
+            {/* Header / Banner Image */}
+            <div className="relative h-48 sm:h-56 w-full bg-slate-900 shrink-0">
+              <img
+                src={activeProfileModal.image_url || "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=800&q=80"}
+                alt={activeProfileModal.business_name}
+                className="h-full w-full object-cover opacity-80"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setActiveProfileModal(null)}
+                className="absolute top-4 right-4 h-9 w-9 rounded-full bg-black/50 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/80 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Badges on Banner */}
+              <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+                <span className="px-3 py-1 rounded-full bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                  <ShieldCheck size={14} /> Verified Supplier
+                </span>
+                <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-slate-900 text-xs font-bold shadow-sm">
+                  {activeProfileModal.category}
+                </span>
+              </div>
+
+              {/* Title & Location on Banner Bottom */}
+              <div className="absolute bottom-4 left-4 right-4 text-white">
+                <p className="text-xs text-emerald-300 font-bold uppercase tracking-wider">{activeProfileModal.vendor_id}</p>
+                <h3 className="text-xl sm:text-2xl font-extrabold leading-tight mt-0.5">{activeProfileModal.business_name}</h3>
+                <p className="text-xs text-slate-200 mt-1 flex items-center gap-1.5">
+                  <MapPin size={13} className="text-emerald-400" />
+                  <span>{activeProfileModal.city}, {activeProfileModal.state}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Body Content (Scrollable) */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Farmer & Sourcing Highlights */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Rating</span>
+                  <span className="text-base font-extrabold text-slate-900 flex items-center justify-center gap-1 mt-0.5">
+                    <span className="text-amber-500">★</span> {typeof activeProfileModal.rating === "number" ? activeProfileModal.rating.toFixed(2) : activeProfileModal.rating || "4.85"}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Experience</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 mt-1 block">
+                    {activeProfileModal.experience_years || "3+ Years"}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Capacity</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 mt-1 block truncate">
+                    {activeProfileModal.supply_capacity || "Daily Harvest"}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Status</span>
+                  <span className="text-xs sm:text-sm font-bold text-emerald-700 mt-1 block">
+                    Active Partner
+                  </span>
+                </div>
+              </div>
+
+              {/* Description */}
+              {activeProfileModal.description && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">About Producer &amp; Sourcing</h4>
+                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-100">
+                    {activeProfileModal.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Supplied Products List */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Package size={14} className="text-emerald-700" />
+                    <span>Supplied Products &amp; Harvest Lines</span>
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    {activeProfileModal.products_supplied?.length || 1} items
+                  </span>
+                </h4>
+
+                {activeProfileModal.products_supplied && activeProfileModal.products_supplied.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {activeProfileModal.products_supplied.map((prod, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/50 border border-emerald-100"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                            ✓
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{prod.name}</p>
+                            {prod.category && <p className="text-[10px] text-slate-500">{prod.category}</p>}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                          Direct Sourced
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-800">{activeProfileModal.category}</p>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                      Standard Supply
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Contact & Compliance Credentials */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Contact Details</h4>
+                  <p className="text-xs text-slate-800">
+                    <span className="text-slate-400 font-medium">Contact Person:</span> <strong>{activeProfileModal.contact_person}</strong>
+                  </p>
+                  <p className="text-xs text-slate-800 flex items-center gap-1.5">
+                    <Phone size={13} className="text-emerald-600" />
+                    <span>+91 {activeProfileModal.phone}</span>
+                  </p>
+                  {activeProfileModal.email && (
+                    <p className="text-xs text-slate-800 flex items-center gap-1.5">
+                      <Mail size={13} className="text-emerald-600" />
+                      <span>{activeProfileModal.email}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Regulatory Credentials</h4>
+                  <p className="text-xs text-slate-800">
+                    <span className="text-slate-400 font-medium">FSSAI License:</span>{" "}
+                    <strong>{activeProfileModal.fssai_license || "Verified On File"}</strong>
+                  </p>
+                  <p className="text-xs text-slate-800">
+                    <span className="text-slate-400 font-medium">GSTIN:</span>{" "}
+                    <strong>{activeProfileModal.gstin || "Direct Farmer Entity"}</strong>
+                  </p>
+                  <p className="text-xs text-emerald-800 font-medium flex items-center gap-1">
+                    <BadgeCheck size={14} className="text-emerald-600" />
+                    <span>F2H Quality &amp; Hygiene Inspected</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveProfileModal(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-white transition cursor-pointer"
+              >
+                Close
+              </button>
+              <a
+                href={`tel:${activeProfileModal.phone}`}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition shadow-sm shadow-emerald-700/20"
+              >
+                <Phone size={14} />
+                <span>Call Vendor (+91 {activeProfileModal.phone.slice(-10)})</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

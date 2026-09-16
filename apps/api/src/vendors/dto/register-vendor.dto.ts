@@ -72,4 +72,8 @@ export class RegisterVendorDto {
   @IsString()
   @IsOptional()
   imageUrl?: string;
+
+  @IsOptional()
+  products?: Array<{ product_id?: string; name: string; category?: string }> | string[];
 }
+

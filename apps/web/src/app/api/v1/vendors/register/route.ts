@@ -58,6 +58,11 @@ export async function POST(request: Request) {
     const category = body.category || 'Dairy & Milk';
     const imageUrl = body.imageUrl || getDefaultImage(category);
 
+    // Normalize supplied products
+    const suppliedProducts = Array.isArray(body.products)
+      ? body.products.map((p: any) => (typeof p === 'string' ? { name: p.trim() } : { product_id: p.product_id, name: (p.name || '').trim(), category: p.category }))
+      : [];
+
     const vendorProfile = addRegisteredVendor({
       vendor_id: vendorId,
       business_name: businessName,
@@ -75,7 +80,8 @@ export async function POST(request: Request) {
       supply_capacity: body.supplyCapacity?.trim() || 'Regular Batch Supply',
       experience_years: body.experienceYears || '1-2 Years',
       rating: 4.85,
-      total_products_supplied: 0,
+      products_supplied: suppliedProducts,
+      total_products_supplied: suppliedProducts.length,
       is_verified: true,
       is_active: true,
       status: 'approved',
