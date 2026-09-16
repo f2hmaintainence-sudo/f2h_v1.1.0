@@ -53,6 +53,9 @@ class TodayDeliveryPartner {
   final String runStatus;
   final String deliveryStatus;
   final String runDate;
+  final double? latitude;
+  final double? longitude;
+  final String? lastLocationAt;
   final List<DeliveryPartnerAddressInfo> addresses;
 
   const TodayDeliveryPartner({
@@ -66,6 +69,9 @@ class TodayDeliveryPartner {
     this.runStatus = 'planned',
     this.deliveryStatus = 'pending',
     this.runDate = '',
+    this.latitude,
+    this.longitude,
+    this.lastLocationAt,
     this.addresses = const [],
   });
 
@@ -86,10 +92,47 @@ class TodayDeliveryPartner {
       runStatus: json['run_status']?.toString() ?? 'planned',
       deliveryStatus: json['delivery_status']?.toString() ?? 'pending',
       runDate: json['run_date']?.toString() ?? '',
+      latitude: double.tryParse(json['latitude']?.toString() ?? json['lat']?.toString() ?? ''),
+      longitude: double.tryParse(json['longitude']?.toString() ?? json['lng']?.toString() ?? ''),
+      lastLocationAt: json['last_location_at']?.toString(),
       addresses: rawAddresses
           .map((a) =>
               DeliveryPartnerAddressInfo.fromJson(Map<String, dynamic>.from(a as Map)))
           .toList(),
+    );
+  }
+
+  TodayDeliveryPartner copyWith({
+    String? partnerId,
+    String? partnerName,
+    String? phone,
+    String? profilePhoto,
+    String? deliverySlot,
+    String? slotLabel,
+    bool? isCurrentSlot,
+    String? runStatus,
+    String? deliveryStatus,
+    String? runDate,
+    double? latitude,
+    double? longitude,
+    String? lastLocationAt,
+    List<DeliveryPartnerAddressInfo>? addresses,
+  }) {
+    return TodayDeliveryPartner(
+      partnerId: partnerId ?? this.partnerId,
+      partnerName: partnerName ?? this.partnerName,
+      phone: phone ?? this.phone,
+      profilePhoto: profilePhoto ?? this.profilePhoto,
+      deliverySlot: deliverySlot ?? this.deliverySlot,
+      slotLabel: slotLabel ?? this.slotLabel,
+      isCurrentSlot: isCurrentSlot ?? this.isCurrentSlot,
+      runStatus: runStatus ?? this.runStatus,
+      deliveryStatus: deliveryStatus ?? this.deliveryStatus,
+      runDate: runDate ?? this.runDate,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      lastLocationAt: lastLocationAt ?? this.lastLocationAt,
+      addresses: addresses ?? this.addresses,
     );
   }
 
@@ -105,6 +148,9 @@ class TodayDeliveryPartner {
       'run_status': runStatus,
       'delivery_status': deliveryStatus,
       'run_date': runDate,
+      'latitude': latitude,
+      'longitude': longitude,
+      'last_location_at': lastLocationAt,
       'addresses': addresses.map((a) => a.toJson()).toList(),
     };
   }

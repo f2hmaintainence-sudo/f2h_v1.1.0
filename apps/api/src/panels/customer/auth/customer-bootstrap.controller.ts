@@ -19,6 +19,7 @@ import { DataService } from 'src/shared/database/Data.service';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 import { AuthService } from './auth.service';
+import { RedisService } from 'src/shared/redis/redis.service';
 const COORDINATE_EPSILON = 0.0000001;
 
 /** Cached firebase client configs (TTL: 1h per process) */
@@ -34,6 +35,7 @@ export class CustomerBootstrapController {
     private readonly db: DatabaseService,
     private readonly Developer: DeveloperService,
     private readonly authService: AuthService,
+    private readonly redisService: RedisService,
   ) { }
 
   private columnCache: Map<string, { columns: Set<string>; cachedAt: number }> = new Map();
@@ -298,6 +300,67 @@ export class CustomerBootstrapController {
     return await this.getTodayDeliveryPartners(customerId);
   }
 
+  /**
+   * GET /customer/today-delivery-partners/:partnerId/location
+   * Returns live real-time location (Redis telemetry + DB fallback) for a delivery partner
+   */
+  @Get('today-delivery-partners/:partnerId/location')
+  @UseGuards(AuthGuard('jwt'))
+  async getPartnerLiveLocation(@Param('partnerId') partnerId: string) {
+    if (!partnerId) {
+      return { status: false, message: 'Partner ID is required', data: null };
+    }
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let battery: number | null = null;
+    let speed: number | null = null;
+    let lastLocationAt: string | null = null;
+
+    try {
+      const redisLoc: any = await this.redisService.fetch(`delivery_partner_location:${partnerId}`);
+      if (redisLoc && redisLoc.latitude && redisLoc.longitude) {
+        lat = Number(redisLoc.latitude);
+        lng = Number(redisLoc.longitude);
+        battery = redisLoc.battery != null ? Number(redisLoc.battery) : null;
+        speed = redisLoc.speed != null ? Number(redisLoc.speed) : null;
+        lastLocationAt = redisLoc.updatedAt || redisLoc.lastDbLogTime || new Date().toISOString();
+      }
+    } catch (_) {}
+
+    if (lat === null || lng === null) {
+      const dbRows = await this.db.query(
+        `SELECT current_lat, current_lng, last_location_at FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+        [partnerId],
+      );
+      if (dbRows?.length && dbRows[0].current_lat != null && dbRows[0].current_lng != null) {
+        lat = Number(dbRows[0].current_lat);
+        lng = Number(dbRows[0].current_lng);
+        lastLocationAt = dbRows[0].last_location_at ? new Date(dbRows[0].last_location_at).toISOString() : null;
+      }
+    }
+
+    if (lat !== null && lng !== null) {
+      return {
+        status: true,
+        data: {
+          partner_id: partnerId,
+          latitude: lat,
+          longitude: lng,
+          battery,
+          speed,
+          last_location_at: lastLocationAt,
+        },
+      };
+    }
+
+    return {
+      status: false,
+      message: 'Location unavailable for delivery partner',
+      data: null,
+    };
+  }
+
   private parseSlotTimeMinutes(timeStr?: string, defaultMinutes = 840): number {
     if (!timeStr || typeof timeStr !== 'string') return defaultMinutes;
     const parts = timeStr.split(':');
@@ -400,6 +463,9 @@ export class CustomerBootstrapController {
           COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
           COALESCE(u.phone, '') AS partner_phone,
           COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+          dp.current_lat,
+          dp.current_lng,
+          dp.last_location_at,
           ca.address_type,
           ca.address_line,
           ca.flat_no,
@@ -457,6 +523,9 @@ export class CustomerBootstrapController {
             run_status: row.run_status || 'planned',
             delivery_status: row.address_delivery_status || 'pending',
             run_date: row.run_date,
+            latitude: row.current_lat != null ? Number(row.current_lat) : null,
+            longitude: row.current_lng != null ? Number(row.current_lng) : null,
+            last_location_at: row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
             addresses: [],
           });
         }
@@ -502,6 +571,9 @@ export class CustomerBootstrapController {
               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
               COALESCE(u.phone, '') AS partner_phone,
               COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              dp.current_lat,
+              dp.current_lng,
+              dp.last_location_at,
               ca.address_id,
               ca.address_type,
               ca.address_line,
@@ -544,6 +616,9 @@ export class CustomerBootstrapController {
               run_status: status === 'delivered' ? 'completed' : 'in_progress',
               delivery_status: status,
               run_date: row.delivery_date || todayDate,
+              latitude: row.current_lat != null ? Number(row.current_lat) : null,
+              longitude: row.current_lng != null ? Number(row.current_lng) : null,
+              last_location_at: row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
               addresses: row.address_id ? [{
                 address_id: row.address_id,
                 address_type: row.address_type || 'home',
@@ -567,6 +642,9 @@ export class CustomerBootstrapController {
               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
               COALESCE(u.phone, '') AS partner_phone,
               COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              dp.current_lat,
+              dp.current_lng,
+              dp.last_location_at,
               ca.address_id,
               ca.address_type,
               ca.address_line,
@@ -603,6 +681,9 @@ export class CustomerBootstrapController {
               run_status: 'assigned',
               delivery_status: 'pending',
               run_date: todayDate,
+              latitude: bp.current_lat != null ? Number(bp.current_lat) : null,
+              longitude: bp.current_lng != null ? Number(bp.current_lng) : null,
+              last_location_at: bp.last_location_at ? new Date(bp.last_location_at).toISOString() : null,
               addresses: bp.address_id ? [{
                 address_id: bp.address_id,
                 address_type: bp.address_type || 'home',
@@ -625,7 +706,10 @@ export class CustomerBootstrapController {
               dp.delivery_partner_id,
               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
               COALESCE(u.phone, '') AS partner_phone,
-              COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo
+              COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
+              dp.current_lat,
+              dp.current_lng,
+              dp.last_location_at
             FROM delivery_partners dp
             JOIN users u ON u.user_id = dp.delivery_partner_id
             WHERE dp.deleted_at IS NULL
@@ -647,10 +731,27 @@ export class CustomerBootstrapController {
               run_status: 'assigned',
               delivery_status: 'pending',
               run_date: todayDate,
+              latitude: gp.current_lat != null ? Number(gp.current_lat) : null,
+              longitude: gp.current_lng != null ? Number(gp.current_lng) : null,
+              last_location_at: gp.last_location_at ? new Date(gp.last_location_at).toISOString() : null,
               addresses: [],
             });
           }
         } catch (_) { }
+      }
+
+      // Enrich all partners with fresh real-time GPS telemetry from Redis if available
+      for (const partner of partnerMap.values()) {
+        try {
+          const redisLoc: any = await this.redisService.fetch(`delivery_partner_location:${partner.partner_id}`);
+          if (redisLoc && redisLoc.latitude && redisLoc.longitude) {
+            partner.latitude = Number(redisLoc.latitude);
+            partner.longitude = Number(redisLoc.longitude);
+            if (redisLoc.battery != null) partner.battery = Number(redisLoc.battery);
+            if (redisLoc.speed != null) partner.speed = Number(redisLoc.speed);
+            partner.last_location_at = redisLoc.updatedAt || redisLoc.lastDbLogTime || new Date().toISOString();
+          }
+        } catch (_) {}
       }
 
       const deliveryPartners = Array.from(partnerMap.values());
