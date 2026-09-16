@@ -578,6 +578,23 @@ export class AdminSystemService {
         `, [role.role_name, role.description, JSON.stringify(role.permissions), role.is_active]);
       }
 
+      // Ensure MILK_COLLECTOR exists in core roles table for auth token lookups
+      try {
+        const existingCoreRole = await this.db.query(
+          `SELECT role_id FROM roles WHERE UPPER(role_id) = 'MILK_COLLECTOR' LIMIT 1`,
+          [],
+        );
+        if (!existingCoreRole?.length) {
+          await this.db.query(
+            `INSERT INTO roles (id, sno, role_id, name, description, is_system_role, is_active, created_at, updated_at)
+             VALUES (COALESCE((SELECT MAX(id)+1 FROM roles), 10), '10', 'MILK_COLLECTOR', 'Milk Collector', 'Dedicated milk collector with restricted access exclusively to daily collections', 1, 1, NOW(), NOW())`,
+            [],
+          );
+        }
+      } catch (err) {
+        this.developer.warn('Core roles table sync non-fatal:', err);
+      }
+
       const rows = await this.db.query(
         'SELECT * FROM admin_roles ORDER BY id ASC',
         [],

@@ -943,11 +943,24 @@ export default function StaffManagementPage() {
                     onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                   >
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.role_name}>
-                        {r.role_name.replace(/_/g, ' ').toUpperCase()}
-                      </option>
-                    ))}
+                    {roles.length > 0 ? (
+                      roles.map((r) => (
+                        <option key={r.id} value={r.role_name}>
+                          {r.role_name.replace(/_/g, ' ').toUpperCase()}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="milk_collector">MILK COLLECTOR</option>
+                        <option value="admin">ADMIN</option>
+                        <option value="branch_manager">BRANCH MANAGER</option>
+                        <option value="milk_procurement_officer">MILK PROCUREMENT OFFICER</option>
+                        <option value="warehouse_manager">WAREHOUSE MANAGER</option>
+                        <option value="delivery_dispatcher">DELIVERY DISPATCHER</option>
+                        <option value="finance_billing_staff">FINANCE BILLING STAFF</option>
+                        <option value="staff">STAFF</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -1152,11 +1165,24 @@ export default function StaffManagementPage() {
                     onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none"
                   >
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.role_name}>
-                        {r.role_name.replace(/_/g, ' ').toUpperCase()}
-                      </option>
-                    ))}
+                    {roles.length > 0 ? (
+                      roles.map((r) => (
+                        <option key={r.id} value={r.role_name}>
+                          {r.role_name.replace(/_/g, ' ').toUpperCase()}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="milk_collector">MILK COLLECTOR</option>
+                        <option value="admin">ADMIN</option>
+                        <option value="branch_manager">BRANCH MANAGER</option>
+                        <option value="milk_procurement_officer">MILK PROCUREMENT OFFICER</option>
+                        <option value="warehouse_manager">WAREHOUSE MANAGER</option>
+                        <option value="delivery_dispatcher">DELIVERY DISPATCHER</option>
+                        <option value="finance_billing_staff">FINANCE BILLING STAFF</option>
+                        <option value="staff">STAFF</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
