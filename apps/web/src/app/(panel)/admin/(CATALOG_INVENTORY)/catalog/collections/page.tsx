@@ -5,8 +5,8 @@
 // © 2026 ChronoSparkSolutions. All rights reserved.
 //
 // Project     : F2H Fresh
-// File        : page.tsx (Daily Vendor Collections & Milk Procurement)
-// Description : Daily collection management for milk & produce procurement
+// File        : page.tsx (Mobile-First Daily Vendor Collections & Milk Procurement)
+// Description : Field-optimized mobile-first daily procurement & milk collection UI
 // ============================================================================
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -15,6 +15,7 @@ import {
   ClipboardCheck,
   Home,
   ChevronRight,
+  ChevronLeft,
   Search,
   Filter,
   Plus,
@@ -48,7 +49,10 @@ import {
   Gauge,
   Thermometer,
   Printer,
-  ChevronDown
+  Share2,
+  PlusCircle,
+  ChevronDown,
+  UserCheck
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
@@ -122,46 +126,54 @@ export default function DailyCollectionsPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Filters & State
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedShift, setSelectedShift] = useState<string>("ALL");
-  const [selectedVendorFilter, setSelectedVendorFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   // Vendors list for dropdowns
   const [registeredVendors, setRegisteredVendors] = useState<VendorOption[]>([]);
 
-  // Modals
+  // Modals & Sliders
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<VendorCollectionRecord | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<VendorCollectionRecord | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Form State for Recording Collection
+  // Form State for Recording Collection (Mobile-optimized with numeric inputs)
   const [formData, setFormData] = useState({
     collection_date: todayStr,
     shift: "MORNING" as "MORNING" | "EVENING" | "AFTERNOON" | "GENERAL",
     vendor_id: "",
     vendor_name: "",
-    collector_name: "Procurement Officer",
+    collector_name: "Collection Officer",
     collector_phone: "+91 98765 00001",
     product_name: "Fresh Cow Milk",
     category: "Dairy & Milk",
-    quantity: "" as string | number,
+    quantity: "",
     unit: "Liters",
-    rate_per_unit: "42.00" as string | number,
-    fat_percentage: "4.5" as string | number,
-    snf_percentage: "8.5" as string | number,
-    clr_reading: "28.5" as string | number,
-    temperature: "4.0" as string | number,
+    rate_per_unit: "42.00",
+    fat_percentage: "4.5",
+    snf_percentage: "8.5",
+    clr_reading: "28.5",
+    temperature: "4.0",
     quality_grade: "Grade A",
     container_can_no: "CAN-01",
     payment_status: "PENDING" as "PENDING" | "PAID" | "PARTIAL",
     payment_mode: "CASH" as "CASH" | "UPI" | "BANK_TRANSFER" | "CREDIT",
     notes: ""
   });
+
+  // Date Navigation Helpers (Previous Day, Next Day, Today)
+  const navigateDay = (offset: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + offset);
+    setSelectedDate(d.toISOString().split("T")[0]);
+  };
+
+  const isToday = selectedDate === todayStr;
 
   // Fetch Collections
   const fetchCollections = useCallback(async () => {
@@ -170,7 +182,6 @@ export default function DailyCollectionsPage() {
       const params = new URLSearchParams();
       if (selectedDate) params.append("date", selectedDate);
       if (selectedShift && selectedShift !== "ALL") params.append("shift", selectedShift);
-      if (selectedVendorFilter && selectedVendorFilter !== "ALL") params.append("vendorId", selectedVendorFilter);
       if (searchQuery.trim()) params.append("search", searchQuery.trim());
 
       const res = await fetch(`/api/v1/vendors/collections?${params.toString()}`, { cache: "no-store" });
@@ -187,7 +198,7 @@ export default function DailyCollectionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, selectedShift, selectedVendorFilter, searchQuery]);
+  }, [selectedDate, selectedShift, searchQuery]);
 
   // Fetch Registered Vendors for dropdown
   const fetchVendors = useCallback(async () => {
@@ -222,7 +233,9 @@ export default function DailyCollectionsPage() {
   const handleVendorSelect = (vendorId: string) => {
     const found = registeredVendors.find((v) => v.vendor_id === vendorId);
     if (found) {
-      const defaultProduct = found.products_supplied?.[0]?.name || (found.category.includes("Dairy") ? "Fresh Cow Milk" : "Farm Produce");
+      const defaultProduct =
+        found.products_supplied?.[0]?.name ||
+        (found.category.toLowerCase().includes("dairy") ? "Fresh Cow Milk" : "Farm Produce");
       setFormData((prev) => ({
         ...prev,
         vendor_id: found.vendor_id,
@@ -234,7 +247,7 @@ export default function DailyCollectionsPage() {
   };
 
   // Submit new collection
-  const handleAddCollectionSubmit = async (e: React.FormEvent) => {
+  const handleAddCollectionSubmit = async (e: React.FormEvent, addAnother = false) => {
     e.preventDefault();
     if (!formData.vendor_id || !formData.vendor_name) {
       showErrorToast("Please select a vendor");
@@ -245,7 +258,7 @@ export default function DailyCollectionsPage() {
       return;
     }
     if (!formData.quantity || Number(formData.quantity) <= 0) {
-      showErrorToast("Please enter a valid quantity");
+      showErrorToast("Please enter a valid quantity in Liters/Kg");
       return;
     }
 
@@ -270,17 +283,26 @@ export default function DailyCollectionsPage() {
 
       if (data.success) {
         showSuccessToast(
-          `Collection recorded: ${payload.quantity} ${payload.unit} from ${payload.vendor_name}`
+          `✓ Recorded: ${payload.quantity} ${payload.unit} (${payload.vendor_name})`
         );
-        setIsAddModalOpen(false);
-        // Reset quantity & notes for next quick entry
-        setFormData((prev) => ({
-          ...prev,
-          quantity: "",
-          notes: "",
-          container_can_no: `CAN-${String(Math.floor(Math.random() * 20) + 1).padStart(2, "0")}`
-        }));
         fetchCollections();
+
+        if (addAnother) {
+          // Prepare next entry for same collector
+          setFormData((prev) => ({
+            ...prev,
+            quantity: "",
+            notes: "",
+            container_can_no: `CAN-${String(Math.floor(Math.random() * 20) + 1).padStart(2, "0")}`
+          }));
+        } else {
+          setIsAddModalOpen(false);
+          setFormData((prev) => ({
+            ...prev,
+            quantity: "",
+            notes: ""
+          }));
+        }
       } else {
         showErrorToast(data.message || "Failed to record collection");
       }
@@ -303,7 +325,7 @@ export default function DailyCollectionsPage() {
       const data = await res.json();
 
       if (data.success) {
-        showSuccessToast(`Payment status updated to ${nextStatus}`);
+        showSuccessToast(`Payment marked as ${nextStatus}`);
         setCollections((prev) =>
           prev.map((c) => (c.id === collection.id ? { ...c, payment_status: nextStatus } : c))
         );
@@ -323,13 +345,16 @@ export default function DailyCollectionsPage() {
     if (!collectionToDelete) return;
     setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/v1/vendors/collections/${collectionToDelete.collection_id || collectionToDelete.id}`, {
-        method: "DELETE"
-      });
+      const res = await fetch(
+        `/api/v1/vendors/collections/${collectionToDelete.collection_id || collectionToDelete.id}`,
+        {
+          method: "DELETE"
+        }
+      );
       const data = await res.json();
 
       if (data.success) {
-        showSuccessToast("Collection record removed");
+        showSuccessToast("Collection slip removed");
         setCollections((prev) => prev.filter((c) => c.id !== collectionToDelete.id));
         if (selectedCollection && selectedCollection.id === collectionToDelete.id) {
           setSelectedCollection(null);
@@ -346,10 +371,34 @@ export default function DailyCollectionsPage() {
     }
   };
 
+  // WhatsApp Share Slip text builder
+  const getWhatsAppSlipUrl = (c: VendorCollectionRecord, vendorPhone?: string) => {
+    const text = encodeURIComponent(
+      `*F2H FRESH - MILK PROCUREMENT RECEIPT*\n` +
+      `------------------------------------\n` +
+      `Date: ${c.collection_date} (${c.shift})\n` +
+      `Slip No: ${c.collection_id}\n` +
+      `Vendor: ${c.vendor_name}\n` +
+      `Product: ${c.product_name}\n` +
+      `Quantity: ${c.quantity} ${c.unit}\n` +
+      `Rate: Rs ${c.rate_per_unit}/${c.unit === 'Liters' ? 'L' : 'Kg'}\n` +
+      `Total Amount: Rs ${c.total_amount}\n` +
+      (c.fat_percentage ? `Fat %: ${c.fat_percentage}%\n` : '') +
+      (c.snf_percentage ? `SNF %: ${c.snf_percentage}%\n` : '') +
+      (c.container_can_no ? `Container: ${c.container_can_no}\n` : '') +
+      `Payment: ${c.payment_status}\n` +
+      `Collector: ${c.collector_name}\n` +
+      `------------------------------------\n` +
+      `Thank you for supplying pure fresh milk to F2H!`
+    );
+    const cleanPhone = (vendorPhone || "").replace(/[^0-9]/g, "");
+    return cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
+  };
+
   return (
-    <div className="space-y-6 p-4 md:p-6 animate-in fade-in duration-300">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+    <div className="space-y-4 md:space-y-6 p-3 md:p-6 pb-24 md:pb-8 animate-in fade-in duration-200">
+      {/* Breadcrumbs - Hidden on small mobile to save vertical screen real estate */}
+      <nav className="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-medium">
         <Link href="/admin/dashboard" className="flex items-center gap-1 hover:text-[#16a34a] transition-colors">
           <Home size={13} /> Dashboard
         </Link>
@@ -359,355 +408,467 @@ export default function DailyCollectionsPage() {
         <span className="font-semibold text-slate-800">Daily Collections</span>
       </nav>
 
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#16a34a] flex items-center justify-center border border-emerald-100/60 shadow-xs shrink-0">
-            <ClipboardCheck size={24} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Daily Vendor Collections</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100/80 text-emerald-800">
-                Procurement
-              </span>
+      {/* Mobile Top Header & Date Day Picker */}
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl md:rounded-3xl border border-slate-100 shadow-xs space-y-3">
+        {/* Title Bar */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center border border-emerald-100 shrink-0">
+              <ClipboardCheck size={22} />
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Track daily milk &amp; farm produce collection with Fat %, SNF %, quantities, and payments
-            </p>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-snug">
+                Daily Milk &amp; Produce Intake
+              </h1>
+              <p className="text-[11px] text-slate-500">
+                {collections.length} slips recorded • {summary.totalQuantity} L total
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={fetchCollections}
+              disabled={loading}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs"
+              title="Refresh"
+            >
+              <RefreshCw size={15} className={loading ? "animate-spin text-emerald-600" : ""} />
+              <span className="hidden sm:inline sm:ml-1">Refresh</span>
+            </button>
+
+            {/* Desktop Add Button */}
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#16a34a] hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Plus size={15} />
+              <span>Record Collection</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Quick Date Picker */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
-            <Calendar size={13} className="text-slate-500" />
+        {/* Date Selector Row with Quick < Today > Nav Buttons */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 p-1 rounded-xl">
+            <button
+              onClick={() => navigateDay(-1)}
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+              title="Previous Day"
+            >
+              <ChevronLeft size={16} />
+            </button>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs sm:text-sm font-bold text-slate-800 focus:outline-none cursor-pointer px-1 text-center"
             />
+            <button
+              onClick={() => navigateDay(1)}
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+              title="Next Day"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
 
-          <button
-            onClick={fetchCollections}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors shadow-xs"
-            title="Refresh collections"
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin text-emerald-600" : ""} />
-            <span>Refresh</span>
-          </button>
+          {!isToday && (
+            <button
+              onClick={() => setSelectedDate(todayStr)}
+              className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+            >
+              Jump to Today
+            </button>
+          )}
 
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#16a34a] hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <Plus size={15} />
-            <span>Record Collection</span>
-          </button>
+          {/* Shift Filter Switcher for Mobile & Desktop */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
+            <button
+              onClick={() => setSelectedShift("ALL")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
+                selectedShift === "ALL" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSelectedShift("MORNING")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${
+                selectedShift === "MORNING" ? "bg-amber-500 text-white shadow-2xs" : "text-amber-800"
+              }`}
+            >
+              <Sun size={12} /> AM
+            </button>
+            <button
+              onClick={() => setSelectedShift("EVENING")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${
+                selectedShift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs" : "text-indigo-800"
+              }`}
+            >
+              <Moon size={12} /> PM
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* KPI Analytics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 md:gap-4">
-        {/* Total Quantity */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Droplet size={20} />
+      {/* Mobile-Friendly KPI Summary Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        {/* Total Liters */}
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Droplet size={18} />
           </div>
           <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Total Volume</p>
-            <p className="text-lg md:text-xl font-bold text-slate-900">
-              {summary.totalQuantity} <span className="text-xs font-normal text-slate-500">Liters</span>
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Total Milk Volume</p>
+            <p className="text-base sm:text-lg font-extrabold text-slate-900">
+              {summary.totalQuantity} <span className="text-xs font-normal text-slate-500">L</span>
             </p>
           </div>
         </div>
 
-        {/* Shift Distribution */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Sun size={20} />
+        {/* Shift Split */}
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <Sun size={18} />
           </div>
           <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Morn / Eve Split</p>
-            <p className="text-sm md:text-base font-bold text-slate-900">
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">AM / PM Split</p>
+            <p className="text-xs sm:text-sm font-bold text-slate-900">
               <span className="text-amber-700">{summary.morningQuantity}L</span> /{" "}
               <span className="text-indigo-700">{summary.eveningQuantity}L</span>
             </p>
           </div>
         </div>
 
-        {/* Avg Fat & SNF */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <Gauge size={20} />
+        {/* Quality Index */}
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <Gauge size={18} />
           </div>
           <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Quality Index</p>
-            <p className="text-sm md:text-base font-bold text-slate-900">
-              Fat: <span className="text-emerald-700">{summary.avgFat ? `${summary.avgFat}%` : "--"}</span> • SNF:{" "}
-              <span className="text-blue-700">{summary.avgSnf ? `${summary.avgSnf}%` : "--"}</span>
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Avg Fat / SNF</p>
+            <p className="text-xs sm:text-sm font-bold text-slate-900">
+              {summary.avgFat ? `${summary.avgFat}%` : "--"} / {summary.avgSnf ? `${summary.avgSnf}%` : "--"}
             </p>
           </div>
         </div>
 
-        {/* Total Value */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-            <IndianRupee size={20} />
+        {/* Procurement Value */}
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <IndianRupee size={18} />
           </div>
           <div>
-            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Procurement Value</p>
-            <p className="text-lg md:text-xl font-bold text-slate-900">₹{summary.totalAmount.toLocaleString("en-IN")}</p>
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Total Payout</p>
+            <p className="text-base sm:text-lg font-extrabold text-slate-900">
+              ₹{summary.totalAmount.toLocaleString("en-IN")}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Toolbar: Shifts, Search, View Mode */}
-      <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
-        {/* Shift Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-          <button
-            onClick={() => setSelectedShift("ALL")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
-              selectedShift === "ALL" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            All Shifts
-          </button>
-          <button
-            onClick={() => setSelectedShift("MORNING")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              selectedShift === "MORNING"
-                ? "bg-amber-600 text-white shadow-xs font-semibold"
-                : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-            }`}
-          >
-            <Sun size={12} /> Morning
-          </button>
-          <button
-            onClick={() => setSelectedShift("EVENING")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              selectedShift === "EVENING"
-                ? "bg-indigo-600 text-white shadow-xs font-semibold"
-                : "bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
-            }`}
-          >
-            <Moon size={12} /> Evening
-          </button>
+      {/* Search & Layout Bar */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs flex items-center justify-between gap-2.5">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search vendor, CAN, collector..."
+            className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
 
-        {/* Search, Vendor Selector & View Switcher */}
-        <div className="flex flex-1 items-center justify-end gap-2.5">
-          <div className="relative flex-1 max-w-xs">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search vendor, collector, CAN..."
-              className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
-            <button
-              onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-lg text-xs transition-all ${
-                viewMode === "table" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-700"
-              }`}
-              title="Table View"
-            >
-              <List size={15} />
-            </button>
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-lg text-xs transition-all ${
-                viewMode === "grid" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-700"
-              }`}
-              title="Grid View"
-            >
-              <LayoutGrid size={15} />
-            </button>
-          </div>
+        {/* View Mode Toggle */}
+        <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
+          <button
+            onClick={() => setViewMode("cards")}
+            className={`p-1.5 rounded-lg text-xs transition-all ${
+              viewMode === "cards" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"
+            }`}
+            title="Mobile Cards View"
+          >
+            <LayoutGrid size={15} />
+          </button>
+          <button
+            onClick={() => setViewMode("table")}
+            className={`p-1.5 rounded-lg text-xs transition-all ${
+              viewMode === "table" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"
+            }`}
+            title="Table View"
+          >
+            <List size={15} />
+          </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Collection Entries View */}
       {loading ? (
-        <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xs text-center space-y-3">
+        <div className="bg-white rounded-2xl md:rounded-3xl p-8 border border-slate-100 shadow-xs text-center space-y-3">
           <RefreshCw size={24} className="animate-spin text-emerald-600 mx-auto" />
-          <p className="text-xs text-slate-500 font-medium">Loading collection entries...</p>
+          <p className="text-xs text-slate-500 font-medium">Loading collection slips...</p>
         </div>
       ) : collections.length === 0 ? (
-        <div className="bg-white rounded-3xl p-10 border border-slate-100 shadow-xs text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto text-emerald-600">
-            <ClipboardCheck size={28} />
+        <div className="bg-white rounded-2xl md:rounded-3xl p-8 border border-slate-100 shadow-xs text-center space-y-4">
+          <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto text-emerald-600">
+            <ClipboardCheck size={26} />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-800">No Collections Recorded For This Selection</h3>
+            <h3 className="text-sm sm:text-base font-bold text-slate-800">No Collections Logged</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-              {searchQuery || selectedShift !== "ALL"
-                ? "Try clearing filters to see other collection entries."
-                : `No collections logged for date ${selectedDate}. Click "Record Collection" to enter milk or produce intake.`}
+              No milk intake recorded for {selectedDate}. Tap below to log your first collection.
             </p>
           </div>
-          <div className="flex justify-center gap-2">
-            {(searchQuery || selectedShift !== "ALL") && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setSelectedShift("ALL");
-                }}
-                className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-200 transition-colors"
-              >
-                Clear Filters
-              </button>
-            )}
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-2 bg-[#16a34a] text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-1.5"
-            >
-              <Plus size={14} /> Record Collection
-            </button>
-          </div>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-5 py-2.5 bg-[#16a34a] text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-600/20 inline-flex items-center gap-1.5 active:scale-95"
+          >
+            <Plus size={15} /> Record Collection
+          </button>
         </div>
-      ) : viewMode === "table" ? (
-        /* TABLE VIEW */
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
+      ) : viewMode === "cards" ? (
+        /* MOBILE CARDS VIEW (Primary & Default) */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {collections.map((item) => {
+            const vendorMatch = registeredVendors.find((v) => v.vendor_id === item.vendor_id);
+            const vendorPhone = vendorMatch?.phone || item.collector_phone || "";
+
+            return (
+              <div
+                key={item.id}
+                className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-xs hover:border-emerald-200 transition-all p-4 flex flex-col justify-between space-y-3.5"
+              >
+                <div className="space-y-2.5">
+                  {/* Card Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {item.shift === "MORNING" ? (
+                        <div
+                          className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0"
+                          title="Morning AM Shift"
+                        >
+                          <Sun size={16} />
+                        </div>
+                      ) : item.shift === "EVENING" ? (
+                        <div
+                          className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold shrink-0"
+                          title="Evening PM Shift"
+                        >
+                          <Moon size={16} />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0">
+                          <Clock size={16} />
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-bold text-sm text-slate-900 line-clamp-1">{item.vendor_name}</h3>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          {item.collection_id} • {item.shift}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick Payment Pill */}
+                    <button
+                      onClick={() => handleTogglePayment(item)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                        item.payment_status === "PAID"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                      }`}
+                      title="Tap to toggle payment status"
+                    >
+                      {item.payment_status}
+                    </button>
+                  </div>
+
+                  {/* Quantity & Payout Highlight Banner */}
+                  <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-medium text-slate-400 uppercase">Volume</span>
+                      <p className="text-lg font-black text-slate-900">
+                        {item.quantity} <span className="text-xs font-semibold text-slate-600">{item.unit}</span>
+                      </p>
+                      <p className="text-[10px] text-slate-500">@ ₹{item.rate_per_unit}/{item.unit === "Liters" ? "L" : "Kg"}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-medium text-slate-400 uppercase">Total Value</span>
+                      <p className="text-lg font-black text-emerald-700">₹{item.total_amount.toLocaleString("en-IN")}</p>
+                      <span className="text-[10px] text-slate-400 font-sans">{item.product_name}</span>
+                    </div>
+                  </div>
+
+                  {/* Quality Badges: Fat, SNF, CAN */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {item.fat_percentage && (
+                      <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                        Fat: {item.fat_percentage}%
+                      </span>
+                    )}
+                    {item.snf_percentage && (
+                      <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200/60">
+                        SNF: {item.snf_percentage}%
+                      </span>
+                    )}
+                    {item.container_can_no && (
+                      <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200/60">
+                        {item.container_can_no}
+                      </span>
+                    )}
+                    {item.clr_reading && (
+                      <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700">
+                        CLR: {item.clr_reading}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer Quick Action Bar (Mobile Field Optimized) */}
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1">
+                    {/* Direct Call to Vendor */}
+                    {vendorPhone && (
+                      <a
+                        href={`tel:${vendorPhone}`}
+                        className="p-2 rounded-xl text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                        title="Call Vendor"
+                      >
+                        <PhoneCall size={14} />
+                      </a>
+                    )}
+
+                    {/* WhatsApp Share Receipt */}
+                    <a
+                      href={getWhatsAppSlipUrl(item, vendorPhone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-xl text-emerald-700 hover:bg-emerald-50 transition-colors"
+                      title="Share Receipt on WhatsApp"
+                    >
+                      <MessageSquare size={14} />
+                    </a>
+
+                    {/* Delete Entry */}
+                    <button
+                      onClick={() => setCollectionToDelete(item)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                      title="Delete Slip"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+
+                  {/* View Details Slip */}
+                  <button
+                    onClick={() => setSelectedCollection(item)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  >
+                    <Eye size={13} /> Slip
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* TABLE VIEW (Desktop / Tablet) */
+        <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="py-3.5 px-4">Date / Shift</th>
-                  <th className="py-3.5 px-4">Vendor &amp; Collector</th>
-                  <th className="py-3.5 px-4">Product &amp; Volume</th>
-                  <th className="py-3.5 px-4">Quality (Fat / SNF)</th>
-                  <th className="py-3.5 px-4">Amount &amp; Payment</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4">Shift &amp; Slip</th>
+                  <th className="py-3 px-4">Vendor</th>
+                  <th className="py-3 px-4">Volume &amp; Rate</th>
+                  <th className="py-3 px-4">Fat / SNF</th>
+                  <th className="py-3 px-4">Amount</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {collections.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                    {/* Date / Shift */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         {item.shift === "MORNING" ? (
-                          <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-xs" title="Morning Shift">
-                            <Sun size={14} />
-                          </div>
-                        ) : item.shift === "EVENING" ? (
-                          <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs" title="Evening Shift">
-                            <Moon size={14} />
-                          </div>
+                          <Sun size={15} className="text-amber-600" />
                         ) : (
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs">
-                            <Clock size={14} />
-                          </div>
+                          <Moon size={15} className="text-indigo-600" />
                         )}
                         <div>
-                          <p className="font-bold text-slate-900">{item.collection_date}</p>
+                          <p className="font-bold text-slate-900">{item.shift}</p>
                           <p className="text-[10px] text-slate-400 font-mono">{item.collection_id}</p>
                         </div>
                       </div>
                     </td>
 
-                    {/* Vendor & Collector */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-4">
                       <p className="font-bold text-slate-900">{item.vendor_name}</p>
-                      <p className="text-[11px] text-slate-500">
-                        Collector: <span className="font-semibold text-slate-700">{item.collector_name}</span>
-                      </p>
+                      <p className="text-[11px] text-slate-500">{item.collector_name}</p>
                     </td>
 
-                    {/* Product & Volume */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-900">
-                          {item.quantity} {item.unit}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                          {item.product_name}
-                        </span>
-                      </div>
+                    <td className="py-3 px-4">
+                      <p className="font-bold text-slate-900">
+                        {item.quantity} {item.unit}
+                      </p>
                       <p className="text-[10px] text-slate-400">@ ₹{item.rate_per_unit}/{item.unit === "Liters" ? "L" : "Kg"}</p>
                     </td>
 
-                    {/* Quality (Fat / SNF) */}
-                    <td className="py-3.5 px-4">
-                      {item.fat_percentage || item.snf_percentage ? (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {item.fat_percentage && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
-                              Fat {item.fat_percentage}%
-                            </span>
-                          )}
-                          {item.snf_percentage && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200/60">
-                              SNF {item.snf_percentage}%
-                            </span>
-                          )}
-                          {item.container_can_no && (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono bg-slate-100 text-slate-600">
-                              {item.container_can_no}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-[11px]">Standard / Not tested</span>
-                      )}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1.5">
+                        {item.fat_percentage && (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold text-[10px]">
+                            {item.fat_percentage}% Fat
+                          </span>
+                        )}
+                        {item.snf_percentage && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 font-bold text-[10px]">
+                            {item.snf_percentage}% SNF
+                          </span>
+                        )}
+                      </div>
                     </td>
 
-                    {/* Amount & Payment Status */}
-                    <td className="py-3.5 px-4">
-                      <p className="font-bold text-slate-900">₹{item.total_amount.toLocaleString("en-IN")}</p>
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      ₹{item.total_amount.toLocaleString("en-IN")}
+                    </td>
+
+                    <td className="py-3 px-4">
                       <button
                         onClick={() => handleTogglePayment(item)}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-0.5 transition-all ${
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           item.payment_status === "PAID"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100"
-                            : "bg-amber-50 text-amber-700 border border-amber-200/60 hover:bg-amber-100"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
                         }`}
-                        title="Click to toggle payment status"
                       >
-                        {item.payment_status === "PAID" ? (
-                          <>
-                            <Check size={10} /> Paid
-                          </>
-                        ) : (
-                          <>
-                            <Clock size={10} /> Pending
-                          </>
-                        )}
+                        {item.payment_status}
                       </button>
                     </td>
 
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setSelectedCollection(item)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                          title="View Details & Receipt"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                         >
                           <Eye size={15} />
                         </button>
                         <button
                           onClick={() => setCollectionToDelete(item)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Delete Record"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -719,432 +880,318 @@ export default function DailyCollectionsPage() {
             </table>
           </div>
         </div>
-      ) : (
-        /* GRID VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {collections.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-3xl border border-slate-100 shadow-xs hover:shadow-md hover:border-emerald-200 transition-all p-5 flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-3">
-                {/* Header Row */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    {item.shift === "MORNING" ? (
-                      <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-                        <Sun size={18} />
-                      </div>
-                    ) : item.shift === "EVENING" ? (
-                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-                        <Moon size={18} />
-                      </div>
-                    ) : (
-                      <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
-                        <Clock size={18} />
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="font-bold text-sm text-slate-900 line-clamp-1">{item.vendor_name}</h3>
-                      <p className="text-[11px] text-slate-400 font-mono">{item.collection_id} • {item.collection_date}</p>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      item.payment_status === "PAID"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-amber-50 text-amber-700 border border-amber-200"
-                    }`}
-                  >
-                    {item.payment_status}
-                  </span>
-                </div>
-
-                {/* Volume & Rate Row */}
-                <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Quantity</span>
-                    <p className="font-bold text-base text-slate-900">
-                      {item.quantity} <span className="text-xs font-normal text-slate-500">{item.unit}</span>
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Total Amount</span>
-                    <p className="font-bold text-base text-emerald-700">₹{item.total_amount.toLocaleString("en-IN")}</p>
-                  </div>
-                </div>
-
-                {/* Quality Metrics */}
-                {(item.fat_percentage || item.snf_percentage || item.container_can_no) && (
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    {item.fat_percentage && (
-                      <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-100">
-                        Fat: {item.fat_percentage}%
-                      </span>
-                    )}
-                    {item.snf_percentage && (
-                      <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-100">
-                        SNF: {item.snf_percentage}%
-                      </span>
-                    )}
-                    {item.container_can_no && (
-                      <span className="px-2 py-0.5 rounded-lg text-xs font-mono bg-slate-100 text-slate-700">
-                        {item.container_can_no}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Collector Agent */}
-                <div className="text-xs text-slate-500 flex items-center justify-between pt-1">
-                  <span>Collector: <strong className="text-slate-800">{item.collector_name}</strong></span>
-                  <span className="text-[11px] text-slate-400">{item.product_name}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                <button
-                  onClick={() => handleTogglePayment(item)}
-                  className="text-xs font-semibold text-slate-600 hover:text-emerald-700"
-                >
-                  {item.payment_status === "PAID" ? "Mark Pending" : "Mark Paid"}
-                </button>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setSelectedCollection(item)}
-                    className="p-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors text-xs font-medium flex items-center gap-1 px-2.5"
-                  >
-                    <Eye size={13} /> Details
-                  </button>
-                  <button
-                    onClick={() => setCollectionToDelete(item)}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       )}
 
       {/* ========================================================================= */}
-      {/* RECORD NEW COLLECTION MODAL */}
+      {/* MOBILE STICKY FLOATING ACTION BUTTON (+ RECORD INTAKE) */}
+      {/* ========================================================================= */}
+      <div className="fixed bottom-4 right-4 sm:hidden z-30">
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-[#16a34a] text-white font-extrabold text-sm shadow-xl shadow-emerald-700/40 active:scale-95 transition-all"
+        >
+          <Plus size={18} />
+          <span>Record Milk</span>
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* RECORD NEW COLLECTION MODAL (MOBILE BOTTOM SHEET & DESKTOP DIALOG) */}
       {/* ========================================================================= */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="p-5 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 rounded-t-3xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center font-bold shrink-0">
                   <ClipboardCheck size={20} />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">Record Daily Vendor Collection</h2>
-                  <p className="text-xs text-slate-500">Log vendor milk intake, test results, and procurement quantities</p>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900">Record Vendor Milk Intake</h2>
+                  <p className="text-[11px] text-slate-500">Quick field entry form</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleAddCollectionSubmit} className="p-5 md:p-6 space-y-5">
-              {/* Date, Shift, & Collector Agent */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Collection Date <span className="text-rose-500">*</span>
-                  </label>
+            {/* Scrollable Form Body */}
+            <form
+              onSubmit={(e) => handleAddCollectionSubmit(e, false)}
+              className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1"
+            >
+              {/* Shift & Date Quick Bar */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-700">Date</label>
                   <input
                     type="date"
                     required
                     value={formData.collection_date}
                     onChange={(e) => setFormData({ ...formData, collection_date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Collection Shift <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={formData.shift}
-                    onChange={(e) => setFormData({ ...formData, shift: e.target.value as any })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
-                  >
-                    <option value="MORNING">Morning Shift (AM)</option>
-                    <option value="EVENING">Evening Shift (PM)</option>
-                    <option value="GENERAL">General / Afternoon</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Collector Person Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.collector_name}
-                    onChange={(e) => setFormData({ ...formData, collector_name: e.target.value })}
-                    placeholder="e.g. Ramesh / Agent 01"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
-                  />
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-700">Shift</label>
+                  <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, shift: "MORNING" })}
+                      className={`py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                        formData.shift === "MORNING" ? "bg-amber-500 text-white shadow-2xs" : "text-slate-700"
+                      }`}
+                    >
+                      <Sun size={12} /> AM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, shift: "EVENING" })}
+                      className={`py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                        formData.shift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs" : "text-slate-700"
+                      }`}
+                    >
+                      <Moon size={12} /> PM
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Vendor Selection & Product */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Select Vendor / Producer <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={formData.vendor_id}
-                    onChange={(e) => handleVendorSelect(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
-                  >
-                    {registeredVendors.length > 0 ? (
-                      registeredVendors.map((v) => (
-                        <option key={v.vendor_id} value={v.vendor_id}>
-                          {v.business_name} ({v.contact_person})
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">No vendors found (Register a vendor first)</option>
-                    )}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Product Collected <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.product_name}
-                    onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                    placeholder="e.g. Fresh Cow Milk / Buffalo Milk"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
+              {/* Vendor Selector (Large Touch Friendly) */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                  <span>
+                    Vendor / Farmer <span className="text-rose-500">*</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">Registered Producers</span>
+                </label>
+                <select
+                  value={formData.vendor_id}
+                  onChange={(e) => handleVendorSelect(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                >
+                  {registeredVendors.length > 0 ? (
+                    registeredVendors.map((v) => (
+                      <option key={v.vendor_id} value={v.vendor_id}>
+                        {v.business_name} ({v.contact_person})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No vendors found</option>
+                  )}
+                </select>
               </div>
 
-              {/* Quantity, Unit & Rate */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Quantity Collected <span className="text-rose-500">*</span>
+              {/* Quantity, Rate & Live Total Banner */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-800">
+                    Quantity (Liters) <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     min="0.01"
+                    inputMode="decimal"
                     required
                     value={formData.quantity}
                     onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    placeholder="e.g. 50.00"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none font-bold"
+                    placeholder="e.g. 50.0"
+                    className="w-full px-3.5 py-2.5 bg-emerald-50/40 border border-emerald-300 rounded-xl text-base font-black text-slate-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 focus:outline-none"
                   />
+                  {/* Quick Quantity Presets for One-Touch Mobile Entry */}
+                  <div className="flex gap-1 pt-0.5">
+                    {["20", "30", "50", "100"].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, quantity: preset })}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[10px] font-bold"
+                      >
+                        +{preset}L
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Unit of Measure</label>
-                  <select
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
-                  >
-                    <option value="Liters">Liters (L)</option>
-                    <option value="Kg">Kilograms (Kg)</option>
-                    <option value="Units">Units / Crates</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Rate per Unit (₹)</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-800">Rate per Liter (₹)</label>
                   <input
                     type="number"
                     step="0.5"
                     min="0"
+                    inputMode="decimal"
                     value={formData.rate_per_unit}
                     onChange={(e) => setFormData({ ...formData, rate_per_unit: e.target.value })}
-                    placeholder="e.g. 42.00"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                    placeholder="42.00"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
                   />
+                  {/* Quick Rate Presets */}
+                  <div className="flex gap-1 pt-0.5">
+                    {["40", "42", "45", "50"].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, rate_per_unit: r })}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[10px] font-bold"
+                      >
+                        ₹{r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Live Calculation Preview Banner */}
+              {/* Live Amount Banner */}
               {Number(formData.quantity) > 0 && (
-                <div className="p-3.5 bg-emerald-50/70 border border-emerald-200/70 rounded-2xl flex items-center justify-between">
-                  <span className="text-xs font-semibold text-emerald-900">Calculated Payout Amount:</span>
-                  <span className="text-base font-bold text-emerald-800">
+                <div className="p-3 bg-emerald-100/70 border border-emerald-300 rounded-2xl flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-950">Payout Amount:</span>
+                  <span className="text-lg font-black text-emerald-900">
                     ₹{(Number(formData.quantity) * (Number(formData.rate_per_unit) || 0)).toLocaleString("en-IN")}
                   </span>
                 </div>
               )}
 
-              {/* Milk Quality Test Section */}
-              <div className="space-y-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
-                <div className="flex items-center gap-2">
-                  <Gauge size={16} className="text-emerald-600" />
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Milk Quality &amp; Lab Test Details
-                  </h3>
+              {/* Milk Quality Test Section (Fat, SNF, CLR, Can) */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1">
+                    <Gauge size={14} className="text-emerald-600" /> Milk Quality Testing
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-700">Lab &amp; Lactometer</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">Fat Percentage (%)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-bold text-slate-700">Fat %</label>
                     <input
                       type="number"
                       step="0.1"
                       min="0"
                       max="15"
+                      inputMode="decimal"
                       value={formData.fat_percentage}
                       onChange={(e) => setFormData({ ...formData, fat_percentage: e.target.value })}
-                      placeholder="e.g. 4.5"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none font-semibold"
+                      placeholder="4.5"
+                      className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none text-center"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">SNF (%)</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-bold text-slate-700">SNF %</label>
                     <input
                       type="number"
                       step="0.1"
                       min="0"
                       max="15"
+                      inputMode="decimal"
                       value={formData.snf_percentage}
                       onChange={(e) => setFormData({ ...formData, snf_percentage: e.target.value })}
-                      placeholder="e.g. 8.5"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none font-semibold"
+                      placeholder="8.5"
+                      className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none text-center"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">CLR / Lactometer</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-bold text-slate-700">CLR Reading</label>
                     <input
                       type="number"
                       step="0.5"
+                      inputMode="decimal"
                       value={formData.clr_reading}
                       onChange={(e) => setFormData({ ...formData, clr_reading: e.target.value })}
-                      placeholder="e.g. 28.5"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                      placeholder="28.5"
+                      className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none text-center"
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">Container / Can No</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-bold text-slate-700">Can No.</label>
                     <input
                       type="text"
                       value={formData.container_can_no}
                       onChange={(e) => setFormData({ ...formData, container_can_no: e.target.value })}
-                      placeholder="e.g. CAN-04"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">Quality Grade</label>
-                    <select
-                      value={formData.quality_grade}
-                      onChange={(e) => setFormData({ ...formData, quality_grade: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
-                    >
-                      <option value="Grade A">Grade A (Optimal Quality)</option>
-                      <option value="Grade B">Grade B (Standard)</option>
-                      <option value="Premium">Premium Raw Milk</option>
-                      <option value="Under Review">Under Lab Review</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-700">Temperature (°C)</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={formData.temperature}
-                      onChange={(e) => setFormData({ ...formData, temperature: e.target.value })}
-                      placeholder="e.g. 4.0"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                      placeholder="CAN-01"
+                      className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none text-center"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Payment Status & Mode */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Payment Status</label>
+              {/* Collector Name & Payment Status */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-700">Collector Person</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.collector_name}
+                    onChange={(e) => setFormData({ ...formData, collector_name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-700">Payment Status</label>
                   <select
                     value={formData.payment_status}
                     onChange={(e) => setFormData({ ...formData, payment_status: e.target.value as any })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none font-semibold"
                   >
-                    <option value="PENDING">Pending (Weekly Settlement)</option>
-                    <option value="PAID">Paid on Collection (Instant)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Payment Mode</label>
-                  <select
-                    value={formData.payment_mode}
-                    onChange={(e) => setFormData({ ...formData, payment_mode: e.target.value as any })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
-                  >
-                    <option value="CASH">Cash</option>
-                    <option value="UPI">UPI Transfer</option>
-                    <option value="BANK_TRANSFER">Bank NEFT/IMPS</option>
-                    <option value="CREDIT">Vendor Credit Balance</option>
+                    <option value="PENDING">Pending (Weekly)</option>
+                    <option value="PAID">Paid Instant</option>
                   </select>
                 </div>
               </div>
 
               {/* Notes */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Collection Remarks / Notes</label>
-                <textarea
-                  rows={2}
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-slate-700">Remarks (Optional)</label>
+                <input
+                  type="text"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="e.g., Fresh farm morning yield, chilled to 4°C, tested in lab"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                  placeholder="e.g., Morning yield, chilled"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none"
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              {/* Submit Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  className="px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={addLoading}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-[#16a34a] hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {addLoading && <RefreshCw size={13} className="animate-spin" />}
-                  <span>Save Collection</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={addLoading}
+                    onClick={(e) => handleAddCollectionSubmit(e, true)}
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 transition-colors flex items-center gap-1"
+                  >
+                    <PlusCircle size={14} /> Next Vendor
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={addLoading}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#16a34a] hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                  >
+                    {addLoading && <RefreshCw size={13} className="animate-spin" />}
+                    <span>Save Intake</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1155,47 +1202,47 @@ export default function DailyCollectionsPage() {
       {/* COLLECTION DETAIL MODAL / RECEIPT VIEW */}
       {/* ========================================================================= */}
       {selectedCollection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="p-5 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 rounded-t-3xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-10 rounded-t-3xl">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                   <ClipboardCheck size={20} />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">Collection Slip / Receipt</h2>
-                  <p className="text-xs text-slate-500 font-mono">{selectedCollection.collection_id}</p>
+                  <h2 className="text-sm font-bold text-slate-900">Collection Receipt</h2>
+                  <p className="text-[10px] text-slate-500 font-mono">{selectedCollection.collection_id}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedCollection(null)}
-                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-5 md:p-6 space-y-5">
+            <div className="p-4 sm:p-5 space-y-4">
               {/* Slip Card */}
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 font-mono text-xs">
-                <div className="text-center pb-3 border-b border-dashed border-slate-300">
-                  <h3 className="font-bold text-sm text-slate-900 uppercase">F2H Fresh Dairy &amp; Produce</h3>
-                  <p className="text-[11px] text-slate-500 font-sans">Vendor Procurement Intake Receipt</p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 font-mono text-xs">
+                <div className="text-center pb-2 border-b border-dashed border-slate-300">
+                  <h3 className="font-bold text-xs sm:text-sm text-slate-900 uppercase">F2H Fresh Dairy &amp; Produce</h3>
+                  <p className="text-[10px] text-slate-500 font-sans">Field Intake Receipt</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div>
-                    <span className="text-slate-400 block font-sans">Date &amp; Shift:</span>
+                    <span className="text-slate-400 block font-sans">Date:</span>
                     <strong className="text-slate-800">
                       {selectedCollection.collection_date} ({selectedCollection.shift})
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-sans">Container / Can:</span>
+                    <span className="text-slate-400 block font-sans">Container:</span>
                     <strong className="text-slate-800">{selectedCollection.container_can_no || "N/A"}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-sans">Vendor Name:</span>
+                    <span className="text-slate-400 block font-sans">Vendor:</span>
                     <strong className="text-slate-800">{selectedCollection.vendor_name}</strong>
                   </div>
                   <div>
@@ -1205,20 +1252,20 @@ export default function DailyCollectionsPage() {
                 </div>
 
                 {/* Quality Box */}
-                <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2">
+                <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-1.5">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-sans text-slate-600">Product:</span>
                     <span className="font-bold text-slate-900">{selectedCollection.product_name}</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-sans text-slate-600">Quantity:</span>
+                    <span className="font-sans text-slate-600">Volume:</span>
                     <span className="font-bold text-slate-900">
                       {selectedCollection.quantity} {selectedCollection.unit}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-sans text-slate-600">Rate per Unit:</span>
-                    <span className="font-bold text-slate-900">₹{selectedCollection.rate_per_unit}</span>
+                    <span className="font-sans text-slate-600">Rate:</span>
+                    <span className="font-bold text-slate-900">₹{selectedCollection.rate_per_unit}/{selectedCollection.unit === 'Liters' ? 'L' : 'Kg'}</span>
                   </div>
 
                   {selectedCollection.fat_percentage && (
@@ -1232,45 +1279,56 @@ export default function DailyCollectionsPage() {
 
                   {selectedCollection.clr_reading && (
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-sans text-slate-600">CLR / Lactometer:</span>
+                      <span className="font-sans text-slate-600">CLR Reading:</span>
                       <span className="font-bold text-blue-700">{selectedCollection.clr_reading}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Total Payout */}
-                <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-300 text-sm">
-                  <span className="font-bold text-slate-800 uppercase">Total Amount:</span>
+                <div className="flex items-center justify-between pt-1 border-t border-dashed border-slate-300 text-sm">
+                  <span className="font-bold text-slate-800 uppercase">Payout:</span>
                   <span className="font-bold text-base text-emerald-800">
                     ₹{selectedCollection.total_amount.toLocaleString("en-IN")}
                   </span>
                 </div>
 
-                <div className="text-center pt-2 text-[10px] text-slate-400 font-sans">
+                <div className="text-center pt-1 text-[10px] text-slate-400 font-sans">
                   Status: <strong className="text-slate-700">{selectedCollection.payment_status}</strong> (Mode:{" "}
                   {selectedCollection.payment_mode || "CASH"})
                 </div>
               </div>
             </div>
 
-            <div className="p-5 border-t border-slate-100 bg-slate-50/80 rounded-b-3xl flex items-center justify-between">
-              <button
-                onClick={() => handleTogglePayment(selectedCollection)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                  selectedCollection.payment_status === "PAID"
-                    ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                    : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                }`}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/80 rounded-b-3xl flex items-center justify-between gap-2">
+              <a
+                href={getWhatsAppSlipUrl(selectedCollection)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-xs"
               >
-                {selectedCollection.payment_status === "PAID" ? "Mark Pending" : "Mark as Paid"}
-              </button>
+                <MessageSquare size={14} /> WhatsApp Slip
+              </a>
 
-              <button
-                onClick={() => setSelectedCollection(null)}
-                className="px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100 transition-colors"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleTogglePayment(selectedCollection)}
+                  className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                    selectedCollection.payment_status === "PAID"
+                      ? "bg-amber-50 text-amber-800 border-amber-200"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  }`}
+                >
+                  {selectedCollection.payment_status === "PAID" ? "Mark Pending" : "Mark Paid"}
+                </button>
+
+                <button
+                  onClick={() => setSelectedCollection(null)}
+                  className="px-3.5 py-2 bg-white text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1281,29 +1339,28 @@ export default function DailyCollectionsPage() {
       {/* ========================================================================= */}
       {collectionToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <AlertCircle size={24} />
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <AlertCircle size={22} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Remove Collection Entry?</h3>
+              <h3 className="text-sm font-bold text-slate-900">Remove Collection Slip?</h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Are you sure you want to remove collection slip{" "}
-                <span className="font-mono font-semibold text-slate-800">{collectionToDelete.collection_id}</span> for{" "}
-                <span className="font-semibold text-slate-800">{collectionToDelete.vendor_name}</span>?
+                Remove slip <span className="font-mono font-semibold">{collectionToDelete.collection_id}</span> for{" "}
+                <span className="font-semibold">{collectionToDelete.vendor_name}</span>?
               </p>
             </div>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 onClick={() => setCollectionToDelete(null)}
-                className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+                className="px-3.5 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-200"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteCollection}
                 disabled={deleteLoading}
-                className="px-4 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl hover:bg-rose-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3.5 py-2 bg-rose-600 text-white text-xs font-semibold rounded-xl hover:bg-rose-700 flex items-center gap-1.5 disabled:opacity-50"
               >
                 {deleteLoading && <RefreshCw size={13} className="animate-spin" />}
                 <span>Delete</span>
