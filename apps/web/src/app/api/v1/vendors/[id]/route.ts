@@ -4,25 +4,45 @@
 //
 // Project     : F2H Fresh
 // File        : route.ts (Single Vendor Profile)
-// Description : Retrieve single vendor profile by ID or vendor_id
+// Description : Retrieve, update, or remove single vendor profile by ID or vendor_id
 // ============================================================================
 
 import { NextResponse } from 'next/server';
-import { getRegisteredVendors, updateRegisteredVendor, deleteRegisteredVendor } from '@/lib/vendors.store';
+import { getRegisteredVendors, updateRegisteredVendor, deleteRegisteredVendor, addRegisteredVendor } from '@/lib/vendors.store';
 
 export const dynamic = 'force-dynamic';
 
+function getInternalApiUrl(): string {
+  return (process.env.INTERNAL_API_URL || 'https://dev.f2hfresh.com').replace(/\/+$/, '');
+}
+
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  props: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const { id } = await params;
+    const rawParams = await props.params;
+    const id = rawParams?.id;
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Vendor ID is required' }, { status: 400 });
+    }
+
     const allVendors = getRegisteredVendors();
-    
-    const vendor = allVendors.find(
+    let vendor = allVendors.find(
       (v) => String(v.id) === String(id) || v.vendor_id.toLowerCase() === id.toLowerCase(),
     );
+
+    if (!vendor) {
+      try {
+        const backendRes = await fetch(`${getInternalApiUrl()}/api/v1/vendors/${id}`, { cache: 'no-store' });
+        const backendData = await backendRes.json();
+        if (backendData.success && backendData.data) {
+          vendor = backendData.data;
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     if (!vendor) {
       return NextResponse.json(
@@ -45,13 +65,36 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  props: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const { id } = await params;
-    const body = await request.json();
+    const rawParams = await props.params;
+    const id = rawParams?.id;
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Vendor ID is required' }, { status: 400 });
+    }
 
-    const updated = updateRegisteredVendor(id, body);
+    const body = await request.json();
+    let updated = updateRegisteredVendor(id, body);
+
+    // Sync with remote backend API if possible
+    try {
+      const backendRes = await fetch(`${getInternalApiUrl()}/api/v1/vendors/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const backendData = await backendRes.json();
+      if (backendData.success && backendData.data) {
+        if (!updated) {
+          updated = addRegisteredVendor(backendData.data);
+        } else {
+          updated = { ...updated, ...backendData.data };
+        }
+      }
+    } catch {
+      // ignore
+    }
 
     if (!updated) {
       return NextResponse.json(
@@ -75,13 +118,29 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  props: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const { id } = await params;
-    const deleted = deleteRegisteredVendor(id);
+    const rawParams = await props.params;
+    const id = rawParams?.id;
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Vendor ID is required' }, { status: 400 });
+    }
 
-    if (!deleted) {
+    const deletedLocally = deleteRegisteredVendor(id);
+    let deletedRemotely = false;
+
+    try {
+      const backendRes = await fetch(`${getInternalApiUrl()}/api/v1/vendors/${id}`, {
+        method: 'DELETE',
+      });
+      const backendData = await backendRes.json();
+      deletedRemotely = Boolean(backendData?.success);
+    } catch {
+      // ignore
+    }
+
+    if (!deletedLocally && !deletedRemotely) {
       return NextResponse.json(
         { success: false, message: `Vendor profile '${id}' not found` },
         { status: 404 },
@@ -99,4 +158,5 @@ export async function DELETE(
     );
   }
 }
+
 

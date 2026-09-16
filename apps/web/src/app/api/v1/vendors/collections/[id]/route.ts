@@ -12,20 +12,42 @@ import {
   getVendorCollections,
   updateVendorCollection,
   deleteVendorCollection,
+  addVendorCollection,
 } from '@/lib/vendor-collections.store';
 
 export const dynamic = 'force-dynamic';
 
+function getInternalApiUrl(): string {
+  return (process.env.INTERNAL_API_URL || 'https://dev.f2hfresh.com').replace(/\/+$/, '');
+}
+
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  props: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const { id } = await params;
+    const rawParams = await props.params;
+    const id = rawParams?.id;
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Collection ID is required' }, { status: 400 });
+    }
+
     const all = getVendorCollections();
-    const found = all.find(
+    let found = all.find(
       (c) => String(c.id) === String(id) || c.collection_id.toLowerCase() === id.toLowerCase(),
     );
+
+    if (!found) {
+      try {
+        const backendRes = await fetch(`${getInternalApiUrl()}/api/v1/vendors/collections/${id}`, { cache: 'no-store' });
+        const backendData = await backendRes.json();
+        if (backendData.success && backendData.data) {
+          found = backendData.data;
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     if (!found) {
       return NextResponse.json(
@@ -48,13 +70,36 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  props: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const { id } = await params;
-    const body = await request.json();
+    const rawParams = await props.params;
+    const id = rawParams?.id;
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Collection ID is required' }, { status: 400 });
+    }
 
-    const updated = updateVendorCollection(id, body);
+    const body = await request.json();
+    let updated = updateVendorCollection(id, body);
+
+    // Sync with remote backend API
+    try {
+      const backendRes = await fetch(`${getInternalApiUrl()}/api/v1/vendors/collections/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const backendData = await backendRes.json();
+      if (backendData.success && backendData.data) {
+        if (!updated) {
+          updated = addVendorCollection(backendData.data);
+        } else {
+          updated = { ...updated, ...backendData.data };
+        }
+      }
+    } catch {
+      // ignore
+    }
 
     if (!updated) {
       return NextResponse.json(
@@ -78,13 +123,29 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  props: { params: Promise<{ id: string }> | { id: string } },
 ) {
   try {
-    const { id } = await params;
-    const deleted = deleteVendorCollection(id);
+    const rawParams = await props.params;
+    const id = rawParams?.id;
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Collection ID is required' }, { status: 400 });
+    }
 
-    if (!deleted) {
+    const deletedLocally = deleteVendorCollection(id);
+    let deletedRemotely = false;
+
+    try {
+      const backendRes = await fetch(`${getInternalApiUrl()}/api/v1/vendors/collections/${id}`, {
+        method: 'DELETE',
+      });
+      const backendData = await backendRes.json();
+      deletedRemotely = Boolean(backendData?.success);
+    } catch {
+      // ignore
+    }
+
+    if (!deletedLocally && !deletedRemotely) {
       return NextResponse.json(
         { success: false, message: `Collection record '${id}' not found` },
         { status: 404 },
@@ -102,3 +163,4 @@ export async function DELETE(
     );
   }
 }
+

@@ -72,16 +72,20 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${internalApiUrl}/api/:path*`,
-      },
-      {
-        source: '/uploads/:path*',
-        destination: `${internalApiUrl}/uploads/:path*`,
-      },
-    ];
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: `${internalApiUrl}/api/:path*`,
+        },
+        {
+          source: '/uploads/:path*',
+          destination: `${internalApiUrl}/uploads/:path*`,
+        },
+      ],
+    };
   },
   async headers() {
     if (process.env.NODE_ENV !== "production") return [];
