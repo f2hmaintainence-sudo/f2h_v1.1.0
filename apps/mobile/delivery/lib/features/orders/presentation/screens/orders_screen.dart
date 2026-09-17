@@ -95,29 +95,28 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   void _showConfirmation(BuildContext context, GroupedStop stop) async {
-    final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
-        ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
-        : null;
-    if (sessionState != null && !sessionState.isPickupConfirmed) {
+    final blocState = context.read<DeliverySessionBloc>().state;
+    if (blocState is DeliverySessionLoaded && !blocState.isPickupConfirmed) {
       showPickupRequiredDialog(
         context,
-        orders: sessionState.orders,
-        groupedStops: sessionState.groupedStops,
-        currentRun: sessionState.currentRun,
+        orders: blocState.orders,
+        groupedStops: blocState.groupedStops,
+        currentRun: blocState.currentRun,
       );
       return;
     }
 
-    final position = await _locationService.getCurrentPosition();
-    if (position != null) {
-      final dist = _locationService.haversineDistanceKm(
-        position.latitude,
-        position.longitude,
-        stop.addressLat,
-        stop.addressLng,
-      );
-      print('[DEBUG] Rider is $dist km away from stop.');
-    }
+    _locationService.getCurrentPosition().then((position) {
+      if (position != null) {
+        final dist = _locationService.haversineDistanceKm(
+          position.latitude,
+          position.longitude,
+          stop.addressLat,
+          stop.addressLng,
+        );
+        debugPrint('[DEBUG] Rider is $dist km away from stop.');
+      }
+    }).catchError((_) {});
 
     Map<String, dynamic>? confirmedResult;
 

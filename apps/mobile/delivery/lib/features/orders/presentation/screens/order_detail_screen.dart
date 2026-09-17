@@ -110,45 +110,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _showConfirmation(BuildContext context) async {
-    final position = await _locationService.getCurrentPosition();
-    if (position != null) {
-      final dist = _locationService.haversineDistanceKm(
-        position.latitude,
-        position.longitude,
-        _currentStop.addressLat,
-        _currentStop.addressLng,
-      );
-      print('[DEBUG] Rider is $dist km away from stop.');
-      // Bypassed 300 meters check to allow testing locally
-      /*
-      if (dist > 0.3) { // 300 meters threshold
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Please reach the location to mark as delivered.'),
-              backgroundColor: kDanger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        }
-        return;
-      }
-      */
-    }
-
-    final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
-        ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
-        : null;
-    if (sessionState != null && !sessionState.isPickupConfirmed) {
+    final blocState = context.read<DeliverySessionBloc>().state;
+    if (blocState is DeliverySessionLoaded && !blocState.isPickupConfirmed) {
       showPickupRequiredDialog(
         context,
-        orders: sessionState.orders,
-        groupedStops: sessionState.groupedStops,
-        currentRun: sessionState.currentRun,
+        orders: blocState.orders,
+        groupedStops: blocState.groupedStops,
+        currentRun: blocState.currentRun,
       );
       return;
     }
+
+    // Fire non-blocking GPS distance check in background for debug logs
+    _locationService.getCurrentPosition().then((position) {
+      if (position != null) {
+        final dist = _locationService.haversineDistanceKm(
+          position.latitude,
+          position.longitude,
+          _currentStop.addressLat,
+          _currentStop.addressLng,
+        );
+        debugPrint('[DEBUG] Rider is $dist km away from stop.');
+      }
+    }).catchError((_) {});
 
     Map<String, dynamic>? confirmedResult;
 

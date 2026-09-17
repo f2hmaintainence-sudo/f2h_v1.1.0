@@ -1063,6 +1063,15 @@ export class DeliveryOrderService {
     const norm = this.normalizeDeliveryBody(body);
     const status = body.status || 'delivered';
 
+    if (status === 'delivered') {
+      const dispatch = await this.findActiveDispatchForRun(runIds);
+      if (dispatch && !isDispatchHandedOver(dispatch.status)) {
+        throw new BadRequestException(
+          'Cannot deliver order: Warehouse dispatch has not been confirmed yet. Please verify and confirm dispatch pickup first.',
+        );
+      }
+    }
+
     await this.db.transaction(async (client) => {
       // 1. Mark each order in the stop as delivered/failed & process containers
       let isFirstOrder = true;
