@@ -1,3 +1,13 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : roles.guard.ts
+// Description : Enforces role and granular RBAC permission-based access control
+//
+// ============================================================================
+
 import {
   CanActivate,
   ExecutionContext,
@@ -7,16 +17,9 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { RoleResolverService } from '../role-resolver.service';
 
-/**
- * Enforces `@Roles()`. Registered globally after `JwtAuthGuard`, so by the time it
- * runs `req.user` is populated for every non-public route.
- *
- * The roles are re-read from the database (Redis-cached) instead of taken from the
- * token, so revoking a role takes effect within the cache TTL rather than at token
- * rotation — which, for this system, could be never.
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(
@@ -33,28 +36,65 @@ export class RolesGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const required = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!required?.length) return true;
+
+    const requiredPerms = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (!requiredRoles?.length && !requiredPerms?.length) return true;
 
     const request = context.switchToHttp().getRequest();
-    const userId = request.user?.user_id;
+    const userId = request.user?.user_id || request.user?.id;
     if (!userId) {
-      throw new ForbiddenException('Insufficient role');
+      throw new ForbiddenException('Insufficient permissions');
     }
 
     const roles = await this.roleResolver.resolveRoles(userId);
-    // Cache the resolved roles on the request so handlers and later guards
-    // (branch scoping, audit) do not resolve them a second time.
     request.user.roles = roles;
 
-    const wanted = required.map((role) => role.toUpperCase());
-    if (!roles.some((role) => wanted.includes(role))) {
-      throw new ForbiddenException('Insufficient role');
+    // 1. Super Admin and Admin always have full universal access across all modules
+    const isSuperOrAdmin = roles.some((role) =>
+      ['ADMIN', 'SUPER_ADMIN'].includes((role || '').toUpperCase()),
+    );
+    if (isSuperOrAdmin) {
+      return true;
     }
 
-    return true;
+    // 2. If explicit @RequirePermissions(...) is specified, check against resolved permissions
+    if (requiredPerms?.length) {
+      const perms = await this.roleResolver.resolvePermissions(userId);
+      if (perms.includes('*') || requiredPerms.some((p) => perms.includes(p))) {
+        return true;
+      }
+    }
+
+    // 3. Direct role match (e.g. for CUSTOMER or DELIVERY_PARTNER routes)
+    if (requiredRoles?.length) {
+      const wanted = requiredRoles.map((role) => role.toUpperCase());
+      if (roles.some((role) => wanted.includes(role))) {
+        return true;
+      }
+
+      // 4. If the route requires ADMIN / SUPER_ADMIN, check granular permissions for staff roles
+      const isRequiresAdmin = wanted.includes('ADMIN') || wanted.includes('SUPER_ADMIN');
+      if (isRequiresAdmin) {
+        const hasAccess = await this.roleResolver.checkRoutePermission(
+          userId,
+          request.method,
+          request.originalUrl || request.url,
+          context,
+        );
+        if (hasAccess) {
+          return true;
+        }
+      }
+    }
+
+    throw new ForbiddenException('Insufficient permissions');
   }
 }

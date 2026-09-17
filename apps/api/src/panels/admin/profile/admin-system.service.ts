@@ -6,6 +6,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../../../shared/database/Database.service';
 import { DeveloperService } from '../../../shared/logger/Developer.service';
+import { RedisService } from '../../../shared/redis/redis.service';
 import { generateId } from '../../../helpers/RandomHelper';
 import { AuditLogQueryDto } from './admin-system.dto';
 import {
@@ -161,6 +162,7 @@ export class AdminSystemService {
   constructor(
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
+    private readonly redis: RedisService,
   ) {}
 
   // ────────────────────────────────────────────────
@@ -935,6 +937,12 @@ export class AdminSystemService {
           updated_at = NOW()
       `, [roleId.toLowerCase(), description, JSON.stringify(permissions), isActive]);
 
+      // Flush permissions cache
+      try {
+        await this.redis.clearPattern('f2h_user_perms_*');
+        await this.redis.clearPattern('f2h_user_roles_*');
+      } catch {}
+
       return {
         status: true,
         data: {
@@ -1027,6 +1035,12 @@ export class AdminSystemService {
         adminRoleParams,
       ).catch(() => {});
 
+      // Flush permissions cache
+      try {
+        await this.redis.clearPattern('f2h_user_perms_*');
+        await this.redis.clearPattern('f2h_user_roles_*');
+      } catch {}
+
       return { status: true, message: 'Role and permissions updated successfully' };
     } catch (error) {
       this.developer.error('updateRole error', { error });
@@ -1051,6 +1065,12 @@ export class AdminSystemService {
       await this.db.query(`DELETE FROM admin_roles WHERE LOWER(role_name) = LOWER($1) OR id::text = $2`, [roleId, idOrRoleId]).catch(() => {});
       // 3. Mark deleted / remove from master roles table
       await this.db.query(`UPDATE roles SET deleted_at = NOW(), is_active = 0 WHERE UPPER(role_id) = UPPER($1) OR id::text = $2`, [roleId, idOrRoleId]);
+
+      // Flush permissions cache
+      try {
+        await this.redis.clearPattern('f2h_user_perms_*');
+        await this.redis.clearPattern('f2h_user_roles_*');
+      } catch {}
 
       return { status: true, message: 'Role and permissions deleted successfully' };
     } catch (error) {
