@@ -4,6 +4,26 @@ import { DataService } from '../../../../shared/database/Data.service';
 import { DeveloperService } from '../../../../shared/logger/Developer.service';
 import { PdfService } from '../../../../common/pdf/pdf.service';
 
+function normalizeDate(val: unknown): string | null {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (!s || s === 'null' || s === 'undefined' || s === 'NaN') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const dmy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  }
+  const ymd = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
+  }
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+  return s;
+}
+
 function todayInIndia(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
@@ -161,19 +181,23 @@ export class OrdersService {
       const params: any[] = [];
       const where: string[] = [];
 
-      if (query.fromDate && query.toDate) {
-        params.push(query.fromDate);
+      const fromDate = normalizeDate(query.fromDate);
+      const toDate = normalizeDate(query.toDate);
+      const singleDate = normalizeDate(query.date);
+
+      if (fromDate && toDate) {
+        params.push(fromDate);
         where.push(`scheduled_date >= $${params.length}`);
-        params.push(query.toDate);
+        params.push(toDate);
         where.push(`scheduled_date <= $${params.length}`);
-      } else if (query.fromDate) {
-        params.push(query.fromDate);
+      } else if (fromDate) {
+        params.push(fromDate);
         where.push(`scheduled_date >= $${params.length}`);
-      } else if (query.toDate) {
-        params.push(query.toDate);
+      } else if (toDate) {
+        params.push(toDate);
         where.push(`scheduled_date <= $${params.length}`);
-      } else if (query.date) {
-        params.push(query.date);
+      } else if (singleDate) {
+        params.push(singleDate);
         where.push(`scheduled_date = $${params.length}`);
       }
 
@@ -230,7 +254,7 @@ export class OrdersService {
       return {
         status: true,
         data: rows[0] ?? {},
-        date: query.date || null,
+        date: singleDate || (fromDate && toDate ? `${fromDate} to ${toDate}` : null),
         message: 'Orders summary fetched',
       };
     } catch (error) {
@@ -240,7 +264,7 @@ export class OrdersService {
   }
 
   async getTodaySummary(query: any) {
-    const date = query.date || todayInIndia();
+    const date = normalizeDate(query.date) || todayInIndia();
     const response = await this.getOrdersSummary({ ...query, date });
 
     return {

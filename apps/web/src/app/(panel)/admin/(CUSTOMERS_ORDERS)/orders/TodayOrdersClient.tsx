@@ -133,8 +133,11 @@ export default function TodayOrdersClient({
       if (activeTab === 'one-time')     qp.set('order_source', 'one-time');
       if (slotFilter && slotFilter !== 'all') qp.set('slot', slotFilter);
       if (searchQuery.trim()) qp.set('search', searchQuery.trim());
+      qp.set('_t', String(Date.now()));
       const qs = qp.toString() ? `?${qp}` : '';
-      const result = await apiClient.get<any>(`/admin/orders/${summaryPath}${qs}`);
+      const result = await apiClient.get<any>(`/admin/orders/${summaryPath}${qs}`, {
+        cache: 'no-store',
+      });
       const payload = result?.data?.data ?? result?.data;
       if (payload && typeof payload === 'object') {
         setSummary(payload);
@@ -547,12 +550,12 @@ export default function TodayOrdersClient({
         urgentOnly={urgentOnly}
         onUrgentToggle={() => setUrgentOnly((v) => !v)}
         selectedDate={selectedDate}
-        onSelectedDateChange={(d) => { setSelectedDate(d); setFromDate(''); setToDate(''); }}
+        onSelectedDateChange={(d) => { setSelectedDate(d); setFromDate(''); setToDate(''); setTableKey((k) => k + 1); }}
         fromDate={fromDate}
-        onFromDateChange={(fd) => { setFromDate(fd); setSelectedDate(''); }}
+        onFromDateChange={(fd) => { setFromDate(fd); setSelectedDate(''); setTableKey((k) => k + 1); }}
         toDate={toDate}
-        onToDateChange={(td) => { setToDate(td); setSelectedDate(''); }}
-        onClearDates={() => { setSelectedDate(''); setFromDate(''); setToDate(''); }}
+        onToDateChange={(td) => { setToDate(td); setSelectedDate(''); setTableKey((k) => k + 1); }}
+        onClearDates={() => { setSelectedDate(''); setFromDate(''); setToDate(''); setTableKey((k) => k + 1); }}
       />
 
       {/* ── Orders Table ── */}

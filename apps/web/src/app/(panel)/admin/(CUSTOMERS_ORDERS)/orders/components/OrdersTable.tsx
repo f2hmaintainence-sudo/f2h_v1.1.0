@@ -481,14 +481,22 @@ export default function OrdersTable({
   const [pageSize, setPageSize]     = useState(20);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const prevEndpointRef = useRef(endpoint);
 
   const fetchOrders = useCallback(async (pg: number, size: number) => {
     setLoading(true);
     setError('');
     try {
       const sep = endpoint.includes('?') ? '&' : '?';
-      const url = `${API_URL}${endpoint}${sep}page=${pg}&limit=${size}`;
-      const res = await fetch(url, { credentials: 'include' });
+      const url = `${API_URL}${endpoint}${sep}page=${pg}&limit=${size}&_t=${Date.now()}`;
+      const res = await fetch(url, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json();
 
@@ -517,8 +525,15 @@ export default function OrdersTable({
 
   // Reset page to 1 on filter, endpoint, or pageSize change
   useEffect(() => {
+    if (prevEndpointRef.current !== endpoint) {
+      prevEndpointRef.current = endpoint;
+      setPage(1);
+    }
+  }, [endpoint]);
+
+  useEffect(() => {
     setPage(1);
-  }, [endpoint, tableKey, activeStatusFilter, searchQuery, slotFilter, pageSize]);
+  }, [tableKey, activeStatusFilter, searchQuery, slotFilter, pageSize]);
 
   useEffect(() => {
     fetchOrders(page, pageSize);
