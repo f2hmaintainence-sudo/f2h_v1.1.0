@@ -67,10 +67,13 @@ export class AuthController {
     const userAgent = req.headers['user-agent'] || 'unknown';
     // 1. Extract x-role strictly from header (ignore any role sent in request body)
     const rawClientRole = req.headers['x-role'];
-    const clientRole =
+    let clientRole =
       typeof rawClientRole === 'string'
         ? rawClientRole.trim().toUpperCase()
         : '';
+    if (clientRole === 'A') {
+      clientRole = 'ADMIN';
+    }
 
     if (
       !clientRole ||
@@ -252,10 +255,13 @@ export class AuthController {
     @Req() req: Request,
   ) {
     const rawClientRole = req.headers['x-role'];
-    const clientRole =
+    let clientRole =
       typeof rawClientRole === 'string'
         ? rawClientRole.trim().toUpperCase()
         : undefined;
+    if (clientRole === 'A') {
+      clientRole = 'ADMIN';
+    }
     const identifier = body.email || body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);
   }
@@ -272,10 +278,13 @@ export class AuthController {
     @Req() req: Request,
   ) {
     const rawClientRole = req.headers['x-role'];
-    const clientRole =
+    let clientRole =
       typeof rawClientRole === 'string'
         ? rawClientRole.trim().toUpperCase()
         : undefined;
+    if (clientRole === 'A') {
+      clientRole = 'ADMIN';
+    }
     const identifier = body.phone || body.identifier || '';
     return this.authService.forgotPassword(identifier, clientRole);
   }

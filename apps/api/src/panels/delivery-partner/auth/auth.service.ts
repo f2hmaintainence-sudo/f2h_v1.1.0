@@ -92,6 +92,7 @@ export class AuthService {
       await this.db.query(
         `UPDATE delivery_partners
          SET is_online = true,
+             is_active = true,
              is_available = true,
              updated_at = NOW()
          WHERE delivery_partner_id = $1`,
@@ -101,7 +102,7 @@ export class AuthService {
 
     return {
       success: true,
-      is_active: boyRes[0].is_active,
+      is_active: true,
       is_online: newStatus,
       message: `Shift status updated to ${newStatus ? 'online' : 'offline'}`,
     };

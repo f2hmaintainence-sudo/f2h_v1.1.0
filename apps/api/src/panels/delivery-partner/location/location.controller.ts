@@ -53,12 +53,12 @@ export class LocationController {
       return { status: false, message: 'Latitude and longitude are required' };
     }
 
-    // Verify partner is active before tracking location
+    // Verify partner is not deleted before tracking location
     const partnerStatusRes = await this.db.query(
-      `SELECT is_online, is_active FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+      `SELECT is_online, is_active, deleted_at FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
       [userId],
     );
-    if (partnerStatusRes?.length && partnerStatusRes[0].is_active === false) {
+    if (partnerStatusRes?.length && partnerStatusRes[0].deleted_at != null) {
       await this.redisService.delete(`delivery_partner_location:${userId}`);
       return {
         status: false,
@@ -67,10 +67,10 @@ export class LocationController {
       };
     }
 
-    // Auto-mark delivery partner online on active location ping
-    if (!partnerStatusRes?.[0]?.is_online) {
+    // Auto-mark delivery partner online and active on active location ping
+    if (!partnerStatusRes?.[0]?.is_online || !partnerStatusRes?.[0]?.is_active) {
       await this.db.query(
-        `UPDATE delivery_partners SET is_online = true, is_available = true, updated_at = NOW() WHERE delivery_partner_id = $1`,
+        `UPDATE delivery_partners SET is_online = true, is_active = true, is_available = true, updated_at = NOW() WHERE delivery_partner_id = $1`,
         [userId],
       );
     }

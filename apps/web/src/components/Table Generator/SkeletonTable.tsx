@@ -383,7 +383,7 @@ export default function SkeletonTable({
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          'x-role': 'A',
+          'x-role': 'ADMIN',
         };
         if (typeof window !== 'undefined') {
           const authToken = localStorage.getItem('access_token') || localStorage.getItem('token');

@@ -257,7 +257,7 @@ class ApiClient {
       url,
       headers: {
         'Content-Type': 'application/json',
-        'x-role': 'A',
+        'x-role': 'ADMIN',
         ...options.headers,
       },
       credentials: 'include', // SECURITY: Always include credentials for httpOnly cookies

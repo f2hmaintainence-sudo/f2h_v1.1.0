@@ -100,7 +100,12 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
 
       if (response.statusCode == 200 && response.data != null) {
         final body = response.data;
-        if (body['is_online'] == false || body['status'] == false) {
+        final dynamic isOnlineRaw = body['is_online'];
+        final bool isOnline = isOnlineRaw is bool
+            ? isOnlineRaw
+            : (isOnlineRaw == 1 || isOnlineRaw == 'true' || isOnlineRaw == true);
+
+        if (!isOnline && body['status'] == true) {
           if (mounted) {
             setState(() {
               _isOnline = false;
@@ -112,7 +117,7 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
           return;
         }
 
-        if (body['status'] == true && body['data'] != null) {
+        if (body['data'] != null) {
           final data = body['data'];
           final lat = double.tryParse(data['latitude']?.toString() ?? '');
           final lng = double.tryParse(data['longitude']?.toString() ?? '');
@@ -129,7 +134,15 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
             if (hasChanged) {
               _animateToCurrentLocation();
             }
+          } else if (mounted) {
+            setState(() {
+              _isOnline = isOnline;
+            });
           }
+        } else if (mounted && isOnline) {
+          setState(() {
+            _isOnline = true;
+          });
         }
       }
     } catch (_) {

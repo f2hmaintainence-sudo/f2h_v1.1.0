@@ -312,15 +312,15 @@ export class CustomerBootstrapController {
     }
 
     const partnerStatusRes = await this.db.query(
-      `SELECT is_online, is_active, current_lat, current_lng, last_location_at FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+      `SELECT is_online, is_active, current_lat, current_lng, last_location_at, deleted_at FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
       [partnerId],
     );
 
-    if (partnerStatusRes?.length && partnerStatusRes[0].is_active === false) {
+    if (partnerStatusRes?.length && partnerStatusRes[0].deleted_at != null) {
       return {
         status: false,
         is_online: false,
-        message: 'Delivery partner is deactivated',
+        message: 'Delivery partner account is deactivated',
         data: null,
       };
     }
@@ -356,7 +356,7 @@ export class CustomerBootstrapController {
 
     if (!isOnline && lat === null && lng === null) {
       return {
-        status: false,
+        status: true,
         is_online: false,
         message: 'Delivery partner is currently offline',
         data: null,
@@ -366,7 +366,7 @@ export class CustomerBootstrapController {
     if (lat !== null && lng !== null) {
       return {
         status: true,
-        is_online: true,
+        is_online: isOnline,
         data: {
           partner_id: partnerId,
           latitude: lat,
@@ -379,8 +379,8 @@ export class CustomerBootstrapController {
     }
 
     return {
-      status: false,
-      is_online: true,
+      status: true,
+      is_online: isOnline,
       message: 'Location unavailable for delivery partner',
       data: null,
     };
