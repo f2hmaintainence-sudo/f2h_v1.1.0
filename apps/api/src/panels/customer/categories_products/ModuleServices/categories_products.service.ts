@@ -600,51 +600,55 @@ export class CategoriesProductsService {
       // 1. Resolve variant or product with images
       const query = `
         SELECT 
-          COALESCE(pv.product_id, p.product_id) AS product_id,
+          p.product_id,
           pv.variant_id,
           COALESCE(NULLIF(pv.name, ''), p.name, 'Fresh Product') AS name,
           COALESCE(p.name, pv.name, 'Fresh Product') AS product_name,
           COALESCE(p.description, '') AS description,
           COALESCE(p.highlights, '') AS highlights,
-          COALESCE(pv.price, p.price, 0) AS price,
-          COALESCE(pv.original_price, pv.price, p.price, 0) AS original_price,
+          COALESCE(pv.price, 0) AS price,
+          COALESCE(pv.original_price, pv.price, 0) AS original_price,
           c.name AS category_name,
           COALESCE(
             (
-              SELECT COALESCE(NULLIF(pi.storage_key, ''), pi.url, pi.image_url, pi.image_path) FROM product_images pi
+              SELECT pi.storage_key FROM product_images pi
               WHERE (pi.variant_id = pv.variant_id OR (pv.variant_id IS NOT NULL AND pi.variant_id = pv.variant_id))
                 AND pi.deleted_at IS NULL
-                AND (pi.storage_key IS NOT NULL OR pi.url IS NOT NULL OR pi.image_url IS NOT NULL OR pi.image_path IS NOT NULL)
+                AND pi.storage_key IS NOT NULL
+                AND pi.storage_key <> ''
               ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             (
-              SELECT COALESCE(NULLIF(pi.storage_key, ''), pi.url, pi.image_url, pi.image_path) FROM product_images pi
-              WHERE (pi.product_id = pv.product_id OR pi.product_id = p.product_id)
+              SELECT pi.storage_key FROM product_images pi
+              WHERE (pi.product_id = p.product_id OR pi.product_id = pv.product_id)
                 AND (pi.variant_id IS NULL OR pi.variant_id = '')
                 AND pi.deleted_at IS NULL
-                AND (pi.storage_key IS NOT NULL OR pi.url IS NOT NULL OR pi.image_url IS NOT NULL OR pi.image_path IS NOT NULL)
+                AND pi.storage_key IS NOT NULL
+                AND pi.storage_key <> ''
               ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
             (
-              SELECT COALESCE(NULLIF(pi.storage_key, ''), pi.url, pi.image_url, pi.image_path) FROM product_images pi
-              WHERE (pi.product_id = pv.product_id OR pi.product_id = p.product_id)
+              SELECT pi.storage_key FROM product_images pi
+              WHERE (pi.product_id = p.product_id OR pi.product_id = pv.product_id)
                 AND pi.deleted_at IS NULL
-                AND (pi.storage_key IS NOT NULL OR pi.url IS NOT NULL OR pi.image_url IS NOT NULL OR pi.image_path IS NOT NULL)
+                AND pi.storage_key IS NOT NULL
+                AND pi.storage_key <> ''
               ORDER BY pi.is_primary DESC NULLS LAST, pi.sort_order ASC NULLS LAST, pi.id ASC LIMIT 1
             ),
-            c.image_path
+            c.image_path,
+            c.image_url
           ) AS image_key
-        FROM product_variants pv
-        FULL OUTER JOIN products p ON (p.product_id = pv.product_id OR p.id::text = pv.product_id)
+        FROM products p
+        LEFT JOIN product_variants pv ON (pv.product_id = p.product_id AND pv.deleted_at IS NULL)
         LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
         WHERE (
-          pv.variant_id = $1 
-          OR pv.id::text = $1 
-          OR p.product_id = $1 
+          p.product_id = $1 
           OR p.id::text = $1 
           OR p.slug = $1
+          OR pv.variant_id = $1
+          OR pv.id::text = $1
         )
-        AND (p.deleted_at IS NULL OR pv.deleted_at IS NULL)
+        AND p.deleted_at IS NULL
         ORDER BY 
           (CASE WHEN pv.variant_id = $1 OR pv.id::text = $1 THEN 0 ELSE 1 END) ASC,
           pv.sort_order ASC NULLS LAST,
@@ -662,11 +666,12 @@ export class CategoriesProductsService {
       // Clean small product description
       let smallDescription = '';
       if (item.highlights && typeof item.highlights === 'string' && item.highlights.trim()) {
-        smallDescription = item.highlights.replace(/<[^>]*>?/gm, '').trim();
+        const clean = item.highlights.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+        smallDescription = clean.length > 150 ? clean.substring(0, 147) + '...' : clean;
       } else if (item.description && typeof item.description === 'string' && item.description.trim()) {
-        const clean = item.description.replace(/<[^>]*>?/gm, '').trim();
+        const clean = item.description.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
         const sentence = clean.split('.')[0] || clean;
-        smallDescription = sentence.length > 120 ? sentence.substring(0, 117) + '...' : sentence;
+        smallDescription = sentence.length > 150 ? sentence.substring(0, 147) + '...' : sentence;
       }
       if (!smallDescription) {
         smallDescription = 'Farm-fresh dairy, fruits, vegetables and daily essentials delivered to your doorstep.';
