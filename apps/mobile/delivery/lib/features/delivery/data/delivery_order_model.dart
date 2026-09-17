@@ -426,11 +426,13 @@ class DeliveryRun {
     final ordersList = (json['deliveries'] as List<dynamic>? ?? [])
         .map((e) => DeliveryOrderModel.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+    final dStatus = (json['dispatch_status']?.toString() ?? '').toLowerCase();
     final bool isConfirmed = json['pickup_confirmed'] == true ||
         json['pickup_confirmed'] == 1 ||
-        json['run_status'] == 'in_progress' ||
-        json['run_status'] == 'completed' ||
-        json['run_status'] == 'handed_over';
+        dStatus == 'collected' ||
+        dStatus == 'in_progress' ||
+        dStatus == 'return_pending' ||
+        dStatus == 'completed';
     return DeliveryRun(
       runId: json['run_id']?.toString() ?? '',
       status: json['run_status']?.toString() ?? 'pending',

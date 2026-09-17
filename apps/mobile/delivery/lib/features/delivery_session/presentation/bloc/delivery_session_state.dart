@@ -43,10 +43,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
 
   bool get isPickupConfirmed {
     if (currentRun != null) {
-      return currentRun!.pickupConfirmed ||
-          currentRun!.status == 'in_progress' ||
-          currentRun!.status == 'completed' ||
-          currentRun!.status == 'handed_over';
+      return currentRun!.pickupConfirmed;
     }
     return orders.isNotEmpty &&
         orders.every((o) =>

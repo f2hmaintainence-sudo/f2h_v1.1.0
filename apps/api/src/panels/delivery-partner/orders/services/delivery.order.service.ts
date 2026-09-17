@@ -1009,31 +1009,36 @@ export class DeliveryOrderService {
         [run.id],
       );
 
+      // Only transition dispatch to in_progress if it was already collected/handed over
       await client.query(
         `UPDATE delivery_dispatch
          SET status = 'in_progress', updated_at = NOW()
          WHERE delivery_run_id = ANY($1)
-           AND status IN ('collected', 'loaded')`,
+           AND status = 'collected'`,
         [this.getRunIdentifiers(run)],
       );
 
-      const runAddressesRes = await client.query(
-        `SELECT order_id FROM orders WHERE delivery_run_id = ANY($1)`,
-        [this.getRunIdentifiers(run)],
-      );
-      const runAddresses = runAddressesRes.rows || [];
-      const orderIds = runAddresses.map((row) => String(row.order_id));
-
-      if (orderIds.length > 0) {
-        await client.query(
-          `UPDATE orders
-             SET status = 'out_for_delivery',
-                 delivery_partner_id = $1,
-                 delivery_run_id = $2,
-                 updated_at = NOW()
-             WHERE order_id = ANY($3) AND status IN ('pending', 'placed', 'confirmed', 'packed', 'assigned')`,
-          [boy.user_id, runIdentifier, orderIds],
+      // Only move orders to out_for_delivery if dispatch was already confirmed/collected
+      const activeDispatch = await this.findActiveDispatchForRun(this.getRunIdentifiers(run));
+      if (activeDispatch && isDispatchHandedOver(activeDispatch.status)) {
+        const runAddressesRes = await client.query(
+          `SELECT order_id FROM orders WHERE delivery_run_id = ANY($1)`,
+          [this.getRunIdentifiers(run)],
         );
+        const runAddresses = runAddressesRes.rows || [];
+        const orderIds = runAddresses.map((row) => String(row.order_id));
+
+        if (orderIds.length > 0) {
+          await client.query(
+            `UPDATE orders
+               SET status = 'out_for_delivery',
+                   delivery_partner_id = $1,
+                   delivery_run_id = $2,
+                   updated_at = NOW()
+               WHERE order_id = ANY($3) AND status IN ('pending', 'placed', 'confirmed', 'packed', 'assigned')`,
+            [boy.user_id, runIdentifier, orderIds],
+          );
+        }
       }
     });
 

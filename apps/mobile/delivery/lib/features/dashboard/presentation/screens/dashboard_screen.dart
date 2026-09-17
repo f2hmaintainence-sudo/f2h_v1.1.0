@@ -477,10 +477,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final listQueue = session.groupedStops;
         final currentRun = session.currentRun;
         final isShiftCompleted = currentRun?.status == 'handed_over';
-        final pickupConfirmed = currentRun != null &&
-            (currentRun.status == 'in_progress' ||
-                currentRun.status == 'completed' ||
-                currentRun.status == 'handed_over');
+        final pickupConfirmed = currentRun != null && currentRun.pickupConfirmed;
 
         final collectQueue = pickupConfirmed
             ? <GroupedStop>[]
