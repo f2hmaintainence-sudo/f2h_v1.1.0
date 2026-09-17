@@ -372,16 +372,88 @@ export class AdminSystemService {
     }
   }
 
+  async getAdminUserById(identifier: string) {
+    try {
+      const cleanId = String(identifier || '').trim();
+      const strippedId = cleanId.replace(/^MNG-/, '');
+      const withMngPrefix = cleanId.startsWith('MNG-') ? cleanId : `MNG-${cleanId}`;
+
+      const rows = await this.db.query(
+        `SELECT
+           COALESCE(ms.management_id, 'MNG-' || u.user_id) AS management_id,
+           u.user_id,
+           COALESCE(u.user_name, NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS user_name,
+           u.first_name,
+           u.last_name,
+           u.email,
+           COALESCE(u.phone, '') AS phone,
+           COALESCE(ms.role_id, u.role_id, 'admin') AS role_id,
+           COALESCE(ar.role_name, r.name, ms.role_id, u.role_id, 'Admin') AS role_name,
+           ms.branch_id,
+           b.branch_name,
+           ms.department,
+           ms.designation,
+           COALESCE(ms.is_active, CASE WHEN u.account_status = 'active' THEN true ELSE false END) AS is_active,
+           COALESCE(ms.created_at, u.created_at) AS created_at,
+           COALESCE(ms.updated_at, u.updated_at) AS updated_at
+         FROM users u
+         LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
+         LEFT JOIN (SELECT DISTINCT ON (UPPER(role_id)) role_id, name FROM roles WHERE deleted_at IS NULL) r ON UPPER(r.role_id) = UPPER(COALESCE(ms.role_id, u.role_id))
+         LEFT JOIN (SELECT DISTINCT ON (LOWER(role_name)) role_name, id FROM admin_roles) ar ON (LOWER(ar.role_name) = LOWER(COALESCE(ms.role_id, u.role_id)) OR ar.id::text = COALESCE(ms.role_id, u.role_id))
+         LEFT JOIN branches b ON b.branch_id = ms.branch_id
+         WHERE (
+           u.user_id = $1 
+           OR u.user_id = $2
+           OR ms.management_id = $1 
+           OR ms.management_id = $2
+           OR ms.management_id = $3
+           OR u.email = $1
+           OR ('MNG-' || u.user_id) = $1
+         ) AND u.deleted_at IS NULL
+         ORDER BY (ms.management_id IS NOT NULL) DESC
+         LIMIT 1`,
+        [cleanId, strippedId, withMngPrefix],
+      );
+
+      if (!rows.length) {
+        throw new BadRequestException('Staff member not found');
+      }
+
+      return {
+        status: true,
+        data: rows[0],
+        message: 'Staff member fetched',
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.developer.error('getAdminUserById error', { error });
+      throw new InternalServerErrorException(error.message || 'Failed to retrieve staff member');
+    }
+  }
+
   async updateAdminUser(identifier: string, body: any, adminId: string = 'system') {
     try {
+      const cleanId = String(identifier || '').trim();
+      const strippedId = cleanId.replace(/^MNG-/, '');
+      const withMngPrefix = cleanId.startsWith('MNG-') ? cleanId : `MNG-${cleanId}`;
+
       const staffRows = await this.db.query(
         `SELECT u.user_id, u.email, u.phone, u.user_name, u.role_id,
                 ms.management_id, ms.branch_id, ms.department, ms.designation, ms.is_active
          FROM users u
          LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
-         WHERE (u.user_id = $1 OR ms.management_id = $1 OR u.email = $1) AND u.deleted_at IS NULL
+         WHERE (
+           u.user_id = $1 
+           OR u.user_id = $2
+           OR ms.management_id = $1 
+           OR ms.management_id = $2
+           OR ms.management_id = $3
+           OR u.email = $1
+           OR ('MNG-' || u.user_id) = $1
+         ) AND u.deleted_at IS NULL
+         ORDER BY (ms.management_id IS NOT NULL) DESC
          LIMIT 1`,
-        [identifier],
+        [cleanId, strippedId, withMngPrefix],
       );
 
       if (!staffRows.length) {
@@ -391,6 +463,16 @@ export class AdminSystemService {
       const current = staffRows[0];
       const userId = current.user_id;
       let managementId = current.management_id;
+
+      if (!managementId) {
+        const existingMs = await this.db.query(
+          `SELECT management_id FROM management_staff WHERE user_id = $1 AND deleted_at IS NULL LIMIT 1`,
+          [userId],
+        );
+        if (existingMs.length > 0) {
+          managementId = existingMs[0].management_id;
+        }
+      }
 
       // Validate duplicate email if changed
       if (body.email && body.email.toLowerCase().trim() !== current.email?.toLowerCase().trim()) {
@@ -437,9 +519,22 @@ export class AdminSystemService {
           userParams.push(body.user_name.trim());
           userUpdates.push(`first_name = $${userParams.length}`);
         }
+        if (body.first_name !== undefined) {
+          userParams.push(body.first_name?.trim() || null);
+          userUpdates.push(`first_name = $${userParams.length}`);
+        }
+        if (body.last_name !== undefined) {
+          userParams.push(body.last_name?.trim() || null);
+          userUpdates.push(`last_name = $${userParams.length}`);
+        }
         if (newRole) {
           userParams.push(newRole);
           userUpdates.push(`role_id = $${userParams.length}`);
+        }
+        if (body.is_active !== undefined) {
+          const isActive = body.is_active === true || String(body.is_active) === 'true' || Number(body.is_active) === 1;
+          userParams.push(isActive ? 'active' : 'inactive');
+          userUpdates.push(`account_status = $${userParams.length}`);
         }
         if (body.password && body.password.trim()) {
           const hashedPassword = bcrypt.hashSync(body.password.trim(), 10);
@@ -487,7 +582,7 @@ export class AdminSystemService {
             msUpdates.push(`designation = $${msParams.length}`);
           }
           if (body.is_active !== undefined) {
-            const isActive = body.is_active === true || String(body.is_active) === 'true';
+            const isActive = body.is_active === true || String(body.is_active) === 'true' || Number(body.is_active) === 1;
             msParams.push(isActive);
             msUpdates.push(`is_active = $${msParams.length}`);
           }
@@ -500,7 +595,7 @@ export class AdminSystemService {
           // If no management_staff record exists yet for this user, insert one
           managementId = generateId('MNG', 12);
           const targetRole = newRole || current.role_id || 'admin';
-          const isActive = body.is_active !== undefined ? (body.is_active === true || String(body.is_active) === 'true') : true;
+          const isActive = body.is_active !== undefined ? (body.is_active === true || String(body.is_active) === 'true' || Number(body.is_active) === 1) : true;
 
           await client.query(
             `INSERT INTO management_staff (
@@ -532,19 +627,32 @@ export class AdminSystemService {
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('updateAdminUser error', { error });
-      throw new InternalServerErrorException('Failed to update staff member');
+      throw new InternalServerErrorException(error.message || 'Failed to update staff member');
     }
   }
 
   async deleteAdminUser(identifier: string, adminId: string = 'system') {
     try {
+      const cleanId = String(identifier || '').trim();
+      const strippedId = cleanId.replace(/^MNG-/, '');
+      const withMngPrefix = cleanId.startsWith('MNG-') ? cleanId : `MNG-${cleanId}`;
+
       const staffRows = await this.db.query(
         `SELECT u.user_id, u.user_name, ms.management_id
          FROM users u
          LEFT JOIN management_staff ms ON ms.user_id = u.user_id
-         WHERE (u.user_id = $1 OR ms.management_id = $1 OR u.email = $1) AND u.deleted_at IS NULL
+         WHERE (
+           u.user_id = $1 
+           OR u.user_id = $2
+           OR ms.management_id = $1 
+           OR ms.management_id = $2
+           OR ms.management_id = $3
+           OR u.email = $1
+           OR ('MNG-' || u.user_id) = $1
+         ) AND u.deleted_at IS NULL
+         ORDER BY (ms.management_id IS NOT NULL) DESC
          LIMIT 1`,
-        [identifier],
+        [cleanId, strippedId, withMngPrefix],
       );
 
       if (!staffRows.length) {
@@ -558,6 +666,11 @@ export class AdminSystemService {
           await client.query(
             'UPDATE management_staff SET deleted_at = NOW(), is_active = false WHERE management_id = $1',
             [staff.management_id],
+          );
+        } else {
+          await client.query(
+            'UPDATE management_staff SET deleted_at = NOW(), is_active = false WHERE user_id = $1',
+            [staff.user_id],
           );
         }
         await client.query(
@@ -578,7 +691,7 @@ export class AdminSystemService {
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('deleteAdminUser error', { error });
-      throw new InternalServerErrorException('Failed to delete staff member');
+      throw new InternalServerErrorException(error.message || 'Failed to delete staff member');
     }
   }
 

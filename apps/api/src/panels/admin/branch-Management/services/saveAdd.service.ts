@@ -138,7 +138,7 @@ export class StaffsSaveAddService {
     private readonly Data: DataService,
     private readonly Developer: DeveloperService,
     private readonly idGenerator: IdGeneratorService,
-  ) {}
+  ) { }
 
   async saveStaff(body: any, adminId: string) {
     try {

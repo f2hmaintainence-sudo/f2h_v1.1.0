@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Query, Body, Param, Req, UseGuards,
+import { Controller, Get, Post, Patch, Delete, Put, Query, Body, Param, Req, UseGuards,
   Logger,
 } from '@nestjs/common';
 import { AdminSystemService } from './admin-system.service';
@@ -21,6 +21,11 @@ export class AdminSystemController {
     return this.systemService.getAdminUsers(query);
   }
 
+  @Get('admins/:id')
+  async getAdminUserById(@Param('id') id: string) {
+    return this.systemService.getAdminUserById(id);
+  }
+
   @Post('admins')
   async createAdminUser(@Body() body: any, @Req() req: any) {
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
@@ -28,6 +33,7 @@ export class AdminSystemController {
   }
 
   @Patch('admins/:id')
+  @Put('admins/:id')
   async updateAdminUser(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
     return this.systemService.updateAdminUser(id, body, adminId);
