@@ -327,6 +327,15 @@ export class ProfileService {
 
   async updateMyProfile(userId: string, body: any) {
     try {
+      const userRows = await this.db.query(
+        `SELECT user_id FROM users WHERE user_id = $1 OR email = $1 LIMIT 1`,
+        [userId],
+      );
+      if (!userRows.length) {
+        throw new BadRequestException('User not found');
+      }
+      const actualUserId = userRows[0].user_id;
+
       const {
         first_name,
         last_name,
@@ -348,12 +357,6 @@ export class ProfileService {
         branch_id,
       } = body;
 
-      // A key the caller did not send arrives as undefined, which pg binds as
-      // NULL. Without COALESCE that silently blanked every field the request
-      // happened to omit, so saving one field wiped the rest. An explicit empty
-      // string still clears a field — only an absent key is treated as "keep".
-      // `email` is deliberately not written here; it has its own OTP-verified
-      // endpoint.
       const keep = (v: unknown) => (v === undefined ? null : v);
 
       // 1) Update users table (identity single source of truth)
@@ -365,14 +368,14 @@ export class ProfileService {
              user_name  = COALESCE($4, user_name),
              phone      = COALESCE($5, phone),
              updated_at = NOW()
-         WHERE user_id = $1 OR email = $1`,
-        [userId, keep(first_name), keep(last_name), keep(fullName), keep(phone)],
+         WHERE user_id = $1`,
+        [actualUserId, keep(first_name), keep(last_name), keep(fullName), keep(phone)],
       );
 
       // 2) Upsert management_staff (WITHOUT user_name or phone)
       const existing = await this.db.query(
-        `SELECT management_id FROM management_staff WHERE user_id = $1`,
-        [userId],
+        `SELECT management_id FROM management_staff WHERE user_id = $1 AND deleted_at IS NULL LIMIT 1`,
+        [actualUserId],
       );
 
       if (existing.length > 0) {
@@ -393,12 +396,10 @@ export class ProfileService {
                alt_phone      = COALESCE($14, alt_phone),
                branch_id      = COALESCE($15, branch_id),
                updated_at     = NOW()
-           WHERE user_id = $1`,
+           WHERE user_id = $1 AND deleted_at IS NULL`,
           [
-            userId,
+            actualUserId,
             keep(gender),
-            // An empty date input is not a date — it must stay NULL-as-"keep"
-            // rather than reach a date column as ''.
             date_of_birth || null,
             keep(marital_status),
             keep(bio),
@@ -416,7 +417,7 @@ export class ProfileService {
         );
       } else {
         // Generate a management_id for management_staff
-        const mgmtId = `MGMT-${userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)}`;
+        const mgmtId = `MGMT-${actualUserId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)}`;
 
         await this.db.query(
           `INSERT INTO management_staff
@@ -428,7 +429,7 @@ export class ProfileService {
            VALUES ($1,$2,'ADMIN',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())`,
           [
             mgmtId,
-            userId,
+            actualUserId,
             branch_id || null,
             gender || null,
             date_of_birth || null,
@@ -449,8 +450,9 @@ export class ProfileService {
 
       return { status: true, message: 'Profile updated successfully' };
     } catch (error) {
+      if (error instanceof BadRequestException) throw error;
       this.developer.error('updateMyProfile error', { error });
-      throw new InternalServerErrorException('Failed to update profile');
+      throw new InternalServerErrorException(error.message || 'Failed to update profile');
     }
   }
 

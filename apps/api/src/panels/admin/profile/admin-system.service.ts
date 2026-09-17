@@ -168,6 +168,8 @@ export class AdminSystemService {
   // ────────────────────────────────────────────────
   async getAdminUsers(query: any) {
     try {
+      await this.ensureRoleAndPermissionTables();
+
       const { page = 1, limit = 50, search, branch_id, role_id, is_active } = query;
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
@@ -194,7 +196,7 @@ export class AdminSystemService {
         params.push(role_id);
         const pIdx = params.length;
         where.push(
-          `(u.role_id = $${pIdx} OR ms.role_id = $${pIdx} OR r.role_id = $${pIdx} OR ar.role_name = $${pIdx} OR ar.id::text = $${pIdx})`,
+          `(LOWER(COALESCE(u.role_id, '')) = LOWER($${pIdx}) OR LOWER(COALESCE(ms.role_id, '')) = LOWER($${pIdx}))`,
         );
       }
 
@@ -225,8 +227,8 @@ export class AdminSystemService {
         COALESCE(ms.updated_at, u.updated_at) AS updated_at
       FROM users u
       LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
-      LEFT JOIN roles r ON (UPPER(r.role_id) = UPPER(COALESCE(ms.role_id, u.role_id)))
-      LEFT JOIN admin_roles ar ON (ar.role_name = COALESCE(ms.role_id, u.role_id) OR ar.id::text = COALESCE(ms.role_id, u.role_id))
+      LEFT JOIN (SELECT DISTINCT ON (UPPER(role_id)) role_id, name FROM roles WHERE deleted_at IS NULL) r ON UPPER(r.role_id) = UPPER(COALESCE(ms.role_id, u.role_id))
+      LEFT JOIN (SELECT DISTINCT ON (LOWER(role_name)) role_name, id FROM admin_roles) ar ON (LOWER(ar.role_name) = LOWER(COALESCE(ms.role_id, u.role_id)) OR ar.id::text = COALESCE(ms.role_id, u.role_id))
       LEFT JOIN branches b ON b.branch_id = ms.branch_id
       WHERE ${where.join(' AND ')}
       ORDER BY COALESCE(ms.created_at, u.created_at) DESC
@@ -241,8 +243,6 @@ export class AdminSystemService {
       SELECT COUNT(*)::int AS total
       FROM users u
       LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
-      LEFT JOIN roles r ON (UPPER(r.role_id) = UPPER(COALESCE(ms.role_id, u.role_id)))
-      LEFT JOIN admin_roles ar ON (ar.role_name = COALESCE(ms.role_id, u.role_id) OR ar.id::text = COALESCE(ms.role_id, u.role_id))
       WHERE ${where.join(' AND ')}
     `;
 

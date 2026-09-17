@@ -21,7 +21,7 @@ function getTurbopackRoot(): string {
 const internalApiUrl = (process.env.INTERNAL_API_URL || 'https://dev.f2hfresh.com').replace(/\/+$/, '');
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ['f2hfresh.com', '*.f2hfresh.com', 'localhost'],
+  allowedDevOrigins: ['f2hfresh.com', '*.f2hfresh.com', 'localhost', '127.0.0.1', '192.168.1.112', '192.168.*', '10.*'],
   // `typescript.ignoreBuildErrors` used to be true here, so `next build` succeeded
   // regardless of type errors across ~50k lines of TSX. Removing it surfaced real
   // defects: query parameters silently dropped by the API client, success toasts
