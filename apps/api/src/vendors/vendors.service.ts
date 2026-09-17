@@ -88,38 +88,46 @@ export class VendorsService {
     try {
       let query = `
         SELECT 
-          id, vendor_id, business_name, contact_person, phone, email,
-          category, description, address, city, state, pincode,
-          gstin, fssai_license, supply_capacity, experience_years,
-          rating, products_supplied, total_products_supplied, is_verified, is_active,
-          status, image_url, logo_url, website_url, source, created_at
-        FROM public.vendors
-        WHERE is_active = true 
-          AND deleted_at IS NULL
-          AND status = 'approved'
+          v.id, v.vendor_id, v.business_name,
+          COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), v.contact_person, u.user_name) AS contact_person,
+          COALESCE(u.phone, v.phone) AS phone,
+          COALESCE(u.email, v.email) AS email,
+          v.category, v.description, v.address, v.city, v.state, v.pincode,
+          v.gstin, v.fssai_license, v.supply_capacity, v.experience_years,
+          v.rating, v.products_supplied, v.total_products_supplied, v.is_verified, v.is_active,
+          v.status, v.image_url, v.logo_url, v.website_url, v.source, v.created_at
+        FROM public.vendors v
+        LEFT JOIN public.users u ON (u.phone = v.phone OR (u.email IS NOT NULL AND u.email = v.email))
+        WHERE v.is_active = true 
+          AND v.deleted_at IS NULL
+          AND v.status = 'approved'
       `;
       const params: any[] = [];
       let paramIdx = 1;
 
       if (category && category.trim() !== '' && category.toLowerCase() !== 'all') {
-        query += ` AND category ILIKE $${paramIdx}`;
+        query += ` AND v.category ILIKE $${paramIdx}`;
         params.push(`%${category.trim()}%`);
         paramIdx++;
       }
 
       if (search && search.trim() !== '') {
         query += ` AND (
-          business_name ILIKE $${paramIdx} 
-          OR contact_person ILIKE $${paramIdx} 
-          OR city ILIKE $${paramIdx} 
-          OR description ILIKE $${paramIdx}
-          OR category ILIKE $${paramIdx}
+          v.business_name ILIKE $${paramIdx} 
+          OR u.first_name ILIKE $${paramIdx}
+          OR u.last_name ILIKE $${paramIdx}
+          OR v.contact_person ILIKE $${paramIdx} 
+          OR u.phone ILIKE $${paramIdx}
+          OR v.phone ILIKE $${paramIdx}
+          OR v.city ILIKE $${paramIdx} 
+          OR v.description ILIKE $${paramIdx}
+          OR v.category ILIKE $${paramIdx}
         )`;
         params.push(`%${search.trim()}%`);
         paramIdx++;
       }
 
-      query += ` ORDER BY rating DESC, created_at DESC LIMIT 50`;
+      query += ` ORDER BY v.rating DESC, v.created_at DESC LIMIT 50`;
 
       const rows = await this.db.query<VendorProfile>(query, params);
       return {
@@ -159,6 +167,44 @@ export class VendorsService {
     const city = dto.city?.trim() || 'Bengaluru';
     const state = dto.state?.trim() || 'Karnataka';
 
+    // 1. Sync / Resolve user identity from users table (Single Source of Truth)
+    let contactPerson = dto.contactPerson?.trim() || '';
+    const userRows = await this.db.query<any>(
+      `SELECT user_id, first_name, last_name, phone, email FROM public.users WHERE phone = $1 LIMIT 1`,
+      [cleanPhone],
+    );
+
+    if (userRows && userRows.length > 0) {
+      const u = userRows[0];
+      const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+      if (fullName) {
+        contactPerson = fullName;
+      }
+    } else {
+      // Create user record in users table
+      const nameParts = contactPerson.split(/\s+/);
+      const firstName = nameParts[0] || 'Vendor';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      const userId = `F2H_${Date.now().toString().slice(-6)}_${randomSuffix}`;
+
+      await this.db.query(
+        `INSERT INTO public.users (
+          user_id, first_name, last_name, phone, email, role_id, account_status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, 'VENDOR', 'active', NOW(), NOW())
+        ON CONFLICT (phone) DO UPDATE SET
+          first_name = COALESCE(EXCLUDED.first_name, public.users.first_name),
+          last_name = COALESCE(EXCLUDED.last_name, public.users.last_name),
+          updated_at = NOW()`,
+        [
+          userId,
+          firstName,
+          lastName,
+          cleanPhone,
+          dto.email?.trim() || null,
+        ],
+      );
+    }
+
     // Normalize products supplied array
     const productsSupplied = Array.isArray(dto.products)
       ? dto.products.map((p) => (typeof p === 'string' ? { name: p } : p))
@@ -180,7 +226,7 @@ export class VendorsService {
     const inserted = await this.db.query<VendorProfile>(insertQuery, [
       vendorId,
       dto.businessName.trim(),
-      dto.contactPerson.trim(),
+      contactPerson,
       cleanPhone,
       dto.email?.trim() || null,
       dto.category.trim(),
@@ -220,14 +266,18 @@ export class VendorsService {
       const isNumeric = /^\d+$/.test(id);
       const query = `
         SELECT 
-          id, vendor_id, business_name, contact_person, phone, email,
-          category, description, address, city, state, pincode,
-          gstin, fssai_license, supply_capacity, experience_years,
-          rating, products_supplied, total_products_supplied, is_verified, is_active,
-          status, image_url, logo_url, website_url, source, created_at
-        FROM public.vendors
-        WHERE deleted_at IS NULL
-          AND (${isNumeric ? 'id = $1::bigint OR ' : ''}vendor_id = $1)
+          v.id, v.vendor_id, v.business_name,
+          COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), v.contact_person, u.user_name) AS contact_person,
+          COALESCE(u.phone, v.phone) AS phone,
+          COALESCE(u.email, v.email) AS email,
+          v.category, v.description, v.address, v.city, v.state, v.pincode,
+          v.gstin, v.fssai_license, v.supply_capacity, v.experience_years,
+          v.rating, v.products_supplied, v.total_products_supplied, v.is_verified, v.is_active,
+          v.status, v.image_url, v.logo_url, v.website_url, v.source, v.created_at
+        FROM public.vendors v
+        LEFT JOIN public.users u ON (u.phone = v.phone OR (u.email IS NOT NULL AND u.email = v.email))
+        WHERE v.deleted_at IS NULL
+          AND (${isNumeric ? 'v.id = $1::bigint OR ' : ''}v.vendor_id = $1)
         LIMIT 1
       `;
       const rows = await this.db.query<VendorProfile>(query, [String(id)]);
@@ -302,6 +352,22 @@ export class VendorsService {
         String(id),
       ]);
 
+      // Sync identity attributes to users table
+      if (cur.phone) {
+        const nameParts = String(contactPerson || '').trim().split(/\s+/);
+        const firstName = nameParts[0] || 'Vendor';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        await this.db.query(
+          `UPDATE public.users SET 
+            first_name = COALESCE($1, first_name),
+            last_name = COALESCE($2, last_name),
+            email = COALESCE($3, email),
+            updated_at = NOW()
+           WHERE phone = $4`,
+          [firstName, lastName, email ? String(email).trim() : null, cur.phone],
+        );
+      }
+
       return {
         success: true,
         message: 'Vendor profile updated successfully',
@@ -353,8 +419,10 @@ export class VendorsService {
       let query = `
         SELECT 
           c.id, c.collection_id, COALESCE(c.collection_type, 'MILK') as collection_type,
-          c.collection_date, c.shift, c.vendor_id, c.vendor_name,
-          COALESCE(c.vendor_phone, v.phone) as vendor_phone,
+          c.collection_date, c.shift, c.vendor_id,
+          COALESCE(v.business_name, c.vendor_name) as vendor_name,
+          COALESCE(u.phone, v.phone) as vendor_phone,
+          COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), v.contact_person, c.vendor_name) as contact_person,
           c.collector_name, c.collector_phone,
           c.product_id, c.product_name, c.category, c.quantity, c.unit, c.rate_per_unit, c.total_amount,
           c.fat_percentage, c.snf_percentage, c.clr_reading, c.temperature, c.acidity, c.quality_grade,
@@ -363,6 +431,7 @@ export class VendorsService {
           c.payment_mode, c.payment_reference, c.notes, c.extra_attributes, c.status, c.created_at
         FROM public.vendor_collections c
         LEFT JOIN public.vendors v ON v.vendor_id = c.vendor_id
+        LEFT JOIN public.users u ON (u.phone = v.phone OR (u.email IS NOT NULL AND u.email = v.email))
         WHERE c.deleted_at IS NULL
       `;
       const params: any[] = [];
@@ -411,11 +480,15 @@ export class VendorsService {
       if (filter.search && filter.search.trim()) {
         query += ` AND (
           c.vendor_name ILIKE $${idx}
+          OR v.business_name ILIKE $${idx}
+          OR u.first_name ILIKE $${idx}
+          OR u.last_name ILIKE $${idx}
+          OR v.contact_person ILIKE $${idx}
+          OR u.phone ILIKE $${idx}
+          OR v.phone ILIKE $${idx}
           OR c.product_name ILIKE $${idx}
           OR c.collection_id ILIKE $${idx}
           OR c.collector_name ILIKE $${idx}
-          OR c.vendor_phone ILIKE $${idx}
-          OR v.phone ILIKE $${idx}
         )`;
         params.push(`%${filter.search.trim()}%`);
         idx++;
@@ -499,14 +572,19 @@ export class VendorsService {
     try {
       const isNumeric = /^\d+$/.test(id);
       const query = `
-        SELECT c.*, COALESCE(c.vendor_phone, v.phone) as vendor_phone
+        SELECT 
+          c.*,
+          COALESCE(v.business_name, c.vendor_name) as vendor_name,
+          COALESCE(u.phone, v.phone) as vendor_phone,
+          COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))), ''), v.contact_person, c.vendor_name) as contact_person
         FROM public.vendor_collections c
         LEFT JOIN public.vendors v ON v.vendor_id = c.vendor_id
+        LEFT JOIN public.users u ON (u.phone = v.phone OR (u.email IS NOT NULL AND u.email = v.email))
         WHERE c.deleted_at IS NULL
-          AND (${isNumeric ? 'c.id = $1 OR ' : ''}c.collection_id = $1)
+          AND (${isNumeric ? 'c.id = $1::bigint OR ' : ''}c.collection_id = $1)
         LIMIT 1
       `;
-      const rows = await this.db.query<any>(query, [isNumeric ? Number(id) : id]);
+      const rows = await this.db.query<any>(query, [String(id)]);
       if (!rows || rows.length === 0) {
         return { success: false, data: null, message: `Collection slip '${id}' not found` };
       }
@@ -541,18 +619,9 @@ export class VendorsService {
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const collectionId = `COL-${dateStr}-${randomSuffix}`;
 
-      // Resolve vendor phone from body or vendor profile
-      let vendorPhone = body.vendor_phone || body.vendorPhone || null;
-      if (!vendorPhone && body.vendor_id) {
-        const vRes = await this.getVendorById(body.vendor_id);
-        if (vRes.success && vRes.data?.phone) {
-          vendorPhone = vRes.data.phone;
-        }
-      }
-
       const insertQuery = `
         INSERT INTO public.vendor_collections (
-          collection_id, collection_type, collection_date, shift, vendor_id, vendor_name, vendor_phone,
+          collection_id, collection_type, collection_date, shift, vendor_id, vendor_name,
           collector_name, collector_phone, product_id, product_name, category, quantity, unit,
           rate_per_unit, total_amount, fat_percentage, snf_percentage, clr_reading, temperature,
           acidity, quality_grade, container_can_no, batch_lot_no, packaging_type,
@@ -562,7 +631,7 @@ export class VendorsService {
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
           $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
-          $29, $30, $31, $32, $33, $34, $35, $36, $37, NOW(), NOW()
+          $29, $30, $31, $32, $33, $34, $35, $36, NOW(), NOW()
         )
         RETURNING *;
       `;
@@ -574,7 +643,6 @@ export class VendorsService {
         body.shift || 'MORNING',
         body.vendor_id,
         body.vendor_name,
-        vendorPhone,
         body.collector_name,
         body.collector_phone || null,
         body.product_id || null,
@@ -642,7 +710,7 @@ export class VendorsService {
           status = $4,
           notes = $5,
           updated_at = NOW()
-        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $6 OR ' : ''}collection_id = $6)
+        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $6::bigint OR ' : ''}collection_id = $6)
         RETURNING *;
       `;
 
@@ -652,7 +720,7 @@ export class VendorsService {
         paymentReference,
         status,
         notes,
-        isNumeric ? Number(id) : id,
+        String(id),
       ]);
 
       return {
@@ -672,10 +740,10 @@ export class VendorsService {
       const query = `
         UPDATE public.vendor_collections
         SET deleted_at = NOW(), updated_at = NOW()
-        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $1 OR ' : ''}collection_id = $1)
+        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $1::bigint OR ' : ''}collection_id = $1)
         RETURNING id;
       `;
-      const rows = await this.db.query(query, [isNumeric ? Number(id) : id]);
+      const rows = await this.db.query(query, [String(id)]);
       if (!rows || rows.length === 0) {
         return { success: false, message: `Collection slip '${id}' not found or already deleted` };
       }
@@ -686,4 +754,5 @@ export class VendorsService {
     }
   }
 }
+
 
