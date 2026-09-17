@@ -107,23 +107,29 @@ export class UsersController {
     // Fetch dynamic permissions from role_permissions table for this user's roles
     let permissions: string[] = [];
     try {
+      const allUserRoleKeys = Array.from(
+        new Set(
+          [
+            ...roles.map((r: any) => String(r.role_id || '').toUpperCase()),
+            ...roles.map((r: any) => String(r.role_id || '').toLowerCase()),
+            ...(activeRole ? [String(activeRole).toUpperCase(), String(activeRole).toLowerCase()] : []),
+          ].filter(Boolean),
+        ),
+      );
+
       const permRows = await this.db.query(
         `SELECT DISTINCT rp.permission_key
          FROM role_permissions rp
-         LEFT JOIN roles r ON UPPER(r.role_id) = UPPER(rp.role_id)
-         WHERE (r.is_active IS NULL OR r.is_active::text = '1' OR r.is_active::text = 'true')
-           AND (
-             UPPER(rp.role_id) IN (
-               SELECT UPPER(ra.role_id) FROM role_assignments ra
-               WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
-               UNION
-               SELECT UPPER(u.role_id) FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
-               UNION
-               SELECT UPPER(ms.role_id) FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
-             )
-             OR ($2 IS NOT NULL AND UPPER(rp.role_id) = UPPER($2))
-           )`,
-        [userId, activeRole],
+         WHERE UPPER(rp.role_id) = ANY($1) 
+            OR LOWER(rp.role_id) = ANY($1)
+            OR rp.role_id IN (
+              SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $2 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
+              UNION
+              SELECT u.role_id FROM users u WHERE u.user_id = $2 AND u.role_id IS NOT NULL
+              UNION
+              SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $2 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
+            )`,
+        [allUserRoleKeys, userId],
       );
       permissions = (permRows || []).map((p: any) => p.permission_key);
 
@@ -131,18 +137,16 @@ export class UsersController {
       if (permissions.length === 0) {
         const adminRoleRows = await this.db.query(
           `SELECT permissions FROM admin_roles 
-           WHERE (
-             LOWER(role_name) IN (
-               SELECT LOWER(ra.role_id) FROM role_assignments ra
-               WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
-               UNION
-               SELECT LOWER(u.role_id) FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
-               UNION
-               SELECT LOWER(ms.role_id) FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
-             )
-             OR ($2 IS NOT NULL AND LOWER(role_name) = LOWER($2))
-           ) AND (is_active = TRUE OR is_active::text = '1')`,
-          [userId, activeRole],
+           WHERE LOWER(role_name) = ANY($1)
+              OR UPPER(role_name) = ANY($1)
+              OR role_name IN (
+                SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $2 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
+                UNION
+                SELECT u.role_id FROM users u WHERE u.user_id = $2 AND u.role_id IS NOT NULL
+                UNION
+                SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $2 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
+              )`,
+          [allUserRoleKeys, userId],
         );
         const set = new Set<string>();
         for (const row of adminRoleRows || []) {
