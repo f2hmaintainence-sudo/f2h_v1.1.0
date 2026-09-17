@@ -280,7 +280,6 @@ export default function AdminProfilePage() {
       designation: (current as any).designation || "",
       education: (current as any).education || "",
       alt_phone: (current as any).alt_phone || "",
-      branch_id: (current as any).branch_id || "",
     });
     setEditing(true);
   };
@@ -726,7 +725,7 @@ export default function AdminProfilePage() {
                       <EditField icon={Shield} label="Designation" value={form.designation ?? ""} onChange={v => updateField("designation", v)} placeholder="e.g. Manager" accent="#f57c00" />
                       <EditField icon={FiBookOpen} label="Education" value={form.education ?? ""} onChange={v => updateField("education", v)} placeholder="e.g. B.Tech" accent="#e65100" />
                       <EditField icon={FiPhone} label="Alt Phone" value={form.alt_phone ?? ""} onChange={v => updateField("alt_phone", v)} type="tel" placeholder="Alternate number" accent="#f57c00" />
-                      <EditField icon={Building2} label="Branch" value={form.branch_id ?? ""} onChange={v => updateField("branch_id", v)} options={branchOptions} accent="#e65100" />
+                      <ViewField icon={Building2} label="Branch" value={val(p?.branch_name)} accent="#e65100" />
                     </>
                   ) : (
                     <>

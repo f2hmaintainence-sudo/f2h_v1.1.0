@@ -450,7 +450,6 @@ export class ProfileService {
         state,
         postal_code,
         alt_phone,
-        branch_id,
       } = body;
 
       const keep = (v: unknown) => (v === undefined ? null : v);
@@ -466,9 +465,9 @@ export class ProfileService {
         [actualUserId, keep(first_name), keep(last_name), keep(phone)],
       );
 
-      // 2) Upsert management_staff (WITHOUT user_name or phone)
+      // 2) Upsert management_staff (WITHOUT user_name or phone; branch_id is managed by admin staff management)
       const existing = await this.db.query(
-        `SELECT management_id FROM management_staff WHERE user_id = $1 OR management_id = $2 LIMIT 1`,
+        `SELECT management_id, branch_id FROM management_staff WHERE user_id = $1 OR management_id = $2 LIMIT 1`,
         [actualUserId, `MGMT-${actualUserId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)}`],
       );
 
@@ -488,10 +487,9 @@ export class ProfileService {
                state          = COALESCE($12, state),
                postal_code    = COALESCE($13, postal_code),
                alt_phone      = COALESCE($14, alt_phone),
-               branch_id      = COALESCE($15, branch_id),
                deleted_at     = NULL,
                updated_at     = NOW()
-           WHERE user_id = $1 OR management_id = $16`,
+           WHERE user_id = $1 OR management_id = $15`,
           [
             actualUserId,
             keep(gender),
@@ -507,7 +505,6 @@ export class ProfileService {
             keep(state),
             keep(postal_code),
             keep(alt_phone),
-            branch_id || null,
             existing[0].management_id,
           ],
         );
@@ -517,33 +514,31 @@ export class ProfileService {
 
         await this.db.query(
           `INSERT INTO management_staff
-             (management_id, user_id, role_id, branch_id,
+             (management_id, user_id, role_id,
               gender, date_of_birth, marital_status, bio,
               department, designation, education,
               address_line1, address_line2, city, state, postal_code,
               alt_phone, created_at, updated_at)
-           VALUES ($1,$2,'ADMIN',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())
+           VALUES ($1,$2,'ADMIN',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())
            ON CONFLICT (management_id) DO UPDATE SET
-             branch_id = EXCLUDED.branch_id,
-             gender = EXCLUDED.gender,
-             date_of_birth = EXCLUDED.date_of_birth,
-             marital_status = EXCLUDED.marital_status,
-             bio = EXCLUDED.bio,
-             department = EXCLUDED.department,
-             designation = EXCLUDED.designation,
-             education = EXCLUDED.education,
-             address_line1 = EXCLUDED.address_line1,
-             address_line2 = EXCLUDED.address_line2,
-             city = EXCLUDED.city,
-             state = EXCLUDED.state,
-             postal_code = EXCLUDED.postal_code,
-             alt_phone = EXCLUDED.alt_phone,
-             deleted_at = NULL,
-             updated_at = NOW()`,
+              gender = EXCLUDED.gender,
+              date_of_birth = EXCLUDED.date_of_birth,
+              marital_status = EXCLUDED.marital_status,
+              bio = EXCLUDED.bio,
+              department = EXCLUDED.department,
+              designation = EXCLUDED.designation,
+              education = EXCLUDED.education,
+              address_line1 = EXCLUDED.address_line1,
+              address_line2 = EXCLUDED.address_line2,
+              city = EXCLUDED.city,
+              state = EXCLUDED.state,
+              postal_code = EXCLUDED.postal_code,
+              alt_phone = EXCLUDED.alt_phone,
+              deleted_at = NULL,
+              updated_at = NOW()`,
           [
             mgmtId,
             actualUserId,
-            branch_id || null,
             gender || null,
             date_of_birth || null,
             marital_status || null,
