@@ -21,7 +21,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/next_delivery_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/queue_item_tile.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/verification_pending_view.dart';
-import 'package:f2h_delivery/features/dashboard/presentation/widgets/handover_status_card.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/collect_queue_item.dart';
 import 'package:f2h_delivery/features/dashboard/presentation/widgets/pickup_status_card.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/pickup_selection_screen.dart';
@@ -658,8 +657,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ] else ...[
                         if (isShiftCompleted) ...[
-                          HandoverStatusCard(currentRun: session.currentRun),
-                          const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
