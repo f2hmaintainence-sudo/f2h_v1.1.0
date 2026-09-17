@@ -437,22 +437,34 @@ export class DeliveryManagementService {
   async getDeliveryTracking(query: any) {
     try {
       const date = query.date || todayIST();
-      const { branch_id, status, partner_id, page = 1, limit = 50 } = query;
+      const { branch_id, status, partner_id, slot, delivery_slot, page = 1, limit = 50 } = query;
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
       const params: any[] = [date];
       const where: string[] = ['o.scheduled_date = $1'];
 
-      if (branch_id) {
+      if (branch_id && branch_id !== 'all') {
         params.push(branch_id);
         where.push(`o.branch_id = $${params.length}`);
       }
-      if (status) {
+      if (status && status !== 'all') {
         params.push(status);
         where.push(`o.status = $${params.length}`);
       }
-      if (partner_id) {
+      if (partner_id && partner_id !== 'all') {
         params.push(partner_id);
         where.push(`o.delivery_partner_id = $${params.length}`);
+      }
+      const targetSlot = slot || delivery_slot;
+      if (targetSlot && targetSlot !== 'all') {
+        const cleanSlot = String(targetSlot).toLowerCase().trim();
+        if (cleanSlot === 'morning' || cleanSlot === 'am') {
+          where.push(`(LOWER(o.delivery_slot) LIKE '%morning%' OR LOWER(o.delivery_slot) LIKE '%am%' OR LOWER(o.delivery_slot) LIKE '%05:00%')`);
+        } else if (cleanSlot === 'evening' || cleanSlot === 'pm') {
+          where.push(`(LOWER(o.delivery_slot) LIKE '%evening%' OR LOWER(o.delivery_slot) LIKE '%pm%' OR LOWER(o.delivery_slot) LIKE '%17:00%')`);
+        } else {
+          params.push(`%${cleanSlot}%`);
+          where.push(`LOWER(o.delivery_slot) LIKE $${params.length}`);
+        }
       }
 
       const sql = `

@@ -17,7 +17,7 @@ import {
   RefreshCw, Home, ChevronRight, Package, Users, Search,
   Phone, Building2, BatteryCharging, Navigation, ShieldCheck,
   Zap, ArrowRight, Compass, Radio, Check, Circle, Award, X,
-  Maximize2, Minimize2, ChevronLeft, Layers
+  Maximize2, Minimize2, ChevronLeft, Layers, Sunrise, Sunset, Sun, Moon, Calendar
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
@@ -96,6 +96,19 @@ function formatMoney(v: number | string) {
 
 function isPartnerOnDuty(p: DeliveryPartner): boolean {
   return Boolean(p.is_online && p.is_active !== false);
+}
+
+function isOrderInSlot(slotStr: string | undefined | null, targetSlot: string): boolean {
+  if (!targetSlot || targetSlot === "all") return true;
+  if (!slotStr) return false;
+  const s = String(slotStr).toLowerCase().trim();
+  if (targetSlot === "morning" || targetSlot === "am") {
+    return s.includes("morning") || s.includes("am") || s.includes("05:00") || s.includes("early");
+  }
+  if (targetSlot === "evening" || targetSlot === "pm") {
+    return s.includes("evening") || s.includes("pm") || s.includes("17:00") || s.includes("night");
+  }
+  return s.includes(targetSlot.toLowerCase());
 }
 
 const statusBadgeConfig: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -220,6 +233,7 @@ export default function DeliveryTrackingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [slotFilter, setSlotFilter] = useState<"all" | "morning" | "evening" | string>("all");
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
 
   // Layout mode: "split" (7:5 side-by-side), "map_expanded" (Map occupies full 12 cols), "timeline_expanded" (Timeline occupies full 12 cols)
@@ -413,10 +427,24 @@ export default function DeliveryTrackingPage() {
     };
   }, [selectedPartner, branchFilter, availableBranches]);
 
-  // Partner assigned orders with Uber-style sequential numbering and customer address coordinate caching
+  // Dynamic slot counter breakdown (All / Morning / Evening) based on current branch selection
+  const slotCounts = useMemo(() => {
+    const bOrders = orders.filter(o => branchFilter === "all" || o.branch_id === branchFilter);
+    return {
+      all: bOrders.length,
+      morning: bOrders.filter(o => isOrderInSlot(o.delivery_slot, "morning")).length,
+      evening: bOrders.filter(o => isOrderInSlot(o.delivery_slot, "evening")).length,
+    };
+  }, [orders, branchFilter]);
+
+  // Partner assigned orders filtered by delivery slot with Uber-style sequential numbering and coordinate caching
   const partnerOrders = useMemo(() => {
     if (!selectedPartner) return [];
-    const assigned = orders.filter(o => o.delivery_partner_id === selectedPartner.delivery_partner_id);
+    const assigned = orders.filter(o => {
+      if (o.delivery_partner_id !== selectedPartner.delivery_partner_id) return false;
+      if (!isOrderInSlot(o.delivery_slot, slotFilter)) return false;
+      return true;
+    });
 
     const hubLat = Number(activeBranch.lat);
     const hubLng = Number(activeBranch.lng);
@@ -481,7 +509,7 @@ export default function DeliveryTrackingPage() {
     }
 
     return [];
-  }, [orders, selectedPartner, activeBranch]);
+  }, [orders, selectedPartner, activeBranch, slotFilter]);
 
   const partnerStats = useMemo(() => {
     const total = partnerOrders.length;
@@ -540,8 +568,6 @@ export default function DeliveryTrackingPage() {
     }
   };
 
-
-
   const formattedToday = useMemo(() => {
     return new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
   }, []);
@@ -555,8 +581,12 @@ export default function DeliveryTrackingPage() {
   }, [branchPartners]);
 
   const branchOrders = useMemo(() => {
-    return orders.filter(o => branchFilter === "all" || o.branch_id === branchFilter);
-  }, [orders, branchFilter]);
+    return orders.filter(o => {
+      if (branchFilter !== "all" && o.branch_id !== branchFilter) return false;
+      if (!isOrderInSlot(o.delivery_slot, slotFilter)) return false;
+      return true;
+    });
+  }, [orders, branchFilter, slotFilter]);
 
   const onDutyCount = branchOnDutyCount;
 
@@ -580,14 +610,24 @@ export default function DeliveryTrackingPage() {
             <Radio size={20} className="animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base font-black text-slate-900 tracking-tight">Live GPS Fleet Tracking</h1>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Today ({formattedToday})
               </span>
+              {slotFilter !== "all" && (
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                  slotFilter === "morning"
+                    ? "bg-amber-50 text-amber-800 border-amber-300"
+                    : "bg-indigo-50 text-indigo-800 border-indigo-300"
+                }`}>
+                  {slotFilter === "morning" ? <Sunrise size={11} className="text-amber-600" /> : <Sunset size={11} className="text-indigo-600" />}
+                  Slot Filter: {slotFilter === "morning" ? "Morning (AM)" : "Evening (PM)"}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              Real-time Google/CartoDB light map tracking, branch-wise delivery boy filtering &amp; timeline progression.
+              Real-time Google/CartoDB light map tracking, branch &amp; slot filtering, live delivery partner telemetry &amp; stop timeline.
             </p>
           </div>
         </div>
@@ -615,10 +655,16 @@ export default function DeliveryTrackingPage() {
         {[
           { l: "Total Fleet", v: branchPartners.length, sub: branchFilter === "all" ? `${availableBranches.length} Branches` : "Selected Branch", cls: "bg-emerald-50 border-emerald-200 text-emerald-950", icon: Users },
           { l: "On Duty (Online)", v: branchOnDutyCount, sub: `${branchPartners.length - branchOnDutyCount} Offline`, cls: "bg-teal-50 border-teal-200 text-teal-950", icon: Truck },
-          { l: "In Transit", v: branchOrders.filter(o => o.status === "out_for_delivery").length, sub: "En Route", cls: "bg-blue-50 border-blue-200 text-blue-950", icon: Navigation },
-          { l: "Delivered", v: branchOrders.filter(o => o.status === "delivered").length, sub: "Completed Today", cls: "bg-green-50 border-green-200 text-green-950", icon: CheckCircle2 },
-          { l: "Pending", v: branchOrders.filter(o => o.status === "confirmed" || o.status === "placed").length, sub: "Queued", cls: "bg-amber-50 border-amber-200 text-amber-950", icon: Clock },
-          { l: "On-Time Rate", v: "98.4%", sub: "SLA Target 95%", cls: "bg-indigo-50 border-indigo-200 text-indigo-950", icon: Award },
+          { l: "In Transit", v: branchOrders.filter(o => o.status === "out_for_delivery").length, sub: slotFilter !== "all" ? `${slotFilter === "morning" ? "Morning" : "Evening"} Slot` : "En Route", cls: "bg-blue-50 border-blue-200 text-blue-950", icon: Navigation },
+          { l: "Delivered", v: branchOrders.filter(o => o.status === "delivered").length, sub: slotFilter !== "all" ? `${slotFilter === "morning" ? "Morning" : "Evening"} Slot` : "Completed Today", cls: "bg-green-50 border-green-200 text-green-950", icon: CheckCircle2 },
+          { l: "Pending", v: branchOrders.filter(o => o.status === "confirmed" || o.status === "placed").length, sub: slotFilter !== "all" ? `${slotFilter === "morning" ? "Morning" : "Evening"} Slot` : "Queued", cls: "bg-amber-50 border-amber-200 text-amber-950", icon: Clock },
+          {
+            l: "Active Slot",
+            v: slotFilter === "all" ? "All Slots" : slotFilter === "morning" ? "🌅 Morning" : "🌆 Evening",
+            sub: `${branchOrders.length} Orders in Filter`,
+            cls: slotFilter === "morning" ? "bg-amber-50 border-amber-200 text-amber-950" : slotFilter === "evening" ? "bg-indigo-50 border-indigo-200 text-indigo-950" : "bg-slate-50 border-slate-200 text-slate-900",
+            icon: slotFilter === "morning" ? Sunrise : slotFilter === "evening" ? Sunset : Calendar,
+          },
         ].map(c => (
           <div key={c.l} className={`${c.cls} rounded-xl border p-3 flex items-center gap-2.5 hover:scale-[1.01] transition-transform`}>
             <c.icon size={18} className="shrink-0 opacity-80" />
@@ -660,6 +706,52 @@ export default function DeliveryTrackingPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Delivery Slot Filter Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px]">
+              <button
+                onClick={() => setSlotFilter("all")}
+                className={`px-2.5 py-1 rounded-md font-extrabold transition-all flex items-center gap-1 ${
+                  slotFilter === "all"
+                    ? "bg-white text-emerald-700 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="View All Delivery Slots"
+              >
+                <span>All Slots</span>
+                <span className="px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[9px] font-black">{slotCounts.all}</span>
+              </button>
+              <button
+                onClick={() => setSlotFilter("morning")}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-extrabold transition-all ${
+                  slotFilter === "morning"
+                    ? "bg-amber-500 text-white shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="Morning Slot (05:00 AM - 08:30 AM)"
+              >
+                <Sunrise size={11} />
+                <span>Morning</span>
+                <span className={`px-1 py-0.2 rounded-full text-[9px] font-black ${
+                  slotFilter === "morning" ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
+                }`}>{slotCounts.morning}</span>
+              </button>
+              <button
+                onClick={() => setSlotFilter("evening")}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-extrabold transition-all ${
+                  slotFilter === "evening"
+                    ? "bg-indigo-600 text-white shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title="Evening Slot (05:00 PM - 08:30 PM)"
+              >
+                <Sunset size={11} />
+                <span>Evening</span>
+                <span className={`px-1 py-0.2 rounded-full text-[9px] font-black ${
+                  slotFilter === "evening" ? "bg-indigo-800 text-white" : "bg-indigo-100 text-indigo-800"
+                }`}>{slotCounts.evening}</span>
+              </button>
             </div>
 
             {/* Status Filter Tabs (On Duty / Idle) */}
@@ -731,8 +823,9 @@ export default function DeliveryTrackingPage() {
           ) : (
             filteredPartners.map(p => {
               const isSelected = p.delivery_partner_id === selectedPartner?.delivery_partner_id;
-              const pOrds = isSelected ? partnerOrders : orders.filter(o => o.delivery_partner_id === p.delivery_partner_id);
+              const pOrds = orders.filter(o => o.delivery_partner_id === p.delivery_partner_id && isOrderInSlot(o.delivery_slot, slotFilter));
               const delCnt = pOrds.filter(o => o.status === "delivered").length;
+              const totCnt = pOrds.length;
               const onDuty = isPartnerOnDuty(p);
 
               const partnerName = getPartnerDisplayName(p);
@@ -762,7 +855,7 @@ export default function DeliveryTrackingPage() {
                       </span>
                     </div>
                     <p className={`text-[9px] font-normal leading-tight mt-0.5 ${isSelected ? "text-emerald-100" : "text-slate-400"}`}>
-                      {delCnt} delivered today
+                      {delCnt}/{totCnt} delivered {slotFilter !== "all" ? `(${slotFilter === "morning" ? "AM" : "PM"})` : ""}
                     </p>
                   </div>
 
@@ -1034,13 +1127,45 @@ export default function DeliveryTrackingPage() {
             : "lg:col-span-5 h-[560px]"
         }`}>
           {/* Header */}
-          <div className="p-3.5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between shrink-0">
+          <div className="p-3.5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between shrink-0 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Clock size={15} className="text-emerald-600" />
               <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">Orders Timeline</h2>
+              {slotFilter !== "all" && (
+                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                  slotFilter === "morning"
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-indigo-50 text-indigo-800 border-indigo-200"
+                }`}>
+                  {slotFilter === "morning" ? <Sunrise size={10} /> : <Sunset size={10} />}
+                  {slotFilter === "morning" ? "Morning Slot" : "Evening Slot"}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Quick Slot Toggle for Timeline */}
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[9px] font-bold">
+                <button
+                  onClick={() => setSlotFilter("all")}
+                  className={`px-2 py-0.5 rounded transition-all ${slotFilter === "all" ? "bg-white text-emerald-700 shadow-2xs font-extrabold" : "text-slate-500 hover:text-slate-800"}`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setSlotFilter("morning")}
+                  className={`flex items-center gap-0.5 px-2 py-0.5 rounded transition-all ${slotFilter === "morning" ? "bg-amber-500 text-white shadow-2xs font-extrabold" : "text-slate-500 hover:text-slate-800"}`}
+                >
+                  <Sunrise size={9} /> AM
+                </button>
+                <button
+                  onClick={() => setSlotFilter("evening")}
+                  className={`flex items-center gap-0.5 px-2 py-0.5 rounded transition-all ${slotFilter === "evening" ? "bg-indigo-600 text-white shadow-2xs font-extrabold" : "text-slate-500 hover:text-slate-800"}`}
+                >
+                  <Sunset size={9} /> PM
+                </button>
+              </div>
+
               {selectedPartner && (
                 <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                   {partnerStats.delivered}/{partnerStats.total} Completed
@@ -1120,14 +1245,15 @@ export default function DeliveryTrackingPage() {
             {partnerOrders.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs font-medium space-y-2">
                 <Package size={24} className="mx-auto text-slate-300" />
-                <p>No orders assigned to this delivery partner today.</p>
+                <p>No orders matching this slot assigned to this delivery partner today.</p>
               </div>
             ) : (
               partnerOrders.map((o, idx) => {
                 const isDelivered = o.status === "delivered";
                 const isInTransit = o.status === "out_for_delivery";
                 const isLast = idx === partnerOrders.length - 1;
-                const orderBranch = o.branch_name || selectedPartner?.branch_name || "Main Branch";
+                const isMorning = isOrderInSlot(o.delivery_slot, "morning");
+                const isEvening = isOrderInSlot(o.delivery_slot, "evening");
 
                 return (
                   <div key={o.order_id} className="relative flex items-start gap-3 pb-5 group">
@@ -1191,7 +1317,21 @@ export default function DeliveryTrackingPage() {
                       </p>
 
                       <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px]">
-                        <span className="text-slate-600 font-semibold">{o.items?.length || 1} items ({o.delivery_slot})</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-600 font-semibold">{o.items?.length || 1} items</span>
+                          {o.delivery_slot && (
+                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold border ${
+                              isMorning
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : isEvening
+                                ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                                : "bg-slate-50 text-slate-700 border-slate-200"
+                            }`}>
+                              {isMorning ? <Sunrise size={9} className="text-amber-600" /> : isEvening ? <Sunset size={9} className="text-indigo-600" /> : <Clock size={9} />}
+                              {o.delivery_slot}
+                            </span>
+                          )}
+                        </div>
                         <span className="font-black text-emerald-700 text-xs">{formatMoney(o.total_amount)}</span>
                       </div>
                     </div>
@@ -1205,3 +1345,4 @@ export default function DeliveryTrackingPage() {
     </div>
   );
 }
+
