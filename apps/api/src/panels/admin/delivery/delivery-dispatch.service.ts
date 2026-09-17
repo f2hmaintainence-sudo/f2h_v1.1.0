@@ -237,6 +237,24 @@ export class DeliveryDispatchService {
           [runId],
         );
 
+        // Update associated orders to 'packed' upon admin dispatch approval (draft -> loaded/pending handover)
+        const runIdentifiers = [run.run_id, String(run.id), String(runId)].filter(Boolean);
+        await client.query(
+          `UPDATE orders
+           SET status = 'packed', updated_at = NOW()
+           WHERE (
+             delivery_run_id = ANY($1)
+             OR (
+               scheduled_date = CURRENT_DATE
+               AND address_id IN (
+                 SELECT address_id FROM delivery_run_addresses WHERE run_id = ANY($1) AND deleted_at IS NULL
+               )
+             )
+           )
+           AND status IN ('pending', 'placed', 'confirmed', 'assigned')`,
+          [runIdentifiers],
+        );
+
         return {
           status: true,
           data: { dispatch_id: activeDispatchId, items: results, run_id: runId },
