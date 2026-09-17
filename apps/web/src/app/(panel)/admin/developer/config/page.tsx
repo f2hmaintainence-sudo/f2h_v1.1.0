@@ -383,8 +383,8 @@ export default function SystemConfigPage() {
         <button
           onClick={() => setActiveTab("slots")}
           className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "slots"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            ? "bg-emerald-600 text-white shadow-sm"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
         >
           <Clock size={15} />
@@ -394,8 +394,8 @@ export default function SystemConfigPage() {
         <button
           onClick={() => setActiveTab("crons")}
           className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "crons"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            ? "bg-emerald-600 text-white shadow-sm"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
         >
           <Zap size={15} />
@@ -405,8 +405,8 @@ export default function SystemConfigPage() {
         <button
           onClick={() => setActiveTab("delivery")}
           className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "delivery"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            ? "bg-emerald-600 text-white shadow-sm"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
         >
           <Truck size={15} />
@@ -416,8 +416,8 @@ export default function SystemConfigPage() {
         <button
           onClick={() => setActiveTab("ordering")}
           className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "ordering"
-              ? "bg-emerald-600 text-white shadow-sm"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            ? "bg-emerald-600 text-white shadow-sm"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
         >
           <Calendar size={15} />
@@ -767,7 +767,7 @@ export default function SystemConfigPage() {
                   {/* Cron Execution Time */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>Delivery Run Generation Cron Time</span>
+                      <span>Orders Confirmation Cron Time</span>
                       <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
                         Automated Cron
                       </span>
@@ -1026,8 +1026,8 @@ export default function SystemConfigPage() {
                         })
                       }
                       className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all ${deliveryRules.delivery_radius_meters === preset.value
-                          ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
-                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                         }`}
                     >
                       {preset.label}
@@ -1068,8 +1068,8 @@ export default function SystemConfigPage() {
                 <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center gap-2">
                   <span
                     className={`w-2 h-2 rounded-full ${deliveryRules.enable_delivery_radius_check !== false
-                        ? "bg-emerald-500 animate-pulse"
-                        : "bg-slate-400"
+                      ? "bg-emerald-500 animate-pulse"
+                      : "bg-slate-400"
                       }`}
                   />
                   <span className="text-[11px] font-bold text-slate-700">
