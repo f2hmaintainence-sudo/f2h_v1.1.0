@@ -592,7 +592,7 @@ export class AuthController {
         this.db.query<CompanyProfileRecord>(
           `SELECT id, name, email, phone, secondary_phone, whatsapp,
                   address, city, state, pincode, logo_url, website,
-                  instagram_url, facebook_url, youtube_url
+                  instagram_url, facebook_url, youtube_url, linkedin_url
              FROM company_profile
             ORDER BY created_at ASC NULLS LAST, id ASC
             LIMIT 1`,

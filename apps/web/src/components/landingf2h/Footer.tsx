@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { F2H_PUBLIC } from "@/constants/f2hPublicAssets";
-import { FaInstagram, FaWhatsapp, FaFacebookF, FaYoutube } from "react-icons/fa";
+import { FaInstagram, FaWhatsapp, FaFacebookF, FaYoutube, FaLinkedinIn } from "react-icons/fa";
 import { FiPhone, FiMail, FiMapPin } from "react-icons/fi";
 
 const quickLinks = [
@@ -39,6 +39,7 @@ const DEFAULT_CONTACT = {
   instagram_url: "#",
   facebook_url: "#",
   youtube_url: "#",
+  linkedin_url: "#",
 };
 
 import { usePublicCompany } from "./PublicCompanyProvider";
@@ -63,6 +64,7 @@ export function Footer() {
     { name: "whatsapp", icon: FaWhatsapp, href: company.whatsapp_url || `https://wa.me/${(company.whatsapp || company.phone || "").replace(/\D/g, "")}`, hoverClass: "hover:bg-green-500", active: Boolean(company.whatsapp || company.phone) },
     { name: "facebook", icon: FaFacebookF, href: company.facebook_url || "#", hoverClass: "hover:bg-blue-600", active: Boolean(company.facebook_url && company.facebook_url !== "#") },
     { name: "youtube", icon: FaYoutube, href: company.youtube_url || "#", hoverClass: "hover:bg-red-600", active: Boolean(company.youtube_url && company.youtube_url !== "#") },
+    { name: "linkedin", icon: FaLinkedinIn, href: company.linkedin_url || "#", hoverClass: "hover:bg-blue-700", active: Boolean(company.linkedin_url && company.linkedin_url !== "#") },
   ];
 
   const contactItems = [

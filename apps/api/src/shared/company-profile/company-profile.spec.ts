@@ -45,17 +45,20 @@ describe('company profile projections', () => {
       { key: 'phone_url', value: 'tel:+919148773591' },
       { key: 'whatsapp_url', value: 'https://wa.me/919148773591' },
       { key: 'instagram_url', value: 'javascript:alert(1)' },
+      { key: 'linkedin_url', value: 'https://linkedin.com/company/f2hfresh' },
     ]);
     const data = buildPublicCompanyProfile(null, legacy);
 
     expect(data.phone_url).toBe('tel:+919148773591');
     expect(data.whatsapp_url).toBe('https://wa.me/919148773591');
     expect(data.instagram_url).toBe('');
+    expect(data.linkedin_url).toBe('https://linkedin.com/company/f2hfresh');
   });
 
   it('returns a stable editable shape when no canonical row exists', () => {
     const data = buildEditableCompanyProfile(null, {
       email: 'legacy@f2hfresh.com',
+      linkedin_url: 'https://linkedin.com/company/f2hfresh',
     });
 
     expect(data).toMatchObject({
@@ -65,6 +68,7 @@ describe('company profile projections', () => {
       phone: '',
       whatsapp: '',
       legal_name: '',
+      linkedin_url: 'https://linkedin.com/company/f2hfresh',
     });
   });
 });

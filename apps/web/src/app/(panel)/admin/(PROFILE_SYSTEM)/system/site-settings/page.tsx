@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/services/api.client";
 import {
   Globe, Save, RefreshCw, Phone, Mail, MapPin,
-  Instagram, Youtube, Facebook, MessageCircle, CheckCircle, Loader2, ChevronRight, Home
+  Instagram, Youtube, Facebook, Linkedin, MessageCircle, CheckCircle, Loader2, ChevronRight, Home
 } from "lucide-react";
 import Link from "next/link";
 import { showSuccessToast } from "@/components/Toast";
@@ -19,6 +19,7 @@ interface SiteForm {
   instagram_url: string;
   facebook_url: string;
   youtube_url: string;
+  linkedin_url: string;
 }
 
 const EMPTY_FORM: SiteForm = {
@@ -31,6 +32,7 @@ const EMPTY_FORM: SiteForm = {
   instagram_url: "",
   facebook_url: "",
   youtube_url: "",
+  linkedin_url: "",
 };
 
 const FIELD_META: {
@@ -102,6 +104,13 @@ const FIELD_META: {
       label: "YouTube URL",
       placeholder: "https://youtube.com/@f2hfresh",
       icon: <Youtube className="w-4 h-4" />,
+      type: "url",
+    },
+    {
+      key: "linkedin_url",
+      label: "LinkedIn URL",
+      placeholder: "https://linkedin.com/company/f2hfresh",
+      icon: <Linkedin className="w-4 h-4" />,
       type: "url",
     },
   ];

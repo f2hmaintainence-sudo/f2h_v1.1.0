@@ -21,6 +21,7 @@ describe('ProfileService company profile', () => {
       instagram_url: '',
       facebook_url: '',
       youtube_url: '',
+      linkedin_url: 'https://linkedin.com/company/f2hfresh',
       created_at: new Date('2026-08-20T00:00:00Z'),
       updated_at: new Date('2026-08-20T00:00:00Z'),
     };
@@ -56,6 +57,7 @@ describe('ProfileService company profile', () => {
       state: profile.state,
       pincode: profile.pincode,
       website: profile.website,
+      linkedin_url: profile.linkedin_url,
     });
 
     expect(db.transaction).toHaveBeenCalledTimes(1);
@@ -73,6 +75,8 @@ describe('ProfileService company profile', () => {
         'tel:+919148773591',
         'whatsapp_url',
         'https://wa.me/919148773591',
+        'linkedin_url',
+        'https://linkedin.com/company/f2hfresh',
       ]),
     );
     expect(result).toMatchObject({

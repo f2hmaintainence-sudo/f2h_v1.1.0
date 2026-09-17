@@ -17,6 +17,7 @@ export interface CompanyProfileRecord {
   instagram_url?: unknown;
   facebook_url?: unknown;
   youtube_url?: unknown;
+  linkedin_url?: unknown;
   created_at?: unknown;
   updated_at?: unknown;
 }
@@ -40,6 +41,7 @@ export interface EditableCompanyProfile {
   instagram_url: string;
   facebook_url: string;
   youtube_url: string;
+  linkedin_url: string;
   created_at: unknown | null;
   updated_at: unknown | null;
 }
@@ -63,6 +65,7 @@ export interface PublicCompanyProfile {
   instagram_url: string;
   facebook_url: string;
   youtube_url: string;
+  linkedin_url: string;
 }
 
 export interface SiteSettingRow {
@@ -174,6 +177,7 @@ export const buildEditableCompanyProfile = (
   instagram_url: firstText(profile?.instagram_url, legacy.instagram_url),
   facebook_url: firstText(profile?.facebook_url, legacy.facebook_url),
   youtube_url: firstText(profile?.youtube_url, legacy.youtube_url),
+  linkedin_url: firstText(profile?.linkedin_url, legacy.linkedin_url),
   created_at: profile?.created_at ?? null,
   updated_at: profile?.updated_at ?? null,
 });
@@ -242,6 +246,9 @@ export const buildPublicCompanyProfile = (
     ),
     youtube_url: sanitizeHttpUrl(
       firstText(profile?.youtube_url, legacy.youtube_url),
+    ),
+    linkedin_url: sanitizeHttpUrl(
+      firstText(profile?.linkedin_url, legacy.linkedin_url),
     ),
   };
 };

@@ -142,4 +142,12 @@ export class UpdateCompanyProfileDto {
   @ValidateIf(validateWhenProvided)
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   youtube_url?: string;
+
+  @Transform(trim)
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @ValidateIf(validateWhenProvided)
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  linkedin_url?: string;
 }

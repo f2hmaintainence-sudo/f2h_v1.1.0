@@ -19,6 +19,7 @@ export interface PublicCompanyProfile {
   instagram_url: string;
   facebook_url: string;
   youtube_url: string;
+  linkedin_url: string;
 }
 
 export const DEFAULT_PUBLIC_COMPANY: PublicCompanyProfile = {
@@ -39,6 +40,7 @@ export const DEFAULT_PUBLIC_COMPANY: PublicCompanyProfile = {
   instagram_url: "#",
   facebook_url: "#",
   youtube_url: "#",
+  linkedin_url: "#",
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -84,6 +86,8 @@ function normalizePublicCompany(data: unknown): PublicCompanyProfile {
       readText(data, "facebook_url") ?? DEFAULT_PUBLIC_COMPANY.facebook_url,
     youtube_url:
       readText(data, "youtube_url") ?? DEFAULT_PUBLIC_COMPANY.youtube_url,
+    linkedin_url:
+      readText(data, "linkedin_url") ?? DEFAULT_PUBLIC_COMPANY.linkedin_url,
   };
 }
 

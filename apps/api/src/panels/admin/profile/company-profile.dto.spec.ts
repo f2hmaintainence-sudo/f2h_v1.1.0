@@ -14,11 +14,13 @@ describe('UpdateCompanyProfileDto', () => {
       website: 'https://f2hfresh.com',
       logo_url: '',
       instagram_url: 'https://instagram.com/f2hfresh',
+      linkedin_url: 'https://linkedin.com/company/f2hfresh',
     });
 
     expect(await validate(dto)).toEqual([]);
     expect(dto.name).toBe('F2H Fresh');
     expect(dto.email).toBe('support@f2hfresh.com');
+    expect(dto.linkedin_url).toBe('https://linkedin.com/company/f2hfresh');
   });
 
   it('rejects missing names and unsafe public contact values', async () => {
@@ -27,12 +29,13 @@ describe('UpdateCompanyProfileDto', () => {
       email: 'not-an-email',
       phone: 'call-me',
       website: 'javascript:alert(1)',
+      linkedin_url: 'javascript:alert(1)',
     });
 
     const errors = await validate(dto);
 
     expect(errors.map((error) => error.property)).toEqual(
-      expect.arrayContaining(['name', 'email', 'phone', 'website']),
+      expect.arrayContaining(['name', 'email', 'phone', 'website', 'linkedin_url']),
     );
   });
 });

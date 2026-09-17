@@ -24,7 +24,7 @@ import {
 const COMPANY_PROFILE_COLUMNS = `
   id, name, legal_name, gst_number, pan_number, email, phone,
   secondary_phone, whatsapp, address, city, state, pincode, logo_url,
-  website, instagram_url, facebook_url, youtube_url, created_at, updated_at
+  website, instagram_url, facebook_url, youtube_url, linkedin_url, created_at, updated_at
 `;
 
 const COMPANY_PROFILE_LOCK = 'admin-company-profile-singleton';
@@ -83,6 +83,7 @@ export class ProfileService {
         body.instagram_url ?? '',
         body.facebook_url ?? '',
         body.youtube_url ?? '',
+        body.linkedin_url ?? '',
       ];
 
       const saved = await this.db.transaction(async (client) => {
@@ -105,8 +106,8 @@ export class ProfileService {
                     secondary_phone = $7, whatsapp = $8, address = $9,
                     city = $10, state = $11, pincode = $12, logo_url = $13,
                     website = $14, instagram_url = $15, facebook_url = $16,
-                    youtube_url = $17, updated_at = NOW()
-              WHERE id = $18
+                    youtube_url = $17, linkedin_url = $18, updated_at = NOW()
+              WHERE id = $19
               RETURNING ${COMPANY_PROFILE_COLUMNS}`,
             [...values, existing.rows[0].id],
           );
@@ -115,10 +116,10 @@ export class ProfileService {
             `INSERT INTO company_profile (
                 name, legal_name, gst_number, pan_number, email, phone,
                 secondary_phone, whatsapp, address, city, state, pincode,
-                logo_url, website, instagram_url, facebook_url, youtube_url
+                logo_url, website, instagram_url, facebook_url, youtube_url, linkedin_url
               ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9,
-                $10, $11, $12, $13, $14, $15, $16, $17
+                $10, $11, $12, $13, $14, $15, $16, $17, $18
               )
               RETURNING ${COMPANY_PROFILE_COLUMNS}`,
             values,
@@ -144,6 +145,7 @@ export class ProfileService {
           ['instagram_url', String(profile.instagram_url ?? '')],
           ['facebook_url', String(profile.facebook_url ?? '')],
           ['youtube_url', String(profile.youtube_url ?? '')],
+          ['linkedin_url', String(profile.linkedin_url ?? '')],
         ];
         const placeholders = legacySettings
           .map((_, index) => `($${index * 2 + 1}, $${index * 2 + 2}, NOW())`)

@@ -18,6 +18,7 @@ import {
   ImageIcon,
   Instagram,
   Layers,
+  Linkedin,
   Loader2,
   Mail,
   MapPin,
@@ -52,6 +53,7 @@ interface CompanyProfileForm {
   instagram_url: string;
   facebook_url: string;
   youtube_url: string;
+  linkedin_url: string;
 }
 
 interface CompanyProfileResponse {
@@ -105,6 +107,7 @@ const EMPTY_FORM: CompanyProfileForm = {
   instagram_url: "",
   facebook_url: "",
   youtube_url: "",
+  linkedin_url: "",
 };
 
 const SECTIONS: SectionConfig[] = [
@@ -314,9 +317,18 @@ const SECTIONS: SectionConfig[] = [
         type: "url",
         inputMode: "url",
         maxLength: 500,
-        wide: true,
         icon: Youtube,
         hint: "Official YouTube video channel URL.",
+      },
+      {
+        key: "linkedin_url",
+        label: "LinkedIn Profile / Company Page URL",
+        placeholder: "https://linkedin.com/company/f2hfresh",
+        type: "url",
+        inputMode: "url",
+        maxLength: 500,
+        icon: Linkedin,
+        hint: "Official LinkedIn organization or business profile URL.",
       },
     ],
   },
@@ -343,6 +355,7 @@ function normalizeProfile(profile?: Partial<CompanyProfileForm> | null): Company
     instagram_url: profile?.instagram_url ?? "",
     facebook_url: profile?.facebook_url ?? "",
     youtube_url: profile?.youtube_url ?? "",
+    linkedin_url: profile?.linkedin_url ?? "",
   };
 }
 
@@ -365,6 +378,7 @@ function trimProfile(profile: CompanyProfileForm): CompanyProfileForm {
     instagram_url: profile.instagram_url.trim(),
     facebook_url: profile.facebook_url.trim(),
     youtube_url: profile.youtube_url.trim(),
+    linkedin_url: profile.linkedin_url.trim(),
   };
 }
 
@@ -391,7 +405,7 @@ function validateField(field: ProfileField, rawValue: string): string | undefine
 
   if (field === "pincode" && value && !/^\d{6}$/.test(value)) return "Enter a 6-digit postal pincode.";
 
-  const urlFields: ProfileField[] = ["logo_url", "website", "instagram_url", "facebook_url", "youtube_url"];
+  const urlFields: ProfileField[] = ["logo_url", "website", "instagram_url", "facebook_url", "youtube_url", "linkedin_url"];
   if (urlFields.includes(field) && value && !isHttpUrl(value)) {
     return "Enter a full URL beginning with http:// or https://.";
   }
@@ -625,6 +639,7 @@ export default function CompanyProfilePage() {
     { label: "Instagram", value: form.instagram_url, icon: <Instagram className="h-3.5 w-3.5" /> },
     { label: "Facebook", value: form.facebook_url, icon: <Facebook className="h-3.5 w-3.5" /> },
     { label: "YouTube", value: form.youtube_url, icon: <Youtube className="h-3.5 w-3.5" /> },
+    { label: "LinkedIn", value: form.linkedin_url, icon: <Linkedin className="h-3.5 w-3.5" /> },
   ].filter((link) => isHttpUrl(link.value.trim()));
 
   const filteredSections = activeTab === "all" ? SECTIONS : SECTIONS.filter((s) => s.id === activeTab);
