@@ -3934,11 +3934,11 @@ class _HomeBottomPromoBannersState extends State<_HomeBottomPromoBanners> {
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeOutCubic,
                   margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: isSel ? 22 : 6,
-                  height: 6,
+                  width: isSel ? 22 : 12,
+                  height: 3.5,
                   decoration: BoxDecoration(
-                    color: isSel ? const Color(0xFF16A34A) : const Color(0xFFD1D5DB),
-                    borderRadius: BorderRadius.circular(3),
+                    color: isSel ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1).withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               );

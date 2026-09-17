@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/app.dart';
-import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
-import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 
 /// Displays top promo banners (subscription_banner.png & wallet_banner.png) as a sliding carousel.
 class PromoBanner extends StatefulWidget {
@@ -41,11 +39,11 @@ class _PromoBannerState extends State<PromoBanner> {
   void _startAutoScroll() {
     _autoScrollTimer?.cancel();
     if (_banners.length <= 1) return;
-    _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) {
       if (!mounted || !_pageController.hasClients) return;
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.fastOutSlowIn,
+        duration: const Duration(milliseconds: 550),
+        curve: Curves.easeInOutCubic,
       );
     });
   }
@@ -201,6 +199,7 @@ class _PromoBannerState extends State<PromoBanner> {
               onPageChanged: (index) {
                 if (mounted) {
                   setState(() => _currentPage = index);
+                  _startAutoScroll();
                 }
               },
               itemCount: 100000,
@@ -275,21 +274,22 @@ class _PromoBannerState extends State<PromoBanner> {
                     final targetPage = _currentPage + (index - currentMod);
                     _pageController.animateToPage(
                       targetPage,
-                      duration: const Duration(milliseconds: 350),
-                      curve: Curves.easeOutCubic,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOutCubic,
                     );
+                    _startAutoScroll();
                   },
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: isSelected ? 20 : 6,
-                    height: 6,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOutCubic,
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    width: isSelected ? 22 : 12,
+                    height: 3.5,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFFCBD5E1),
-                      borderRadius: BorderRadius.circular(3),
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFCBD5E1).withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 );
