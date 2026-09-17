@@ -97,15 +97,9 @@ export class UsersController {
     });
 
     // Get stored role preference or default to first role
-    let storedRole: string | null = null;
-    try {
-      storedRole = await this.redisService.fetch<string>(
-        SELECTED_ROLE_KEY(userId),
-      );
-    } catch {
-      storedRole = null;
-    }
-
+    const storedRole = await this.redisService.fetch<string>(
+      SELECTED_ROLE_KEY(userId),
+    );
     const validRoleIds = roles.map((r: any) => r.role_id);
     const activeRole =
       storedRole && validRoleIds.includes(storedRole) ? storedRole : validRoleIds[0] || null;
