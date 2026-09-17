@@ -48,22 +48,46 @@ export class UsersController {
     if (!rawUser) return { error: 'User not found' };
     const user = this.fieldEncryption.decryptRow('users', rawUser);
 
-    let rawRoles = await this.db.query(
-      `SELECT DISTINCT 
-         COALESCE(r.role_id, UPPER(sub.role_id)) AS role_id,
-         COALESCE(r.name, sub.role_id) AS role_name
-       FROM (
-         SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
-         UNION
-         SELECT u.role_id FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
-         UNION
-         SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
-       ) sub
-       LEFT JOIN roles r ON UPPER(r.role_id) = UPPER(sub.role_id)
-       WHERE sub.role_id IS NOT NULL AND sub.role_id != ''
-       ORDER BY CASE UPPER(COALESCE(r.role_id, UPPER(sub.role_id))) WHEN 'SUPER_ADMIN' THEN 1 WHEN 'ADMIN' THEN 2 WHEN 'DELIVERY_PARTNER' THEN 3 WHEN 'CUSTOMER' THEN 4 ELSE 5 END`,
-      [userId],
-    );
+    let rawRoles: any[] = [];
+    try {
+      rawRoles = await this.db.query(
+        `SELECT DISTINCT 
+           COALESCE(r.role_id, UPPER(sub.role_id)) AS role_id,
+           COALESCE(r.name, sub.role_id) AS role_name
+         FROM (
+           SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
+           UNION
+           SELECT u.role_id FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
+           UNION
+           SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
+         ) sub
+         LEFT JOIN roles r ON UPPER(r.role_id) = UPPER(sub.role_id)
+         WHERE sub.role_id IS NOT NULL AND sub.role_id != ''`,
+        [userId],
+      );
+    } catch {
+      try {
+        rawRoles = await this.db.query(
+          `SELECT role_id, role_id as role_name FROM role_assignments WHERE user_id = $1 AND is_active = 1`,
+          [userId],
+        );
+      } catch {
+        rawRoles = [];
+      }
+    }
+
+    // Sort roles by priority in JavaScript
+    const rolePriority: Record<string, number> = {
+      SUPER_ADMIN: 1,
+      ADMIN: 2,
+      DELIVERY_PARTNER: 3,
+      CUSTOMER: 4,
+    };
+    (rawRoles || []).sort((a: any, b: any) => {
+      const pa = rolePriority[String(a.role_id || '').toUpperCase()] ?? 99;
+      const pb = rolePriority[String(b.role_id || '').toUpperCase()] ?? 99;
+      return pa - pb;
+    });
 
     const seenRoles = new Set();
     let roles = (rawRoles || []).filter((r: any) => {
@@ -73,9 +97,15 @@ export class UsersController {
     });
 
     // Get stored role preference or default to first role
-    const storedRole = await this.redisService.fetch<string>(
-      SELECTED_ROLE_KEY(userId),
-    );
+    let storedRole: string | null = null;
+    try {
+      storedRole = await this.redisService.fetch<string>(
+        SELECTED_ROLE_KEY(userId),
+      );
+    } catch {
+      storedRole = null;
+    }
+
     const validRoleIds = roles.map((r: any) => r.role_id);
     const activeRole =
       storedRole && validRoleIds.includes(storedRole) ? storedRole : validRoleIds[0] || null;
