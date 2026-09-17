@@ -9,7 +9,7 @@
 // Description : Management section for all registered vendors under Catalog & Inventory
 // ============================================================================
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -46,7 +46,10 @@ import {
   Check,
   Calendar,
   Star,
-  ChevronDown
+  ChevronDown,
+  Camera,
+  ImageIcon,
+  UploadCloud
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
@@ -101,6 +104,48 @@ const CATEGORY_OPTIONS = [
   "Hydroponics & Greens"
 ];
 
+export function getVendorImageUrl(url?: string | null): string | null {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("/uploads/")) return trimmed;
+  if (trimmed.startsWith("uploads/")) return `/${trimmed}`;
+  return trimmed;
+}
+
+async function compressImageFile(file: File, maxWidth = 800, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(dataUrl);
+        } else {
+          resolve(event.target?.result as string);
+        }
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+}
+
 function formatWhatsAppPhone(phone?: string | null): string {
   if (!phone) return "";
   const digits = String(phone).replace(/\D/g, "");
@@ -127,6 +172,8 @@ export default function RegisteredVendorsPage() {
   const [addLoading, setAddLoading] = useState(false);
   const [availableProducts, setAvailableProducts] = useState<ProductOption[]>([]);
   const [selectedProductNames, setSelectedProductNames] = useState<string[]>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete Confirm State
   const [vendorToDelete, setVendorToDelete] = useState<VendorRecord | null>(null);
@@ -382,6 +429,28 @@ export default function RegisteredVendorsPage() {
     );
   };
 
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setPhotoUploading(true);
+      const compressed = await compressImageFile(file, 800, 0.82);
+      setFormData((prev) => ({ ...prev, image_url: compressed }));
+    } catch (err) {
+      console.error("Image upload error:", err);
+      showErrorToast("Failed to process selected image");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const clearPhoto = () => {
+    setFormData((prev) => ({ ...prev, image_url: "" }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6 animate-in fade-in duration-300">
       {/* Breadcrumbs */}
@@ -630,7 +699,8 @@ export default function RegisteredVendorsPage() {
         /* GRID VIEW */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredVendors.map((vendor) => {
-            const hasImage = Boolean(vendor.image_url && vendor.image_url.startsWith("http"));
+            const vendorImg = getVendorImageUrl(vendor.image_url);
+            const hasImage = Boolean(vendorImg);
             const productsList = vendor.products_supplied || [];
 
             return (
@@ -645,7 +715,7 @@ export default function RegisteredVendorsPage() {
                       {hasImage ? (
                         <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-200/60 bg-slate-50 shrink-0">
                           <img
-                            src={vendor.image_url!}
+                            src={vendorImg!}
                             alt={vendor.business_name}
                             className="w-full h-full object-cover"
                             onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
@@ -821,7 +891,8 @@ export default function RegisteredVendorsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {filteredVendors.map((vendor) => {
-                  const hasImage = Boolean(vendor.image_url && vendor.image_url.startsWith("http"));
+                  const vendorImg = getVendorImageUrl(vendor.image_url);
+                  const hasImage = Boolean(vendorImg);
                   const productsCount = vendor.products_supplied?.length || vendor.total_products_supplied || 0;
 
                   return (
@@ -831,7 +902,7 @@ export default function RegisteredVendorsPage() {
                           {hasImage ? (
                             <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-200 shrink-0">
                               <img
-                                src={vendor.image_url!}
+                                src={vendorImg!}
                                 alt={vendor.business_name}
                                 className="w-full h-full object-cover"
                                 onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
@@ -925,10 +996,10 @@ export default function RegisteredVendorsPage() {
             {/* Header */}
             <div className="p-5 md:p-6 border-b border-slate-100 flex items-start justify-between gap-4 sticky top-0 bg-white/95 backdrop-blur-md z-10 rounded-t-3xl">
               <div className="flex items-center gap-3.5">
-                {selectedVendor.image_url && selectedVendor.image_url.startsWith("http") ? (
+                {getVendorImageUrl(selectedVendor.image_url) ? (
                   <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-200 shrink-0">
                     <img
-                      src={selectedVendor.image_url}
+                      src={getVendorImageUrl(selectedVendor.image_url)!}
                       alt={selectedVendor.business_name}
                       className="w-full h-full object-cover"
                       onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
@@ -1326,16 +1397,77 @@ export default function RegisteredVendorsPage() {
                 )}
               </div>
 
-              {/* Image URL / Photo Link */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Profile / Farm Image URL</label>
+              {/* Photo Upload Section */}
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Camera size={14} className="text-emerald-600" />
+                    Vendor Profile / Farm Photo
+                  </label>
+                  <span className="text-[11px] text-slate-400">Saves to uploads/vendors</span>
+                </div>
+
                 <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://images.unsplash.com/... (optional)"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
                 />
+
+                <div className="flex items-center gap-3.5">
+                  <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-slate-200 border-2 border-dashed border-slate-300 flex items-center justify-center shrink-0">
+                    {formData.image_url ? (
+                      <>
+                        <img
+                          src={formData.image_url}
+                          alt="Vendor Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={clearPhoto}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center hover:bg-rose-700 shadow"
+                          title="Remove photo"
+                        >
+                          <X size={10} />
+                        </button>
+                      </>
+                    ) : (
+                      <ImageIcon size={22} className="text-slate-400" />
+                    )}
+                    {photoUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <RefreshCw size={14} className="animate-spin text-white" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                      >
+                        <UploadCloud size={13} />
+                        <span>{formData.image_url ? "Change Photo" : "Upload Photo"}</span>
+                      </button>
+                      {formData.image_url && (
+                        <button
+                          type="button"
+                          onClick={clearPhoto}
+                          className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs hover:bg-slate-50 transition cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Upload JPEG, PNG or WebP photo. Automatically compressed and saved to uploads/vendors.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Submit Buttons */}

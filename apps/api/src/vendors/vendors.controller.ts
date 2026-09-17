@@ -9,7 +9,11 @@ import {
   Query,
   ValidationPipe,
   UsePipes,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { VendorsService } from './vendors.service';
 import { RegisterVendorDto } from './dto/register-vendor.dto';
 import { Public } from '../auth/decorators/public.decorator';
@@ -38,6 +42,23 @@ export class VendorsController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async registerVendor(@Body() dto: RegisterVendorDto) {
     return this.vendorsService.registerVendor(dto);
+  }
+
+  @Public()
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  async uploadVendorPhoto(
+    @UploadedFile() file?: any,
+    @Body() body?: { image?: string; vendor_id?: string; vendorId?: string },
+  ) {
+    const base64 = body?.image;
+    const vendorId = body?.vendor_id || body?.vendorId;
+    return this.vendorsService.uploadVendorFile(file, base64, vendorId);
   }
 
   // =========================================================================

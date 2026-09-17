@@ -541,21 +541,21 @@ export default function DailyCollectionsPage() {
     const cleanPhone = formatWhatsAppPhone(resolvedVendorPhone);
 
     const text = encodeURIComponent(
-      `*🥛 F2H FRESH - INTAKE RECEIPT / రసీదు*\n` +
+      `*🥛 F2H FRESH - INTAKE RECEIPT *\n` +
       `------------------------------------\n` +
-      `📋 *Slip No:* ${c.collection_id}\n` +
-      `📅 *Date:* ${c.collection_date} (${c.shift})\n` +
-      `🏷️ *Intake Type:* ${isMilk ? "Milk Procurement" : "Produce & Ghee Intake"}\n` +
-      `👨‍🌾 *Vendor:* ${c.vendor_name}${resolvedVendorPhone ? ` (+91 ${resolvedVendorPhone.replace(/^(\+91|91|0)/, '')})` : ""}\n` +
-      `📦 *Product:* ${c.product_name}\n` +
-      `⚖️ *Quantity:* ${c.quantity} ${c.unit}\n` +
-      `💵 *Rate:* ₹${c.rate_per_unit} / ${c.unit}\n` +
-      `💰 *Total Amount:* ₹${c.total_amount.toLocaleString("en-IN")}\n` +
+      ` *Slip No:* ${c.collection_id}\n` +
+      ` *Date:* ${c.collection_date} (${c.shift})\n` +
+      ` *Intake Type:* ${isMilk ? "Milk Procurement" : "Produce & Ghee Intake"}\n` +
+      ` *Vendor:* ${c.vendor_name}${resolvedVendorPhone ? ` (+91 ${resolvedVendorPhone.replace(/^(\+91|91|0)/, '')})` : ""}\n` +
+      ` *Product:* ${c.product_name}\n` +
+      ` *Quantity:* ${c.quantity} ${c.unit}\n` +
+      ` *Rate:* ₹${c.rate_per_unit} / ${c.unit}\n` +
+      ` *Total Amount:* ₹${c.total_amount.toLocaleString("en-IN")}\n` +
       (extraDetails ? `\n*Quality & Batch Specs:*\n${extraDetails}` : "") +
-      `\n💳 *Payment:* ${c.payment_status} (${c.payment_mode || "CASH"})\n` +
-      `👤 *Received By:* ${c.collector_name}${c.collector_phone ? ` (${c.collector_phone})` : ""}\n` +
+      `\n*Payment:* ${c.payment_status} (${c.payment_mode || "CASH"})\n` +
+      `*Received By:* ${c.collector_name}${c.collector_phone ? ` (${c.collector_phone})` : ""}\n` +
       `------------------------------------\n` +
-      `🌾 *Farm to Home Fresh (F2H)*\n` +
+      `*Farm to Home Fresh (F2H)*\n` +
       `Pure • Direct • Farm Fresh Procurements`
     );
 
@@ -652,25 +652,22 @@ export default function DailyCollectionsPage() {
           <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
             <button
               onClick={() => setSelectedShift("ALL")}
-              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${
-                selectedShift === "ALL" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
-              }`}
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${selectedShift === "ALL" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
+                }`}
             >
               All
             </button>
             <button
               onClick={() => setSelectedShift("MORNING")}
-              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${
-                selectedShift === "MORNING" ? "bg-amber-500 text-white shadow-2xs" : "text-amber-800"
-              }`}
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${selectedShift === "MORNING" ? "bg-amber-500 text-white shadow-2xs" : "text-amber-800"
+                }`}
             >
               <Sun size={12} /> AM
             </button>
             <button
               onClick={() => setSelectedShift("EVENING")}
-              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${
-                selectedShift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs" : "text-indigo-800"
-              }`}
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${selectedShift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs" : "text-indigo-800"
+                }`}
             >
               <Moon size={12} /> PM
             </button>
@@ -681,29 +678,26 @@ export default function DailyCollectionsPage() {
         <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
           <button
             onClick={() => setSelectedType("ALL")}
-            className={`py-1.5 rounded-lg text-xs font-bold transition-all text-center ${
-              selectedType === "ALL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-            }`}
+            className={`py-1.5 rounded-lg text-xs font-bold transition-all text-center ${selectedType === "ALL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
           >
             All Intake ({collections.length})
           </button>
           <button
             onClick={() => setSelectedType("MILK")}
-            className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              selectedType === "MILK"
+            className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedType === "MILK"
                 ? "bg-blue-600 text-white shadow-xs"
                 : "text-blue-700 hover:bg-blue-50"
-            }`}
+              }`}
           >
             <Milk size={14} /> Milk Intake
           </button>
           <button
             onClick={() => setSelectedType("OTHERS")}
-            className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              selectedType === "OTHERS"
+            className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedType === "OTHERS"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "text-emerald-700 hover:bg-emerald-50"
-            }`}
+              }`}
           >
             <Apple size={14} /> Produce &amp; Ghee
           </button>
@@ -790,18 +784,16 @@ export default function DailyCollectionsPage() {
         <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
           <button
             onClick={() => setViewMode("cards")}
-            className={`p-1.5 rounded-lg text-xs transition-all ${
-              viewMode === "cards" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"
-            }`}
+            className={`p-1.5 rounded-lg text-xs transition-all ${viewMode === "cards" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"
+              }`}
             title="Mobile Cards View"
           >
             <LayoutGrid size={15} />
           </button>
           <button
             onClick={() => setViewMode("table")}
-            className={`p-1.5 rounded-lg text-xs transition-all ${
-              viewMode === "table" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"
-            }`}
+            className={`p-1.5 rounded-lg text-xs transition-all ${viewMode === "table" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500"
+              }`}
             title="Table View"
           >
             <List size={15} />
@@ -875,11 +867,10 @@ export default function DailyCollectionsPage() {
 
                     <button
                       onClick={() => handleTogglePayment(item)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-                        item.payment_status === "PAID"
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${item.payment_status === "PAID"
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : "bg-amber-50 text-amber-700 border border-amber-200"
-                      }`}
+                        }`}
                       title="Tap to toggle payment status"
                     >
                       {item.payment_status}
@@ -1096,11 +1087,10 @@ export default function DailyCollectionsPage() {
                       <td className="py-3 px-4">
                         <button
                           onClick={() => handleTogglePayment(item)}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            item.payment_status === "PAID"
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${item.payment_status === "PAID"
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : "bg-amber-50 text-amber-700 border border-amber-200"
-                          }`}
+                            }`}
                         >
                           {item.payment_status}
                         </button>
@@ -1198,22 +1188,20 @@ export default function DailyCollectionsPage() {
                 <button
                   type="button"
                   onClick={() => handleIntakeModeSwitch("MILK")}
-                  className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                    intakeMode === "MILK"
+                  className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${intakeMode === "MILK"
                       ? "bg-blue-600 text-white shadow-sm"
                       : "text-slate-700 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   <Droplet size={15} /> 🥛 Milk Procurement
                 </button>
                 <button
                   type="button"
                   onClick={() => handleIntakeModeSwitch("OTHERS")}
-                  className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                    intakeMode === "OTHERS"
+                  className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${intakeMode === "OTHERS"
                       ? "bg-emerald-600 text-white shadow-sm"
                       : "text-slate-700 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   <Apple size={15} /> 🍎 Ghee, Fruits &amp; Others
                 </button>
@@ -1244,18 +1232,16 @@ export default function DailyCollectionsPage() {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, shift: "MORNING" })}
-                      className={`py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-                        formData.shift === "MORNING" ? "bg-amber-500 text-white shadow-2xs" : "text-slate-700"
-                      }`}
+                      className={`py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${formData.shift === "MORNING" ? "bg-amber-500 text-white shadow-2xs" : "text-slate-700"
+                        }`}
                     >
                       <Sun size={12} /> AM
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, shift: "EVENING" })}
-                      className={`py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-                        formData.shift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs" : "text-slate-700"
-                      }`}
+                      className={`py-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${formData.shift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs" : "text-slate-700"
+                        }`}
                     >
                       <Moon size={12} /> PM
                     </button>
@@ -1851,11 +1837,10 @@ export default function DailyCollectionsPage() {
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => handleTogglePayment(selectedCollection)}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                      selectedCollection.payment_status === "PAID"
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${selectedCollection.payment_status === "PAID"
                         ? "bg-amber-50 text-amber-800 border-amber-200"
                         : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                    }`}
+                      }`}
                   >
                     {selectedCollection.payment_status === "PAID" ? "Mark Pending" : "Mark Paid"}
                   </button>

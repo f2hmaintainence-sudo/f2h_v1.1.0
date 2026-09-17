@@ -1,4 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { DatabaseService } from '../shared/database/Database.service';
 import { RegisterVendorDto } from './dto/register-vendor.dto';
 
@@ -37,6 +39,132 @@ export class VendorsService {
   private readonly logger = new Logger(VendorsService.name);
 
   constructor(private readonly db: DatabaseService) {}
+
+  /**
+   * Helper to process image input (base64 data URI or raw base64) and write it
+   * into filesystem at `uploads/vendors/vnd_<id>_<timestamp>.<ext>`.
+   */
+  public async processAndSaveVendorImage(
+    imageInput?: string | null,
+    vendorIdentifier?: string,
+  ): Promise<string | null> {
+    if (!imageInput || typeof imageInput !== 'string') {
+      return null;
+    }
+
+    const trimmed = imageInput.trim();
+    if (!trimmed) return null;
+
+    // If it's already a relative /uploads/ path or uploads/ path
+    if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+      return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    }
+
+    // Check if it's base64 data URI (e.g. data:image/png;base64,... or data:image/jpeg;base64,...)
+    const matches = trimmed.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (matches && matches.length === 3) {
+      try {
+        const mimeType = matches[1].toLowerCase();
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        let ext = '.jpg';
+        if (mimeType.includes('png')) ext = '.png';
+        else if (mimeType.includes('webp')) ext = '.webp';
+        else if (mimeType.includes('gif')) ext = '.gif';
+        else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = '.jpg';
+
+        const uploadDir = path.join(process.cwd(), 'uploads', 'vendors');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        const safeId = (vendorIdentifier || 'vnd').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${safeId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
+        const filePath = path.join(uploadDir, filename);
+
+        fs.writeFileSync(filePath, buffer);
+        this.logger.log(`Saved vendor profile image to uploads/vendors/${filename}`);
+        return `/uploads/vendors/${filename}`;
+      } catch (err) {
+        this.logger.error('Failed to decode and save base64 vendor image', err);
+      }
+    }
+
+    // If it's a raw base64 string without data: URI prefix
+    if (trimmed.length > 500 && /^[A-Za-z0-9+/=]+$/.test(trimmed)) {
+      try {
+        const buffer = Buffer.from(trimmed, 'base64');
+        const uploadDir = path.join(process.cwd(), 'uploads', 'vendors');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const safeId = (vendorIdentifier || 'vnd').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${safeId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.jpg`;
+        const filePath = path.join(uploadDir, filename);
+        fs.writeFileSync(filePath, buffer);
+        this.logger.log(`Saved raw base64 vendor image to uploads/vendors/${filename}`);
+        return `/uploads/vendors/${filename}`;
+      } catch (err) {
+        this.logger.error('Failed to save raw base64 vendor image', err);
+      }
+    }
+
+    // If it's an external URL (http/https), return as is
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+
+    return trimmed;
+  }
+
+  /**
+   * Dedicated file/photo upload helper for vendor profile photos.
+   */
+  async uploadVendorFile(
+    file?: any,
+    base64Image?: string,
+    vendorId?: string,
+  ): Promise<{ success: boolean; message: string; url?: string }> {
+    const uploadDir = path.join(process.cwd(), 'uploads', 'vendors');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    let fileUrl: string | null = null;
+
+    if (file && file.buffer) {
+      const ext = path.extname(file.originalname || 'profile.jpg') || '.jpg';
+      const safeId = (vendorId || 'vnd').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `${safeId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}${ext}`;
+      const filePath = path.join(uploadDir, filename);
+      fs.writeFileSync(filePath, file.buffer);
+      fileUrl = `/uploads/vendors/${filename}`;
+    } else if (base64Image) {
+      fileUrl = await this.processAndSaveVendorImage(base64Image, vendorId);
+    }
+
+    if (!fileUrl) {
+      throw new BadRequestException('No valid image file or base64 data provided');
+    }
+
+    // If vendorId was provided, update the vendor's image_url directly in DB
+    if (vendorId) {
+      const isNumeric = /^\d+$/.test(vendorId);
+      await this.db.query(
+        `UPDATE public.vendors 
+         SET image_url = $1, updated_at = NOW() 
+         WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $2::bigint OR ' : ''}vendor_id = $2)`,
+        [fileUrl, String(vendorId)],
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Vendor profile photo uploaded successfully',
+      url: fileUrl,
+    };
+  }
 
   private getDefaultImage(category: string): string {
     const cat = (category || '').toLowerCase();
@@ -163,7 +291,10 @@ export class VendorsService {
 
     const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
     const vendorId = `VND_${Date.now().toString().slice(-6)}_${randomSuffix}`;
-    const imageUrl = dto.imageUrl || this.getDefaultImage(dto.category);
+    let imageUrl = await this.processAndSaveVendorImage(dto.imageUrl, vendorId);
+    if (!imageUrl) {
+      imageUrl = this.getDefaultImage(dto.category);
+    }
     const city = dto.city?.trim() || 'Bengaluru';
     const state = dto.state?.trim() || 'Karnataka';
 
@@ -314,6 +445,31 @@ export class VendorsService {
       const state = body.state !== undefined ? body.state : cur.state;
       const pincode = body.pincode !== undefined ? body.pincode : cur.pincode;
 
+      let imageUrl = cur.image_url;
+      if (body.image_url !== undefined || body.imageUrl !== undefined || body.image !== undefined) {
+        const rawImg = body.image_url ?? body.imageUrl ?? body.image;
+        if (rawImg) {
+          imageUrl = await this.processAndSaveVendorImage(rawImg, String(id));
+        } else {
+          imageUrl = null;
+        }
+      }
+
+      const gstin = body.gstin !== undefined ? body.gstin : cur.gstin;
+      const fssaiLicense = body.fssai_license !== undefined ? body.fssai_license : (body.fssaiLicense !== undefined ? body.fssaiLicense : cur.fssai_license);
+      const supplyCapacity = body.supply_capacity !== undefined ? body.supply_capacity : (body.supplyCapacity !== undefined ? body.supplyCapacity : cur.supply_capacity);
+      const experienceYears = body.experience_years !== undefined ? body.experience_years : (body.experienceYears !== undefined ? body.experienceYears : cur.experience_years);
+
+      let productsSupplied = cur.products_supplied;
+      let totalProductsSupplied = cur.total_products_supplied;
+      if (body.products_supplied !== undefined || body.products !== undefined) {
+        const rawProds = body.products_supplied ?? body.products;
+        if (Array.isArray(rawProds)) {
+          productsSupplied = rawProds.map((p) => (typeof p === 'string' ? { name: p } : p));
+          totalProductsSupplied = productsSupplied.length;
+        }
+      }
+
       const updateQuery = `
         UPDATE public.vendors
         SET 
@@ -330,8 +486,15 @@ export class VendorsService {
           city = $11,
           state = $12,
           pincode = $13,
+          image_url = $14,
+          gstin = $15,
+          fssai_license = $16,
+          supply_capacity = $17,
+          experience_years = $18,
+          products_supplied = $19,
+          total_products_supplied = $20,
           updated_at = NOW()
-        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $14::bigint OR ' : ''}vendor_id = $14)
+        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $21::bigint OR ' : ''}vendor_id = $21)
         RETURNING *;
       `;
 
@@ -349,6 +512,13 @@ export class VendorsService {
         city,
         state,
         pincode,
+        imageUrl,
+        gstin,
+        fssaiLicense,
+        supplyCapacity,
+        experienceYears,
+        JSON.stringify(productsSupplied || []),
+        totalProductsSupplied || 0,
         String(id),
       ]);
 
