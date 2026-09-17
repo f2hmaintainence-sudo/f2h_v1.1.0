@@ -146,6 +146,12 @@ class DeliverySessionBloc
       }
     }
 
+    if (orders.isNotEmpty || currentRun != null || isOnline) {
+      try {
+        sl<LocationTrackingService>().startTracking();
+      } catch (_) {}
+    }
+
     return current.copyWith(
       driverName: driverName,
       isOnline: isOnline,

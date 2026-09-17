@@ -53,20 +53,26 @@ export class LocationController {
       return { status: false, message: 'Latitude and longitude are required' };
     }
 
-    // Verify partner is online before tracking location
+    // Verify partner is active before tracking location
     const partnerStatusRes = await this.db.query(
       `SELECT is_online, is_active FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
       [userId],
     );
-    const isOnline = Boolean(partnerStatusRes?.[0]?.is_online && partnerStatusRes?.[0]?.is_active !== false);
-    if (!isOnline) {
-      // Offline: clean up any stale cached telemetry and do not track location
+    if (partnerStatusRes?.length && partnerStatusRes[0].is_active === false) {
       await this.redisService.delete(`delivery_partner_location:${userId}`);
       return {
         status: false,
         is_online: false,
-        message: 'Partner is currently offline. Location tracking is disabled.',
+        message: 'Partner account is deactivated. Location tracking is disabled.',
       };
+    }
+
+    // Auto-mark delivery partner online on active location ping
+    if (!partnerStatusRes?.[0]?.is_online) {
+      await this.db.query(
+        `UPDATE delivery_partners SET is_online = true, is_available = true, updated_at = NOW() WHERE delivery_partner_id = $1`,
+        [userId],
+      );
     }
 
     // Fetch previous cached location to throttle DB writes
@@ -114,8 +120,9 @@ export class LocationController {
              SET current_lat = $1,
                  current_lng = $2,
                  last_location_at = NOW(),
+                 is_online = true,
                  updated_at = NOW()
-             WHERE delivery_partner_id = $3 AND is_online = true`,
+             WHERE delivery_partner_id = $3`,
             [Number(body.latitude), Number(body.longitude), userId]
           );
 

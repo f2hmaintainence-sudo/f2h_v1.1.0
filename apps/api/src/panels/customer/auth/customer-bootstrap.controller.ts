@@ -311,17 +311,16 @@ export class CustomerBootstrapController {
       return { status: false, message: 'Partner ID is required', data: null, is_online: false };
     }
 
-    // When partner is offline, do not get or return location details
     const partnerStatusRes = await this.db.query(
-      `SELECT is_online, is_active FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+      `SELECT is_online, is_active, current_lat, current_lng, last_location_at FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
       [partnerId],
     );
-    const isOnline = Boolean(partnerStatusRes?.[0]?.is_online && partnerStatusRes?.[0]?.is_active !== false);
-    if (!isOnline) {
+
+    if (partnerStatusRes?.length && partnerStatusRes[0].is_active === false) {
       return {
         status: false,
         is_online: false,
-        message: 'Delivery partner is currently offline',
+        message: 'Delivery partner is deactivated',
         data: null,
       };
     }
@@ -344,15 +343,24 @@ export class CustomerBootstrapController {
     } catch (_) {}
 
     if (lat === null || lng === null) {
-      const dbRows = await this.db.query(
-        `SELECT current_lat, current_lng, last_location_at FROM delivery_partners WHERE delivery_partner_id = $1 AND is_online = true LIMIT 1`,
-        [partnerId],
-      );
-      if (dbRows?.length && dbRows[0].current_lat != null && dbRows[0].current_lng != null) {
-        lat = Number(dbRows[0].current_lat);
-        lng = Number(dbRows[0].current_lng);
-        lastLocationAt = dbRows[0].last_location_at ? new Date(dbRows[0].last_location_at).toISOString() : null;
+      if (partnerStatusRes?.length && partnerStatusRes[0].current_lat != null && partnerStatusRes[0].current_lng != null) {
+        lat = Number(partnerStatusRes[0].current_lat);
+        lng = Number(partnerStatusRes[0].current_lng);
+        lastLocationAt = partnerStatusRes[0].last_location_at ? new Date(partnerStatusRes[0].last_location_at).toISOString() : null;
       }
+    }
+
+    const isOnline = Boolean(
+      partnerStatusRes?.[0]?.is_online || (lat != null && lng != null)
+    );
+
+    if (!isOnline && lat === null && lng === null) {
+      return {
+        status: false,
+        is_online: false,
+        message: 'Delivery partner is currently offline',
+        data: null,
+      };
     }
 
     if (lat !== null && lng !== null) {
@@ -531,7 +539,11 @@ export class CustomerBootstrapController {
 
         if (!partnerMap.has(partnerId)) {
           const slotLabel = row.delivery_slot === 'evening' ? 'Evening Delivery' : 'Morning Delivery';
-          const isOnline = Boolean(row.is_online);
+          const isOnline = Boolean(
+            row.is_online || 
+            ['in_progress', 'active', 'started', 'out_for_delivery'].includes((row.run_status || '').toLowerCase()) ||
+            (row.current_lat != null && row.current_lng != null)
+          );
           partnerMap.set(partnerId, {
             partner_id: partnerId,
             partner_name: row.partner_name || 'Delivery Partner',
@@ -544,9 +556,9 @@ export class CustomerBootstrapController {
             run_status: row.run_status || 'planned',
             delivery_status: row.address_delivery_status || 'pending',
             run_date: row.run_date,
-            latitude: isOnline && row.current_lat != null ? Number(row.current_lat) : null,
-            longitude: isOnline && row.current_lng != null ? Number(row.current_lng) : null,
-            last_location_at: isOnline && row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
+            latitude: row.current_lat != null ? Number(row.current_lat) : null,
+            longitude: row.current_lng != null ? Number(row.current_lng) : null,
+            last_location_at: row.last_location_at ? new Date(row.last_location_at).toISOString() : null,
             addresses: [],
           });
         }
@@ -791,17 +803,12 @@ export class CustomerBootstrapController {
         return true;
       });
 
-      // Enrich all active partners with fresh real-time GPS telemetry from Redis ONLY if they are online
+      // Enrich all active partners with fresh real-time GPS telemetry from Redis
       for (const partner of activePartners) {
-        if (!partner.is_online) {
-          partner.latitude = null;
-          partner.longitude = null;
-          partner.last_location_at = null;
-          continue;
-        }
         try {
           const redisLoc: any = await this.redisService.fetch(`delivery_partner_location:${partner.partner_id}`);
           if (redisLoc && redisLoc.latitude && redisLoc.longitude) {
+            partner.is_online = true;
             partner.latitude = Number(redisLoc.latitude);
             partner.longitude = Number(redisLoc.longitude);
             if (redisLoc.battery != null) partner.battery = Number(redisLoc.battery);
@@ -809,6 +816,10 @@ export class CustomerBootstrapController {
             partner.last_location_at = redisLoc.updatedAt || redisLoc.lastDbLogTime || new Date().toISOString();
           }
         } catch (_) {}
+
+        if (!partner.is_online && partner.latitude != null && partner.longitude != null) {
+          partner.is_online = true;
+        }
       }
 
       const deliveryPartners = activePartners;

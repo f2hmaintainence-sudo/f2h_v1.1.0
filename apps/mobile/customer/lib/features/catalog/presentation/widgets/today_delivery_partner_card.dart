@@ -41,13 +41,11 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
     _partner = widget.partner;
     _isOnline = widget.partner.isOnline;
     _mapController = MapController();
-    _currentLat = _isOnline ? widget.partner.latitude : null;
-    _currentLng = _isOnline ? widget.partner.longitude : null;
-    _lastUpdatedTime = _isOnline ? widget.partner.lastLocationAt : null;
+    _currentLat = widget.partner.latitude;
+    _currentLng = widget.partner.longitude;
+    _lastUpdatedTime = widget.partner.lastLocationAt;
 
-    if (_isOnline) {
-      _startLocationPolling();
-    }
+    _startLocationPolling();
   }
 
   @override
@@ -59,21 +57,14 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
         widget.partner.longitude != oldWidget.partner.longitude) {
       _partner = widget.partner;
       _isOnline = widget.partner.isOnline;
-      if (!_isOnline) {
-        _pollingTimer?.cancel();
-        _currentLat = null;
-        _currentLng = null;
-        _lastUpdatedTime = null;
-      } else {
-        if (widget.partner.latitude != null && widget.partner.longitude != null) {
-          _currentLat = widget.partner.latitude;
-          _currentLng = widget.partner.longitude;
-          _lastUpdatedTime = widget.partner.lastLocationAt;
-          _animateToCurrentLocation();
-        }
-        if (_pollingTimer == null || !_pollingTimer!.isActive) {
-          _startLocationPolling();
-        }
+      if (widget.partner.latitude != null && widget.partner.longitude != null) {
+        _currentLat = widget.partner.latitude;
+        _currentLng = widget.partner.longitude;
+        _lastUpdatedTime = widget.partner.lastLocationAt;
+        _animateToCurrentLocation();
+      }
+      if (_pollingTimer == null || !_pollingTimer!.isActive) {
+        _startLocationPolling();
       }
     }
   }
@@ -86,21 +77,17 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
   }
 
   void _startLocationPolling() {
-    if (!_isOnline) return;
+    // Initial fetch
+    _fetchLiveLocation();
 
-    // Initial fetch if coordinates not loaded yet
-    if (_currentLat == null || _currentLng == null) {
-      _fetchLiveLocation();
-    }
-
-    // Periodic live telemetry refresh every 12 seconds
-    _pollingTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+    // Periodic live telemetry refresh every 10 seconds
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _fetchLiveLocation();
     });
   }
 
   Future<void> _fetchLiveLocation() async {
-    if (!_isOnline) return;
     final partnerId = _partner.partnerId.trim();
     if (partnerId.isEmpty || _isLocating) return;
 
@@ -113,7 +100,6 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
 
       if (response.statusCode == 200 && response.data != null) {
         final body = response.data;
-        // If partner went offline or location unavailable, stop polling and clear coordinates
         if (body['is_online'] == false || body['status'] == false) {
           if (mounted) {
             setState(() {
@@ -122,7 +108,6 @@ class _TodayDeliveryPartnerCardState extends State<TodayDeliveryPartnerCard> {
               _currentLng = null;
               _lastUpdatedTime = null;
             });
-            _pollingTimer?.cancel();
           }
           return;
         }
