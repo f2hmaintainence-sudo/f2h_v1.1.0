@@ -17,7 +17,6 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 import { UpdateCompanyProfileDto } from './company-profile.dto';
 
-@Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/profile', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class ProfileController {
@@ -36,7 +35,7 @@ export class ProfileController {
     return this.profileService.uploadProfilePhoto(userId, file);
   }
 
-  // ── My Profile (logged-in admin) ──
+  // ── My Profile (logged-in admin / staff) ──
   @Get('me')
   async getMyProfile(@Req() req: any) {
     const userId = req.user?.user_id || req.user?.sub || req.user?.email || req.user?.id || req.user?.user_name;
@@ -58,33 +57,39 @@ export class ProfileController {
     return this.profileService.updateEmail(userId, body);
   }
 
-  // ── Company Profile ──
+  // ── Company Profile (Admin / Super Admin only) ──
   @Get('company')
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   async getCompanyProfile() {
     return this.profileService.getCompanyProfile();
   }
 
   @Put('company')
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   async updateCompanyProfile(@Body() body: UpdateCompanyProfileDto) {
     return this.profileService.updateCompanyProfile(body);
   }
 
   @Get('admins')
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   async getAdminUsers(@Query() query: any) {
     return this.profileService.getAdminUsers(query);
   }
 
   @Get('roles')
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   async getRoles() {
     return this.profileService.getRoles();
   }
 
   @Get('notifications')
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   async getNotificationSettings() {
     return this.profileService.getNotificationSettings();
   }
 
   @Put('notifications')
+  @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
   async updateNotificationSettings(@Body() body: any) {
     return this.profileService.updateNotificationSettings(body);
   }

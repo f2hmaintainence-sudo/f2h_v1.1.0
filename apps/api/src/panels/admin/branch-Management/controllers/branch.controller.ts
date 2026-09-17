@@ -37,6 +37,7 @@ export class BranchController {
 
   // ─── ALL BRANCHES LIST ─────────────────────────────────────────
   @Get()
+  @Roles()
   async getBranches(@Query() query: any) {
     return this.customersService.getAllBranches(query);
   }
