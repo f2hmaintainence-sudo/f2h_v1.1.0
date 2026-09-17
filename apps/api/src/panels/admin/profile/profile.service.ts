@@ -296,7 +296,49 @@ export class ProfileService {
         console.warn('[getMyProfile] Primary query failed:', err);
       }
 
-      if (!rows.length) return { status: false, message: 'User not found' };
+      if (!rows.length) {
+        try {
+          const fallbackUser = await this.db.query(
+            `SELECT user_id, email, user_name, first_name, last_name, phone, profile_image_url as profile, role_id, account_status, created_at as user_created_at
+             FROM users
+             WHERE (user_id = $1 OR user_id = $2 OR LOWER(COALESCE(email, '')) = LOWER($1) OR LOWER(COALESCE(user_name, '')) = LOWER($1))
+             AND deleted_at IS NULL
+             LIMIT 1`,
+            [cleanId, strippedId],
+          );
+          if (fallbackUser.length) {
+            const u = fallbackUser[0];
+            return {
+              status: true,
+              data: {
+                ...u,
+                first_name: u.first_name || u.user_name || '',
+                last_name: u.last_name || '',
+                management_id: `MNG-${u.user_id}`,
+                branch_id: '',
+                branch_name: '',
+                department: '',
+                designation: '',
+                gender: '',
+                date_of_birth: null,
+                marital_status: '',
+                bio: '',
+                education: '',
+                address_line1: '',
+                address_line2: '',
+                city: '',
+                state: '',
+                postal_code: '',
+                alt_phone: '',
+              },
+              message: 'Profile fetched',
+            };
+          }
+        } catch (fbErr) {
+          console.warn('[getMyProfile] Fallback query failed:', fbErr);
+        }
+        return { status: false, message: 'User not found' };
+      }
       return { status: true, data: rows[0], message: 'Profile fetched' };
     } catch (error) {
       this.developer.error('getMyProfile error', { error });
@@ -414,16 +456,14 @@ export class ProfileService {
       const keep = (v: unknown) => (v === undefined ? null : v);
 
       // 1) Update users table (identity single source of truth)
-      const fullName = [first_name, last_name].filter(Boolean).join(' ') || null;
       await this.db.query(
         `UPDATE users
          SET first_name = COALESCE($2, first_name),
              last_name  = COALESCE($3, last_name),
-             user_name  = COALESCE($4, user_name),
-             phone      = COALESCE($5, phone),
+             phone      = COALESCE($4, phone),
              updated_at = NOW()
          WHERE user_id = $1`,
-        [actualUserId, keep(first_name), keep(last_name), keep(fullName), keep(phone)],
+        [actualUserId, keep(first_name), keep(last_name), keep(phone)],
       );
 
       // 2) Upsert management_staff (WITHOUT user_name or phone)

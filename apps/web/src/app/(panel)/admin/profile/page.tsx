@@ -8,6 +8,7 @@ import {
 import { Home, ChevronRight, Building2, Shield, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/services/api.client";
+import { useAuth } from "@/context/AuthContext";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 import "./profile.css";
 
@@ -142,6 +143,7 @@ const maritalOpts = [
 // ── Main Component ──
 // ════════════════════════════════════════════════
 export default function AdminProfilePage() {
+  const { user: authUser } = useAuth();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -259,25 +261,26 @@ export default function AdminProfilePage() {
 
   // ── Start Profile Edit ──
   const startEdit = () => {
-    if (!profile) return;
+    const current = profile || authUser;
+    if (!current) return;
     setForm({
-      first_name: profile.first_name || "",
-      last_name: profile.last_name || "",
-      phone: profile.phone || "",
-      gender: profile.gender || "",
-      date_of_birth: toInputDate(profile.date_of_birth),
-      marital_status: profile.marital_status || "",
-      bio: profile.bio || "",
-      address_line1: profile.address_line1 || "",
-      address_line2: profile.address_line2 || "",
-      city: profile.city || "",
-      state: profile.state || "",
-      postal_code: profile.postal_code || "",
-      department: profile.department || "",
-      designation: profile.designation || "",
-      education: profile.education || "",
-      alt_phone: profile.alt_phone || "",
-      branch_id: profile.branch_id || "",
+      first_name: current.first_name || authUser?.first_name || "",
+      last_name: current.last_name || authUser?.last_name || "",
+      phone: (current as any).phone || (authUser as any)?.phone || "",
+      gender: (current as any).gender || "",
+      date_of_birth: toInputDate((current as any).date_of_birth),
+      marital_status: (current as any).marital_status || "",
+      bio: (current as any).bio || "",
+      address_line1: (current as any).address_line1 || "",
+      address_line2: (current as any).address_line2 || "",
+      city: (current as any).city || "",
+      state: (current as any).state || "",
+      postal_code: (current as any).postal_code || "",
+      department: (current as any).department || "",
+      designation: (current as any).designation || "",
+      education: (current as any).education || "",
+      alt_phone: (current as any).alt_phone || "",
+      branch_id: (current as any).branch_id || "",
     });
     setEditing(true);
   };
@@ -376,14 +379,46 @@ export default function AdminProfilePage() {
     finally { setEmailOtpVerifying(false); }
   };
 
-  // ── Derived ──
-  const p = profile;
-  const fullName = p ? ([p.first_name, p.last_name].filter(Boolean).join(" ") || p.user_name || p.email || "—") : "—";
-  const profileImage = resolveProfileImage(p?.profile);
+  // ── Derived with AuthContext fallback ──
+  const p: Partial<ProfileData> | null = (profile || authUser) ? {
+    user_id: profile?.user_id || authUser?.user_id || "",
+    email: profile?.email || authUser?.email || "",
+    user_name: profile?.user_name || authUser?.user_name || "",
+    first_name: profile?.first_name || authUser?.first_name || "",
+    last_name: profile?.last_name || authUser?.last_name || "",
+    phone: profile?.phone || (authUser as any)?.phone || "",
+    profile: profile?.profile || authUser?.profile || "",
+    account_status: profile?.account_status || "active",
+    user_created_at: profile?.user_created_at || "",
+    management_id: profile?.management_id || (authUser?.user_id ? `MNG-${authUser.user_id}` : ""),
+    branch_id: profile?.branch_id || "",
+    branch_name: profile?.branch_name || "",
+    department: profile?.department || "",
+    designation: profile?.designation || "",
+    bio: profile?.bio || "",
+    gender: profile?.gender || "",
+    date_of_birth: profile?.date_of_birth || "",
+    marital_status: profile?.marital_status || "",
+    alt_phone: profile?.alt_phone || "",
+    address_line1: profile?.address_line1 || "",
+    address_line2: profile?.address_line2 || "",
+    city: profile?.city || "",
+    state: profile?.state || "",
+    postal_code: profile?.postal_code || "",
+    education: profile?.education || "",
+    staff_active: profile?.staff_active ?? true,
+  } : null;
+
+  const firstName = p?.first_name || authUser?.first_name || "";
+  const lastName = p?.last_name || authUser?.last_name || "";
+  const userName = p?.user_name || authUser?.user_name || "";
+  const email = p?.email || authUser?.email || "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || userName || email || "Admin";
+  const profileImage = resolveProfileImage(p?.profile || authUser?.profile || undefined);
   const branchOptions = branches.map((b: any) => ({ value: b.branch_id, label: b.branch_name || b.name }));
 
   // ── Skeleton ──
-  if (loading) {
+  if (loading && !p) {
     return (
       <div className="pv-page-wrap">
         <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-5">
@@ -423,8 +458,8 @@ export default function AdminProfilePage() {
             </p>
           </div>
           <div className="pv-page-head-actions">
-            <span className={`pv-status-chip ${p?.account_status !== "active" ? "pv-status-chip--inactive" : ""}`}>
-              {val(p?.account_status)}
+            <span className={`pv-status-chip ${(p?.account_status || 'active') !== "active" ? "pv-status-chip--inactive" : ""}`}>
+              {val(p?.account_status || (authUser ? "active" : undefined))}
             </span>
             <span className="pv-date-chip">Joined {fmtDate(p?.user_created_at)}</span>
           </div>
@@ -463,7 +498,7 @@ export default function AdminProfilePage() {
                 )}
                 {profileImage && !imageError
                   ? <img src={profileImage} alt="avatar" onError={() => setImageError(true)} />
-                  : initials(p?.first_name, p?.last_name, p?.user_name || p?.email)
+                  : initials(firstName, lastName, userName || email)
                 }
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex flex-col items-center justify-center text-white gap-1">
                   <FiCamera size={20} />
