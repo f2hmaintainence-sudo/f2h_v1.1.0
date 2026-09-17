@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/presentation/screens/delivery_confirmation_sheet.dart';
@@ -122,17 +123,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
 
     // Fire non-blocking GPS distance check in background for debug logs
-    _locationService.getCurrentPosition().then((position) {
-      if (position != null) {
-        final dist = _locationService.haversineDistanceKm(
-          position.latitude,
-          position.longitude,
-          _currentStop.addressLat,
-          _currentStop.addressLng,
-        );
-        debugPrint('[DEBUG] Rider is $dist km away from stop.');
-      }
-    }).catchError((_) {});
+    Position? currentPos;
+    try {
+      currentPos = await _locationService.getCurrentPosition();
+    } catch (_) {}
 
     Map<String, dynamic>? confirmedResult;
 
@@ -142,6 +136,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: _currentStop,
+        initialPosition: currentPos,
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (_currentStop.orders.isEmpty) return;
           final orderId = _currentStop.orders.first.orderId;

@@ -11,6 +11,7 @@ import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_require
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class ContainerItemState {
@@ -54,6 +55,8 @@ class ContainerItemState {
 
 class DeliveryConfirmationSheet extends StatefulWidget {
   final GroupedStop stop;
+  final Position? initialPosition;
+  final double allowedRadiusMeters;
   final Function(
     String status,
     int emptyBottles,
@@ -71,6 +74,8 @@ class DeliveryConfirmationSheet extends StatefulWidget {
   const DeliveryConfirmationSheet({
     super.key,
     required this.stop,
+    this.initialPosition,
+    this.allowedRadiusMeters = 100.0,
     required this.onConfirm,
   });
 
@@ -99,7 +104,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   bool _isCheckingGps = true;
   double? _distanceMeters;
   bool _isOutOfRadius = false;
-  static const double _kMaxAllowedRadiusMeters = 100.0; // Strict 100m doorstep verification
+  late double _allowedRadiusMeters;
 
   final Map<String, ContainerItemState> _containerStates = {};
 
@@ -112,6 +117,22 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   @override
   void initState() {
     super.initState();
+    _allowedRadiusMeters = widget.allowedRadiusMeters;
+
+    // Fast synchronous evaluation if parent passed a recent location fix
+    if (widget.initialPosition != null && widget.stop.addressLat != 0 && widget.stop.addressLng != 0) {
+      final loc = sl<LocationService>();
+      final distKm = loc.haversineDistanceKm(
+        widget.initialPosition!.latitude,
+        widget.initialPosition!.longitude,
+        widget.stop.addressLat,
+        widget.stop.addressLng,
+      );
+      _distanceMeters = distKm * 1000.0;
+      _isOutOfRadius = _distanceMeters! > _allowedRadiusMeters;
+      _isCheckingGps = false;
+    }
+
     _checkGpsRadius();
     if (widget.stop.isCod && widget.stop.codAmount > 0) {
       _fetchPaymentQr();
@@ -282,7 +303,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     if (mounted) {
       setState(() {
         _isCheckingGps = true;
-        _gpsStatusText = 'Checking GPS position...';
       });
     }
 
@@ -293,7 +313,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         if (mounted) {
           setState(() {
             _isCheckingGps = false;
-            _gpsStatusText = 'Could not acquire GPS position. Please turn on location services.';
           });
         }
         return;
@@ -301,22 +320,22 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
 
       final distKm = loc.haversineDistanceKm(pos.latitude, pos.longitude, destLat, destLng);
       final distMeters = distKm * 1000.0;
-      final isOut = distMeters > _kMaxAllowedRadiusMeters;
+      final isOut = distMeters > _allowedRadiusMeters;
 
       if (mounted) {
         setState(() {
           _isCheckingGps = false;
           _distanceMeters = distMeters;
           _isOutOfRadius = isOut;
-          _gpsStatusText = null;
         });
 
         if (showFeedback) {
           if (isOut) {
+            final remainingMeters = (distMeters - _allowedRadiusMeters).clamp(0.0, double.infinity);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Still out of delivery radius (${_formatDistance(distMeters)} away). Must be within 100m.',
+                  'Out of radius (${_formatDistance(distMeters)} away). Remaining distance: ${_formatDistance(remainingMeters)} (Max radius: ${_allowedRadiusMeters.round()}m)',
                 ),
                 backgroundColor: const Color(0xFFDC2626),
                 behavior: SnackBarBehavior.floating,
@@ -324,9 +343,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Doorstep location verified! You are within the 100m delivery radius.'),
-                backgroundColor: Color(0xFF16A34A),
+              SnackBar(
+                content: Text('Doorstep verified! Within ${_formatDistance(distMeters)} (Radius: ${_allowedRadiusMeters.round()}m)'),
+                backgroundColor: const Color(0xFF16A34A),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -337,7 +356,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       if (mounted) {
         setState(() {
           _isCheckingGps = false;
-          _gpsStatusText = 'Location check error: $e';
         });
       }
     }
@@ -352,6 +370,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
 
   void _showOutOfRadiusDialog() {
     final distStr = _distanceMeters != null ? _formatDistance(_distanceMeters!) : 'Unknown distance';
+    final remainingMeters = (_distanceMeters != null && _distanceMeters! > _allowedRadiusMeters)
+        ? _distanceMeters! - _allowedRadiusMeters
+        : 0.0;
+    final remainingStr = _formatDistance(remainingMeters);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -384,9 +407,19 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFECACA)),
               ),
-              child: const Text(
-                'Maximum allowed distance is 100 meters. Please reach the customer doorstep before confirming arrival.',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF991B1B)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Remaining Distance: $remainingStr to reach radius',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Allowed doorstep radius is ${_allowedRadiusMeters.round()} meters. Please reach the customer location to complete delivery.',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF991B1B)),
+                  ),
+                ],
               ),
             ),
           ],
@@ -795,7 +828,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'OUT OF DELIVERY RADIUS (${_formatDistance(_distanceMeters!)})',
+                            'OUT OF RADIUS (${_formatDistance(_distanceMeters!)})',
                             style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 13.5,
@@ -804,9 +837,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
-                            'Doorstep Geofence is ACTIVE (Max 100m)',
-                            style: TextStyle(
+                          Text(
+                            'Allowed Delivery Radius: ${_allowedRadiusMeters.round()}m',
+                            style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 11,
                               color: Color(0xFFDC2626),
@@ -818,9 +851,31 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Remaining Distance:',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF7F1D1D)),
+                      ),
+                      Text(
+                        '${_formatDistance((_distanceMeters! - _allowedRadiusMeters).clamp(0.0, double.infinity))} to doorstep',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Text(
-                  'You are currently ${_formatDistance(_distanceMeters!)} away from ${widget.stop.customerName}\'s delivery location. You must be at the customer\'s doorstep (within 100m) to confirm arrival and complete delivery.',
-                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF7F1D1D), height: 1.4),
+                  'Doorstep geofence is ACTIVE. You are ${_formatDistance(_distanceMeters!)} away from ${widget.stop.customerName}\'s delivery location. You must be within ${_allowedRadiusMeters.round()}m of the doorstep to confirm arrival.',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF7F1D1D), height: 1.35),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -880,7 +935,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ] else if (_distanceMeters != null) ...[
           Container(
             margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFF0FDF4),
               borderRadius: BorderRadius.circular(14),
@@ -888,16 +943,29 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.verified_rounded, color: Color(0xFF16A34A), size: 18),
+                const Icon(Icons.verified_rounded, color: Color(0xFF16A34A), size: 20),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    'Doorstep Verified: Within ${_formatDistance(_distanceMeters!)} (Max Radius: 100m)',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
-                      color: Color(0xFF15803D),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Inside Delivery Radius',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12.5,
+                          color: Color(0xFF15803D),
+                        ),
+                      ),
+                      Text(
+                        'Doorstep Verified: Within ${_formatDistance(_distanceMeters!)} (Allowed: ${_allowedRadiusMeters.round()}m)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -950,10 +1018,16 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         const SizedBox(height: 8),
 
         ElevatedButton(
-          onPressed: _isOutOfRadius ? _showOutOfRadiusDialog : _nextStep,
+          onPressed: _isCheckingGps && _distanceMeters == null
+              ? null
+              : _isOutOfRadius
+                  ? _showOutOfRadiusDialog
+                  : _nextStep,
           style: ElevatedButton.styleFrom(
             backgroundColor: _isOutOfRadius ? const Color(0xFFDC2626) : kPrimary,
             foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0xFFCBD5E1),
+            disabledForegroundColor: const Color(0xFF64748B),
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 2,
@@ -961,17 +1035,32 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                _isOutOfRadius ? Icons.location_off_rounded : Icons.check_circle_outline_rounded,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                _isOutOfRadius
-                    ? 'OUT OF RADIUS (${_formatDistance(_distanceMeters ?? 0)})'
-                    : 'ARRIVED AT LOCATION →',
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
-              ),
+              if (_isCheckingGps && _distanceMeters == null) ...[
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'CHECKING LOCATION...',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                ),
+              ] else if (_isOutOfRadius) ...[
+                const Icon(Icons.location_off_rounded, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'OUT OF RADIUS (${_formatDistance(_distanceMeters ?? 0)} Away)',
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                ),
+              ] else ...[
+                const Icon(Icons.check_circle_outline_rounded, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'ARRIVED AT LOCATION →',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                ),
+              ],
             ],
           ),
         ),

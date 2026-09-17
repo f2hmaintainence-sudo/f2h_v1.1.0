@@ -858,6 +858,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     if (!context.mounted) return;
 
+    Position? pos;
+    if (_currentPosition != null) {
+      pos = Position(
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
+    }
+
     Map<String, dynamic>? confirmedResult;
 
     await showModalBottomSheet(
@@ -866,6 +882,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => DeliveryConfirmationSheet(
         stop: stop,
+        initialPosition: pos,
         onConfirm: (
           status,
           emptyBottles,

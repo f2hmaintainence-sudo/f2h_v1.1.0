@@ -10,6 +10,7 @@ import 'package:f2h_delivery/features/orders/presentation/screens/warehouse_hand
 import 'package:f2h_delivery/features/orders/presentation/widgets/containers_tracker_modal.dart';
 import 'package:f2h_delivery/features/tracking/presentation/screens/map_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
@@ -106,17 +107,10 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       return;
     }
 
-    _locationService.getCurrentPosition().then((position) {
-      if (position != null) {
-        final dist = _locationService.haversineDistanceKm(
-          position.latitude,
-          position.longitude,
-          stop.addressLat,
-          stop.addressLng,
-        );
-        debugPrint('[DEBUG] Rider is $dist km away from stop.');
-      }
-    }).catchError((_) {});
+    Position? currentPos;
+    try {
+      currentPos = await _locationService.getCurrentPosition();
+    } catch (_) {}
 
     Map<String, dynamic>? confirmedResult;
 
@@ -126,6 +120,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       backgroundColor: Colors.transparent,
       builder: (_) => DeliveryConfirmationSheet(
         stop: stop,
+        initialPosition: currentPos,
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
