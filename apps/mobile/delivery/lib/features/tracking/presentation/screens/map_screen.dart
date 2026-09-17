@@ -720,6 +720,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   
   List<GroupedStop> _visibleStops(List<GroupedStop> sessionStops) {
+    final state = context.read<DeliverySessionBloc>().state;
+    if (state is DeliverySessionLoaded && (state.isShiftCompleted || state.isWaitingForAssignment)) {
+      return [];
+    }
     if (!_isFocusedNavigation) return sessionStops;
     final focused = widget.focusedStop!;
     final match = sessionStops.where((s) => s.stop == focused.stop);

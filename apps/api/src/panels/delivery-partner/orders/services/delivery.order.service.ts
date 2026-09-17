@@ -528,21 +528,28 @@ export class DeliveryOrderService {
     const timeMinutes = h * 60 + m;
 
     const timings = await this.getSlotTimingsConfig();
-    // Morning delivery closes at Evening Slot Customer Order Cutoff Time (read directly from system_configurations table)
-    const morningClosingMinutes = this.parseCutoffMinutes(timings?.evening_slot?.customer_cutoff_time, 16 * 60);
-    // Evening delivery closes at Morning Slot Customer Order Cutoff Time (read directly from system_configurations table)
-    const eveningClosingMinutes = this.parseCutoffMinutes(timings?.morning_slot?.customer_cutoff_time, 23 * 60);
+    const morningSlot = timings?.morning_slot || {};
+    const eveningSlot = timings?.evening_slot || {};
+
+    // Evening slot start threshold in minutes (dispatch_start_time / customer_cutoff_time / delivery_window_start)
+    const eveningStartMinutes = this.parseCutoffMinutes(
+      eveningSlot.dispatch_start_time || eveningSlot.customer_cutoff_time || eveningSlot.delivery_window_start,
+      14 * 60,
+    );
+    // Evening slot end / closing threshold in minutes (delivery_window_end or next day morning cutoff)
+    const eveningEndMinutes = this.parseCutoffMinutes(
+      eveningSlot.delivery_window_end || morningSlot.customer_cutoff_time,
+      21 * 60,
+    );
 
     let targetSlot = slotParam;
     let targetDate = dateParam || kolkataDateStr;
 
     if (!targetSlot) {
-      if (timeMinutes < morningClosingMinutes) {
-        targetSlot = 'morning';
-      } else if (timeMinutes < eveningClosingMinutes) {
+      if (eveningSlot.is_enabled !== false && timeMinutes >= eveningStartMinutes && timeMinutes < eveningEndMinutes) {
         targetSlot = 'evening';
-      } else {
-        // After evening closing, advance target date to next day's morning preparation if no date was passed
+      } else if (timeMinutes >= eveningEndMinutes) {
+        // After evening operations end, advance target date to next day's morning slot
         if (!dateParam) {
           const nextDay = new Date();
           nextDay.setDate(nextDay.getDate() + 1);
@@ -553,6 +560,8 @@ export class DeliveryOrderService {
             day: '2-digit',
           }).format(nextDay);
         }
+        targetSlot = 'morning';
+      } else {
         targetSlot = 'morning';
       }
     }
@@ -926,9 +935,9 @@ export class DeliveryOrderService {
   }
 
 
-  async getTodayRun(userId: string, dateParam?: string, status?: string) {
+  async getTodayRun(userId: string, dateParam?: string, status?: string, slotParam?: string) {
     const boy = await this.resolveDeliveryPartner(userId);
-    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam);
+    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam, slotParam);
 
     const runs = await this.db.query(
       `SELECT id, run_id, status, delivery_slot, run_date
@@ -943,7 +952,7 @@ export class DeliveryOrderService {
 
     let activeRunId: string | null = null;
     let activeRunStatus: string | null = null;
-    let runIds: string[] = [String(boy.user_id)];
+    let runIds: string[] = [];
 
     if (runs?.length) {
       const activeRun = runs[0];
@@ -1006,13 +1015,16 @@ export class DeliveryOrderService {
          ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
        LEFT JOIN delivery_run_addresses dra
          ON (dra.run_id = o.delivery_run_id AND dra.address_id = o.address_id)
-        WHERE (o.delivery_partner_id = $1 OR o.delivery_run_id = ANY($4))
+        WHERE (
+          (o.delivery_run_id IS NOT NULL AND o.delivery_run_id = ANY($4))
+          OR (o.delivery_partner_id = $1 AND o.delivery_slot = $5 AND o.scheduled_date = $2::date)
+        )
           AND o.status = ANY($3)
           AND o.scheduled_date = $2::date
         ORDER BY o.delivery_slot ASC,
                  COALESCE(dra.sequence_no, o.run_sequence) ASC NULLS LAST,
                  o.created_at ASC`,
-      [String(boy.user_id), targetDate, orderStatuses, runIds],
+      [String(boy.user_id), targetDate, orderStatuses, runIds.length ? runIds : ['__no_runs__'], targetSlot],
     );
 
     if (!activeRunId && orders?.length) {
@@ -1066,13 +1078,18 @@ export class DeliveryOrderService {
     const dispatchStatus = activeDispatch?.status || null;
     const pickupConfirmed = isDispatchHandedOver(dispatchStatus);
 
+    const isShiftHandedOver = activeRunId ? await this.isRunHandedOver(activeRunId) : false;
+    const isShiftDone = activeRunStatus === 'completed' || activeRunStatus === 'handed_over' || isShiftHandedOver;
+
     if (!orders?.length) {
       return {
         status: true,
         delivery_partner: { id: boy.id, name: boy.full_name },
         date: targetDate,
+        slot: targetSlot,
         run_id: activeRunId,
-        run_status: activeRunStatus,
+        run_status: activeRunStatus || 'unassigned',
+        shift_completed: false,
         dispatch_id: activeDispatch?.dispatch_id || null,
         dispatch_status: dispatchStatus,
         pickup_confirmed: pickupConfirmed,
@@ -1087,8 +1104,10 @@ export class DeliveryOrderService {
       status: true,
       delivery_partner: { id: boy.id, name: boy.full_name },
       date: targetDate,
+      slot: targetSlot,
       run_id: activeRunId,
       run_status: activeRunStatus,
+      shift_completed: isShiftDone,
       dispatch_id: activeDispatch?.dispatch_id || null,
       dispatch_status: dispatchStatus,
       pickup_confirmed: pickupConfirmed,

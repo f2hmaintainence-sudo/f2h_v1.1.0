@@ -101,9 +101,10 @@ export class DeliveryOrderController {
     @Request() req: any,
     @Query('date') dateParam?: string,
     @Query('status') status?: string,
+    @Query('slot') slot?: string,
   ) {
     const userId = req.user?.user_id;
-    return this.service.getTodayRun(userId, dateParam, status);
+    return this.service.getTodayRun(userId, dateParam, status, slot);
   }
 
   @Get('run/today')
@@ -111,9 +112,10 @@ export class DeliveryOrderController {
     @Request() req: any,
     @Query('date') dateParam?: string,
     @Query('status') status?: string,
+    @Query('slot') slot?: string,
   ) {
     const userId = req.user?.user_id;
-    return this.service.getTodayRun(userId, dateParam, status);
+    return this.service.getTodayRun(userId, dateParam, status, slot);
   }
 
   @RequireIntegrity('delivery')

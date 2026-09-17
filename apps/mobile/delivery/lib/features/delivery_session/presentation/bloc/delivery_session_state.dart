@@ -41,6 +41,34 @@ class DeliverySessionLoaded extends DeliverySessionState {
 
   bool get isAccountActive => accountStatus.toLowerCase() == 'active';
 
+  bool get isShiftCompleted {
+    if (currentRun != null && currentRun!.shiftCompleted) return true;
+    if (currentRun != null &&
+        (currentRun!.status == 'completed' || currentRun!.status == 'handed_over')) {
+      return true;
+    }
+    if (orders.isNotEmpty &&
+        orders.every((o) {
+          final s = o.status.toLowerCase().trim();
+          return s == 'delivered' || s == 'failed' || s == 'cancelled' || s == 'completed';
+        })) {
+      if (currentRun != null &&
+          (currentRun!.pickupConfirmed ||
+              currentRun!.status == 'completed' ||
+              currentRun!.status == 'handed_over')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool get isWaitingForAssignment =>
+      isOnline &&
+      orders.isEmpty &&
+      (currentRun == null ||
+          currentRun!.status == 'unassigned' ||
+          currentRun!.status == 'pending_assignment');
+
   bool get isPickupConfirmed {
     if (currentRun != null) {
       return currentRun!.pickupConfirmed;

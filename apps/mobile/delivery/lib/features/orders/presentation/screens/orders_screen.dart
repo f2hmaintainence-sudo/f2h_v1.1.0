@@ -294,6 +294,10 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   Widget _buildStopsList(List<GroupedStop> filtered) {
+    final sessionState = context.read<DeliverySessionBloc>().state;
+    final isShiftDone = sessionState is DeliverySessionLoaded && sessionState.isShiftCompleted;
+    final isWaiting = sessionState is DeliverySessionLoaded && sessionState.isWaitingForAssignment;
+
     return RefreshIndicator(
       onRefresh: () async => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
       child: filtered.isEmpty
@@ -302,15 +306,58 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
               child: Container(
                 height: MediaQuery.of(context).size.height * 0.5,
                 alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.inventory_2_outlined, size: 48, color: kMuted.withValues(alpha: 0.5)),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'No matching stops found',
-                      style: TextStyle(fontWeight: FontWeight.w800, color: kTextSub, fontSize: 14),
-                    ),
+                    if (isShiftDone) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFDCFCE7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.task_alt_rounded, size: 40, color: Color(0xFF16A34A)),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Shift Completed!',
+                        style: TextStyle(fontWeight: FontWeight.w900, color: kText, fontSize: 16),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'All deliveries and returns for this shift are completed. Route resets when next slot begins.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w500, color: kTextSub, fontSize: 13, height: 1.4),
+                      ),
+                    ] else if (isWaiting) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFEF3C7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.access_time_rounded, size: 40, color: Color(0xFFD97706)),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Waiting for Run Assignment',
+                        style: TextStyle(fontWeight: FontWeight.w900, color: kText, fontSize: 16),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'You are on duty! Your dispatcher or automated run generator will assign your stops shortly.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w500, color: kTextSub, fontSize: 13, height: 1.4),
+                      ),
+                    ] else ...[
+                      Icon(Icons.inventory_2_outlined, size: 48, color: kMuted.withValues(alpha: 0.5)),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No matching stops found',
+                        style: TextStyle(fontWeight: FontWeight.w800, color: kTextSub, fontSize: 14),
+                      ),
+                    ],
                   ],
                 ),
               ),

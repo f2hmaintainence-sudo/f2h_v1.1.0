@@ -409,6 +409,7 @@ class DeliveryRun {
   final String slot;
   final String runDate;
   final bool pickupConfirmed;
+  final bool shiftCompleted;
   final String? dispatchStatus;
   final List<DeliveryOrderModel> orders;
 
@@ -418,6 +419,7 @@ class DeliveryRun {
     required this.slot,
     required this.runDate,
     this.pickupConfirmed = false,
+    this.shiftCompleted = false,
     this.dispatchStatus,
     required this.orders,
   });
@@ -433,12 +435,17 @@ class DeliveryRun {
         dStatus == 'in_progress' ||
         dStatus == 'return_pending' ||
         dStatus == 'completed';
+    final rStatus = json['run_status']?.toString() ?? 'pending';
+    final bool isShiftDone = json['shift_completed'] == true ||
+        rStatus == 'completed' ||
+        rStatus == 'handed_over';
     return DeliveryRun(
       runId: json['run_id']?.toString() ?? '',
-      status: json['run_status']?.toString() ?? 'pending',
+      status: rStatus,
       slot: json['slot']?.toString() ?? '',
       runDate: json['date']?.toString() ?? '',
       pickupConfirmed: isConfirmed,
+      shiftCompleted: isShiftDone,
       dispatchStatus: json['dispatch_status']?.toString(),
       orders: ordersList,
     );

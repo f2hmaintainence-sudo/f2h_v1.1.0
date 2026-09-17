@@ -476,7 +476,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final listQueue = session.groupedStops;
         final currentRun = session.currentRun;
-        final isShiftCompleted = currentRun?.status == 'handed_over';
+        final isShiftCompleted = session.isShiftCompleted;
         final pickupConfirmed = currentRun != null && currentRun.pickupConfirmed;
 
         final collectQueue = pickupConfirmed
@@ -659,283 +659,351 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ] else ...[
                         if (isShiftCompleted) ...[
                           HandoverStatusCard(currentRun: session.currentRun),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: const Color(0xFF86EFAC)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF16A34A).withValues(alpha: 0.06),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFDCFCE7),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.task_alt_rounded, color: Color(0xFF16A34A), size: 40),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  'Shift Completed!',
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'All deliveries and warehouse returns for this shift are completed. When the evening slot starts, your route will reset automatically.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 13,
+                                    color: const Color(0xFF64748B),
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
                         ] else ...[
                           // ── WAREHOUSE PICKUP REQUIRED CARD (When handover pending) ──
                           if (!pickupConfirmed && currentRun != null && listQueue.isNotEmpty) ...[
                             PickupStatusCard(currentRun: currentRun),
                             const SizedBox(height: 12),
                           ],
-                        ],
 
-                        // ── SECTION 1: TODAY'S PROGRESS ─────────────────────
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "Today's Progress",
-                              style: GoogleFonts.roboto(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const OrdersScreen()),
-                                );
-                              },
-                              child: Text(
-                                'View Details',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF16A34A),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // 4 Progress Counter Cards with colorful icons
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x04000000),
-                                blurRadius: 8,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
+                          // ── SECTION 1: TODAY'S PROGRESS ─────────────────────
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _buildProgressCard(
-                                icon: Icons.shopping_bag_outlined,
-                                iconColor: const Color(0xFF16A34A),
-                                iconBgColor: const Color(0xFFDCFCE7),
-                                count: completedActiveStops,
-                                label: 'Completed',
-                                labelColor: const Color(0xFF16A34A),
+                              Text(
+                                "Today's Progress",
+                                style: GoogleFonts.roboto(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
+                                  letterSpacing: -0.2,
+                                ),
                               ),
-                              _buildProgressCard(
-                                icon: Icons.access_time_rounded,
-                                iconColor: const Color(0xFFD97706),
-                                iconBgColor: const Color(0xFFFEF3C7),
-                                count: ongoingActiveStops,
-                                label: 'Ongoing',
-                                labelColor: const Color(0xFFD97706),
-                              ),
-                              _buildProgressCard(
-                                icon: Icons.sync_rounded,
-                                iconColor: const Color(0xFF2563EB),
-                                iconBgColor: const Color(0xFFDBEAFE),
-                                count: acceptedActiveStops,
-                                label: 'Accepted',
-                                labelColor: const Color(0xFF2563EB),
-                              ),
-                              _buildProgressCard(
-                                icon: Icons.cancel_outlined,
-                                iconColor: const Color(0xFF64748B),
-                                iconBgColor: const Color(0xFFF1F5F9),
-                                count: cancelledActiveStops,
-                                label: 'Cancelled',
-                                labelColor: const Color(0xFF64748B),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                                  );
+                                },
+                                child: Text(
+                                  'View Details',
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF16A34A),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 12),
 
-                        const SizedBox(height: 24),
-
-                        // ── SECTION: STOPS LIST ────────────────────────────
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Stops (${displayedStops.length})',
-                              style: GoogleFonts.roboto(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-
-                            // Filter Dropdown Button
-                            PopupMenuButton<String>(
-                              initialValue: _selectedStatusFilter,
-                              tooltip: 'Filter stops by status',
-                              onSelected: (String val) {
-                                setState(() => _selectedStatusFilter = val);
-                              },
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: _selectedStatusFilter == 'all' ? const Color(0xFFF1F5F9) : const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _selectedStatusFilter == 'all' ? const Color(0xFFCBD5E1) : const Color(0xFF86EFAC),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.filter_list_rounded,
-                                      size: 15,
-                                      color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _selectedStatusFilter == 'all'
-                                          ? 'All'
-                                          : (_selectedStatusFilter == 'pending'
-                                              ? 'Pending ($pendingCount)'
-                                              : (_selectedStatusFilter == 'delivered'
-                                                  ? 'Delivered ($deliveredCount)'
-                                                  : 'Failed ($failedCount)')),
-                                      style: GoogleFonts.roboto(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Icon(
-                                      Icons.arrow_drop_down_rounded,
-                                      size: 18,
-                                      color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                                PopupMenuItem<String>(
-                                  value: 'all',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.list_alt_rounded, size: 18, color: _selectedStatusFilter == 'all' ? kPrimary : kTextSub),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'All Stops (${listQueue.length})',
-                                        style: TextStyle(
-                                          fontWeight: _selectedStatusFilter == 'all' ? FontWeight.bold : FontWeight.normal,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'pending',
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.access_time_rounded, size: 18, color: Color(0xFFD97706)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Pending ($pendingCount)',
-                                        style: TextStyle(
-                                          fontWeight: _selectedStatusFilter == 'pending' ? FontWeight.bold : FontWeight.normal,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'delivered',
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF16A34A)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Delivered ($deliveredCount)',
-                                        style: TextStyle(
-                                          fontWeight: _selectedStatusFilter == 'delivered' ? FontWeight.bold : FontWeight.normal,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'failed',
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.cancel_rounded, size: 18, color: Color(0xFFDC2626)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Failed ($failedCount)',
-                                        style: TextStyle(
-                                          fontWeight: _selectedStatusFilter == 'failed' ? FontWeight.bold : FontWeight.normal,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        if (displayedStops.isEmpty)
+                          // 4 Progress Counter Cards with colorful icons
                           Container(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: const Color(0xFFE2E8F0)),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x04000000),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            child: Center(
-                              child: Text(
-                                _selectedStatusFilter == 'all'
-                                    ? 'No stops assigned for today.'
-                                    : 'No $_selectedStatusFilter stops found.',
+                            child: Row(
+                              children: [
+                                _buildProgressCard(
+                                  icon: Icons.shopping_bag_outlined,
+                                  iconColor: const Color(0xFF16A34A),
+                                  iconBgColor: const Color(0xFFDCFCE7),
+                                  count: completedActiveStops,
+                                  label: 'Completed',
+                                  labelColor: const Color(0xFF16A34A),
+                                ),
+                                _buildProgressCard(
+                                  icon: Icons.access_time_rounded,
+                                  iconColor: const Color(0xFFD97706),
+                                  iconBgColor: const Color(0xFFFEF3C7),
+                                  count: ongoingActiveStops,
+                                  label: 'Ongoing',
+                                  labelColor: const Color(0xFFD97706),
+                                ),
+                                _buildProgressCard(
+                                  icon: Icons.sync_rounded,
+                                  iconColor: const Color(0xFF2563EB),
+                                  iconBgColor: const Color(0xFFDBEAFE),
+                                  count: acceptedActiveStops,
+                                  label: 'Accepted',
+                                  labelColor: const Color(0xFF2563EB),
+                                ),
+                                _buildProgressCard(
+                                  icon: Icons.cancel_outlined,
+                                  iconColor: const Color(0xFF64748B),
+                                  iconBgColor: const Color(0xFFF1F5F9),
+                                  count: cancelledActiveStops,
+                                  label: 'Cancelled',
+                                  labelColor: const Color(0xFF64748B),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // ── SECTION: STOPS LIST ────────────────────────────
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Stops (${displayedStops.length})',
                                 style: GoogleFonts.roboto(
-                                  color: const Color(0xFF64748B),
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
+                                  letterSpacing: -0.2,
                                 ),
                               ),
-                            ),
-                          )
-                        else
-                          ...List.generate(displayedStops.length, (index) {
-                            final stop = displayedStops[index];
-                            final isNext = nextStop != null &&
-                                ((nextStop.addressId.isNotEmpty && nextStop.addressId == stop.addressId) ||
-                                    (nextStop.addressId.isEmpty && nextStop.customerId == stop.customerId));
-                            return Column(
-                              children: [
-                                QueueItemTile(
-                                  stop: stop,
-                                  isNext: isNext,
-                                  distanceStr: _calculateDistanceStr(stop),
-                                  isPickupConfirmed: pickupConfirmed,
-                                  onDeliverTap: () => _showConfirmation(context, stop, session: session),
-                                  onPickupRequiredTap: () => showPickupRequiredDialog(
-                                    context,
-                                    orders: session.orders,
-                                    groupedStops: session.groupedStops,
-                                    currentRun: currentRun,
+
+                              // Filter Dropdown Button
+                              PopupMenuButton<String>(
+                                initialValue: _selectedStatusFilter,
+                                tooltip: 'Filter stops by status',
+                                onSelected: (String val) {
+                                  setState(() => _selectedStatusFilter = val);
+                                },
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: _selectedStatusFilter == 'all' ? const Color(0xFFF1F5F9) : const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _selectedStatusFilter == 'all' ? const Color(0xFFCBD5E1) : const Color(0xFF86EFAC),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.filter_list_rounded,
+                                        size: 15,
+                                        color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _selectedStatusFilter == 'all'
+                                            ? 'All'
+                                            : (_selectedStatusFilter == 'pending'
+                                                ? 'Pending ($pendingCount)'
+                                                : (_selectedStatusFilter == 'delivered'
+                                                    ? 'Delivered ($deliveredCount)'
+                                                    : 'Failed ($failedCount)')),
+                                        style: GoogleFonts.roboto(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Icon(
+                                        Icons.arrow_drop_down_rounded,
+                                        size: 18,
+                                        color: _selectedStatusFilter == 'all' ? const Color(0xFF64748B) : const Color(0xFF15803D),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                if (index < displayedStops.length - 1)
-                                  const SizedBox(height: 10),
-                              ],
-                            );
-                          }),
+                                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                  PopupMenuItem<String>(
+                                    value: 'all',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.list_alt_rounded, size: 18, color: _selectedStatusFilter == 'all' ? kPrimary : kTextSub),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'All Stops (${listQueue.length})',
+                                          style: TextStyle(
+                                            fontWeight: _selectedStatusFilter == 'all' ? FontWeight.bold : FontWeight.normal,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: 'pending',
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.access_time_rounded, size: 18, color: Color(0xFFD97706)),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Pending ($pendingCount)',
+                                          style: TextStyle(
+                                            fontWeight: _selectedStatusFilter == 'pending' ? FontWeight.bold : FontWeight.normal,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: 'delivered',
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF16A34A)),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Delivered ($deliveredCount)',
+                                          style: TextStyle(
+                                            fontWeight: _selectedStatusFilter == 'delivered' ? FontWeight.bold : FontWeight.normal,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: 'failed',
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.cancel_rounded, size: 18, color: Color(0xFFDC2626)),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Failed ($failedCount)',
+                                          style: TextStyle(
+                                            fontWeight: _selectedStatusFilter == 'failed' ? FontWeight.bold : FontWeight.normal,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          if (displayedStops.isEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(28),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFEF3C7),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.access_time_rounded, color: Color(0xFFD97706), size: 36),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'Waiting for Run Assignment',
+                                    style: GoogleFonts.roboto(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'You are on duty! Your dispatcher or automated run generator will assign your route shortly. Please stay online.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.roboto(
+                                      fontSize: 13,
+                                      color: const Color(0xFF64748B),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            ...List.generate(displayedStops.length, (index) {
+                              final stop = displayedStops[index];
+                              final isNext = nextStop != null &&
+                                  ((nextStop.addressId.isNotEmpty && nextStop.addressId == stop.addressId) ||
+                                      (nextStop.addressId.isEmpty && nextStop.customerId == stop.customerId));
+                              return Column(
+                                children: [
+                                  QueueItemTile(
+                                    stop: stop,
+                                    isNext: isNext,
+                                    distanceStr: _calculateDistanceStr(stop),
+                                    isPickupConfirmed: pickupConfirmed,
+                                    onDeliverTap: () => _showConfirmation(context, stop, session: session),
+                                    onPickupRequiredTap: () => showPickupRequiredDialog(
+                                      context,
+                                      orders: session.orders,
+                                      groupedStops: session.groupedStops,
+                                      currentRun: currentRun,
+                                    ),
+                                  ),
+                                  if (index < displayedStops.length - 1)
+                                    const SizedBox(height: 10),
+                                ],
+                              );
+                            }),
+                        ],
                       ],
                       if (!isVerified || !isAccountActive) ...[
                         const SizedBox(height: 16),
