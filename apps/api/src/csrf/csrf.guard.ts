@@ -3,9 +3,12 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { timingSafeEqual } from 'crypto';
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './csrf.constants';
+import { IS_PUBLIC_KEY } from '../auth/decorators/public.decorator';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -16,11 +19,25 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * those carry ambient credentials a third-party site can trigger. The Flutter apps
  * send a Bearer header, which a browser never attaches cross-origin, so they have
  * no CSRF surface and are not required to carry a token.
+ *
+ * Public routes (@Public()) are open by design and do not rely on session cookies,
+ * so they bypass CSRF validation.
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
+  constructor(@Optional() private readonly reflector?: Reflector) {}
+
   canActivate(context: ExecutionContext): boolean {
     if (context.getType() !== 'http') return true;
+
+    // Public routes don't require session auth or CSRF validation
+    if (this.reflector) {
+      const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (isPublic) return true;
+    }
 
     const request = context.switchToHttp().getRequest();
 

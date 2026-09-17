@@ -54,4 +54,12 @@ describe('CsrfGuard', () => {
       true,
     );
   });
+
+  it('allows public routes even if cookie is present without CSRF header', () => {
+    const mockReflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(true),
+    } as any;
+    const publicGuard = new CsrfGuard(mockReflector);
+    expect(publicGuard.canActivate(contextFor(cookieRequest('POST', 'abc')))).toBe(true);
+  });
 });
