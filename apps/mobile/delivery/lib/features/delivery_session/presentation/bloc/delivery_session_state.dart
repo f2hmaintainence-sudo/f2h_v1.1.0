@@ -42,32 +42,30 @@ class DeliverySessionLoaded extends DeliverySessionState {
   bool get isAccountActive => accountStatus.toLowerCase() == 'active';
 
   bool get isShiftCompleted {
-    if (currentRun != null && currentRun!.shiftCompleted) return true;
-    if (currentRun != null &&
-        (currentRun!.status == 'completed' || currentRun!.status == 'handed_over')) {
-      return true;
-    }
-    if (orders.isNotEmpty &&
-        orders.every((o) {
-          final s = o.status.toLowerCase().trim();
-          return s == 'delivered' || s == 'failed' || s == 'cancelled' || s == 'completed';
-        })) {
-      if (currentRun != null &&
-          (currentRun!.pickupConfirmed ||
-              currentRun!.status == 'completed' ||
-              currentRun!.status == 'handed_over')) {
+    // A shift can only be completed if orders were assigned and all of them have been completed
+    if (orders.isEmpty) return false;
+
+    final allOrdersFinished = orders.every((o) {
+      final s = o.status.toLowerCase().trim();
+      return s == 'delivered' || s == 'failed' || s == 'cancelled' || s == 'completed';
+    });
+
+    if (allOrdersFinished) {
+      if (currentRun != null) {
+        if (currentRun!.shiftCompleted ||
+            currentRun!.status == 'completed' ||
+            currentRun!.status == 'handed_over' ||
+            currentRun!.pickupConfirmed) {
+          return true;
+        }
+      } else {
         return true;
       }
     }
     return false;
   }
 
-  bool get isWaitingForAssignment =>
-      isOnline &&
-      orders.isEmpty &&
-      (currentRun == null ||
-          currentRun!.status == 'unassigned' ||
-          currentRun!.status == 'pending_assignment');
+  bool get isWaitingForAssignment => isOnline && orders.isEmpty;
 
   bool get isPickupConfirmed {
     if (currentRun != null) {

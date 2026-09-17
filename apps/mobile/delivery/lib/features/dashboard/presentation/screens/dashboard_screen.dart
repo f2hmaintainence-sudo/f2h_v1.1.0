@@ -478,6 +478,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final isShiftCompleted = session.isShiftCompleted;
         final pickupConfirmed = currentRun != null && currentRun.pickupConfirmed;
 
+        final slotName = (currentRun?.slot != null && currentRun!.slot.isNotEmpty)
+            ? (currentRun!.slot.toLowerCase() == 'evening' ? 'Evening Shift' : 'Morning Shift')
+            : (session.orders.isNotEmpty && session.orders.first.deliverySlot != null
+                ? (session.orders.first.deliverySlot!.toLowerCase() == 'evening' ? 'Evening Shift' : 'Morning Shift')
+                : (DateTime.now().hour >= 12 ? 'Evening Shift' : 'Morning Shift'));
+
         final collectQueue = pickupConfirmed
             ? <GroupedStop>[]
             : listQueue.where((stop) => stop.orders.any((o) {
@@ -683,7 +689,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
-                                  'Shift Completed!',
+                                  '$slotName Completed!',
                                   style: GoogleFonts.roboto(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
@@ -692,12 +698,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  'All deliveries and warehouse returns for this shift are completed. When the evening slot starts, your route will reset automatically.',
+                                  'All deliveries and warehouse returns for this shift are completed.',
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.roboto(
                                     fontSize: 13,
                                     color: const Color(0xFF64748B),
                                     height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                OutlinedButton.icon(
+                                  onPressed: () => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  label: const Text('Check for New Orders'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF16A34A),
+                                    side: const BorderSide(color: Color(0xFF86EFAC)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                 ),
                               ],
@@ -950,11 +967,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       color: Color(0xFFFEF3C7),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.access_time_rounded, color: Color(0xFFD97706), size: 36),
+                                    child: const Icon(Icons.assignment_late_outlined, color: Color(0xFFD97706), size: 36),
                                   ),
                                   const SizedBox(height: 14),
                                   Text(
-                                    'Waiting for Run Assignment',
+                                    listQueue.isEmpty
+                                        ? 'No Stops Assigned'
+                                        : 'No matching stops found',
                                     style: GoogleFonts.roboto(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
@@ -963,12 +982,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'You are on duty! Your dispatcher or automated run generator will assign your route shortly. Please stay online.',
+                                    listQueue.isEmpty
+                                        ? 'No delivery stops are assigned to you for the $slotName yet. Once assigned by the dispatcher, your stops will appear here.'
+                                        : 'Try changing the stop status filter above to view your assigned stops.',
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.roboto(
                                       fontSize: 13,
                                       color: const Color(0xFF64748B),
                                       height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  OutlinedButton.icon(
+                                    onPressed: () => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
+                                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                                    label: const Text('Check for Stops'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFFD97706),
+                                      side: const BorderSide(color: Color(0xFFFCD34D)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
                                 ],

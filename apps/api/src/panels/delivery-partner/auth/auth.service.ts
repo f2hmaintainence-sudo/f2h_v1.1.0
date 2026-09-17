@@ -61,8 +61,8 @@ export class AuthService {
         `SELECT COUNT(*)::int AS pending_count
          FROM orders
          WHERE delivery_partner_id = $1
-           AND scheduled_date = $2::date
-           AND delivery_slot = $3
+           AND (scheduled_date::date = $2::date OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $2::date))
+           AND (LOWER(delivery_slot) = LOWER($3) OR delivery_slot IS NULL OR LOWER(delivery_slot) = 'both')
            AND status NOT IN ('delivered', 'failed', 'cancelled')`,
         [boyRes[0].delivery_partner_id, targetDate, targetSlot],
       );

@@ -509,7 +509,11 @@ export class DeliveryOrderService {
     return h * 60 + m;
   }
 
-  async getKolkataDateAndSlot(dateParam?: string, slotParam?: string): Promise<{ targetDate: string; targetSlot: string }> {
+  async getKolkataDateAndSlot(
+    dateParam?: string,
+    slotParam?: string,
+    partnerId?: string,
+  ): Promise<{ targetDate: string; targetSlot: string }> {
     const kolkataDateStr = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -527,42 +531,48 @@ export class DeliveryOrderService {
     const m = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
     const timeMinutes = h * 60 + m;
 
-    const timings = await this.getSlotTimingsConfig();
-    const morningSlot = timings?.morning_slot || {};
-    const eveningSlot = timings?.evening_slot || {};
-
-    // Evening slot start threshold in minutes (dispatch_start_time / customer_cutoff_time / delivery_window_start)
-    const eveningStartMinutes = this.parseCutoffMinutes(
-      eveningSlot.dispatch_start_time || eveningSlot.customer_cutoff_time || eveningSlot.delivery_window_start,
-      14 * 60,
-    );
-    // Evening slot end / closing threshold in minutes (delivery_window_end or next day morning cutoff)
-    const eveningEndMinutes = this.parseCutoffMinutes(
-      eveningSlot.delivery_window_end || morningSlot.customer_cutoff_time,
-      21 * 60,
-    );
-
-    let targetSlot = slotParam;
     let targetDate = dateParam || kolkataDateStr;
+    let targetSlot = slotParam ? (slotParam.toLowerCase() === 'evening' ? 'evening' : 'morning') : undefined;
 
     if (!targetSlot) {
-      if (eveningSlot.is_enabled !== false && timeMinutes >= eveningStartMinutes && timeMinutes < eveningEndMinutes) {
-        targetSlot = 'evening';
-      } else if (timeMinutes >= eveningEndMinutes) {
-        // After evening operations end, advance target date to next day's morning slot
-        if (!dateParam) {
-          const nextDay = new Date();
-          nextDay.setDate(nextDay.getDate() + 1);
-          targetDate = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'Asia/Kolkata',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-          }).format(nextDay);
+      // 1. If partnerId is provided, check if partner has active/uncompleted evening runs or assigned evening orders today
+      if (partnerId) {
+        try {
+          const eveningOrders = await this.db.query(
+            `SELECT 1 FROM orders
+             WHERE delivery_partner_id = $1
+               AND (scheduled_date::date = $2::date OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $2::date))
+               AND LOWER(delivery_slot) = 'evening'
+               AND status NOT IN ('delivered', 'failed', 'cancelled')
+             LIMIT 1`,
+            [partnerId, targetDate],
+          );
+          if (eveningOrders?.length > 0) {
+            targetSlot = 'evening';
+          } else {
+            const eveningRun = await this.db.query(
+              `SELECT 1 FROM delivery_runs
+               WHERE delivery_partner_id = $1
+                 AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
+                 AND LOWER(delivery_slot) = 'evening'
+                 AND status NOT IN ('completed', 'handed_over', 'cancelled')
+               LIMIT 1`,
+              [partnerId, targetDate],
+            );
+            if (eveningRun?.length > 0) {
+              targetSlot = 'evening';
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 2. If slot is still unresolved, use time-based default (12:00 PM / 720 mins onwards is evening)
+      if (!targetSlot) {
+        if (timeMinutes >= 12 * 60) {
+          targetSlot = 'evening';
+        } else {
+          targetSlot = 'morning';
         }
-        targetSlot = 'morning';
-      } else {
-        targetSlot = 'morning';
       }
     }
 
@@ -937,14 +947,14 @@ export class DeliveryOrderService {
 
   async getTodayRun(userId: string, dateParam?: string, status?: string, slotParam?: string) {
     const boy = await this.resolveDeliveryPartner(userId);
-    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam, slotParam);
+    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam, slotParam, String(boy.user_id));
 
     const runs = await this.db.query(
       `SELECT id, run_id, status, delivery_slot, run_date
        FROM delivery_runs
        WHERE delivery_partner_id = $1
          AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
-         AND delivery_slot = $3
+         AND LOWER(delivery_slot) = LOWER($3)
          AND status != 'cancelled'
        ORDER BY run_date DESC, created_at DESC`,
       [String(boy.user_id), targetDate, targetSlot],
@@ -1014,13 +1024,13 @@ export class DeliveryOrderService {
        LEFT JOIN customer_addresses ca
          ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
        LEFT JOIN delivery_run_addresses dra
-         ON (dra.run_id = o.delivery_run_id AND dra.address_id = o.address_id)
+         ON (dra.run_id = o.delivery_run_id AND (dra.address_id = o.address_id OR dra.address_id = ca.id::text))
         WHERE (
           (o.delivery_run_id IS NOT NULL AND o.delivery_run_id = ANY($4))
-          OR (o.delivery_partner_id = $1 AND o.delivery_slot = $5 AND o.scheduled_date = $2::date)
+          OR (o.delivery_partner_id = $1 AND (LOWER(o.delivery_slot) = LOWER($5) OR o.delivery_slot IS NULL OR LOWER(o.delivery_slot) = 'both') AND (o.scheduled_date::date = $2::date OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = $2::date)))
         )
           AND o.status = ANY($3)
-          AND o.scheduled_date = $2::date
+          AND (o.scheduled_date::date = $2::date OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = $2::date))
         ORDER BY o.delivery_slot ASC,
                  COALESCE(dra.sequence_no, o.run_sequence) ASC NULLS LAST,
                  o.created_at ASC`,
@@ -1032,6 +1042,8 @@ export class DeliveryOrderService {
       if (orderWithRun) {
         activeRunId = orderWithRun.run_id;
         activeRunStatus = 'in_progress';
+      } else {
+        activeRunStatus = 'assigned';
       }
     }
 
@@ -1079,7 +1091,19 @@ export class DeliveryOrderService {
     const pickupConfirmed = isDispatchHandedOver(dispatchStatus);
 
     const isShiftHandedOver = activeRunId ? await this.isRunHandedOver(activeRunId) : false;
-    const isShiftDone = activeRunStatus === 'completed' || activeRunStatus === 'handed_over' || isShiftHandedOver;
+    
+    // Shift is completed ONLY if:
+    // 1. There are orders assigned AND all of them are finished
+    // AND the run status is completed or handed over.
+    let isShiftDone = false;
+    if (orders?.length > 0) {
+      const allOrdersFinished = orders.every((o: any) =>
+        ['delivered', 'failed', 'cancelled', 'completed'].includes(o.status?.toLowerCase()?.trim()),
+      );
+      if (allOrdersFinished && (activeRunStatus === 'completed' || activeRunStatus === 'handed_over' || isShiftHandedOver)) {
+        isShiftDone = true;
+      }
+    }
 
     if (!orders?.length) {
       return {
@@ -1874,13 +1898,13 @@ export class DeliveryOrderService {
 
   async getPickupItems(userId: string, dateParam?: string) {
     const boy = await this.resolveDeliveryPartner(userId);
-    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam);
+    const { targetDate, targetSlot } = await this.getKolkataDateAndSlot(dateParam, undefined, String(boy.user_id));
 
     const runs = await this.db.query(
       `SELECT id, run_id, status, delivery_slot AS slot, run_date FROM delivery_runs
          WHERE delivery_partner_id = $1
            AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
-           AND delivery_slot = $3
+           AND LOWER(delivery_slot) = LOWER($3)
            AND status NOT IN ('completed', 'handed_over', 'cancelled')
          ORDER BY run_date DESC, created_at DESC`,
       [String(boy.user_id), targetDate, targetSlot],
@@ -1919,7 +1943,7 @@ export class DeliveryOrderService {
            LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
            WHERE o.delivery_run_id = ANY($1)
              AND o.status IN ('confirmed', 'out_for_delivery', 'assigned', 'packed')
-             AND o.delivery_slot = $2
+             AND (LOWER(o.delivery_slot) = LOWER($2) OR o.delivery_slot IS NULL OR LOWER(o.delivery_slot) = 'both')
            ORDER BY o.run_sequence ASC`,
         [runIds, targetSlot],
       );
@@ -1944,9 +1968,9 @@ export class DeliveryOrderService {
          JOIN users cu ON cu.user_id = o.customer_id
          LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
          WHERE o.delivery_partner_id = $1
-           AND DATE(o.scheduled_date AT TIME ZONE 'Asia/Kolkata') = $2::date
+           AND (o.scheduled_date::date = $2::date OR (o.scheduled_date IS NULL AND DATE(o.created_at AT TIME ZONE 'Asia/Kolkata') = $2::date))
            AND o.status IN ('confirmed', 'out_for_delivery', 'assigned', 'packed')
-           AND o.delivery_slot = $3`,
+           AND (LOWER(o.delivery_slot) = LOWER($3) OR o.delivery_slot IS NULL OR LOWER(o.delivery_slot) = 'both')`,
       [String(boy.user_id), targetDate, targetSlot],
     );
 

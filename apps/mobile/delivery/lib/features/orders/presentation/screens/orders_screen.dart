@@ -298,6 +298,10 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     final isShiftDone = sessionState is DeliverySessionLoaded && sessionState.isShiftCompleted;
     final isWaiting = sessionState is DeliverySessionLoaded && sessionState.isWaitingForAssignment;
 
+    final slotName = (sessionState is DeliverySessionLoaded && sessionState.currentRun?.slot != null && sessionState.currentRun!.slot.isNotEmpty)
+        ? (sessionState.currentRun!.slot.toLowerCase() == 'evening' ? 'Evening Shift' : 'Morning Shift')
+        : (DateTime.now().hour >= 12 ? 'Evening Shift' : 'Morning Shift');
+
     return RefreshIndicator(
       onRefresh: () async => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
       child: filtered.isEmpty
@@ -320,35 +324,57 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                         child: const Icon(Icons.task_alt_rounded, size: 40, color: Color(0xFF16A34A)),
                       ),
                       const SizedBox(height: 14),
-                      const Text(
-                        'Shift Completed!',
-                        style: TextStyle(fontWeight: FontWeight.w900, color: kText, fontSize: 16),
+                      Text(
+                        '$slotName Completed!',
+                        style: const TextStyle(fontWeight: FontWeight.w900, color: kText, fontSize: 16),
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'All deliveries and returns for this shift are completed. Route resets when next slot begins.',
+                        'All deliveries and returns for this shift are completed.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontWeight: FontWeight.w500, color: kTextSub, fontSize: 13, height: 1.4),
                       ),
-                    ] else if (isWaiting) ...[
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: () => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Check for New Orders'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF16A34A),
+                          side: const BorderSide(color: Color(0xFF86EFAC)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ] else if (isWaiting || (sessionState is DeliverySessionLoaded && sessionState.orders.isEmpty)) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: const BoxDecoration(
                           color: Color(0xFFFEF3C7),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.access_time_rounded, size: 40, color: Color(0xFFD97706)),
+                        child: const Icon(Icons.assignment_late_outlined, size: 40, color: Color(0xFFD97706)),
                       ),
                       const SizedBox(height: 14),
                       const Text(
-                        'Waiting for Run Assignment',
+                        'No Stops Assigned',
                         style: TextStyle(fontWeight: FontWeight.w900, color: kText, fontSize: 16),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'You are on duty! Your dispatcher or automated run generator will assign your stops shortly.',
+                      Text(
+                        'No delivery stops are assigned to your route for the $slotName yet. Once assigned by the dispatcher, your stops will appear here.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontWeight: FontWeight.w500, color: kTextSub, fontSize: 13, height: 1.4),
+                        style: const TextStyle(fontWeight: FontWeight.w500, color: kTextSub, fontSize: 13, height: 1.4),
+                      ),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: () => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Check for Stops'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFD97706),
+                          side: const BorderSide(color: Color(0xFFFCD34D)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ] else ...[
                       Icon(Icons.inventory_2_outlined, size: 48, color: kMuted.withValues(alpha: 0.5)),
