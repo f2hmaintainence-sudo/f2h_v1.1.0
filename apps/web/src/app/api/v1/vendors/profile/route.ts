@@ -8,9 +8,12 @@
 // ============================================================================
 
 import { NextResponse } from 'next/server';
-import { getRegisteredVendors } from '@/lib/vendors.store';
 
 export const dynamic = 'force-dynamic';
+
+function getInternalApiUrl(): string {
+  return (process.env.INTERNAL_API_URL || 'https://dev.f2hfresh.com').replace(/\/+$/, '');
+}
 
 export async function GET(request: Request) {
   try {
@@ -18,20 +21,33 @@ export async function GET(request: Request) {
     const id = searchParams.get('id') || searchParams.get('vendor_id') || searchParams.get('vendorId');
     const phone = searchParams.get('phone');
 
-    const allVendors = getRegisteredVendors();
-    
-    let vendor = null;
-    if (id) {
-      const q = id.trim().toLowerCase();
-      vendor = allVendors.find(
-        (v) => String(v.id) === q || v.vendor_id.toLowerCase() === q,
+    if (!id && !phone) {
+      return NextResponse.json(
+        { success: false, message: 'Vendor ID or phone number is required' },
+        { status: 400 },
       );
-    } else if (phone) {
-      const p = phone.replace(/\D/g, '');
-      vendor = allVendors.find((v) => v.phone.replace(/\D/g, '') === p);
     }
 
-    if (!vendor) {
+    if (id) {
+      const res = await fetch(`${getInternalApiUrl()}/api/v1/vendors/${encodeURIComponent(id)}`, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+      });
+      const data = await res.json();
+      return NextResponse.json(data, { status: res.status });
+    }
+
+    // Lookup by phone via public vendors search
+    const res = await fetch(`${getInternalApiUrl()}/api/v1/vendors/public?search=${encodeURIComponent(phone!)}`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    });
+    const data = await res.json();
+    const list = Array.isArray(data?.data) ? data.data : [];
+    const cleanPhone = phone!.replace(/\D/g, '');
+    const found = list.find((v: any) => String(v.phone).replace(/\D/g, '').includes(cleanPhone));
+
+    if (!found) {
       return NextResponse.json(
         { success: false, message: 'Vendor profile not found' },
         { status: 404 },
@@ -40,7 +56,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      data: vendor,
+      data: found,
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -49,3 +65,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

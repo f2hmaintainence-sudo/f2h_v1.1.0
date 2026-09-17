@@ -227,10 +227,10 @@ export class VendorsService {
           status, image_url, logo_url, website_url, source, created_at
         FROM public.vendors
         WHERE deleted_at IS NULL
-          AND (${isNumeric ? 'id = $1 OR ' : ''}vendor_id = $1)
+          AND (${isNumeric ? 'id = $1::bigint OR ' : ''}vendor_id = $1)
         LIMIT 1
       `;
-      const rows = await this.db.query<VendorProfile>(query, [isNumeric ? Number(id) : id]);
+      const rows = await this.db.query<VendorProfile>(query, [String(id)]);
       if (!rows || rows.length === 0) {
         return { success: false, data: null, message: `Vendor '${id}' not found` };
       }
@@ -281,7 +281,7 @@ export class VendorsService {
           state = $12,
           pincode = $13,
           updated_at = NOW()
-        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $14 OR ' : ''}vendor_id = $14)
+        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $14::bigint OR ' : ''}vendor_id = $14)
         RETURNING *;
       `;
 
@@ -299,7 +299,7 @@ export class VendorsService {
         city,
         state,
         pincode,
-        isNumeric ? Number(id) : id,
+        String(id),
       ]);
 
       return {
@@ -319,10 +319,10 @@ export class VendorsService {
       const query = `
         UPDATE public.vendors
         SET deleted_at = NOW(), is_active = false, updated_at = NOW()
-        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $1 OR ' : ''}vendor_id = $1)
+        WHERE deleted_at IS NULL AND (${isNumeric ? 'id = $1::bigint OR ' : ''}vendor_id = $1)
         RETURNING id;
       `;
-      const rows = await this.db.query(query, [isNumeric ? Number(id) : id]);
+      const rows = await this.db.query(query, [String(id)]);
       if (!rows || rows.length === 0) {
         return { success: false, message: `Vendor '${id}' not found or already removed` };
       }

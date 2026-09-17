@@ -4,11 +4,10 @@
 //
 // Project     : F2H Fresh
 // File        : route.ts (Public Vendors List)
-// Description : Returns list of verified registered vendors (no dummy data)
+// Description : Returns list of verified registered vendors directly from DB
 // ============================================================================
 
 import { NextResponse } from 'next/server';
-import { getRegisteredVendors, addRegisteredVendor } from '@/lib/vendors.store';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,35 +21,31 @@ export async function GET(request: Request) {
     const category = searchParams.get('category');
     const search = searchParams.get('search');
 
-    const localResults = getRegisteredVendors(category, search);
+    const q = new URLSearchParams();
+    if (category && category !== 'All') q.set('category', category);
+    if (search) q.set('search', search);
 
-    // Also attempt fetching from backend API and merge
-    try {
-      const q = new URLSearchParams();
-      if (category) q.set('category', category);
-      if (search) q.set('search', search);
+    const res = await fetch(`${getInternalApiUrl()}/api/v1/vendors/public?${q.toString()}`, {
+      cache: 'no-store',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
 
-      const res = await fetch(`${getInternalApiUrl()}/api/v1/vendors/public?${q.toString()}`, {
-        cache: 'no-store',
-      });
+    if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        for (const remoteVendor of data.data) {
-          const exists = localResults.some((l) => l.vendor_id === remoteVendor.vendor_id);
-          if (!exists) {
-            addRegisteredVendor(remoteVendor);
-            localResults.push(remoteVendor);
-          }
-        }
-      }
-    } catch {
-      // ignore backend fetch errors
+      const list = Array.isArray(data?.data) ? data.data : [];
+      return NextResponse.json({
+        success: Boolean(data?.success !== false),
+        data: list,
+        total: list.length,
+      });
     }
 
     return NextResponse.json({
       success: true,
-      data: localResults,
-      total: localResults.length,
+      data: [],
+      total: 0,
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -59,4 +54,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
