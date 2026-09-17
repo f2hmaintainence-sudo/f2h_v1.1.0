@@ -2592,7 +2592,7 @@ class _HomeDeliveryCalendarCardState extends State<HomeDeliveryCalendarCard> {
                                         Text(
                                           itemsCount > 0
                                               ? '$itemsCount item${itemsCount > 1 ? 's' : ''} $relativeDay'
-                                              : (isPast ? 'No deliveries' : '1 item $relativeDay'),
+                                              : (isPast ? 'No deliveries' : 'No items $relativeDay'),
                                           style: const TextStyle(
                                             fontSize: 11.5,
                                             fontWeight: FontWeight.w600,
