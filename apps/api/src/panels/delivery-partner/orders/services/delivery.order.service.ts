@@ -1057,8 +1057,14 @@ export class DeliveryOrderService {
     const runIdentifier = run.run_id || String(run.id) || runId;
     const stopsRes = await this.db.query(
       `SELECT order_id, customer_id, status, total_amount, payment_mode FROM orders
-       WHERE delivery_run_id = ANY($1) AND address_id = $2`,
-      [runIds, addressId],
+       WHERE (delivery_run_id = ANY($1) OR delivery_partner_id = $3)
+         AND (
+           address_id = $2
+           OR id::text = $2
+           OR address_id IN (SELECT address_id FROM delivery_run_addresses WHERE run_id = ANY($1) AND address_id = $2)
+           OR ($4::text IS NOT NULL AND order_id = $4::text)
+         )`,
+      [runIds, addressId, String(boy.user_id), body.order_id || null],
     );
 
     if (!stopsRes?.length) {
@@ -1325,7 +1331,7 @@ export class DeliveryOrderService {
       }
     }
 
-    return { success: true, message: `Stop marked as ${status} successfully` };
+    return { success: true, status: true, message: `Stop marked as ${status} successfully` };
   }
 
   async handoverRun(userId: string, runId: string) {
@@ -1722,7 +1728,7 @@ export class DeliveryOrderService {
       }
     }
 
-    return { success: true, message: `Order status updated to ${status} successfully` };
+    return { success: true, status: true, message: `Order status updated to ${status} successfully` };
   }
 
   async getPickupItems(userId: string, dateParam?: string) {

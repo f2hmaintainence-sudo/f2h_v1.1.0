@@ -109,7 +109,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
         },
       );
       final data = response.data;
-      return data != null && data['status'] == true;
+      return data != null && (data['status'] == true || data['success'] == true);
     } catch (e) {
       print('Error updating order status: $e');
       throw _handleDioError(e, 'Failed to update order status');
@@ -194,7 +194,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
         },
       );
       final data = response.data;
-      return data != null && data['status'] == true;
+      return data != null && (data['status'] == true || data['success'] == true);
     } catch (e) {
       print('Error marking stop as delivered: $e');
       throw _handleDioError(e, 'Failed to mark stop as delivered');
