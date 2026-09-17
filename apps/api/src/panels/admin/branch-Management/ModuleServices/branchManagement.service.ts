@@ -22,6 +22,60 @@ export class BranchManagementService {
   ) { }
 
   // ═══════════════════════════════════════════════════════════════
+  // ALL BRANCHES LIST (for selectors & dropdowns across admin panel)
+  // ═══════════════════════════════════════════════════════════════
+
+  async getAllBranches(query: any = {}) {
+    try {
+      const whereClause: any[] = [];
+      if (query && (query.is_active !== undefined || query.active !== undefined)) {
+        const val = query.is_active !== undefined ? query.is_active : query.active;
+        whereClause.push({
+          column: 'branches.is_active',
+          operator: '=',
+          value: String(val) === 'true' || String(val) === '1',
+        });
+      } else if (!query || (query.all !== 'true' && query.all !== '1')) {
+        whereClause.push({
+          column: 'branches.is_active',
+          operator: '=',
+          value: true,
+        });
+      }
+
+      const result = await this.dataService.query('branches', {
+        select: [
+          'branches.id',
+          'branches.branch_id',
+          'branches.branch_name',
+          'branches.branch_code',
+          'branches.city',
+          'branches.state',
+          'branches.lat',
+          'branches.lng',
+          'branches.delivery_radius_km',
+          'branches.buffer_zone',
+          'branches.allow_buffer_order',
+          'branches.hex_shape',
+          'branches.is_active',
+          'branches.created_at',
+          'branches.updated_at',
+        ],
+        where: whereClause,
+        sort: { 'branches.branch_name': 'ASC' },
+      });
+
+      return {
+        status: true,
+        data: result?.data || [],
+      };
+    } catch (error) {
+      this.developer.error('BranchManagementService.getAllBranches error', { error });
+      throw new InternalServerErrorException('Failed to retrieve branches');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // CUSTOMER DIRECTORY TABLE
   // ═══════════════════════════════════════════════════════════════
 

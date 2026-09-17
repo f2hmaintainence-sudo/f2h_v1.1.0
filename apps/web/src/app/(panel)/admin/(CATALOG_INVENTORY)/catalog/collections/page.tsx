@@ -699,7 +699,7 @@ export default function DailyCollectionsPage() {
                 : "text-emerald-700 hover:bg-emerald-50"
               }`}
           >
-            <Apple size={14} /> Produce &amp; Ghee
+            <Apple size={14} /> Others
           </button>
         </div>
       </div>

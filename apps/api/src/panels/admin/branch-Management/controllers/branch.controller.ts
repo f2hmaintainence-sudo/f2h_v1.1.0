@@ -23,7 +23,7 @@ import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
-@Controller({ path: 'admin/branch', version: '1' })
+@Controller({ path: ['admin/branches', 'admin/branch'], version: '1' })
 export class BranchController {
   constructor(
     private readonly customersService: BranchManagementService,
@@ -34,6 +34,12 @@ export class BranchController {
     private readonly saveEditService: BranchSaveEditService,
     private readonly sectorService: SectorService,
   ) { }
+
+  // ─── ALL BRANCHES LIST ─────────────────────────────────────────
+  @Get()
+  async getBranches(@Query() query: any) {
+    return this.customersService.getAllBranches(query);
+  }
 
   // ─── TABLE + FORM CRUD (static routes FIRST) ──────────────────
   @Get('table')
