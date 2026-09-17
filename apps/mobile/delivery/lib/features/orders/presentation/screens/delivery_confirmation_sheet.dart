@@ -132,9 +132,13 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       _distanceMeters = distKm * 1000.0;
       _isOutOfRadius = _distanceMeters! > _allowedRadiusMeters;
       _isCheckingGps = false;
+    } else if (widget.stop.addressLat == 0 && widget.stop.addressLng == 0) {
+      _distanceMeters = null;
+      _isOutOfRadius = false;
+      _isCheckingGps = false;
+    } else {
+      _checkGpsRadius();
     }
-
-    _checkGpsRadius();
     if (widget.stop.isCod && widget.stop.codAmount > 0) {
       _fetchPaymentQr();
     }
@@ -438,17 +442,24 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
               icon: const Icon(Icons.navigation_rounded, size: 16),
               label: const Text('Navigate'),
             ),
-          ElevatedButton(
+          OutlinedButton(
             onPressed: () {
               Navigator.pop(ctx);
               _checkGpsRadius(showFeedback: true);
+            },
+            child: const Text('Re-check GPS'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _nextStep();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF065F46),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Re-check GPS'),
+            child: const Text('Proceed to Deliver'),
           ),
         ],
       ),
@@ -456,10 +467,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   void _nextStep() {
-    if (_currentStep == 1 && _isOutOfRadius) {
-      _showOutOfRadiusDialog();
-      return;
-    }
     if (_currentStep < 5) {
       setState(() {
         _currentStep++;
@@ -533,11 +540,6 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   void _triggerSuccess() {
-    if (_isOutOfRadius) {
-      _showOutOfRadiusDialog();
-      return;
-    }
-
     final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
         ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
         : null;
@@ -1019,11 +1021,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         const SizedBox(height: 8),
 
         ElevatedButton(
-          onPressed: _isCheckingGps && _distanceMeters == null
-              ? null
-              : _isOutOfRadius
-                  ? _showOutOfRadiusDialog
-                  : _nextStep,
+          onPressed: _isCheckingGps && _distanceMeters == null ? null : _nextStep,
           style: ElevatedButton.styleFrom(
             backgroundColor: _isOutOfRadius ? const Color(0xFF065F46) : kPrimary,
             foregroundColor: Colors.white,
@@ -1048,10 +1046,10 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
                 ),
               ] else if (_isOutOfRadius) ...[
-                const Icon(Icons.location_off_rounded, size: 20),
+                const Icon(Icons.check_circle_outline_rounded, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'OUT OF RADIUS (${_formatDistance(_distanceMeters ?? 0)} Away)',
+                  'ARRIVED AT LOCATION (${_formatDistance(_distanceMeters ?? 0)}) →',
                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
                 ),
               ] else ...[
