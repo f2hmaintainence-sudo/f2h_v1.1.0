@@ -1246,20 +1246,26 @@ export class DeliveryOrderService {
           [runIds],
         );
 
-        // Update delivery_dispatch_items delivered quantities
+        // Update delivery_dispatch_items delivered quantities deterministically from delivered orders
         if (status === 'delivered') {
           await client.query(
             `UPDATE delivery_dispatch_items ddi
-             SET delivered_qty = ddi.delivered_qty + oi.quantity,
+             SET delivered_qty = COALESCE(sub.deliv_sum, 0),
                  updated_at = NOW()
-             FROM orders o
-             JOIN delivery_dispatch dd ON (dd.delivery_run_id = o.delivery_run_id OR dd.delivery_run_id = ANY($2))
-             JOIN order_items oi ON oi.order_id = o.order_id
-             WHERE o.order_id = $1
-               AND ddi.dispatch_id = dd.dispatch_id
-               AND ddi.product_variant_id = oi.variant_id
+             FROM (
+               SELECT oi.variant_id, SUM(oi.quantity)::numeric AS deliv_sum
+               FROM orders o
+               JOIN order_items oi ON oi.order_id = o.order_id
+               WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = $2)
+                 AND o.status IN ('delivered', 'completed')
+               GROUP BY oi.variant_id
+             ) sub
+             WHERE ddi.product_variant_id = sub.variant_id
+               AND ddi.dispatch_id IN (
+                 SELECT dispatch_id FROM delivery_dispatch WHERE delivery_run_id = ANY($1)
+               )
                AND ddi.deleted_at IS NULL`,
-            [order.order_id, runIds],
+            [runIds, String(boy.user_id)],
           );
         }
 
@@ -1619,20 +1625,27 @@ export class DeliveryOrderService {
         await this.handleCodDeliveryPaymentAndBill(client, order, boy.full_name, effectivePaymentMode);
       }
 
-      // Update delivery_dispatch_items delivered quantities
+      // Update delivery_dispatch_items delivered quantities deterministically from delivered orders
       if (status === 'delivered') {
+        const runIdParam = order.delivery_run_id ? [order.delivery_run_id] : [];
         await client.query(
           `UPDATE delivery_dispatch_items ddi
-           SET delivered_qty = ddi.delivered_qty + oi.quantity,
+           SET delivered_qty = COALESCE(sub.deliv_sum, 0),
                updated_at = NOW()
-           FROM orders o
-           JOIN delivery_dispatch dd ON dd.delivery_run_id = o.delivery_run_id
-           JOIN order_items oi ON oi.order_id = o.order_id
-           WHERE o.order_id = $1
-             AND ddi.dispatch_id = dd.dispatch_id
-             AND ddi.product_variant_id = oi.variant_id
+           FROM (
+             SELECT oi.variant_id, SUM(oi.quantity)::numeric AS deliv_sum
+             FROM orders o
+             JOIN order_items oi ON oi.order_id = o.order_id
+             WHERE (o.delivery_run_id = ANY($1) OR o.delivery_partner_id = $2)
+               AND o.status IN ('delivered', 'completed')
+             GROUP BY oi.variant_id
+           ) sub
+           WHERE ddi.product_variant_id = sub.variant_id
+             AND ddi.dispatch_id IN (
+               SELECT dispatch_id FROM delivery_dispatch WHERE delivery_run_id = ANY($1)
+             )
              AND ddi.deleted_at IS NULL`,
-          [order.order_id],
+          [runIdParam, String(boy.user_id)],
         );
       }
 

@@ -507,7 +507,7 @@ export class BasketService {
       const orderedQty = liveInfo ? liveInfo.planned : 0;
       const plannedQty = Number(dItem.planned_qty || 0);
       const loadedQty = Number(dItem.loaded_qty || 0);
-      const deliveredQty = Math.max(Number(dItem.delivered_qty || 0), liveInfo ? liveInfo.delivered : 0);
+      const deliveredQty = liveInfo ? liveInfo.delivered : Number(dItem.delivered_qty || 0);
       const returnedQty = Number(dItem.returned_qty || 0);
       const damagedQty = Number(dItem.damaged_qty || 0);
       const extraQty = Math.max(0, loadedQty - orderedQty);
