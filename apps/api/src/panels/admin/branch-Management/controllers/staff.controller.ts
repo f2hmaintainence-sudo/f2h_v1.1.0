@@ -71,6 +71,8 @@ export class StaffsrController {
         select: [
           'management_staff.*',
           'users.email',
+          'users.phone',
+          'users.user_name',
           'users.role_id',
           'branches.branch_name',
         ],

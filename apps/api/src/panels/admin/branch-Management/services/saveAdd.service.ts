@@ -178,8 +178,10 @@ export class StaffsSaveAddService {
           email: body.email.toLowerCase().trim(),
           phone: body.phone.trim(),
           user_name: body.user_name.trim(),
+          first_name: body.user_name.trim(),
           password: hashedPassword,
           role_id: body.role_id,
+          account_status: 'active',
           created_at: now,
           updated_at: now,
         }, { transaction: tx });
@@ -193,20 +195,14 @@ export class StaffsSaveAddService {
           updated_at: now,
         }, { transaction: tx });
 
-        const maxIdResult = await tx.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM management_staff');
-        const nextId = maxIdResult[0]?.next_id || maxIdResult.rows?.[0]?.next_id || 1;
-
         await this.Data.insert('management_staff', {
-          id: nextId,
           management_id: managementId,
           user_id: userId,
           branch_id: body.branch_id || null,
           role_id: body.role_id,
-          user_name: body.user_name.trim(),
           department: body.department ? body.department.trim() : null,
           designation: body.designation ? body.designation.trim() : null,
           is_active: body.is_active === true || String(body.is_active) === 'true',
-          phone: body.phone.trim(),
           created_at: now,
           updated_at: now,
         }, { transaction: tx });

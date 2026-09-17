@@ -253,7 +253,7 @@ export class ProfileService {
             u.user_name,
             COALESCE(u.first_name, u.user_name) AS first_name,
             COALESCE(u.last_name, '') AS last_name,
-            COALESCE(u.phone, ms.phone, '') AS phone,
+            COALESCE(u.phone, '') AS phone,
             COALESCE(u.profile_image_url, '') AS profile,
             u.role_id,
             u.account_status,
@@ -356,18 +356,20 @@ export class ProfileService {
       // endpoint.
       const keep = (v: unknown) => (v === undefined ? null : v);
 
-      // 1) Update users table
+      // 1) Update users table (identity single source of truth)
+      const fullName = [first_name, last_name].filter(Boolean).join(' ') || null;
       await this.db.query(
         `UPDATE users
          SET first_name = COALESCE($2, first_name),
              last_name  = COALESCE($3, last_name),
-             phone      = COALESCE($4, phone),
+             user_name  = COALESCE($4, user_name),
+             phone      = COALESCE($5, phone),
              updated_at = NOW()
          WHERE user_id = $1 OR email = $1`,
-        [userId, keep(first_name), keep(last_name), keep(phone)],
+        [userId, keep(first_name), keep(last_name), keep(fullName), keep(phone)],
       );
 
-      // 2) Upsert management_staff
+      // 2) Upsert management_staff (WITHOUT user_name or phone)
       const existing = await this.db.query(
         `SELECT management_id FROM management_staff WHERE user_id = $1`,
         [userId],
@@ -390,8 +392,6 @@ export class ProfileService {
                postal_code    = COALESCE($13, postal_code),
                alt_phone      = COALESCE($14, alt_phone),
                branch_id      = COALESCE($15, branch_id),
-               phone          = COALESCE($16, phone),
-               user_name      = COALESCE($17, user_name),
                updated_at     = NOW()
            WHERE user_id = $1`,
           [
@@ -412,46 +412,37 @@ export class ProfileService {
             keep(postal_code),
             keep(alt_phone),
             branch_id || null,
-            keep(phone),
-            [first_name, last_name].filter(Boolean).join(' ') || null,
           ],
         );
       } else {
-        // Generate a management_id and next sequence id for management_staff
+        // Generate a management_id for management_staff
         const mgmtId = `MGMT-${userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)}`;
-        const maxIdRes = await this.db.query(
-          `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM management_staff`,
-        );
-        const nextId = parseInt(maxIdRes[0]?.next_id ?? 1, 10);
 
         await this.db.query(
           `INSERT INTO management_staff
-             (id, management_id, user_id, role_id, user_name, branch_id,
+             (management_id, user_id, role_id, branch_id,
               gender, date_of_birth, marital_status, bio,
               department, designation, education,
               address_line1, address_line2, city, state, postal_code,
-              alt_phone, phone)
-           VALUES ($1,$2,$3,'ADMIN',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+              alt_phone, created_at, updated_at)
+           VALUES ($1,$2,'ADMIN',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())`,
           [
-            nextId,
             mgmtId,
             userId,
-            [first_name, last_name].filter(Boolean).join(' '),
             branch_id || null,
-            gender,
+            gender || null,
             date_of_birth || null,
-            marital_status,
-            bio,
-            department,
-            designation,
-            education,
-            address_line1,
-            address_line2,
-            city,
-            state,
-            postal_code,
-            alt_phone,
-            phone,
+            marital_status || null,
+            bio || null,
+            department || null,
+            designation || null,
+            education || null,
+            address_line1 || null,
+            address_line2 || null,
+            city || null,
+            state || null,
+            postal_code || null,
+            alt_phone || null,
           ],
         );
       }

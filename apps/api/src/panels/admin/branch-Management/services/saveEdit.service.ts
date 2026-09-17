@@ -265,7 +265,7 @@ export class StaffsSaveEditService {
   async saveStaffEdit(id: string, body: any, adminId: string) {
     try {
       const currentRows = await this.Data.query('management_staff', {
-        select: ['management_staff.*', 'users.email'],
+        select: ['management_staff.*', 'users.email', 'users.phone', 'users.user_name'],
         joins: [
           {
             type: 'LEFT',
@@ -320,7 +320,10 @@ export class StaffsSaveEditService {
         };
         if (body.email) userUpdate.email = body.email.toLowerCase().trim();
         if (body.phone) userUpdate.phone = body.phone.trim();
-        if (body.user_name) userUpdate.user_name = body.user_name.trim();
+        if (body.user_name) {
+          userUpdate.user_name = body.user_name.trim();
+          userUpdate.first_name = body.user_name.trim();
+        }
         if (body.role_id) userUpdate.role_id = body.role_id;
 
         await this.Data.update('users', userUpdate, [{ column: 'user_id', operator: '=', value: userId }], { transaction: tx });
@@ -344,8 +347,6 @@ export class StaffsSaveEditService {
         const staffUpdate: Record<string, any> = {
           updated_at: now,
         };
-        if (body.user_name) staffUpdate.user_name = body.user_name.trim();
-        if (body.phone) staffUpdate.phone = body.phone.trim();
         if (body.role_id) staffUpdate.role_id = body.role_id;
         staffUpdate.branch_id = body.branch_id || null;
         staffUpdate.department = body.department ? body.department.trim() : null;

@@ -172,6 +172,8 @@ export class StaffsShowEditService {
         select: [
           'management_staff.*',
           'users.email',
+          'users.phone',
+          'users.user_name',
           'users.role_id',
         ],
         joins: [

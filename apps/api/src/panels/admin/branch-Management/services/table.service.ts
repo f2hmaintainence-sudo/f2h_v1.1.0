@@ -249,9 +249,9 @@ export class StaffsTableService {
         columns: {
           id: ['management_staff.management_id', false],
           management_id: ['management_staff.management_id', true],
-          user_name: ['management_staff.user_name', true],
+          user_name: ['users.user_name', true],
           email: ['users.email', true],
-          phone: ['management_staff.phone', true],
+          phone: ['users.phone', true],
           branch_name: ['branches.branch_name', true],
           department: ['management_staff.department', true],
           designation: ['management_staff.designation', true],

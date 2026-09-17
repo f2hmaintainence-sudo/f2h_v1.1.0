@@ -172,12 +172,16 @@ export class AdminSystemService {
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
       const params: any[] = [];
-      const where: string[] = ['ms.deleted_at IS NULL'];
+      const where: string[] = [
+        'u.deleted_at IS NULL',
+        "(LOWER(COALESCE(u.role_id, '')) NOT IN ('customer', 'delivery_partner', 'delivery_boy', 'vendor') OR ms.management_id IS NOT NULL)",
+      ];
 
       if (search) {
         params.push(`%${search}%`);
+        const pIdx = params.length;
         where.push(
-          `(ms.user_name ILIKE $${params.length} OR ms.phone ILIKE $${params.length} OR u.email ILIKE $${params.length} OR ms.department ILIKE $${params.length} OR ms.designation ILIKE $${params.length})`,
+          `(u.user_name ILIKE $${pIdx} OR u.first_name ILIKE $${pIdx} OR u.last_name ILIKE $${pIdx} OR u.phone ILIKE $${pIdx} OR u.email ILIKE $${pIdx} OR ms.department ILIKE $${pIdx} OR ms.designation ILIKE $${pIdx})`,
         );
       }
 
@@ -188,55 +192,61 @@ export class AdminSystemService {
 
       if (role_id) {
         params.push(role_id);
-        where.push(`(ms.role_id = $${params.length} OR r.role_id = $${params.length} OR ar.role_name = $${params.length})`);
+        const pIdx = params.length;
+        where.push(
+          `(u.role_id = $${pIdx} OR ms.role_id = $${pIdx} OR r.role_id = $${pIdx} OR ar.role_name = $${pIdx} OR ar.id::text = $${pIdx})`,
+        );
       }
 
       if (is_active !== undefined && is_active !== '') {
-        params.push(is_active === true || String(is_active) === 'true');
-        where.push(`ms.is_active = $${params.length}`);
+        const isActiveBool = is_active === true || String(is_active) === 'true';
+        params.push(isActiveBool);
+        const pIdx = params.length;
+        where.push(
+          `(COALESCE(ms.is_active, CASE WHEN u.account_status = 'active' THEN true ELSE false END) = $${pIdx})`,
+        );
       }
 
       const sql = `
       SELECT
-        ms.management_id,
-        ms.user_id,
-        ms.user_name,
+        COALESCE(ms.management_id, 'MNG-' || u.user_id) AS management_id,
+        u.user_id,
+        COALESCE(u.user_name, NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), u.email) AS user_name,
         u.email,
-        ms.phone,
-        ms.role_id,
-        COALESCE(ar.role_name, r.name, ms.role_id) AS role_name,
+        COALESCE(u.phone, '') AS phone,
+        COALESCE(ms.role_id, u.role_id, 'admin') AS role_id,
+        COALESCE(ar.role_name, r.name, ms.role_id, u.role_id, 'Admin') AS role_name,
         ms.branch_id,
         b.branch_name,
         ms.department,
         ms.designation,
-        ms.is_active,
-        ms.created_at,
-        ms.updated_at
-      FROM management_staff ms
-      LEFT JOIN users u ON u.user_id = ms.user_id
-      LEFT JOIN roles r ON r.role_id = ms.role_id
-      LEFT JOIN admin_roles ar ON (ar.role_name = ms.role_id OR ar.id::text = ms.role_id)
+        COALESCE(ms.is_active, CASE WHEN u.account_status = 'active' THEN true ELSE false END) AS is_active,
+        COALESCE(ms.created_at, u.created_at) AS created_at,
+        COALESCE(ms.updated_at, u.updated_at) AS updated_at
+      FROM users u
+      LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
+      LEFT JOIN roles r ON (UPPER(r.role_id) = UPPER(COALESCE(ms.role_id, u.role_id)))
+      LEFT JOIN admin_roles ar ON (ar.role_name = COALESCE(ms.role_id, u.role_id) OR ar.id::text = COALESCE(ms.role_id, u.role_id))
       LEFT JOIN branches b ON b.branch_id = ms.branch_id
       WHERE ${where.join(' AND ')}
-      ORDER BY ms.created_at DESC
+      ORDER BY COALESCE(ms.created_at, u.created_at) DESC
       LIMIT $${params.length + 1}
       OFFSET $${params.length + 2}
     `;
 
-      params.push(parseInt(limit, 10), offset);
-
-      const rows = await this.db.query(sql, params);
+      const queryParams = [...params, parseInt(limit, 10), offset];
+      const rows = await this.db.query(sql, queryParams);
 
       const countSql = `
       SELECT COUNT(*)::int AS total
-      FROM management_staff ms
-      LEFT JOIN users u ON u.user_id = ms.user_id
-      LEFT JOIN roles r ON r.role_id = ms.role_id
-      LEFT JOIN admin_roles ar ON (ar.role_name = ms.role_id OR ar.id::text = ms.role_id)
+      FROM users u
+      LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
+      LEFT JOIN roles r ON (UPPER(r.role_id) = UPPER(COALESCE(ms.role_id, u.role_id)))
+      LEFT JOIN admin_roles ar ON (ar.role_name = COALESCE(ms.role_id, u.role_id) OR ar.id::text = COALESCE(ms.role_id, u.role_id))
       WHERE ${where.join(' AND ')}
     `;
 
-      const countRows = await this.db.query(countSql, params.slice(0, -2));
+      const countRows = await this.db.query(countSql, params);
 
       return {
         status: true,
@@ -309,10 +319,10 @@ export class AdminSystemService {
       const now = new Date().toISOString();
 
       await this.db.transaction(async (client) => {
-        // Insert into users
+        // Insert into users (source of truth for identity)
         await client.query(
-          `INSERT INTO users (user_id, email, phone, user_name, password, role_id, account_status, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $7)`,
+          `INSERT INTO users (user_id, email, phone, user_name, first_name, password, role_id, account_status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $4, $5, $6, 'active', $7, $7)`,
           [userId, cleanEmail, cleanPhone, cleanUserName, hashedPassword, targetRole, now],
         );
 
@@ -323,21 +333,19 @@ export class AdminSystemService {
           [Date.now() + Math.floor(Math.random() * 1000), userId, targetRole, now],
         );
 
-        // Insert into management_staff
+        // Insert into management_staff (WITHOUT user_name or phone)
         await client.query(
           `INSERT INTO management_staff (
-             management_id, user_id, branch_id, role_id, user_name,
-             department, designation, phone, is_active, created_at, updated_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
+             management_id, user_id, branch_id, role_id,
+             department, designation, is_active, created_at, updated_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
           [
             managementId,
             userId,
             branch_id?.trim() || null,
             targetRole,
-            cleanUserName,
             department?.trim() || null,
             designation?.trim() || null,
-            cleanPhone,
             is_active !== false && String(is_active) !== 'false',
             now,
           ],
@@ -367,10 +375,11 @@ export class AdminSystemService {
   async updateAdminUser(identifier: string, body: any, adminId: string = 'system') {
     try {
       const staffRows = await this.db.query(
-        `SELECT ms.*, u.email, u.phone AS user_phone
-         FROM management_staff ms
-         JOIN users u ON u.user_id = ms.user_id
-         WHERE (ms.user_id = $1 OR ms.management_id = $1) AND ms.deleted_at IS NULL
+        `SELECT u.user_id, u.email, u.phone, u.user_name, u.role_id,
+                ms.management_id, ms.branch_id, ms.department, ms.designation, ms.is_active
+         FROM users u
+         LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
+         WHERE (u.user_id = $1 OR ms.management_id = $1 OR u.email = $1) AND u.deleted_at IS NULL
          LIMIT 1`,
         [identifier],
       );
@@ -381,7 +390,7 @@ export class AdminSystemService {
 
       const current = staffRows[0];
       const userId = current.user_id;
-      const managementId = current.management_id;
+      let managementId = current.management_id;
 
       // Validate duplicate email if changed
       if (body.email && body.email.toLowerCase().trim() !== current.email?.toLowerCase().trim()) {
@@ -410,7 +419,7 @@ export class AdminSystemService {
       const newRole = body.role_id || body.role;
 
       await this.db.transaction(async (client) => {
-        // Update users table
+        // Update users table (identity single source of truth)
         const userUpdates: string[] = ['updated_at = NOW()'];
         const userParams: any[] = [userId];
 
@@ -425,6 +434,8 @@ export class AdminSystemService {
         if (body.user_name) {
           userParams.push(body.user_name.trim());
           userUpdates.push(`user_name = $${userParams.length}`);
+          userParams.push(body.user_name.trim());
+          userUpdates.push(`first_name = $${userParams.length}`);
         }
         if (newRole) {
           userParams.push(newRole);
@@ -454,51 +465,66 @@ export class AdminSystemService {
           );
         }
 
-        // Update management_staff table
-        const msUpdates: string[] = ['updated_at = NOW()'];
-        const msParams: any[] = [managementId];
+        // Update or insert management_staff table without phone or user_name
+        if (managementId) {
+          const msUpdates: string[] = ['updated_at = NOW()'];
+          const msParams: any[] = [managementId];
 
-        if (body.user_name) {
-          msParams.push(body.user_name.trim());
-          msUpdates.push(`user_name = $${msParams.length}`);
-        }
-        if (body.phone) {
-          msParams.push(body.phone.trim());
-          msUpdates.push(`phone = $${msParams.length}`);
-        }
-        if (newRole) {
-          msParams.push(newRole);
-          msUpdates.push(`role_id = $${msParams.length}`);
-        }
-        if (body.branch_id !== undefined) {
-          msParams.push(body.branch_id?.trim() || null);
-          msUpdates.push(`branch_id = $${msParams.length}`);
-        }
-        if (body.department !== undefined) {
-          msParams.push(body.department?.trim() || null);
-          msUpdates.push(`department = $${msParams.length}`);
-        }
-        if (body.designation !== undefined) {
-          msParams.push(body.designation?.trim() || null);
-          msUpdates.push(`designation = $${msParams.length}`);
-        }
-        if (body.is_active !== undefined) {
-          const isActive = body.is_active === true || String(body.is_active) === 'true';
-          msParams.push(isActive);
-          msUpdates.push(`is_active = $${msParams.length}`);
-        }
+          if (newRole) {
+            msParams.push(newRole);
+            msUpdates.push(`role_id = $${msParams.length}`);
+          }
+          if (body.branch_id !== undefined) {
+            msParams.push(body.branch_id?.trim() || null);
+            msUpdates.push(`branch_id = $${msParams.length}`);
+          }
+          if (body.department !== undefined) {
+            msParams.push(body.department?.trim() || null);
+            msUpdates.push(`department = $${msParams.length}`);
+          }
+          if (body.designation !== undefined) {
+            msParams.push(body.designation?.trim() || null);
+            msUpdates.push(`designation = $${msParams.length}`);
+          }
+          if (body.is_active !== undefined) {
+            const isActive = body.is_active === true || String(body.is_active) === 'true';
+            msParams.push(isActive);
+            msUpdates.push(`is_active = $${msParams.length}`);
+          }
 
-        await client.query(
-          `UPDATE management_staff SET ${msUpdates.join(', ')} WHERE management_id = $1`,
-          msParams,
-        );
+          await client.query(
+            `UPDATE management_staff SET ${msUpdates.join(', ')} WHERE management_id = $1`,
+            msParams,
+          );
+        } else {
+          // If no management_staff record exists yet for this user, insert one
+          managementId = generateId('MNG', 12);
+          const targetRole = newRole || current.role_id || 'admin';
+          const isActive = body.is_active !== undefined ? (body.is_active === true || String(body.is_active) === 'true') : true;
+
+          await client.query(
+            `INSERT INTO management_staff (
+               management_id, user_id, branch_id, role_id,
+               department, designation, is_active, created_at, updated_at
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+            [
+              managementId,
+              userId,
+              body.branch_id?.trim() || null,
+              targetRole,
+              body.department?.trim() || null,
+              body.designation?.trim() || null,
+              isActive,
+            ],
+          );
+        }
       });
 
       await this.createAuditLog({
         admin_id: adminId,
         action: 'staff_update',
         target_type: 'management_staff',
-        target_id: managementId,
+        target_id: managementId || identifier,
         details: { changes: Object.keys(body), identifier },
       });
 
@@ -513,9 +539,10 @@ export class AdminSystemService {
   async deleteAdminUser(identifier: string, adminId: string = 'system') {
     try {
       const staffRows = await this.db.query(
-        `SELECT ms.management_id, ms.user_id, ms.user_name
-         FROM management_staff ms
-         WHERE (ms.user_id = $1 OR ms.management_id = $1) AND ms.deleted_at IS NULL
+        `SELECT u.user_id, u.user_name, ms.management_id
+         FROM users u
+         LEFT JOIN management_staff ms ON ms.user_id = u.user_id
+         WHERE (u.user_id = $1 OR ms.management_id = $1 OR u.email = $1) AND u.deleted_at IS NULL
          LIMIT 1`,
         [identifier],
       );
@@ -527,10 +554,12 @@ export class AdminSystemService {
       const staff = staffRows[0];
 
       await this.db.transaction(async (client) => {
-        await client.query(
-          'UPDATE management_staff SET deleted_at = NOW(), is_active = false WHERE management_id = $1',
-          [staff.management_id],
-        );
+        if (staff.management_id) {
+          await client.query(
+            'UPDATE management_staff SET deleted_at = NOW(), is_active = false WHERE management_id = $1',
+            [staff.management_id],
+          );
+        }
         await client.query(
           `UPDATE users SET deleted_at = NOW(), account_status = 'deleted' WHERE user_id = $1`,
           [staff.user_id],
@@ -541,7 +570,7 @@ export class AdminSystemService {
         admin_id: adminId,
         action: 'staff_delete',
         target_type: 'management_staff',
-        target_id: staff.management_id,
+        target_id: staff.management_id || staff.user_id,
         details: { username: staff.user_name },
       });
 
