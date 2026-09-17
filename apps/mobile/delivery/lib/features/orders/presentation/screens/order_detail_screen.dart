@@ -122,10 +122,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       return;
     }
 
-    // Fire non-blocking GPS distance check in background for debug logs
     Position? currentPos;
     try {
-      currentPos = await _locationService.getCurrentPosition();
+      currentPos = await _locationService.getFastPosition();
     } catch (_) {}
 
     Map<String, dynamic>? confirmedResult;

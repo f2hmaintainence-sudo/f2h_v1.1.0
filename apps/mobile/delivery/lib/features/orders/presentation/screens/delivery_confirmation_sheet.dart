@@ -119,12 +119,13 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     super.initState();
     _allowedRadiusMeters = widget.allowedRadiusMeters;
 
-    // Fast synchronous evaluation if parent passed a recent location fix
-    if (widget.initialPosition != null && widget.stop.addressLat != 0 && widget.stop.addressLng != 0) {
+    // Instant 0ms evaluation from provided fix or cached location
+    final fastPos = widget.initialPosition ?? sl<LocationService>().cachedPosition;
+    if (fastPos != null && widget.stop.addressLat != 0 && widget.stop.addressLng != 0) {
       final loc = sl<LocationService>();
       final distKm = loc.haversineDistanceKm(
-        widget.initialPosition!.latitude,
-        widget.initialPosition!.longitude,
+        fastPos.latitude,
+        fastPos.longitude,
         widget.stop.addressLat,
         widget.stop.addressLng,
       );
@@ -337,7 +338,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                 content: Text(
                   'Out of radius (${_formatDistance(distMeters)} away). Remaining distance: ${_formatDistance(remainingMeters)} (Max radius: ${_allowedRadiusMeters.round()}m)',
                 ),
-                backgroundColor: const Color(0xFFDC2626),
+                backgroundColor: const Color(0xFF065F46),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -345,7 +346,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Doorstep verified! Within ${_formatDistance(distMeters)} (Radius: ${_allowedRadiusMeters.round()}m)'),
-                backgroundColor: const Color(0xFF16A34A),
+                backgroundColor: const Color(0xFF065F46),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -381,12 +382,12 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 28),
+            Icon(Icons.location_off_rounded, color: Color(0xFF065F46), size: 28),
             SizedBox(width: 10),
             Expanded(
               child: Text(
                 'Out of Delivery Radius',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF064E3B)),
               ),
             ),
           ],
@@ -403,21 +404,21 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
+                color: const Color(0xFFF0FDF4),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFECACA)),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Remaining Distance: $remainingStr to reach radius',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFF065F46)),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Allowed doorstep radius is ${_allowedRadiusMeters.round()} meters. Please reach the customer location to complete delivery.',
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF991B1B)),
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF064E3B)),
                   ),
                 ],
               ),
@@ -443,7 +444,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
               _checkGpsRadius(showFeedback: true);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: const Color(0xFF065F46),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -805,9 +806,9 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: const Color(0xFFF0FDF4),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
+              border: Border.all(color: const Color(0xFFA7F3D0), width: 1.5),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -817,7 +818,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: const BoxDecoration(
-                        color: Color(0xFFDC2626),
+                        color: Color(0xFF065F46),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.location_off_rounded, color: Colors.white, size: 20),
@@ -832,7 +833,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                             style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 13.5,
-                              color: Color(0xFF991B1B),
+                              color: Color(0xFF064E3B),
                               letterSpacing: 0.3,
                             ),
                           ),
@@ -842,7 +843,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 11,
-                              color: Color(0xFFDC2626),
+                              color: Color(0xFF065F46),
                             ),
                           ),
                         ],
@@ -856,18 +857,18 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFECACA)),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         'Remaining Distance:',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF7F1D1D)),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF064E3B)),
                       ),
                       Text(
                         '${_formatDistance((_distanceMeters! - _allowedRadiusMeters).clamp(0.0, double.infinity))} to doorstep',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF065F46)),
                       ),
                     ],
                   ),
@@ -875,7 +876,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                 const SizedBox(height: 10),
                 Text(
                   'Doorstep geofence is ACTIVE. You are ${_formatDistance(_distanceMeters!)} away from ${widget.stop.customerName}\'s delivery location. You must be within ${_allowedRadiusMeters.round()}m of the doorstep to confirm arrival.',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF7F1D1D), height: 1.35),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF064E3B), height: 1.35),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -912,15 +913,15 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                             ? const SizedBox(
                                 width: 14,
                                 height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF065F46)),
                               )
-                            : const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFFDC2626)),
+                            : const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF065F46)),
                         label: Text(
                           _isCheckingGps ? 'Checking...' : 'Re-check GPS',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFFDC2626)),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF065F46)),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFF87171), width: 1.2),
+                          side: const BorderSide(color: Color(0xFF059669), width: 1.2),
                           backgroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1024,7 +1025,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   ? _showOutOfRadiusDialog
                   : _nextStep,
           style: ElevatedButton.styleFrom(
-            backgroundColor: _isOutOfRadius ? const Color(0xFFDC2626) : kPrimary,
+            backgroundColor: _isOutOfRadius ? const Color(0xFF065F46) : kPrimary,
             foregroundColor: Colors.white,
             disabledBackgroundColor: const Color(0xFFCBD5E1),
             disabledForegroundColor: const Color(0xFF64748B),

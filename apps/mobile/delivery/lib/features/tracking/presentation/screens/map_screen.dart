@@ -872,6 +872,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         speed: 0,
         speedAccuracy: 0,
       );
+    } else {
+      pos = sl<LocationService>().cachedPosition;
     }
 
     Map<String, dynamic>? confirmedResult;

@@ -294,27 +294,50 @@ class LocationService {
     );
   }
 
+  Position? _lastKnownPosition;
+  Position? get cachedPosition => _lastKnownPosition;
+
+  /// Fast instant position lookup (< 5ms) using memory cache or OS last-known fix
+  Future<Position?> getFastPosition() async {
+    if (_lastKnownPosition != null) return _lastKnownPosition;
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        _lastKnownPosition = last;
+        return last;
+      }
+    } catch (_) {}
+    return getCurrentPosition();
+  }
+
   // ─── Get current GPS position ─────────────────────────────────
   Future<Position?> getCurrentPosition() async {
     bool serviceEnabled = await isLocationServiceEnabled();
-    if (!serviceEnabled) return null;
+    if (!serviceEnabled) return _lastKnownPosition;
 
     LocationPermission permission = await checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await requestPermission();
-      if (permission == LocationPermission.denied) return null;
+      if (permission == LocationPermission.denied) return _lastKnownPosition;
     }
-    if (permission == LocationPermission.deniedForever) return null;
+    if (permission == LocationPermission.deniedForever) return _lastKnownPosition;
 
     try {
-      return await Geolocator.getCurrentPosition(
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        _lastKnownPosition = lastKnown;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 3),
         ),
       );
+      _lastKnownPosition = pos;
+      return pos;
     } catch (_) {
-      return null;
+      return _lastKnownPosition;
     }
   }
 

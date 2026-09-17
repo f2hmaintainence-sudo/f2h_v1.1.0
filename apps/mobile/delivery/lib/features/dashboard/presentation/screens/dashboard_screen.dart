@@ -252,6 +252,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
+    final fastPos = _currentPosition ?? sl<LocationService>().cachedPosition ?? await sl<LocationService>().getFastPosition();
     Map<String, dynamic>? confirmedResult;
 
     await showModalBottomSheet(
@@ -260,7 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => DeliveryConfirmationSheet(
         stop: stop,
-        initialPosition: _currentPosition,
+        initialPosition: fastPos,
         onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;

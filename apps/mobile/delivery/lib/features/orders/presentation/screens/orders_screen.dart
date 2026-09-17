@@ -109,7 +109,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
     Position? currentPos;
     try {
-      currentPos = await _locationService.getCurrentPosition();
+      currentPos = await _locationService.getFastPosition();
     } catch (_) {}
 
     Map<String, dynamic>? confirmedResult;
