@@ -37,8 +37,40 @@ export class ProfileService {
     private readonly redisService: RedisService,
   ) {}
 
+  private async ensureCompanyProfileSchema() {
+    try {
+      await this.db.query(`
+        CREATE TABLE IF NOT EXISTS public.company_profile (
+          id BIGSERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL DEFAULT 'F2H Fresh',
+          legal_name VARCHAR(255),
+          gst_number VARCHAR(50),
+          pan_number VARCHAR(50),
+          email VARCHAR(255),
+          phone VARCHAR(50),
+          secondary_phone VARCHAR(50),
+          whatsapp VARCHAR(50),
+          address TEXT,
+          city VARCHAR(100),
+          state VARCHAR(100),
+          pincode VARCHAR(20),
+          logo_url TEXT,
+          website TEXT,
+          instagram_url TEXT,
+          facebook_url TEXT,
+          youtube_url TEXT,
+          linkedin_url TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        ALTER TABLE public.company_profile ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
+      `);
+    } catch (_) {}
+  }
+
   async getCompanyProfile() {
     try {
+      await this.ensureCompanyProfileSchema();
       const [profiles, settingRows] = await Promise.all([
         this.db.query<CompanyProfileRecord>(`
           SELECT ${COMPANY_PROFILE_COLUMNS}
@@ -65,6 +97,7 @@ export class ProfileService {
 
   async updateCompanyProfile(body: UpdateCompanyProfileDto) {
     try {
+      await this.ensureCompanyProfileSchema();
       const values = [
         body.name,
         body.legal_name ?? '',
