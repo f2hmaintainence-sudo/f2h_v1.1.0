@@ -42,8 +42,8 @@ const toInputDate = (raw?: string) => {
   return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 };
 
-const initials = (first?: string, last?: string) =>
-  ((first?.[0] ?? "") + (last?.[0] ?? "")).toUpperCase() || "U";
+const initials = (first?: string, last?: string, fallback?: string) =>
+  ((first?.[0] ?? "") + (last?.[0] ?? "")).toUpperCase() || (fallback?.[0]?.toUpperCase() ?? "U");
 
 const getBackendOrigin = () => {
   const envBase = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -211,8 +211,11 @@ export default function AdminProfilePage() {
   const fetchProfile = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<any>("/admin/profile/me");
-      if (data?.status && data.data) setProfile(data.data);
+      const res = await api.get<any>("/admin/profile/me");
+      const payload = res.data?.data || (res.data?.status && res.data?.data) || res.data;
+      if (payload && typeof payload === "object" && (payload.user_id || payload.email || payload.user_name)) {
+        setProfile(payload);
+      }
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, []);
@@ -375,7 +378,7 @@ export default function AdminProfilePage() {
 
   // ── Derived ──
   const p = profile;
-  const fullName = p ? [p.first_name, p.last_name].filter(Boolean).join(" ") || "—" : "—";
+  const fullName = p ? ([p.first_name, p.last_name].filter(Boolean).join(" ") || p.user_name || p.email || "—") : "—";
   const profileImage = resolveProfileImage(p?.profile);
   const branchOptions = branches.map((b: any) => ({ value: b.branch_id, label: b.branch_name || b.name }));
 
@@ -460,7 +463,7 @@ export default function AdminProfilePage() {
                 )}
                 {profileImage && !imageError
                   ? <img src={profileImage} alt="avatar" onError={() => setImageError(true)} />
-                  : initials(p?.first_name, p?.last_name)
+                  : initials(p?.first_name, p?.last_name, p?.user_name || p?.email)
                 }
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex flex-col items-center justify-center text-white gap-1">
                   <FiCamera size={20} />

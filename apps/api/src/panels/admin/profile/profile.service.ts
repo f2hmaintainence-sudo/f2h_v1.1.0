@@ -239,25 +239,25 @@ export class ProfileService {
   // ── My Profile (logged-in admin) ──────────────────────
   async getMyProfile(userId: string) {
     try {
+      const cleanId = String(userId || '').trim();
+      const strippedId = cleanId.replace(/^MNG-/, '');
+      const withMngPrefix = cleanId.startsWith('MNG-') ? cleanId : `MNG-${cleanId}`;
+
       let rows: any[] = [];
       try {
-        // `updateMyProfile` writes the staff detail fields to `management_staff`,
-        // so they have to be read back from there. Selecting from `users` alone
-        // returned them as undefined, which made the edit form seed every one of
-        // them blank — so the page always looked unchanged after a save, and the
-        // next save wrote those blanks over whatever was stored.
         const sql = `
           SELECT
             u.user_id,
             u.email,
             u.user_name,
-            COALESCE(u.first_name, u.user_name) AS first_name,
+            COALESCE(NULLIF(u.first_name, ''), u.user_name, '') AS first_name,
             COALESCE(u.last_name, '') AS last_name,
             COALESCE(u.phone, '') AS phone,
             COALESCE(u.profile_image_url, '') AS profile,
-            u.role_id,
-            u.account_status,
-            u.created_at AS user_created_at,
+            COALESCE(u.role_id, ms.role_id, 'admin') AS role_id,
+            COALESCE(u.account_status, 'active') AS account_status,
+            COALESCE(ms.created_at, u.created_at) AS user_created_at,
+            COALESCE(ms.management_id, 'MNG-' || u.user_id) AS management_id,
             COALESCE(ms.gender, '') AS gender,
             ms.date_of_birth,
             COALESCE(ms.marital_status, '') AS marital_status,
@@ -271,14 +271,27 @@ export class ProfileService {
             COALESCE(ms.state, '') AS state,
             COALESCE(ms.postal_code, '') AS postal_code,
             COALESCE(ms.alt_phone, '') AS alt_phone,
-            COALESCE(ms.branch_id, '') AS branch_id
+            COALESCE(ms.branch_id, '') AS branch_id,
+            COALESCE(b.branch_name, '') AS branch_name
           FROM users u
           LEFT JOIN management_staff ms
             ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
-          WHERE u.user_id = $1 OR u.email = $1
+          LEFT JOIN branches b
+            ON b.branch_id = ms.branch_id
+          WHERE (
+            u.user_id = $1 
+            OR u.user_id = $2
+            OR LOWER(COALESCE(u.email, '')) = LOWER($1)
+            OR LOWER(COALESCE(u.user_name, '')) = LOWER($1)
+            OR ms.management_id = $1
+            OR ms.management_id = $2
+            OR ms.management_id = $3
+            OR ('MNG-' || u.user_id) = $1
+          ) AND u.deleted_at IS NULL
+          ORDER BY (ms.management_id IS NOT NULL) DESC
           LIMIT 1
         `;
-        rows = await this.db.query(sql, [userId]);
+        rows = await this.db.query(sql, [cleanId, strippedId, withMngPrefix]);
       } catch (err) {
         console.warn('[getMyProfile] Primary query failed:', err);
       }
@@ -295,21 +308,44 @@ export class ProfileService {
     try {
       if (!file) throw new BadRequestException('No file provided');
 
+      const cleanId = String(userId || '').trim();
+      const strippedId = cleanId.replace(/^MNG-/, '');
+      const withMngPrefix = cleanId.startsWith('MNG-') ? cleanId : `MNG-${cleanId}`;
+
+      const userRows = await this.db.query(
+        `SELECT u.user_id FROM users u
+         LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
+         WHERE (
+           u.user_id = $1 
+           OR u.user_id = $2
+           OR LOWER(COALESCE(u.email, '')) = LOWER($1)
+           OR LOWER(COALESCE(u.user_name, '')) = LOWER($1)
+           OR ms.management_id = $1
+           OR ms.management_id = $2
+           OR ms.management_id = $3
+           OR ('MNG-' || u.user_id) = $1
+         ) AND u.deleted_at IS NULL
+         LIMIT 1`,
+        [cleanId, strippedId, withMngPrefix],
+      );
+
+      const actualUserId = userRows[0]?.user_id || cleanId;
+
       const docDir = path.join(process.cwd(), 'uploads', 'profile-photos');
       if (!fs.existsSync(docDir)) {
         fs.mkdirSync(docDir, { recursive: true });
       }
 
       const ext = path.extname(file.originalname || 'photo.jpg') || '.jpg';
-      const filename = `admin_${userId}_${Date.now()}${ext}`;
+      const filename = `admin_${actualUserId}_${Date.now()}${ext}`;
       const filePath = path.join(docDir, filename);
       fs.writeFileSync(filePath, file.buffer);
 
       const fileUrl = `uploads/profile-photos/${filename}`;
 
       await this.db.query(
-        `UPDATE users SET profile_image_url = $2, updated_at = NOW() WHERE user_id = $1 OR email = $1`,
-        [userId, fileUrl],
+        `UPDATE users SET profile_image_url = $2, updated_at = NOW() WHERE user_id = $1`,
+        [actualUserId, fileUrl],
       );
 
       return {
@@ -327,9 +363,27 @@ export class ProfileService {
 
   async updateMyProfile(userId: string, body: any) {
     try {
+      const cleanId = String(userId || '').trim();
+      const strippedId = cleanId.replace(/^MNG-/, '');
+      const withMngPrefix = cleanId.startsWith('MNG-') ? cleanId : `MNG-${cleanId}`;
+
       const userRows = await this.db.query(
-        `SELECT user_id FROM users WHERE user_id = $1 OR email = $1 LIMIT 1`,
-        [userId],
+        `SELECT u.user_id, u.email, u.user_name, ms.management_id
+         FROM users u
+         LEFT JOIN management_staff ms ON ms.user_id = u.user_id AND ms.deleted_at IS NULL
+         WHERE (
+           u.user_id = $1 
+           OR u.user_id = $2
+           OR LOWER(COALESCE(u.email, '')) = LOWER($1)
+           OR LOWER(COALESCE(u.user_name, '')) = LOWER($1)
+           OR ms.management_id = $1
+           OR ms.management_id = $2
+           OR ms.management_id = $3
+           OR ('MNG-' || u.user_id) = $1
+         ) AND u.deleted_at IS NULL
+         ORDER BY (ms.management_id IS NOT NULL) DESC
+         LIMIT 1`,
+        [cleanId, strippedId, withMngPrefix],
       );
       if (!userRows.length) {
         throw new BadRequestException('User not found');
