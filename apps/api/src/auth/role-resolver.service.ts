@@ -52,17 +52,17 @@ export class RoleResolverService {
   private async loadFromDatabase(userId: string): Promise<string[]> {
     try {
       const rows = await this.db.query<{ role_id: string }>(
-        `SELECT UPPER(ra.role_id) AS role_id
-           FROM role_assignments ra
-          WHERE ra.user_id = $1
-            AND ra.is_active = 1
-            AND ra.deleted_at IS NULL
-          UNION
-         SELECT UPPER(u.role_id) AS role_id
+        `SELECT UPPER(u.role_id) AS role_id
            FROM users u
           WHERE u.user_id = $1
             AND u.role_id IS NOT NULL
-            AND u.deleted_at IS NULL`,
+            AND u.deleted_at IS NULL
+         UNION
+         SELECT UPPER(ms.role_id) AS role_id
+           FROM management_staff ms
+          WHERE ms.user_id = $1
+            AND ms.role_id IS NOT NULL
+            AND ms.deleted_at IS NULL`,
         [userId],
       );
 

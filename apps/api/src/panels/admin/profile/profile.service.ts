@@ -178,11 +178,10 @@ export class ProfileService {
       const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
       const sql = `
         SELECT u.user_id, u.email, u.first_name, u.last_name, u.phone, u.account_status, u.created_at,
-          ARRAY_AGG(r.name) AS roles
+          ARRAY_AGG(COALESCE(r.name, u.role_id)) AS roles
         FROM users u
-        JOIN role_assignments ra ON ra.user_id = u.user_id AND ra.is_active = 1 AND ra.deleted_at IS NULL
-        JOIN roles r ON UPPER(r.role_id) = UPPER(ra.role_id)
-        WHERE UPPER(ra.role_id) = 'ADMIN'
+        LEFT JOIN roles r ON UPPER(r.role_id) = UPPER(u.role_id)
+        WHERE UPPER(u.role_id) IN ('ADMIN', 'SUPER_ADMIN')
         GROUP BY u.user_id, u.email, u.first_name, u.last_name, u.phone, u.account_status, u.created_at
         ORDER BY u.created_at DESC
         LIMIT $1 OFFSET $2

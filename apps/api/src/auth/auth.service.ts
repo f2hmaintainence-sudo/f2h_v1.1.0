@@ -658,26 +658,7 @@ export class AuthService {
           );
         }
 
-        // Ensure active role assignment exists in role_assignments table (PostgreSQL $1 placeholders)
-        const existingRaRows = await this.DataBase.query(
-          `SELECT id FROM role_assignments WHERE user_id = $1 AND role_id = $2 LIMIT 1`,
-          [userId, roleId]
-        );
 
-        if (!existingRaRows?.length) {
-          await this.Data.insert(
-            'role_assignments',
-            {
-              id: Date.now() + Math.floor(Math.random() * 1000),
-              user_id: userId,
-              role_id: roleId,
-              is_active: 1,
-              created_at: now,
-              updated_at: now,
-            },
-            { transaction },
-          );
-        }
 
         // Insert referral row when DP signed up with a referral code
         if (referrerId) {
@@ -1737,21 +1718,7 @@ export class AuthService {
             });
           }
 
-          // Ensure active role assignment exists
-          const raCheck = await this.DataBase.query(
-            `SELECT id FROM role_assignments WHERE user_id = $1 AND role_id = $2 LIMIT 1`,
-            [user.user_id, ROLE.DELIVERY_PARTNER],
-          );
-          if (!raCheck?.length) {
-            await this.Data.insert('role_assignments', {
-              id: Date.now() + Math.floor(Math.random() * 1000),
-              user_id: user.user_id,
-              role_id: ROLE.DELIVERY_PARTNER,
-              is_active: 1,
-              created_at: new Date(),
-              updated_at: new Date(),
-            });
-          }
+
         } catch (dpErr) {
           console.error('[AuthService] Auto delivery partner sync failed during Google login:', dpErr);
         }

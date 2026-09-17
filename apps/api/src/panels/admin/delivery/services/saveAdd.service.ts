@@ -118,15 +118,7 @@ export class DeliverySaveAddService {
           updated_at: now,
         }, { transaction: tx });
 
-        // 3. Insert into role_assignments
-        await this.dataService.insert('role_assignments', {
-          id: Date.now() + Math.floor(Math.random() * 1000),
-          user_id: partnerId,
-          role_id: 'DELIVERY_PARTNER',
-          is_active: 1,
-          created_at: now,
-          updated_at: now,
-        }, { transaction: tx });
+
       });
 
       await this.dataService.insert('admin_audit_logs', {

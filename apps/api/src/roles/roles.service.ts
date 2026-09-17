@@ -53,19 +53,14 @@ export class RolesService {
         return null;
       }
 
-      // Roles come from two places: explicit grants in `role_assignments` (staff) and
-      // the account's own `users.role_id` (every customer). Reading only one of them
-      // misses whole categories of user.
+      // Roles come from identity table `users.role_id` and satellite `management_staff.role_id`
       const roles = await this.db.query<UserRole>(
         `SELECT DISTINCT r.role_id, r.name, r.description, r.is_system_role, r.is_active
            FROM roles r
           WHERE r.is_active = 1
             AND (
-              r.role_id IN (
-                SELECT ra.role_id FROM role_assignments ra
-                 WHERE ra.user_id = $1 AND ra.is_active = 1 AND ra.deleted_at IS NULL
-              )
-              OR r.role_id = (SELECT u.role_id FROM users u WHERE u.user_id = $1)
+              r.role_id = (SELECT u.role_id FROM users u WHERE u.user_id = $1)
+              OR r.role_id = (SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $1 AND ms.deleted_at IS NULL)
             )`,
         [userId],
       );

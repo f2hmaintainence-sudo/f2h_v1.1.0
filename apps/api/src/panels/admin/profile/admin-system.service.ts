@@ -326,12 +326,7 @@ export class AdminSystemService {
           [userId, cleanEmail, cleanPhone, cleanUserName, hashedPassword, targetRole, now],
         );
 
-        // Insert into role_assignments
-        await client.query(
-          `INSERT INTO role_assignments (id, user_id, role_id, is_active, created_at, updated_at)
-           VALUES ($1, $2, $3, 1, $4, $4)`,
-          [Date.now() + Math.floor(Math.random() * 1000), userId, targetRole, now],
-        );
+
 
         // Insert into management_staff (WITHOUT user_name or phone)
         await client.query(
@@ -552,18 +547,7 @@ export class AdminSystemService {
           userParams,
         );
 
-        // Update role_assignments if role changed
-        if (newRole && newRole !== current.role_id) {
-          await client.query(
-            'UPDATE role_assignments SET is_active = 0, updated_at = NOW() WHERE user_id = $1',
-            [userId],
-          );
-          await client.query(
-            `INSERT INTO role_assignments (id, user_id, role_id, is_active, created_at, updated_at)
-             VALUES ($1, $2, $3, 1, NOW(), NOW())`,
-            [Date.now() + Math.floor(Math.random() * 1000), userId, newRole],
-          );
-        }
+
 
         // Update or insert management_staff table without phone or user_name
         if (managementId) {

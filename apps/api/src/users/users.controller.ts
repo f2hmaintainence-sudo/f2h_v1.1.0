@@ -47,7 +47,6 @@ export class UsersController {
     const rawUser = users?.[0];
     if (!rawUser) return { error: 'User not found' };
     const user = this.fieldEncryption.decryptRow('users', rawUser);
-
     let rawRoles: any[] = [];
     try {
       rawRoles = await this.db.query(
@@ -55,8 +54,6 @@ export class UsersController {
            COALESCE(r.role_id, UPPER(sub.role_id)) AS role_id,
            COALESCE(r.name, sub.role_id) AS role_name
          FROM (
-           SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $1 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
-           UNION
            SELECT u.role_id FROM users u WHERE u.user_id = $1 AND u.role_id IS NOT NULL
            UNION
            SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $1 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
@@ -66,14 +63,7 @@ export class UsersController {
         [userId],
       );
     } catch {
-      try {
-        rawRoles = await this.db.query(
-          `SELECT role_id, role_id as role_name FROM role_assignments WHERE user_id = $1 AND is_active = 1`,
-          [userId],
-        );
-      } catch {
-        rawRoles = [];
-      }
+      rawRoles = [];
     }
 
     // Sort roles by priority in JavaScript
@@ -83,28 +73,18 @@ export class UsersController {
       DELIVERY_PARTNER: 3,
       CUSTOMER: 4,
     };
-    (rawRoles || []).sort((a: any, b: any) => {
-      const pa = rolePriority[String(a.role_id || '').toUpperCase()] ?? 99;
-      const pb = rolePriority[String(b.role_id || '').toUpperCase()] ?? 99;
-      return pa - pb;
+
+    const roles = rawRoles.sort((a, b) => {
+      const pA = rolePriority[a.role_id] || 99;
+      const pB = rolePriority[b.role_id] || 99;
+      return pA - pB;
     });
 
-    const seenRoles = new Set();
-    let roles = (rawRoles || []).filter((r: any) => {
-      if (!r.role_id || seenRoles.has(r.role_id)) return false;
-      seenRoles.add(r.role_id);
-      return true;
-    });
-
-    // Get stored role preference or default to first role
-    const storedRole = await this.redisService.fetch<string>(
+    const selectedRole = await this.redisService.fetch<string>(
       SELECTED_ROLE_KEY(userId),
     );
-    const validRoleIds = roles.map((r: any) => r.role_id);
-    const activeRole =
-      storedRole && validRoleIds.includes(storedRole) ? storedRole : validRoleIds[0] || null;
+    const activeRole = selectedRole || roles[0]?.role_id || user.role_id || null;
 
-    // Fetch dynamic permissions from role_permissions table for this user's roles
     let permissions: string[] = [];
     try {
       const allUserRoleKeys = Array.from(
@@ -123,8 +103,6 @@ export class UsersController {
          WHERE UPPER(rp.role_id) = ANY($1) 
             OR LOWER(rp.role_id) = ANY($1)
             OR rp.role_id IN (
-              SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $2 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
-              UNION
               SELECT u.role_id FROM users u WHERE u.user_id = $2 AND u.role_id IS NOT NULL
               UNION
               SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $2 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
@@ -140,8 +118,6 @@ export class UsersController {
            WHERE LOWER(role_name) = ANY($1)
               OR UPPER(role_name) = ANY($1)
               OR role_name IN (
-                SELECT ra.role_id FROM role_assignments ra WHERE ra.user_id = $2 AND (ra.is_active::text = '1' OR ra.is_active::text = 'true') AND ra.deleted_at IS NULL
-                UNION
                 SELECT u.role_id FROM users u WHERE u.user_id = $2 AND u.role_id IS NOT NULL
                 UNION
                 SELECT ms.role_id FROM management_staff ms WHERE ms.user_id = $2 AND (ms.is_active::text = '1' OR ms.is_active::text = 'true') AND ms.deleted_at IS NULL
@@ -206,20 +182,14 @@ export class UsersController {
       return { success: false, error: 'Invalid role_key' };
     }
 
-    // Validate that this specific role is assigned to this user. The previous query
-    // filtered on user_id only while binding role_key as a second, unused parameter,
-    // so any string was accepted as long as the user held some role.
     const roles = await this.db.query(
-      `SELECT ra.role_id
-         FROM role_assignments ra
-        WHERE ra.user_id = $1
-          AND UPPER(ra.role_id) = UPPER($2)
-          AND ra.is_active = 1
-          AND ra.deleted_at IS NULL
-        UNION
-       SELECT u.role_id
+      `SELECT u.role_id
          FROM users u
-        WHERE u.user_id = $1 AND UPPER(u.role_id) = UPPER($2)`,
+        WHERE u.user_id = $1 AND UPPER(u.role_id) = UPPER($2)
+       UNION
+       SELECT ms.role_id
+         FROM management_staff ms
+        WHERE ms.user_id = $1 AND UPPER(ms.role_id) = UPPER($2)`,
       [userId, role_key],
     );
 

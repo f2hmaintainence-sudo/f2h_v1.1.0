@@ -328,21 +328,7 @@ export class StaffsSaveEditService {
 
         await this.Data.update('users', userUpdate, [{ column: 'user_id', operator: '=', value: userId }], { transaction: tx });
 
-        if (body.role_id && body.role_id !== current.role_id) {
-          await this.Data.update('role_assignments', {
-            is_active: 0,
-            updated_at: now,
-          }, [{ column: 'user_id', operator: '=', value: userId }], { transaction: tx });
 
-          await this.Data.insert('role_assignments', {
-            id: Date.now() + Math.floor(Math.random() * 1000),
-            user_id: userId,
-            role_id: body.role_id,
-            is_active: 1,
-            created_at: now,
-            updated_at: now,
-          }, { transaction: tx });
-        }
 
         const staffUpdate: Record<string, any> = {
           updated_at: now,

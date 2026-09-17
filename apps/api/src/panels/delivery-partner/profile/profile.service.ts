@@ -1130,8 +1130,7 @@ export class ProfileService {
       try {
         const admins = await this.db.query(
           `SELECT u.user_id FROM users u
-           JOIN role_assignments ra ON ra.user_id = u.user_id
-           WHERE UPPER(ra.role_id) = 'ADMIN'
+           WHERE UPPER(u.role_id) IN ('ADMIN', 'SUPER_ADMIN')
              AND u.account_status = 'active'`,
           [],
         );

@@ -186,14 +186,7 @@ export class StaffsSaveAddService {
           updated_at: now,
         }, { transaction: tx });
 
-        await this.Data.insert('role_assignments', {
-          id: Date.now() + Math.floor(Math.random() * 1000),
-          user_id: userId,
-          role_id: body.role_id,
-          is_active: 1,
-          created_at: now,
-          updated_at: now,
-        }, { transaction: tx });
+
 
         await this.Data.insert('management_staff', {
           management_id: managementId,
