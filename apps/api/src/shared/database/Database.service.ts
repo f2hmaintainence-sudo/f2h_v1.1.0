@@ -110,6 +110,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         CREATE UNIQUE INDEX IF NOT EXISTS uq_dcr_run_container 
         ON delivery_container_reconciliation (run_id, container_id) WHERE deleted_at IS NULL;
 
+        ALTER TABLE public.management_staff 
+          ADD COLUMN IF NOT EXISTS gender VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS date_of_birth DATE,
+          ADD COLUMN IF NOT EXISTS marital_status VARCHAR(30),
+          ADD COLUMN IF NOT EXISTS bio TEXT,
+          ADD COLUMN IF NOT EXISTS education VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS address_line1 VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS address_line2 VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS city VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS state VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS postal_code VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS alt_phone VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS department VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS designation VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS branch_id VARCHAR(30),
+          ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+        ALTER TABLE public.users 
+          ADD COLUMN IF NOT EXISTS gender VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+
+        ALTER TABLE public.customers 
+          ADD COLUMN IF NOT EXISTS gender VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS dob DATE,
+          ADD COLUMN IF NOT EXISTS alternate_mobile VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS alternate_phone VARCHAR(20);
+
+        ALTER TABLE public.delivery_partners 
+          ADD COLUMN IF NOT EXISTS gender VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+
         ALTER TABLE public.delivery_partner_referral_bonuses 
           ADD COLUMN IF NOT EXISTS paid_by VARCHAR(50),
           ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100),
