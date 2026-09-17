@@ -478,15 +478,16 @@ export default function OrdersTable({
   const [error, setError]           = useState('');
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage]             = useState(1);
+  const [pageSize, setPageSize]     = useState(20);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const fetchOrders = useCallback(async (pg: number) => {
+  const fetchOrders = useCallback(async (pg: number, size: number) => {
     setLoading(true);
     setError('');
     try {
       const sep = endpoint.includes('?') ? '&' : '?';
-      const url = `${API_URL}${endpoint}${sep}page=${pg}&limit=${PAGE_SIZE}`;
+      const url = `${API_URL}${endpoint}${sep}page=${pg}&limit=${size}`;
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json();
@@ -514,45 +515,39 @@ export default function OrdersTable({
     }
   }, [endpoint]);
 
-  // Reset page on filter/endpoint change
+  // Reset page to 1 on filter, endpoint, or pageSize change
   useEffect(() => {
     setPage(1);
-  }, [endpoint, tableKey, activeStatusFilter, searchQuery, slotFilter]);
+  }, [endpoint, tableKey, activeStatusFilter, searchQuery, slotFilter, pageSize]);
 
   useEffect(() => {
-    fetchOrders(page);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, endpoint, tableKey]);
+    fetchOrders(page, pageSize);
+  }, [page, pageSize, endpoint, tableKey, fetchOrders]);
 
-  // Client-side filtering
-  const filtered = useMemo(() => {
-    return rows.filter((order) => {
-      if (activeStatusFilter) {
-        if (normalizeStatus(order.order_status || order.status) !== activeStatusFilter) return false;
-      }
-      if (searchQuery.trim()) {
-        const q     = searchQuery.toLowerCase();
-        const oId   = stripHtml(order.order_id   || order.id              || '').toLowerCase();
-        const cName = stripHtml(order.customer_name || order.customer_id  || '').toLowerCase();
-        const phone = stripHtml(order.customer_phone || order.phone       || order.contact_number || '').toLowerCase();
-        const area  = stripHtml(order.area || order.pincode || order.delivery_address || '').toLowerCase();
-        if (!oId.includes(q) && !cName.includes(q) && !phone.includes(q) && !area.includes(q)) return false;
-      }
-      if (slotFilter !== 'all') {
-        const slotStr = stripHtml(order.delivery_slot || order.slot || '').toLowerCase();
-        if (slotFilter === 'morning' && !slotStr.includes('morning')) return false;
-        if (slotFilter === 'evening' && !slotStr.includes('evening')) return false;
-      }
-      return true;
-    });
-  }, [rows, activeStatusFilter, searchQuery, slotFilter]);
+  const displayOrders = rows;
+
+  const paginationPills = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (page <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (page >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', page - 1, page, page + 1, '...', totalPages];
+  }, [page, totalPages]);
+
+  const startEntry = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endEntry = Math.min(page * pageSize, totalCount);
 
   // ── Loading skeleton ───────────────────────────────────────────────────
 
   if (loading) {
     return (
       <div className="space-y-3">
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-2xs">
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -589,8 +584,8 @@ export default function OrdersTable({
         <p className="text-sm font-semibold text-rose-700">{error}</p>
         <button
           type="button"
-          onClick={() => fetchOrders(page)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-lg border border-rose-200 transition-colors"
+          onClick={() => fetchOrders(page, pageSize)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-lg border border-rose-200 transition-colors cursor-pointer"
         >
           <RefreshCw size={13} /> Retry
         </button>
@@ -600,15 +595,15 @@ export default function OrdersTable({
 
   // ── Empty ─────────────────────────────────────────────────────────────
 
-  if (filtered.length === 0) {
+  if (displayOrders.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-14 bg-white rounded-xl border border-dashed border-gray-200 gap-3">
+      <div className="flex flex-col items-center justify-center p-14 bg-white rounded-xl border border-dashed border-gray-200 gap-3 shadow-2xs">
         <Package size={38} className="text-gray-300" />
         <p className="text-sm font-semibold text-gray-500">No orders found matching your filters.</p>
         <button
           type="button"
-          onClick={() => fetchOrders(page)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-lg border border-gray-200 transition-colors"
+          onClick={() => fetchOrders(page, pageSize)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-lg border border-gray-200 transition-colors cursor-pointer"
         >
           <RefreshCw size={13} /> Refresh
         </button>
@@ -635,7 +630,7 @@ export default function OrdersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map((order, idx) => {
+            {displayOrders.map((order, idx) => {
               const orderId      = stripHtml(order.order_id || order.id || '—');
               const customerName = stripHtml(order.customer_name || order.customer_id || 'Guest');
               const phone        = stripHtml(order.customer_phone || order.phone || order.contact_number || '');
@@ -762,7 +757,7 @@ export default function OrdersTable({
                     <button
                       type="button"
                       onClick={() => onViewOrder(order)}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 bg-white hover:bg-emerald-50 text-emerald-800 text-[11px] font-bold rounded-lg border border-emerald-200 hover:border-emerald-400 shadow-sm transition-all"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 bg-white hover:bg-emerald-50 text-emerald-800 text-[11px] font-bold rounded-lg border border-emerald-200 hover:border-emerald-400 shadow-sm transition-all cursor-pointer"
                     >
                       <Eye size={13} /> View
                     </button>
@@ -774,59 +769,146 @@ export default function OrdersTable({
         </table>
       </div>
 
-      {/* Pagination */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm text-xs font-medium text-gray-600">
-        <div>
-          Showing <span className="font-bold text-slate-900">{filtered.length}</span> rows on this page &nbsp;·&nbsp; Total <span className="font-bold text-slate-900">{totalCount}</span> orders &nbsp;·&nbsp; Page <span className="font-bold text-slate-900">{page}</span> of <span className="font-bold text-slate-900">{totalPages}</span>
+      {/* ── Enhanced Pagination Controls ── */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-gray-200/90 shadow-2xs text-xs text-slate-600 select-none">
+        {/* Left: Entries Info & Page Size */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 font-medium">
+            <span>Showing</span>
+            <span className="font-bold text-slate-900">{startEntry}</span>
+            <span>to</span>
+            <span className="font-bold text-slate-900">{endEntry}</span>
+            <span>of</span>
+            <span className="font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80">
+              {totalCount.toLocaleString('en-IN')}
+            </span>
+            <span>orders</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+            <span className="text-[11px] text-slate-400 font-semibold">Per page:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                const newSize = Number(e.target.value);
+                setPageSize(newSize);
+                setPage(1);
+              }}
+              className="h-7 px-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+            >
+              {[10, 20, 50, 100].map((sz) => (
+                <option key={sz} value={sz}>
+                  {sz}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Right: Page navigation pills + quick jump */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* First page button */}
+          <button
+            type="button"
+            onClick={() => setPage(1)}
+            disabled={page <= 1 || loading}
+            className="inline-flex items-center justify-center h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-35 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+            title="First Page"
+          >
+            « First
+          </button>
+
+          {/* Previous page button */}
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+            disabled={page <= 1 || loading}
+            className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-35 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+            title="Previous Page"
           >
             <ChevronLeft size={14} /> Prev
           </button>
 
-          {/* Page pills */}
+          {/* Page numbers with ellipsis */}
           <div className="hidden sm:flex items-center gap-1">
-            {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-              let pg: number;
-              if (totalPages <= 7) {
-                pg = i + 1;
-              } else if (page <= 4) {
-                pg = i + 1;
-              } else if (page >= totalPages - 3) {
-                pg = totalPages - 6 + i;
-              } else {
-                pg = page - 3 + i;
+            {paginationPills.map((pItem, idx) => {
+              if (pItem === '...') {
+                return (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-slate-400 font-bold select-none">
+                    …
+                  </span>
+                );
               }
+              const pgNum = Number(pItem);
+              const isCurrent = pgNum === page;
               return (
                 <button
-                  key={pg}
+                  key={pgNum}
                   type="button"
-                  onClick={() => setPage(pg)}
-                  className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-bold transition-colors ${
-                    pg === page
-                      ? 'bg-emerald-700 text-white border border-emerald-700 shadow-sm'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                  onClick={() => setPage(pgNum)}
+                  disabled={loading}
+                  className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    isCurrent
+                      ? 'bg-emerald-700 text-white border border-emerald-700 shadow-xs'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                   }`}
                 >
-                  {pg}
+                  {pgNum}
                 </button>
               );
             })}
           </div>
 
+          {/* Next page button */}
           <button
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+            disabled={page >= totalPages || loading}
+            className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-35 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+            title="Next Page"
           >
             Next <ChevronRight size={14} />
           </button>
+
+          {/* Last page button */}
+          <button
+            type="button"
+            onClick={() => setPage(totalPages)}
+            disabled={page >= totalPages || loading}
+            className="inline-flex items-center justify-center h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-35 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+            title="Last Page"
+          >
+            Last »
+          </button>
+
+          {/* Direct Page Jump (when > 5 pages) */}
+          {totalPages > 5 && (
+            <div className="flex items-center gap-1 pl-2 border-l border-slate-200">
+              <span className="text-[11px] text-slate-400 font-semibold">Go:</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                defaultValue={page}
+                key={page}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = Number((e.target as HTMLInputElement).value);
+                    if (val >= 1 && val <= totalPages) {
+                      setPage(val);
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  const val = Number(e.target.value);
+                  if (val >= 1 && val <= totalPages && val !== page) {
+                    setPage(val);
+                  }
+                }}
+                className="w-12 h-7 px-1.5 text-center bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+          )}
         </div>
       </div>
 

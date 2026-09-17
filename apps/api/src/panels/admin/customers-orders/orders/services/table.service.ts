@@ -161,6 +161,22 @@ export class OrdersTableService {
         });
       }
 
+      if (query.slot && query.slot !== 'all') {
+        conditions.push({
+          column: 'orders.delivery_slot',
+          operator: '=',
+          value: query.slot,
+        });
+      }
+
+      if (query.branch_id && query.branch_id !== 'all') {
+        conditions.push({
+          column: 'orders.branch_id',
+          operator: '=',
+          value: query.branch_id,
+        });
+      }
+
       const reqSet: ReqSet = {
         key: 'orders',
         table: 'orders',
