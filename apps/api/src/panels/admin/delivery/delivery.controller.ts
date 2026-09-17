@@ -360,8 +360,8 @@ export class DeliveryManagementController {
   }
 
   @Get('tracking/summary')
-  async getTrackingSummary(@Query('date') date?: string) {
-    return this.deliveryService.getTrackingSummary(date);
+  async getTrackingSummary(@Query() query?: any) {
+    return this.deliveryService.getTrackingSummary(query);
   }
 
   @Patch('orders/:orderId/status')

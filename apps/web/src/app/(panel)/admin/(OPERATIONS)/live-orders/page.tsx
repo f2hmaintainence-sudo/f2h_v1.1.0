@@ -295,13 +295,10 @@ export default function LiveOrdersPage() {
     return Array.from(m.entries()).map(([id, name]) => ({ id, name }));
   }, [allOrders]);
 
-  const filteredOrders = useMemo(() => {
+  const dimensionFilteredOrders = useMemo(() => {
     return allOrders.filter(o => {
-      if (statusFilter && o.status !== statusFilter) return false;
       if (branchFilter && o.branch_id !== branchFilter) return false;
       if (slotFilter && o.delivery_slot !== slotFilter) return false;
-      if (assignmentFilter === "assigned" && !o.delivery_partner_id) return false;
-      if (assignmentFilter === "unassigned" && o.delivery_partner_id) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         if (
@@ -316,7 +313,49 @@ export default function LiveOrdersPage() {
       }
       return true;
     });
-  }, [allOrders, statusFilter, branchFilter, slotFilter, assignmentFilter, searchQuery]);
+  }, [allOrders, branchFilter, slotFilter, searchQuery]);
+
+  const baseFilteredOrders = useMemo(() => {
+    return dimensionFilteredOrders.filter(o => {
+      if (assignmentFilter === "assigned" && !o.delivery_partner_id) return false;
+      if (assignmentFilter === "unassigned" && o.delivery_partner_id) return false;
+      return true;
+    });
+  }, [dimensionFilteredOrders, assignmentFilter]);
+
+  const filteredOrders = useMemo(() => {
+    if (!statusFilter) return baseFilteredOrders;
+    return baseFilteredOrders.filter(o => o.status === statusFilter);
+  }, [baseFilteredOrders, statusFilter]);
+
+  // Dynamic KPI insights computed directly from active filtered orders
+  const computedSummary = useMemo(() => {
+    const ordersForMetrics = baseFilteredOrders;
+    const total = ordersForMetrics.length;
+    const assigned = ordersForMetrics.filter(o => Boolean(o.delivery_partner_id)).length;
+    const unassigned = ordersForMetrics.filter(o => !o.delivery_partner_id && o.status !== "cancelled").length;
+    const in_transit = ordersForMetrics.filter(o => o.status === "out_for_delivery").length;
+    const delivered = ordersForMetrics.filter(o => o.status === "delivered").length;
+    const failed = ordersForMetrics.filter(o => o.status === "failed").length;
+    const cancelled = ordersForMetrics.filter(o => o.status === "cancelled").length;
+
+    const activePartnerIds = new Set(
+      ordersForMetrics
+        .filter(o => Boolean(o.delivery_partner_id))
+        .map(o => o.delivery_partner_id)
+    );
+
+    return {
+      total_orders: total,
+      assigned,
+      unassigned,
+      in_transit,
+      delivered,
+      failed,
+      cancelled,
+      active_partners: activePartnerIds.size,
+    };
+  }, [baseFilteredOrders]);
 
   // Reset pagination on filter change
   useEffect(() => {
@@ -349,17 +388,17 @@ export default function LiveOrdersPage() {
     }
   };
 
-  const tabs = [
-    { id: "", label: "All Orders", count: allOrders.length },
-    { id: "placed", label: "Placed", count: allOrders.filter(o => o.status === "placed").length },
-    { id: "confirmed", label: "Confirmed", count: allOrders.filter(o => o.status === "confirmed").length },
-    { id: "assigned", label: "Assigned", count: allOrders.filter(o => o.status === "assigned").length },
-    { id: "packed", label: "Packed", count: allOrders.filter(o => o.status === "packed").length },
-    { id: "out_for_delivery", label: "Out for Delivery", count: allOrders.filter(o => o.status === "out_for_delivery").length },
-    { id: "delivered", label: "Delivered", count: allOrders.filter(o => o.status === "delivered").length },
-    { id: "failed", label: "Failed", count: allOrders.filter(o => o.status === "failed").length },
-    { id: "cancelled", label: "Cancelled", count: allOrders.filter(o => o.status === "cancelled").length },
-  ];
+  const tabs = useMemo(() => [
+    { id: "", label: "All Orders", count: baseFilteredOrders.length },
+    { id: "placed", label: "Placed", count: baseFilteredOrders.filter(o => o.status === "placed").length },
+    { id: "confirmed", label: "Confirmed", count: baseFilteredOrders.filter(o => o.status === "confirmed").length },
+    { id: "assigned", label: "Assigned", count: baseFilteredOrders.filter(o => o.status === "assigned").length },
+    { id: "packed", label: "Packed", count: baseFilteredOrders.filter(o => o.status === "packed").length },
+    { id: "out_for_delivery", label: "Out for Delivery", count: baseFilteredOrders.filter(o => o.status === "out_for_delivery").length },
+    { id: "delivered", label: "Delivered", count: baseFilteredOrders.filter(o => o.status === "delivered").length },
+    { id: "failed", label: "Failed", count: baseFilteredOrders.filter(o => o.status === "failed").length },
+    { id: "cancelled", label: "Cancelled", count: baseFilteredOrders.filter(o => o.status === "cancelled").length },
+  ], [baseFilteredOrders]);
 
   const formattedToday = useMemo(() => {
     const d = new Date();
@@ -383,6 +422,98 @@ export default function LiveOrdersPage() {
       gst: toAmount(detailOrder?.gst_amount),
     };
   }, [detailOrder]);
+
+  const kpiCards = [
+    {
+      id: "total",
+      label: "Total",
+      value: computedSummary.total_orders,
+      cls: "bg-emerald-50 border-emerald-200 text-emerald-950",
+      activeRing: "ring-2 ring-emerald-600 border-emerald-500 shadow-sm",
+      isActive: !statusFilter && !assignmentFilter,
+      onClick: () => { setStatusFilter(""); setAssignmentFilter(""); },
+    },
+    {
+      id: "unassigned",
+      label: "Unassigned",
+      value: computedSummary.unassigned,
+      cls: computedSummary.unassigned > 0 ? "bg-amber-100/80 border-amber-300 text-amber-950" : "bg-amber-50 border-amber-200 text-amber-900",
+      activeRing: "ring-2 ring-amber-600 border-amber-500 shadow-sm",
+      isActive: assignmentFilter === "unassigned",
+      onClick: () => {
+        setAssignmentFilter(prev => prev === "unassigned" ? "" : "unassigned");
+        setStatusFilter("");
+      },
+    },
+    {
+      id: "assigned",
+      label: "Assigned",
+      value: computedSummary.assigned,
+      cls: "bg-teal-50 border-teal-200 text-teal-900",
+      activeRing: "ring-2 ring-teal-600 border-teal-500 shadow-sm",
+      isActive: assignmentFilter === "assigned",
+      onClick: () => {
+        setAssignmentFilter(prev => prev === "assigned" ? "" : "assigned");
+        setStatusFilter("");
+      },
+    },
+    {
+      id: "in_transit",
+      label: "In Transit",
+      value: computedSummary.in_transit,
+      cls: "bg-blue-50 border-blue-200 text-blue-900",
+      activeRing: "ring-2 ring-blue-600 border-blue-500 shadow-sm",
+      isActive: statusFilter === "out_for_delivery",
+      onClick: () => {
+        setStatusFilter(prev => prev === "out_for_delivery" ? "" : "out_for_delivery");
+      },
+    },
+    {
+      id: "delivered",
+      label: "Delivered",
+      value: computedSummary.delivered,
+      cls: "bg-green-50 border-green-200 text-green-900",
+      activeRing: "ring-2 ring-green-600 border-green-500 shadow-sm",
+      isActive: statusFilter === "delivered",
+      onClick: () => {
+        setStatusFilter(prev => prev === "delivered" ? "" : "delivered");
+      },
+    },
+    {
+      id: "failed",
+      label: "Failed",
+      value: computedSummary.failed,
+      cls: "bg-rose-50 border-rose-200 text-rose-900",
+      activeRing: "ring-2 ring-rose-600 border-rose-500 shadow-sm",
+      isActive: statusFilter === "failed",
+      onClick: () => {
+        setStatusFilter(prev => prev === "failed" ? "" : "failed");
+      },
+    },
+    {
+      id: "cancelled",
+      label: "Cancelled",
+      value: computedSummary.cancelled,
+      cls: "bg-slate-100 border-slate-200 text-slate-700",
+      activeRing: "ring-2 ring-slate-600 border-slate-400 shadow-sm",
+      isActive: statusFilter === "cancelled",
+      onClick: () => {
+        setStatusFilter(prev => prev === "cancelled" ? "" : "cancelled");
+      },
+    },
+    {
+      id: "active_partners",
+      label: "Active Boys",
+      value: computedSummary.active_partners,
+      cls: "bg-indigo-50 border-indigo-200 text-indigo-900",
+      activeRing: "ring-2 ring-indigo-600 border-indigo-500 shadow-sm",
+      isActive: assignmentFilter === "assigned" && !statusFilter,
+      onClick: () => {
+        setAssignmentFilter(prev => prev === "assigned" ? "" : "assigned");
+        setStatusFilter("");
+      },
+    },
+  ];
 
   return (
     <div className="space-y-4 p-3 md:p-5 max-w-[1400px] mx-auto">
@@ -414,7 +545,9 @@ export default function LiveOrdersPage() {
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-medium truncate">
-                {allOrders.length} orders loaded · <span className="text-emerald-600 font-bold">Live WebSockets</span>
+                {filteredOrders.length === allOrders.length
+                  ? `${allOrders.length} orders loaded`
+                  : `${filteredOrders.length} of ${allOrders.length} orders filtered`} · <span className="text-emerald-600 font-bold">Live WebSockets</span>
               </p>
             </div>
           </div>
@@ -468,26 +601,21 @@ export default function LiveOrdersPage() {
         </div>
       )}
 
-      {/* Light-themed KPI Cards */}
-      {summary && (
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-          {[
-            { l: "Total",      v: summary.total_orders,    cls: "bg-emerald-50 border-emerald-200 text-emerald-950" },
-            { l: "Unassigned", v: summary.unassigned,      cls: summary.unassigned > 0 ? "bg-amber-100/80 border-amber-300 text-amber-950" : "bg-amber-50 border-amber-200 text-amber-900" },
-            { l: "Assigned",   v: summary.assigned,        cls: "bg-teal-50 border-teal-200 text-teal-900" },
-            { l: "In Transit", v: summary.in_transit,      cls: "bg-blue-50 border-blue-200 text-blue-900" },
-            { l: "Delivered",  v: summary.delivered,       cls: "bg-green-50 border-green-200 text-green-900" },
-            { l: "Failed",     v: summary.failed,          cls: "bg-rose-50 border-rose-200 text-rose-900" },
-            { l: "Cancelled",  v: summary.cancelled,       cls: "bg-slate-100 border-slate-200 text-slate-700" },
-            { l: "Active Boys",v: summary.active_partners, cls: "bg-indigo-50 border-indigo-200 text-indigo-900" },
-          ].map(c => (
-            <div key={c.l} className={`${c.cls} rounded-xl border p-3 hover:scale-[1.02] transition-transform`}>
-              <p className="text-[9px] font-extrabold uppercase tracking-wider opacity-75">{c.l}</p>
-              <p className="text-xl font-black mt-0.5">{c.v ?? 0}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Light-themed KPI Cards — dynamic based on active filters */}
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+        {kpiCards.map(c => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={c.onClick}
+            className={`${c.cls} ${c.isActive ? c.activeRing : "hover:border-slate-300"} rounded-xl border p-3 text-left hover:scale-[1.02] transition-all cursor-pointer select-none focus:outline-none`}
+            title={`Filter by ${c.label}`}
+          >
+            <p className="text-[9px] font-extrabold uppercase tracking-wider opacity-75">{c.label}</p>
+            <p className="text-xl font-black mt-0.5">{c.value ?? 0}</p>
+          </button>
+        ))}
+      </div>
 
       {/* Filter Toolbar */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 space-y-2.5">

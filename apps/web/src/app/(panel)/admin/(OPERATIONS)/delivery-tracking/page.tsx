@@ -546,9 +546,19 @@ export default function DeliveryTrackingPage() {
     return new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
   }, []);
 
-  const onDutyCount = useMemo(() => {
-    return activePartners.filter(p => isPartnerOnDuty(p)).length;
-  }, [activePartners]);
+  const branchPartners = useMemo(() => {
+    return activePartners.filter(p => branchFilter === "all" || p.branch_id === branchFilter);
+  }, [activePartners, branchFilter]);
+
+  const branchOnDutyCount = useMemo(() => {
+    return branchPartners.filter(p => isPartnerOnDuty(p)).length;
+  }, [branchPartners]);
+
+  const branchOrders = useMemo(() => {
+    return orders.filter(o => branchFilter === "all" || o.branch_id === branchFilter);
+  }, [orders, branchFilter]);
+
+  const onDutyCount = branchOnDutyCount;
 
   return (
     <div className="space-y-4 p-4 md:p-6 max-w-[1600px] mx-auto">
@@ -603,11 +613,11 @@ export default function DeliveryTrackingPage() {
       {/* Light KPI Stats Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
         {[
-          { l: "Total Fleet", v: partners.length, sub: `${availableBranches.length} Branches`, cls: "bg-emerald-50 border-emerald-200 text-emerald-950", icon: Users },
-          { l: "On Duty (Online)", v: onDutyCount, sub: `${partners.length - onDutyCount} Offline`, cls: "bg-teal-50 border-teal-200 text-teal-950", icon: Truck },
-          { l: "In Transit", v: orders.filter(o => o.status === "out_for_delivery").length, sub: "En Route", cls: "bg-blue-50 border-blue-200 text-blue-950", icon: Navigation },
-          { l: "Delivered", v: orders.filter(o => o.status === "delivered").length, sub: "Completed Today", cls: "bg-green-50 border-green-200 text-green-950", icon: CheckCircle2 },
-          { l: "Pending", v: orders.filter(o => o.status === "confirmed" || o.status === "placed").length, sub: "Queued", cls: "bg-amber-50 border-amber-200 text-amber-950", icon: Clock },
+          { l: "Total Fleet", v: branchPartners.length, sub: branchFilter === "all" ? `${availableBranches.length} Branches` : "Selected Branch", cls: "bg-emerald-50 border-emerald-200 text-emerald-950", icon: Users },
+          { l: "On Duty (Online)", v: branchOnDutyCount, sub: `${branchPartners.length - branchOnDutyCount} Offline`, cls: "bg-teal-50 border-teal-200 text-teal-950", icon: Truck },
+          { l: "In Transit", v: branchOrders.filter(o => o.status === "out_for_delivery").length, sub: "En Route", cls: "bg-blue-50 border-blue-200 text-blue-950", icon: Navigation },
+          { l: "Delivered", v: branchOrders.filter(o => o.status === "delivered").length, sub: "Completed Today", cls: "bg-green-50 border-green-200 text-green-950", icon: CheckCircle2 },
+          { l: "Pending", v: branchOrders.filter(o => o.status === "confirmed" || o.status === "placed").length, sub: "Queued", cls: "bg-amber-50 border-amber-200 text-amber-950", icon: Clock },
           { l: "On-Time Rate", v: "98.4%", sub: "SLA Target 95%", cls: "bg-indigo-50 border-indigo-200 text-indigo-950", icon: Award },
         ].map(c => (
           <div key={c.l} className={`${c.cls} rounded-xl border p-3 flex items-center gap-2.5 hover:scale-[1.01] transition-transform`}>

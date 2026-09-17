@@ -129,6 +129,10 @@ export default function TodayOrdersClient({
       if (selectedDate) qp.set('date', selectedDate);
       if (fromDate)     qp.set('fromDate', fromDate);
       if (toDate)       qp.set('toDate', toDate);
+      if (activeTab === 'subscription') qp.set('order_source', 'subscription');
+      if (activeTab === 'one-time')     qp.set('order_source', 'one-time');
+      if (slotFilter && slotFilter !== 'all') qp.set('slot', slotFilter);
+      if (searchQuery.trim()) qp.set('search', searchQuery.trim());
       const qs = qp.toString() ? `?${qp}` : '';
       const result = await apiClient.get<any>(`/admin/orders/${summaryPath}${qs}`);
       const payload = result?.data?.data ?? result?.data;
@@ -138,7 +142,7 @@ export default function TodayOrdersClient({
     } catch { /* silent */ } finally {
       setSummaryLoading(false);
     }
-  }, [fromDate, scope, selectedDate, showDashboard, toDate]);
+  }, [activeTab, fromDate, scope, searchQuery, selectedDate, showDashboard, slotFilter, toDate]);
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 

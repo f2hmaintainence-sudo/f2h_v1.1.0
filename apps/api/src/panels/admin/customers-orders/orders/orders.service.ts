@@ -187,6 +187,25 @@ export class OrdersService {
         where.push(`status = $${params.length}`);
       }
 
+      if (query.slot && query.slot !== 'all') {
+        params.push(query.slot);
+        where.push(`delivery_slot = $${params.length}`);
+      }
+
+      if (query.branch_id && query.branch_id !== 'all') {
+        params.push(query.branch_id);
+        where.push(`branch_id = $${params.length}`);
+      }
+
+      if (query.search && String(query.search).trim()) {
+        params.push(`%${String(query.search).trim().toLowerCase()}%`);
+        where.push(`(
+          LOWER(order_id) LIKE $${params.length}
+          OR LOWER(customer_name) LIKE $${params.length}
+          OR contact_number LIKE $${params.length}
+        )`);
+      }
+
       const sql = `
         SELECT
           COUNT(*)::int                                              AS total_orders,

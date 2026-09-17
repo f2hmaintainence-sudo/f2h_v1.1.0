@@ -586,9 +586,37 @@ export class DeliveryManagementService {
     }
   }
 
-  async getTrackingSummary(date?: string) {
+  async getTrackingSummary(queryOrDate?: any) {
     try {
-      const targetDate = date || todayIST();
+      const query = typeof queryOrDate === 'string' ? { date: queryOrDate } : (queryOrDate || {});
+      const targetDate = query.date || todayIST();
+
+      const params: any[] = [targetDate];
+      const where: string[] = ['scheduled_date = $1'];
+
+      if (query.branch_id && query.branch_id !== 'all') {
+        params.push(query.branch_id);
+        where.push(`branch_id = $${params.length}`);
+      }
+
+      if (query.slot && query.slot !== 'all') {
+        params.push(query.slot);
+        where.push(`delivery_slot = $${params.length}`);
+      }
+
+      if (query.partner_id && query.partner_id !== 'all') {
+        params.push(query.partner_id);
+        where.push(`delivery_partner_id = $${params.length}`);
+      }
+
+      if (query.search && query.search.trim()) {
+        params.push(`%${query.search.trim().toLowerCase()}%`);
+        where.push(`(
+          LOWER(order_id) LIKE $${params.length}
+          OR LOWER(customer_name) LIKE $${params.length}
+          OR contact_number LIKE $${params.length}
+        )`);
+      }
 
       const sql = `
         SELECT
@@ -601,9 +629,9 @@ export class DeliveryManagementService {
           COUNT(*) FILTER (WHERE status = 'cancelled')::int          AS cancelled,
           COUNT(DISTINCT delivery_partner_id)::int                   AS active_partners
         FROM orders
-        WHERE scheduled_date = $1
+        WHERE ${where.join(' AND ')}
       `;
-      const rows = await this.db.query(sql, [targetDate]);
+      const rows = await this.db.query(sql, params);
 
       return {
         status: true,
