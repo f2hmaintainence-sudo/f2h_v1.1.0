@@ -62,8 +62,8 @@ export class DeliveryOrderService {
         `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' AND deleted_at IS NULL LIMIT 1`,
       );
       const deliveryRules = configRes?.[0]?.config_data || {};
-      const enableRadiusCheck = deliveryRules.enable_delivery_radius_check === true;
-      const maxRadiusMeters = Number(deliveryRules.delivery_radius_meters ?? 500);
+      const enableRadiusCheck = deliveryRules.enable_delivery_radius_check !== false;
+      const maxRadiusMeters = Number(deliveryRules.delivery_radius_meters ?? 100);
 
       // If geofence verification is disabled in system config, bypass completely
       if (!enableRadiusCheck || maxRadiusMeters <= 0) {
@@ -124,20 +124,18 @@ export class DeliveryOrderService {
       }
 
       if (isNaN(partnerLat) || isNaN(partnerLng) || (partnerLat === 0 && partnerLng === 0)) {
-        this.developer.warn('Delivery location verification: GPS coordinates missing, allowing delivery', {
-          partnerId: boy.user_id,
-          orderId,
-          addressId,
-        });
-        return;
+        throw new BadRequestException(
+          'Location required: Please enable device GPS location permission to verify doorstep delivery.',
+        );
       }
 
-      // 3. Compute distance and log geofence verification
+      // 3. Compute distance and enforce geo-fence radius
       const distanceMeters = this.getDistanceMeters(partnerLat, partnerLng, destLat, destLng);
       const roundedDist = Math.round(distanceMeters);
 
       if (distanceMeters > maxRadiusMeters) {
-        this.developer.warn('Delivery completed outside configured radius (permitted by policy)', {
+        const distKmOrM = roundedDist >= 1000 ? `${(roundedDist / 1000).toFixed(1)} km` : `${roundedDist} m`;
+        this.developer.warn('Delivery blocked: partner outside configured radius', {
           partnerId: boy.user_id,
           orderId,
           addressId,
@@ -148,17 +146,24 @@ export class DeliveryOrderService {
           destLat,
           destLng,
         });
-      } else {
-        this.developer.log('Delivery doorstep radius verified', {
-          partnerId: boy.user_id,
-          orderId,
-          addressId,
-          distanceMeters: roundedDist,
-          maxRadiusMeters,
-        });
+        throw new BadRequestException(
+          `Delivery outside permitted radius: You are ${distKmOrM} away from the customer address. You must be within ${maxRadiusMeters}m of the delivery location to complete delivery.`,
+        );
       }
+
+      this.developer.log('Delivery doorstep radius verified', {
+        partnerId: boy.user_id,
+        orderId,
+        addressId,
+        distanceMeters: roundedDist,
+        maxRadiusMeters,
+      });
     } catch (err) {
+      if (err instanceof BadRequestException) {
+        throw err;
+      }
       this.developer.error('validateDeliveryRadius error', { error: err });
+      throw err;
     }
   }
 

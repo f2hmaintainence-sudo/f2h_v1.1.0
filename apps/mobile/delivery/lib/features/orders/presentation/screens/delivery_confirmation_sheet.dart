@@ -9,6 +9,7 @@ import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/services/location_service.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -94,6 +95,12 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   bool _isLoadingQr = false;
   Timer? _paymentPollTimer;
 
+  // Doorstep Geofence Verification State
+  bool _isCheckingGps = true;
+  double? _distanceMeters;
+  bool _isOutOfRadius = false;
+  static const double _kMaxAllowedRadiusMeters = 100.0; // Strict 100m doorstep verification
+
   final Map<String, ContainerItemState> _containerStates = {};
 
   @override
@@ -105,6 +112,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   @override
   void initState() {
     super.initState();
+    _checkGpsRadius();
     if (widget.stop.isCod && widget.stop.codAmount > 0) {
       _fetchPaymentQr();
     }
@@ -255,7 +263,169 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     } catch (_) {}
   }
 
+  Future<void> _checkGpsRadius({bool showFeedback = false}) async {
+    final destLat = widget.stop.addressLat;
+    final destLng = widget.stop.addressLng;
+
+    // If destination coordinates are not configured in DB, allow delivery gracefully
+    if (destLat == 0 && destLng == 0) {
+      if (mounted) {
+        setState(() {
+          _isCheckingGps = false;
+          _isOutOfRadius = false;
+          _distanceMeters = null;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isCheckingGps = true;
+        _gpsStatusText = 'Checking GPS position...';
+      });
+    }
+
+    try {
+      final loc = sl<LocationService>();
+      final pos = await loc.getCurrentPosition();
+      if (pos == null) {
+        if (mounted) {
+          setState(() {
+            _isCheckingGps = false;
+            _gpsStatusText = 'Could not acquire GPS position. Please turn on location services.';
+          });
+        }
+        return;
+      }
+
+      final distKm = loc.haversineDistanceKm(pos.latitude, pos.longitude, destLat, destLng);
+      final distMeters = distKm * 1000.0;
+      final isOut = distMeters > _kMaxAllowedRadiusMeters;
+
+      if (mounted) {
+        setState(() {
+          _isCheckingGps = false;
+          _distanceMeters = distMeters;
+          _isOutOfRadius = isOut;
+          _gpsStatusText = null;
+        });
+
+        if (showFeedback) {
+          if (isOut) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Still out of delivery radius (${_formatDistance(distMeters)} away). Must be within 100m.',
+                ),
+                backgroundColor: const Color(0xFFDC2626),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Doorstep location verified! You are within the 100m delivery radius.'),
+                backgroundColor: Color(0xFF16A34A),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingGps = false;
+          _gpsStatusText = 'Location check error: $e';
+        });
+      }
+    }
+  }
+
+  String _formatDistance(double meters) {
+    if (meters >= 1000) {
+      return '${(meters / 1000).toStringAsFixed(1)} km';
+    }
+    return '${meters.toStringAsFixed(0)} m';
+  }
+
+  void _showOutOfRadiusDialog() {
+    final distStr = _distanceMeters != null ? _formatDistance(_distanceMeters!) : 'Unknown distance';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Out of Delivery Radius',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Doorstep geofence enforcement is active. You are currently $distStr away from ${widget.stop.customerName}\'s delivery location.',
+              style: const TextStyle(fontSize: 13.5, color: kText, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: const Text(
+                'Maximum allowed distance is 100 meters. Please reach the customer doorstep before confirming arrival.',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF991B1B)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (widget.stop.addressLat != 0 && widget.stop.addressLng != 0)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                sl<LocationService>().openNavigation(
+                  widget.stop.addressLat,
+                  widget.stop.addressLng,
+                );
+              },
+              icon: const Icon(Icons.navigation_rounded, size: 16),
+              label: const Text('Navigate'),
+            ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _checkGpsRadius(showFeedback: true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Re-check GPS'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _nextStep() {
+    if (_currentStep == 1 && _isOutOfRadius) {
+      _showOutOfRadiusDialog();
+      return;
+    }
     if (_currentStep < 5) {
       setState(() {
         _currentStep++;
@@ -329,6 +499,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   }
 
   void _triggerSuccess() {
+    if (_isOutOfRadius) {
+      _showOutOfRadiusDialog();
+      return;
+    }
+
     final sessionState = context.read<DeliverySessionBloc>().state is DeliverySessionLoaded
         ? context.read<DeliverySessionBloc>().state as DeliverySessionLoaded
         : null;
@@ -591,6 +766,145 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ),
         const SizedBox(height: 20),
 
+        // Geofence Warning Banner if Out of Radius
+        if (_isOutOfRadius && _distanceMeters != null) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFDC2626),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.location_off_rounded, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'OUT OF DELIVERY RADIUS (${_formatDistance(_distanceMeters!)})',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13.5,
+                              color: Color(0xFF991B1B),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Doorstep Geofence is ACTIVE (Max 100m)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'You are currently ${_formatDistance(_distanceMeters!)} away from ${widget.stop.customerName}\'s delivery location. You must be at the customer\'s doorstep (within 100m) to confirm arrival and complete delivery.',
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF7F1D1D), height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    if (widget.stop.addressLat != 0 && widget.stop.addressLng != 0) ...[
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            sl<LocationService>().openNavigation(
+                              widget.stop.addressLat,
+                              widget.stop.addressLng,
+                            );
+                          },
+                          icon: const Icon(Icons.navigation_rounded, size: 16, color: Colors.white),
+                          label: const Text(
+                            'Navigate via Maps',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1D4ED8),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isCheckingGps ? null : () => _checkGpsRadius(showFeedback: true),
+                        icon: _isCheckingGps
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)),
+                              )
+                            : const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFFDC2626)),
+                        label: Text(
+                          _isCheckingGps ? 'Checking...' : 'Re-check GPS',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFFDC2626)),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFF87171), width: 1.2),
+                          backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ] else if (_distanceMeters != null) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF86EFAC)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.verified_rounded, color: Color(0xFF16A34A), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Doorstep Verified: Within ${_formatDistance(_distanceMeters!)} (Max Radius: 100m)',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      color: Color(0xFF15803D),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
         // Customer Info Card
         Container(
           padding: const EdgeInsets.all(16),
@@ -636,22 +950,27 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         const SizedBox(height: 8),
 
         ElevatedButton(
-          onPressed: _nextStep,
+          onPressed: _isOutOfRadius ? _showOutOfRadiusDialog : _nextStep,
           style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimary,
+            backgroundColor: _isOutOfRadius ? const Color(0xFFDC2626) : kPrimary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 2,
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.check_circle_outline_rounded, size: 20),
-              SizedBox(width: 8),
+              Icon(
+                _isOutOfRadius ? Icons.location_off_rounded : Icons.check_circle_outline_rounded,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
               Text(
-                'ARRIVED AT LOCATION →',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                _isOutOfRadius
+                    ? 'OUT OF RADIUS (${_formatDistance(_distanceMeters ?? 0)})'
+                    : 'ARRIVED AT LOCATION →',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
               ),
             ],
           ),
