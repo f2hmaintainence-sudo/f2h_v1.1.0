@@ -22,12 +22,14 @@ import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_customer/app.dart';
 
 enum MapLayerType { googleRoadmap, googleSatellite, googleTerrain }
 
 class AddAddressScreen extends StatefulWidget {
   final AddressModel? existing;
-  const AddAddressScreen({this.existing, super.key});
+  final bool isInitialSetup;
+  const AddAddressScreen({this.existing, this.isInitialSetup = false, super.key});
 
   @override
   State<AddAddressScreen> createState() => _AddAddressScreenState();
@@ -1065,12 +1067,20 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         }
         await sessionCubit.refresh();
         if (mounted) {
-          Navigator.pop(context);
+          if (widget.isInitialSetup || !Navigator.canPop(context)) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
+              (route) => false,
+            );
+          } else {
+            Navigator.pop(context);
+          }
           F2HToast.success(
             context,
             widget.existing != null
                 ? 'Address updated successfully'
-                : 'Address added successfully',
+                : 'Delivery address added successfully',
           );
         }
       } catch (e) {
@@ -1335,24 +1345,31 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       appBar: AppBar(
         backgroundColor: kSurface,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: kText, size: 20),
-          onPressed: () {
-            if (_isMapExpanded && !isEdit) {
-              Navigator.pop(context);
-            } else if (_isMapExpanded && isEdit) {
-              setState(() {
-                _isMapExpanded = false;
-              });
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
+        automaticallyImplyLeading: !widget.isInitialSetup,
+        leading: (widget.isInitialSetup && !_isMapExpanded)
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: kText, size: 20),
+                onPressed: () {
+                  if (_isMapExpanded && (!isEdit || widget.isInitialSetup)) {
+                    setState(() {
+                      _isMapExpanded = false;
+                    });
+                  } else if (_isMapExpanded && isEdit) {
+                    setState(() {
+                      _isMapExpanded = false;
+                    });
+                  } else if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  }
+                },
+              ),
         title: Text(
           _isMapExpanded
               ? 'Pin Location on Google Map'
-              : (isEdit ? 'Modify Address' : 'New Address Details'),
+              : (isEdit
+                  ? 'Modify Address'
+                  : (widget.isInitialSetup ? 'Set Delivery Location' : 'New Address Details')),
           style: const TextStyle(
             color: kText,
             fontSize: 17,

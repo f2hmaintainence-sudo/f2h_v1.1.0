@@ -267,13 +267,6 @@ class _SignupScreenState extends State<SignupScreen> {
             title: 'Create your F2H account',
             subtitle: 'Sign up to get fresh dairy delivered daily',
             showBack: true,
-            heroAction: AuthSkipButton(
-              onTap: () => Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const AppShell()),
-                (route) => false,
-              ),
-            ),
             children: [
               AuthField(
                 controller: _phoneController,

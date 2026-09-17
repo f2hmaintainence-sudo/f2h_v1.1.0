@@ -99,18 +99,6 @@ class _LoginScreenState extends State<LoginScreen> {
     context.read<AuthBloc>().add(const GoogleSignInRequested());
   }
 
-  void _onSkip() {
-    if (widget.popOnSuccess) {
-      Navigator.pop(context, false);
-    } else {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const AppShell()),
-        (route) => false,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
@@ -144,7 +132,6 @@ class _LoginScreenState extends State<LoginScreen> {
           return AuthScaffold(
             title: 'Welcome to F2H Fresh!',
             subtitle: 'Login to access fresh dairy & more!',
-            heroAction: AuthSkipButton(onTap: _onSkip),
             children: [
               AuthField(
                 controller: _usernameController,

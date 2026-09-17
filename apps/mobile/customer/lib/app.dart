@@ -12,7 +12,6 @@ import 'package:f2h_customer/features/catalog/presentation/screens/product_detai
 import 'package:f2h_customer/features/subscription/presentation/screens/my_subscriptions_screen.dart'; // Contains SubsScreen
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
-import 'package:f2h_customer/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
@@ -38,6 +37,7 @@ import 'package:f2h_customer/core/services/notification_service.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_customer/core/widgets/force_update_gate.dart';
 import 'package:f2h_customer/core/payments/payment_recovery_service.dart';
+import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
 
 class F2HApp extends StatelessWidget {
   const F2HApp({super.key});
@@ -165,11 +165,17 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
       builder: (context, state) {
         if (state.status == CustomerSessionStatus.ready ||
             state.status == CustomerSessionStatus.cached) {
+          if (state.addresses.isEmpty) {
+            return const AddAddressScreen(isInitialSetup: true);
+          }
           return const AppShell();
         }
 
         if (state.status == CustomerSessionStatus.failure) {
           if (state.hasUsableData) {
+            if (state.addresses.isEmpty) {
+              return const AddAddressScreen(isInitialSetup: true);
+            }
             return const AppShell();
           }
 
@@ -272,7 +278,6 @@ class AppShell extends StatefulWidget {
 
 class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _i = AppShell.activeTab;
-  late final PageController _pageController;
   String? _pendingCategory;
   String? _pendingProductId;
   String? _pendingProductName;
