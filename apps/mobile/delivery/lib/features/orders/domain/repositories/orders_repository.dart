@@ -14,6 +14,8 @@ abstract class OrdersRepository {
     String? paymentMode,
     String? paymentStatus,
     String? deliveryImage,
+    double? latitude,
+    double? longitude,
     List<Map<String, dynamic>>? containerReturns,
     List<Map<String, dynamic>>? containerDeliveries,
   });

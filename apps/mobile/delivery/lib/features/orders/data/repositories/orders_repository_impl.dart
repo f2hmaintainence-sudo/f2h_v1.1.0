@@ -80,6 +80,8 @@ class OrdersRepositoryImpl implements OrdersRepository {
     String? paymentMode,
     String? paymentStatus,
     String? deliveryImage,
+    double? latitude,
+    double? longitude,
     List<Map<String, dynamic>>? containerReturns,
     List<Map<String, dynamic>>? containerDeliveries,
   }) async {
@@ -104,6 +106,8 @@ class OrdersRepositoryImpl implements OrdersRepository {
           if (paymentMode != null) 'payment_mode': paymentMode,
           if (paymentStatus != null) 'payment_status': paymentStatus,
           if (resolvedImageUrl != null) 'delivery_image': resolvedImageUrl,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
           if (containerReturns != null) 'container_returns': containerReturns,
           if (containerDeliveries != null) 'container_deliveries': containerDeliveries,
         },

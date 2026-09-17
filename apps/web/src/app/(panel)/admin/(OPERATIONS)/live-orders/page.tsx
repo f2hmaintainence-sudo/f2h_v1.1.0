@@ -261,9 +261,9 @@ export default function LiveOrdersPage() {
 
   // Fetch partners once
   useEffect(() => {
-    api.get<any>("/admin/delivery/partners?limit=200").then(res => {
+    api.get<any>("/admin/delivery/partners?status=active&limit=200").then(res => {
       const list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
-      setPartners(list);
+      setPartners(list.filter((p: any) => p.is_active !== false));
     }).catch(() => {});
   }, []);
 

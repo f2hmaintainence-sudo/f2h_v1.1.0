@@ -40,6 +40,110 @@ export class DeliveryOrderService {
     return `${backendUrl}${cleaned}`;
   }
 
+  private getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371000; // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private async validateDeliveryRadius(
+    boy: any,
+    addressId: string,
+    orderId?: string,
+    body?: any,
+  ): Promise<void> {
+    try {
+      const configRes = await this.db.query(
+        `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' AND deleted_at IS NULL LIMIT 1`,
+      );
+      const deliveryRules = configRes?.[0]?.config_data || {};
+      const enableRadiusCheck = deliveryRules.enable_delivery_radius_check !== false;
+      const maxRadiusMeters = Number(deliveryRules.delivery_radius_meters ?? 500);
+
+      if (!enableRadiusCheck || maxRadiusMeters <= 0) {
+        return;
+      }
+
+      // 1. Resolve customer destination coordinates
+      let destLat: number | null = null;
+      let destLng: number | null = null;
+
+      if (addressId) {
+        const addrRes = await this.db.query(
+          `SELECT latitude, longitude FROM customer_addresses WHERE address_id = $1 OR id::text = $1 LIMIT 1`,
+          [addressId],
+        );
+        if (addrRes?.[0]?.latitude != null && addrRes?.[0]?.longitude != null) {
+          const parsedLat = Number(addrRes[0].latitude);
+          const parsedLng = Number(addrRes[0].longitude);
+          if (!isNaN(parsedLat) && !isNaN(parsedLng) && (parsedLat !== 0 || parsedLng !== 0)) {
+            destLat = parsedLat;
+            destLng = parsedLng;
+          }
+        }
+      }
+
+      if ((destLat == null || destLng == null) && orderId) {
+        const ordAddrRes = await this.db.query(
+          `SELECT ca.latitude, ca.longitude
+           FROM orders o
+           JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::text = o.address_id)
+           WHERE o.order_id = $1 OR o.id::text = $1 LIMIT 1`,
+          [orderId],
+        );
+        if (ordAddrRes?.[0]?.latitude != null && ordAddrRes?.[0]?.longitude != null) {
+          const parsedLat = Number(ordAddrRes[0].latitude);
+          const parsedLng = Number(ordAddrRes[0].longitude);
+          if (!isNaN(parsedLat) && !isNaN(parsedLng) && (parsedLat !== 0 || parsedLng !== 0)) {
+            destLat = parsedLat;
+            destLng = parsedLng;
+          }
+        }
+      }
+
+      // If customer address does not have geo coordinates recorded in database, allow delivery gracefully
+      if (destLat == null || destLng == null) {
+        return;
+      }
+
+      // 2. Resolve partner current GPS coordinates
+      let partnerLat = Number(body?.latitude ?? body?.lat);
+      let partnerLng = Number(body?.longitude ?? body?.lng);
+
+      if (isNaN(partnerLat) || isNaN(partnerLng) || (partnerLat === 0 && partnerLng === 0)) {
+        if (boy.current_lat != null && boy.current_lng != null) {
+          partnerLat = Number(boy.current_lat);
+          partnerLng = Number(boy.current_lng);
+        }
+      }
+
+      if (isNaN(partnerLat) || isNaN(partnerLng) || (partnerLat === 0 && partnerLng === 0)) {
+        throw new BadRequestException(
+          'Location required: Please enable device GPS location permission to verify doorstep delivery.',
+        );
+      }
+
+      // 3. Compute distance and verify geo-fence radius
+      const distanceMeters = this.getDistanceMeters(partnerLat, partnerLng, destLat, destLng);
+      if (distanceMeters > maxRadiusMeters) {
+        const roundedDist = Math.round(distanceMeters);
+        throw new BadRequestException(
+          `Delivery outside permitted radius: You are ${roundedDist}m away from the customer address. You must be within ${maxRadiusMeters}m of the delivery location to complete delivery.`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) {
+        throw err;
+      }
+      this.developer.error('validateDeliveryRadius error', { error: err });
+    }
+  }
+
   async resolveDeliveryPartner(userId: string) {
     // delivery_partners has no surrogate `id` and no separate `user_id` — the
     // partner is keyed by delivery_partner_id, which is also the users.user_id.
@@ -1081,6 +1185,7 @@ export class DeliveryOrderService {
           'Cannot deliver order: Warehouse dispatch has not been confirmed yet. Please verify and confirm dispatch pickup first.',
         );
       }
+      await this.validateDeliveryRadius(boy, addressId, body.order_id || stopsRes[0]?.order_id, body);
     }
 
     await this.db.transaction(async (client) => {
@@ -1522,6 +1627,10 @@ export class DeliveryOrderService {
 
     const norm = this.normalizeDeliveryBody(body);
     const status = body.status || 'delivered';
+
+    if (status === 'delivered') {
+      await this.validateDeliveryRadius(boy, order.address_id, orderId, body);
+    }
 
     await this.db.transaction(async (client) => {
       // Issue containers FIRST so the balance exists before collection check

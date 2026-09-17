@@ -3,6 +3,8 @@ import 'package:f2h_delivery/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_delivery/core/auth/google_auth_client.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
+import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/services/location_tracking_service.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository authRepository;
@@ -67,6 +69,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onLogoutRequested(LogoutRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
+      try {
+        await sl<LocationTrackingService>().stopTracking();
+      } catch (_) {}
       await authRepository.logout();
       emit(const Unauthenticated());
     } catch (e) {

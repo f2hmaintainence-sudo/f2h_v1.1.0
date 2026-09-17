@@ -71,7 +71,7 @@ function getSlotValidationErrors(slot: any, slotName: string): string[] {
 }
 
 export default function SystemConfigPage() {
-  const [activeTab, setActiveTab] = useState<"slots" | "crons" | "ordering">("slots");
+  const [activeTab, setActiveTab] = useState<"slots" | "crons" | "delivery" | "ordering">("slots");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -142,8 +142,8 @@ export default function SystemConfigPage() {
   });
 
   const [deliveryRules, setDeliveryRules] = useState({
-    base_delivery_fee: 39.0,
-    free_delivery_threshold: 199.0,
+    base_delivery_fee: 0.0,
+    free_delivery_threshold: 0.0,
     free_delivery_for_subscriptions: true,
     free_delivery_first_order: true,
     surge_fee_enabled: false,
@@ -152,7 +152,9 @@ export default function SystemConfigPage() {
     container_deposit_fee: 0.0,
     currency: "INR",
     currency_symbol: "₹",
-    display_notes: "Zero delivery fee on all active daily subscriptions. Standard delivery fee applies on single orders below ₹199.",
+    display_notes: "Free delivery on all orders.",
+    delivery_radius_meters: 500,
+    enable_delivery_radius_check: true,
   });
 
   const [orderRules, setOrderRules] = useState({
@@ -360,14 +362,18 @@ export default function SystemConfigPage() {
         <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
           <div className="absolute top-0 left-0 right-0 h-1 bg-purple-500" />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">DELIVERY CHARGES</span>
+            <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">DELIVERY RADIUS</span>
             <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <ShieldCheck size={16} />
+              <Truck size={16} />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-emerald-700">Always ₹0</div>
-            <p className="text-[11px] font-medium text-slate-400 mt-0.5">100% Free delivery on all orders</p>
+            <div className="text-2xl font-black text-slate-800">
+              {deliveryRules.delivery_radius_meters || 500}m
+            </div>
+            <p className="text-[11px] font-medium text-emerald-600 mt-0.5 font-bold">
+              {deliveryRules.enable_delivery_radius_check ? "✓ Geofence Enforced" : "Geofence Optional"}
+            </p>
           </div>
         </div>
       </div>
@@ -376,11 +382,10 @@ export default function SystemConfigPage() {
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         <button
           onClick={() => setActiveTab("slots")}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeTab === "slots"
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "slots"
               ? "bg-emerald-600 text-white shadow-sm"
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+            }`}
         >
           <Clock size={15} />
           Slot Cutoffs & Cron Schedules
@@ -388,23 +393,32 @@ export default function SystemConfigPage() {
 
         <button
           onClick={() => setActiveTab("crons")}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeTab === "crons"
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "crons"
               ? "bg-emerald-600 text-white shadow-sm"
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+            }`}
         >
           <Zap size={15} />
           Background Automated Crons
         </button>
 
         <button
-          onClick={() => setActiveTab("ordering")}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeTab === "ordering"
+          onClick={() => setActiveTab("delivery")}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "delivery"
               ? "bg-emerald-600 text-white shadow-sm"
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+            }`}
+        >
+          <Truck size={15} />
+          Delivery Radius &amp; Geofencing
+        </button>
+
+        <button
+          onClick={() => setActiveTab("ordering")}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === "ordering"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
         >
           <Calendar size={15} />
           Customer Ordering Limits
@@ -527,7 +541,7 @@ export default function SystemConfigPage() {
                   {/* Cron Execution Time */}
                   <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>Delivery Run Generation Cron Time</span>
+                      <span>Orders Confirmation Cron Time</span>
                       <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
                         Automated Cron
                       </span>
@@ -898,9 +912,8 @@ export default function SystemConfigPage() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-slate-800">{cron.name}</h3>
                     <span
-                      className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                        cron.is_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
-                      }`}
+                      className={`text-[10px] font-black px-2 py-0.5 rounded-full ${cron.is_enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
+                        }`}
                     >
                       {cron.is_enabled ? "ACTIVE" : "PAUSED"}
                     </span>
@@ -947,7 +960,208 @@ export default function SystemConfigPage() {
         </div>
       )}
 
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* TAB 3: DELIVERY RADIUS & GEOFENCING RULES */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === "delivery" && (
+        <div className="space-y-6 max-w-4xl">
+          <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 flex items-start gap-3">
+            <Info className="text-emerald-700 w-5 h-5 shrink-0 mt-0.5" />
+            <div className="text-xs text-emerald-900 leading-relaxed">
+              <span className="font-bold">Doorstep Delivery Geofencing: </span>
+              Configure the maximum allowed distance radius between the delivery partner&apos;s real-time GPS location and the customer&apos;s delivery address. When enabled, partners can <b>only mark an order as delivered</b> when they are physically within this radius.
+            </div>
+          </div>
 
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Truck className="text-emerald-600 w-4 h-4" />
+              Delivery Radius &amp; Doorstep Verification Controls
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Radius Input */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Maximum Delivery Radius (Meters)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="50"
+                    min="50"
+                    max="10000"
+                    value={deliveryRules.delivery_radius_meters || 500}
+                    onChange={(e) =>
+                      setDeliveryRules({
+                        ...deliveryRules,
+                        delivery_radius_meters: parseInt(e.target.value, 10) || 500,
+                      })
+                    }
+                    className="flex-1 text-xs font-bold px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  />
+                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-2.5 rounded-xl border border-slate-200">
+                    {((deliveryRules.delivery_radius_meters || 500) / 1000).toFixed(2)} km
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Partner must be within this distance from the customer coordinates to complete delivery.
+                </p>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {[
+                    { label: "100m (Doorstep)", value: 100 },
+                    { label: "250m (Building)", value: 250 },
+                    { label: "500m (Standard)", value: 500 },
+                    { label: "1000m (1 km)", value: 1000 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() =>
+                        setDeliveryRules({
+                          ...deliveryRules,
+                          delivery_radius_meters: preset.value,
+                        })
+                      }
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all ${deliveryRules.delivery_radius_meters === preset.value
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Geofence Enforcement Toggle */}
+              <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-800">
+                      Enforce Geofence Verification
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={deliveryRules.enable_delivery_radius_check !== false}
+                        onChange={(e) =>
+                          setDeliveryRules({
+                            ...deliveryRules,
+                            enable_delivery_radius_check: e.target.checked,
+                          })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                    {deliveryRules.enable_delivery_radius_check !== false
+                      ? "Strict delivery verification is ACTIVE. Delivery partners will receive an alert and cannot submit delivery if they are outside the radius."
+                      : "Geofencing check is disabled. Partners can mark orders as delivered from any distance."}
+                  </p>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center gap-2">
+                  <span
+                    className={`w-2 h-2 rounded-full ${deliveryRules.enable_delivery_radius_check !== false
+                        ? "bg-emerald-500 animate-pulse"
+                        : "bg-slate-400"
+                      }`}
+                  />
+                  <span className="text-[11px] font-bold text-slate-700">
+                    Status: {deliveryRules.enable_delivery_radius_check !== false ? "Strict Enforcement Enabled" : "Bypass Mode"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Delivery Pricing Configuration */}
+            <div className="pt-4 border-t border-slate-100 space-y-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Delivery Fee &amp; Checkout Rules
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Base Delivery Fee (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={deliveryRules.base_delivery_fee || 0}
+                    onChange={(e) =>
+                      setDeliveryRules({
+                        ...deliveryRules,
+                        base_delivery_fee: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Free Delivery Threshold (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={deliveryRules.free_delivery_threshold || 0}
+                    onChange={(e) =>
+                      setDeliveryRules({
+                        ...deliveryRules,
+                        free_delivery_threshold: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white"
+                  />
+                </div>
+
+                <div className="flex flex-col justify-center">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Free for Subscriptions
+                  </label>
+                  <label className="relative inline-flex items-center cursor-pointer mt-1">
+                    <input
+                      type="checkbox"
+                      checked={deliveryRules.free_delivery_for_subscriptions}
+                      onChange={(e) =>
+                        setDeliveryRules({
+                          ...deliveryRules,
+                          free_delivery_for_subscriptions: e.target.checked,
+                        })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    <span className="ml-2.5 text-xs font-semibold text-slate-600">
+                      {deliveryRules.free_delivery_for_subscriptions ? "Always Free" : "Standard Fee"}
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 flex justify-end">
+              <button
+                onClick={() => handleSaveSection("delivery_rules", deliveryRules, "Delivery Radius & Rules")}
+                disabled={saving}
+                className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-all flex items-center gap-2"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Delivery Radius &amp; Rules
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {/* TAB 4: CUSTOMER ORDERING LIMITS */}

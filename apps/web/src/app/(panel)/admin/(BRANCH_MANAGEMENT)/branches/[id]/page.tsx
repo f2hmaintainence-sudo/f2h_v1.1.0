@@ -59,7 +59,7 @@ export default function Branch360PortfolioPage() {
     try {
       const [fullRes, partnersRes] = await Promise.all([
         api.get<any>(`/admin/branch/${id}/detail`).catch(() => null),
-        api.get<any>(`/admin/delivery/partners?limit=200`).catch(() => null),
+        api.get<any>(`/admin/delivery/partners?status=active&limit=200`).catch(() => null),
       ]);
 
       const branchObj = fullRes?.data?.data || fullRes?.data || null;
@@ -68,7 +68,7 @@ export default function Branch360PortfolioPage() {
       }
 
       if (partnersRes?.data?.data) {
-        const all = partnersRes.data.data || [];
+        const all = (partnersRes.data.data || []).filter((p: any) => p.is_active !== false);
         const targetBranchId = branchObj?.branch_id || id;
         const allocated = all.filter((p: any) => p.branch_id === targetBranchId || p.branch_id === id);
         const others = all.filter((p: any) => p.branch_id !== targetBranchId && p.branch_id !== id);

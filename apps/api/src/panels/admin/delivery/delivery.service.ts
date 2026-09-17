@@ -237,10 +237,29 @@ export class DeliveryManagementService {
       if (body.is_active !== undefined) {
         params.push(body.is_active);
         updateFields.push(`is_active = $${params.length}`);
+        if (body.is_active === false) {
+          updateFields.push(`is_online = false`);
+          updateFields.push(`is_available = false`);
+          updateFields.push(`current_lat = NULL`);
+          updateFields.push(`current_lng = NULL`);
+          updateFields.push(`last_location_at = NULL`);
+          try {
+            await this.redisService.delete(`delivery_partner_location:${partnerId}`);
+          } catch (_) {}
+        }
       }
       if (body.is_available !== undefined) {
         params.push(body.is_available);
         updateFields.push(`is_available = $${params.length}`);
+        if (body.is_available === false) {
+          updateFields.push(`is_online = false`);
+          updateFields.push(`current_lat = NULL`);
+          updateFields.push(`current_lng = NULL`);
+          updateFields.push(`last_location_at = NULL`);
+          try {
+            await this.redisService.delete(`delivery_partner_location:${partnerId}`);
+          } catch (_) {}
+        }
       }
       if (body.branch_id !== undefined) {
         params.push(body.branch_id);
@@ -262,7 +281,7 @@ export class DeliveryManagementService {
         UPDATE delivery_partners
         SET ${updateFields.join(', ')}
         WHERE delivery_partner_id = $${params.length}
-        RETURNING delivery_partner_id, is_active, is_available, branch_id, daily_salary
+        RETURNING delivery_partner_id, is_active, is_available, is_online, branch_id, daily_salary
       `;
 
       const rows = await this.db.query(sql, params);
@@ -1028,6 +1047,8 @@ export class DeliveryManagementService {
       const where: string[] = [
         'dp.current_lat IS NOT NULL',
         'dp.current_lng IS NOT NULL',
+        'dp.is_active = true',
+        'dp.is_online = true',
       ];
 
       if (branchId) {

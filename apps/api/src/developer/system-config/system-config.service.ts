@@ -40,6 +40,8 @@ export interface DeliveryFeeRules {
   currency: string;
   currency_symbol: string;
   display_notes?: string;
+  delivery_radius_meters?: number;
+  enable_delivery_radius_check?: boolean;
 }
 
 @Injectable()
@@ -194,6 +196,8 @@ export class SystemConfigService implements OnModuleInit {
             currency: 'INR',
             currency_symbol: '₹',
             display_notes: 'Free delivery on all orders.',
+            delivery_radius_meters: 500,
+            enable_delivery_radius_check: true,
           }),
         ],
       );
@@ -422,6 +426,8 @@ export class SystemConfigService implements OnModuleInit {
         currency: 'INR',
         currency_symbol: '₹',
         display_notes: 'Free delivery on all orders.',
+        delivery_radius_meters: 500,
+        enable_delivery_radius_check: true,
       };
 
       const slotTimings = data.slot_timings?.config_data || {};
@@ -449,6 +455,8 @@ export class SystemConfigService implements OnModuleInit {
             currency: 'INR',
             currency_symbol: '₹',
             display_notes: 'Free delivery on all orders.',
+            delivery_radius_meters: 500,
+            enable_delivery_radius_check: true,
           },
           slot_timings: {},
           order_rules: {

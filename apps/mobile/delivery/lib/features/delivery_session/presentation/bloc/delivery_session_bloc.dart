@@ -253,19 +253,18 @@ class DeliverySessionBloc
 
     try {
       bool success = false;
+      double? lat;
+      double? lng;
+      try {
+        final locationService = sl<LocationService>();
+        final position = await locationService.getCurrentPosition();
+        if (position != null) {
+          lat = position.latitude;
+          lng = position.longitude;
+        }
+      } catch (_) {}
 
       if (existing.runId != null && existing.addressId.isNotEmpty) {
-        double? lat;
-        double? lng;
-        try {
-          final locationService = sl<LocationService>();
-          final position = await locationService.getCurrentPosition();
-          if (position != null) {
-            lat = position.latitude;
-            lng = position.longitude;
-          }
-        } catch (_) {}
-
         success = await _ordersRepo.markStopDelivered(
           runId: existing.runId!,
           addressId: existing.addressId,
@@ -296,6 +295,8 @@ class DeliverySessionBloc
           paymentMode: event.paymentMode,
           paymentStatus: event.paymentStatus,
           deliveryImage: event.deliveryImage,
+          latitude: lat,
+          longitude: lng,
           containerReturns: event.containerReturns,
           containerDeliveries: event.containerDeliveries,
         );

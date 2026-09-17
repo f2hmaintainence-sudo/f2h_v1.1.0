@@ -95,7 +95,7 @@ function formatMoney(v: number | string) {
 }
 
 function isPartnerOnDuty(p: DeliveryPartner): boolean {
-  return Boolean(p.is_online ?? p.is_available);
+  return Boolean(p.is_online && p.is_active !== false);
 }
 
 const statusBadgeConfig: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -242,7 +242,7 @@ export default function DeliveryTrackingPage() {
     try {
       const today = todayIST();
       const [partnersRes, ordersRes, branchesRes] = await Promise.all([
-        api.get<any>("/admin/delivery/partners?limit=100"),
+        api.get<any>("/admin/delivery/partners?status=active&limit=100"),
         api.get<any>(`/admin/delivery/tracking?date=${today}`),
         api.get<any>("/admin/zone/branches-list").catch(() => ({ data: [] })),
       ]);
@@ -363,8 +363,12 @@ export default function DeliveryTrackingPage() {
     return Array.from(map.values());
   }, [branches, partners, orders]);
 
+  const activePartners = useMemo(() => {
+    return partners.filter(p => p.is_active !== false);
+  }, [partners]);
+
   const filteredPartners = useMemo(() => {
-    return partners.filter(p => {
+    return activePartners.filter(p => {
       const onDuty = isPartnerOnDuty(p);
       if (statusFilter === "active" && !onDuty) return false;
       if (statusFilter === "idle" && onDuty) return false;
@@ -380,15 +384,15 @@ export default function DeliveryTrackingPage() {
       }
       return true;
     });
-  }, [partners, statusFilter, branchFilter, searchQuery]);
+  }, [activePartners, statusFilter, branchFilter, searchQuery]);
 
   const selectedPartner = useMemo(() => {
     if (selectedPartnerId) {
-      const matched = partners.find(p => p.delivery_partner_id === selectedPartnerId);
+      const matched = activePartners.find(p => p.delivery_partner_id === selectedPartnerId);
       if (matched) return matched;
     }
-    return filteredPartners[0] || partners[0] || null;
-  }, [partners, filteredPartners, selectedPartnerId]);
+    return filteredPartners[0] || activePartners[0] || null;
+  }, [activePartners, filteredPartners, selectedPartnerId]);
 
   // Active hub/branch for selected partner or selected filter
   const activeBranch = useMemo(() => {
@@ -488,8 +492,9 @@ export default function DeliveryTrackingPage() {
   }, [partnerOrders]);
 
   // Current live GPS position of selected partner (Exact GPS pinning without arbitrary offsets)
+  // Only track location if partner is active and ON DUTY (ONLINE)
   const livePartnerPos = useMemo(() => {
-    if (!selectedPartner) return null;
+    if (!selectedPartner || !isPartnerOnDuty(selectedPartner)) return null;
     const pid = selectedPartner.delivery_partner_id;
     const uid = selectedPartner.user_id;
     const dbId = selectedPartner.id;
@@ -542,8 +547,8 @@ export default function DeliveryTrackingPage() {
   }, []);
 
   const onDutyCount = useMemo(() => {
-    return partners.filter(p => isPartnerOnDuty(p)).length;
-  }, [partners]);
+    return activePartners.filter(p => isPartnerOnDuty(p)).length;
+  }, [activePartners]);
 
   return (
     <div className="space-y-4 p-4 md:p-6 max-w-[1600px] mx-auto">
@@ -650,9 +655,9 @@ export default function DeliveryTrackingPage() {
             {/* Status Filter Tabs (On Duty / Idle) */}
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px]">
               {[
-                { id: "all", label: "All" },
+                { id: "all", label: `All (${activePartners.length})` },
                 { id: "active", label: `On Duty (${onDutyCount})` },
-                { id: "idle", label: `Offline (${partners.length - onDutyCount})` },
+                { id: "idle", label: `Offline (${Math.max(0, activePartners.length - onDutyCount)})` },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -811,9 +816,16 @@ export default function DeliveryTrackingPage() {
               </div>
 
               {selectedPartner && (
-                <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
-                  <Navigation size={11} className="text-emerald-600" />
-                  <span>Tracking: <strong>{getPartnerDisplayName(selectedPartner)}</strong></span>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                  <Navigation size={11} className={isPartnerOnDuty(selectedPartner) ? "text-emerald-600" : "text-slate-400"} />
+                  <span>
+                    Tracking: <strong>{getPartnerDisplayName(selectedPartner)}</strong>
+                    {!isPartnerOnDuty(selectedPartner) && (
+                      <span className="ml-1.5 text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        Offline (GPS Inactive)
+                      </span>
+                    )}
+                  </span>
                 </div>
               )}
 
@@ -879,8 +891,8 @@ export default function DeliveryTrackingPage() {
                   }}>🏢</div>
                 </AdvancedMarker>
 
-                {/* Selected Partner Marker */}
-                {selectedPartner && livePartnerPos && (
+                {/* Selected Partner Marker - ONLY if active & online */}
+                {selectedPartner && isPartnerOnDuty(selectedPartner) && livePartnerPos && (
                   <AdvancedMarker
                     position={{ lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) }}
                     title={selectedPartner.full_name}
@@ -895,7 +907,7 @@ export default function DeliveryTrackingPage() {
                     }}>🏍</div>
                   </AdvancedMarker>
                 )}
-                {mapInfoTarget === "partner" && selectedPartner && livePartnerPos && (
+                {mapInfoTarget === "partner" && selectedPartner && isPartnerOnDuty(selectedPartner) && livePartnerPos && (
                   <InfoWindow
                     position={{ lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) }}
                     onCloseClick={() => setMapInfoTarget(null)}
@@ -937,7 +949,11 @@ export default function DeliveryTrackingPage() {
                 {selectedPartner && (
                   <DirectionsRoute
                     origin={{ lat: activeBranch.lat, lng: activeBranch.lng }}
-                    partnerPos={livePartnerPos ? { lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) } : null}
+                    partnerPos={
+                      isPartnerOnDuty(selectedPartner) && livePartnerPos
+                        ? { lat: Number(livePartnerPos.lat), lng: Number(livePartnerPos.lng) }
+                        : null
+                    }
                     stops={partnerOrders
                       .filter(o => o.lat != null && o.lng != null && !isNaN(Number(o.lat)) && !isNaN(Number(o.lng)))
                       .map(o => ({ lat: Number(o.lat), lng: Number(o.lng) }))}
