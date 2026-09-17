@@ -333,19 +333,19 @@ class _HomeScreenState extends State<HomeScreen>
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFFECFDF5),
+                                                  color: kPrimaryPl,
                                                   borderRadius: BorderRadius.circular(12),
-                                                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                                                  border: Border.all(color: kPrimary.withValues(alpha: 0.25)),
                                                 ),
                                                 child: const Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.check_rounded, size: 12, color: Color(0xFF047857)),
+                                                    Icon(Icons.check_rounded, size: 12, color: kPrimary),
                                                     SizedBox(width: 3),
                                                     Text(
                                                       'Daily',
                                                       style: TextStyle(
-                                                        color: Color(0xFF047857),
+                                                        color: kPrimary,
                                                         fontSize: 10.5,
                                                         fontWeight: FontWeight.w700,
                                                       ),
@@ -1474,9 +1474,16 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFA7F3D0), width: 1.2),
+                      border: Border.all(color: kPrimary, width: 1.4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kPrimary.withValues(alpha: 0.08),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1.5),
+                        ),
+                      ],
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -1492,17 +1499,17 @@ class _HomeScreenState extends State<HomeScreen>
                               Text(
                                 '₹${subPrice.toStringAsFixed(0)}',
                                 style: const TextStyle(
-                                  color: Color(0xFF047857),
+                                  color: kPrimary,
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: -0.3,
                                 ),
                               ),
                               const SizedBox(width: 1.5),
-                              const Text(
+                              Text(
                                 '/sub',
                                 style: TextStyle(
-                                  color: Color(0xFF059669),
+                                  color: kPrimary.withValues(alpha: 0.8),
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1514,7 +1521,7 @@ class _HomeScreenState extends State<HomeScreen>
                         const Text(
                           'Subscribe',
                           style: TextStyle(
-                            color: Color(0xFF047857),
+                            color: kPrimary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
