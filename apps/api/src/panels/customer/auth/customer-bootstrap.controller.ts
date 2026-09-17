@@ -603,9 +603,9 @@ export class CustomerBootstrapController {
             SELECT 
               o.delivery_partner_id,
               o.order_id,
-              o.delivery_date,
+              o.scheduled_date AS delivery_date,
               COALESCE(o.delivery_slot, 'morning') AS delivery_slot,
-              COALESCE(o.order_status, 'pending') AS order_status,
+              COALESCE(o.status, 'pending') AS order_status,
               COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), NULLIF(TRIM(u.user_name), ''), 'Delivery Partner') AS partner_name,
               COALESCE(u.phone, '') AS partner_phone,
               COALESCE(dp.profile_photo_url, u.profile_image_url) AS partner_photo,
@@ -621,12 +621,12 @@ export class CustomerBootstrapController {
               ca.area,
               ca.city
             FROM orders o
-            LEFT JOIN customer_addresses ca ON (ca.address_id = o.delivery_address_id OR ca.id::varchar = o.delivery_address_id)
+            LEFT JOIN customer_addresses ca ON (ca.address_id = o.address_id OR ca.id::varchar = o.address_id)
             LEFT JOIN delivery_partners dp ON (dp.delivery_partner_id = o.delivery_partner_id)
             LEFT JOIN users u ON (u.user_id = dp.delivery_partner_id OR u.user_id = o.delivery_partner_id)
             WHERE (o.customer_id = $1)
-              AND (o.delivery_date = $2 OR o.delivery_date = CURRENT_DATE OR o.order_status IN ('out_for_delivery', 'assigned', 'in_transit'))
-              AND o.order_status NOT IN ('cancelled', 'rejected')
+              AND (o.scheduled_date = $2::date OR (o.scheduled_date = CURRENT_DATE AND o.status IN ('out_for_delivery', 'assigned', 'in_transit')))
+              AND o.status NOT IN ('cancelled', 'rejected')
               AND o.delivery_partner_id IS NOT NULL
               AND o.delivery_partner_id != ''
             ORDER BY 

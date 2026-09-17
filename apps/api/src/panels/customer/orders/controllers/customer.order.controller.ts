@@ -57,7 +57,7 @@ export class CustomerOrderController {
       const orderParams: any[] = [customerId];
       if (dateFilter && /^\d{4}-\d{2}-\d{2}$/.test(dateFilter.trim())) {
         orderParams.push(dateFilter.trim());
-        orderQuery += ` AND (scheduled_date = $2 OR created_at::date = $2)`;
+        orderQuery += ` AND scheduled_date = $2`;
       }
       orderQuery += ` ORDER BY created_at DESC`;
 

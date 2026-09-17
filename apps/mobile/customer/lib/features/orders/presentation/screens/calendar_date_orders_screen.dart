@@ -83,6 +83,11 @@ class _CalendarDateOrdersScreenState extends State<CalendarDateOrdersScreen> {
       final rawOrders = (data['orders'] as List<dynamic>? ?? []);
       final parsed = rawOrders
           .map((j) => Order.fromJson(j as Map<String, dynamic>))
+          .where((o) {
+            if (o.scheduledDate.isEmpty) return true;
+            final cleanDate = o.scheduledDate.split('T')[0].trim();
+            return cleanDate == _dateStr;
+          })
           .toList();
 
       if (mounted) {
