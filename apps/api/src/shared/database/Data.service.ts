@@ -329,7 +329,7 @@ export class DataService {
       // path can silently swallow it.
       if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
         const deletedAtCol = `"${aliasTable}"."deleted_at"`;
-        sql = /\bWHERE\b/i.test(sql)
+        sql = hasOuterWhereClause(sql)
           ? `${sql} AND ${deletedAtCol} IS NULL`
           : `${sql} WHERE ${deletedAtCol} IS NULL`;
       }
@@ -564,7 +564,7 @@ export class DataService {
       // SOFT-DELETE GUARD (raw SQL - bypasses condition pipeline entirely)
       if (!includeDeleted && !AVOID_DELETED_AT.includes(cleanTable)) {
         const deletedAtColQ = `"${aliasTable}"."deleted_at"`;
-        sql = /\bWHERE\b/i.test(sql)
+        sql = hasOuterWhereClause(sql)
           ? `${sql} AND ${deletedAtColQ} IS NULL`
           : `${sql} WHERE ${deletedAtColQ} IS NULL`;
       }
@@ -1718,6 +1718,34 @@ export async function getTableColumns(
   return rows.map((r: any) => r.column_name);
 }
 
+export function hasOuterWhereClause(sql: string): boolean {
+  let depth = 0;
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql[i];
+    if (char === '(') {
+      depth++;
+    } else if (char === ')') {
+      if (depth > 0) depth--;
+    } else if (char === "'" || char === '"') {
+      const quote = char;
+      i++;
+      while (i < sql.length && sql[i] !== quote) {
+        if (sql[i] === '\\') i++;
+        i++;
+      }
+    } else if (depth === 0) {
+      if (
+        (i === 0 || /\s/.test(sql[i - 1])) &&
+        sql.substring(i, i + 5).toUpperCase() === 'WHERE' &&
+        (i + 5 >= sql.length || /\s/.test(sql[i + 5]))
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Apply WHERE conditions to SQL query.
  */
@@ -1734,8 +1762,12 @@ export function applyWhere(
   const qualifiedWhere = qualifyWhere(where, table);
   const whereResult = buildDynamicWhereClause(qualifiedWhere, table);
 
-  // Append WHERE or AND depending on existing clause
-  if (/where\s+/i.test(sql)) {
+  if (!whereResult.sql || whereResult.sql.trim() === '') {
+    return { sql, bindings };
+  }
+
+  // Append WHERE or AND depending on existing outer WHERE clause
+  if (hasOuterWhereClause(sql)) {
     sql += ` AND ${whereResult.sql}`;
   } else {
     sql += ` WHERE ${whereResult.sql}`;
@@ -2460,7 +2492,7 @@ export function applySubqueryWhere(
   const qualified = qualifyRaw(subquery, table ?? '');
 
   // If WHERE already exists, append with AND
-  if (/\bWHERE\b/i.test(sql)) {
+  if (hasOuterWhereClause(sql)) {
     sql += ` AND ${qualified}`;
   } else {
     sql += ` WHERE ${qualified}`;
