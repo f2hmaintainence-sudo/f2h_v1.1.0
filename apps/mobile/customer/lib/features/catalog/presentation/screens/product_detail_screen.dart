@@ -14,7 +14,6 @@ import '../bloc/catalog_event.dart';
 import '../bloc/catalog_state.dart';
 import '../widgets/product_grid_card.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import '../../../../core/widgets/cow_loading_widget.dart';
 
 // ══════════════════════════════════════════════════════════
 //  SHOP SCREEN — category rail + 2-column product grid
@@ -209,26 +208,6 @@ class _BrowseState extends State<BrowseScreen>
       return a.isOutOfStock ? 1 : -1;
     });
     return list;
-  }
-
-  List<Product> _getSuggestedProducts(List<Product> allProducts) {
-    if (allProducts.isEmpty) return [];
-    final seen = <String>{};
-    final deduped = <Product>[];
-    for (final p in allProducts) {
-      final pid = p.productId;
-      final key = (pid != null && pid.isNotEmpty)
-          ? pid
-          : (p.id.isNotEmpty ? p.id : p.name.toLowerCase());
-      if (seen.add(key)) {
-        deduped.add(p);
-      }
-    }
-    deduped.sort((a, b) {
-      if (a.isOutOfStock == b.isOutOfStock) return 0;
-      return a.isOutOfStock ? 1 : -1;
-    });
-    return deduped;
   }
 
   @override
@@ -509,37 +488,27 @@ class _BrowseState extends State<BrowseScreen>
             (state is CatalogLoading) ||
             (state is CatalogLoaded && state.isFiltering);
 
-        final isSuggestionMode = filtered.isEmpty && !isLoading;
-        final displayList = isSuggestionMode
-            ? _getSuggestedProducts(allCatalogProducts.isNotEmpty ? allCatalogProducts : categoryProducts)
-            : filtered;
-
-        if (displayList.isEmpty && !isLoading) {
-          return _EmptyResults(query: _searchQuery.trim());
+        if (filtered.isEmpty && !isLoading) {
+          return _EmptyResults(
+            query: _searchQuery.trim(),
+            onClear: () {
+              _searchController.clear();
+              FocusScope.of(context).unfocus();
+            },
+          );
         }
 
         return LayoutBuilder(
           builder: (context, constraints) => CustomScrollView(
             slivers: [
-              if (isSuggestionMode)
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildNoResultsBanner(_searchQuery.trim()),
-                      _buildSuggestionsHeader(),
-                    ],
-                  ),
-                ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, _kBottomInset),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
                     (_, i) => isLoading
                         ? const _SkeletonCard()
-                        : RepaintBoundary(child: ProductGridCard(displayList[i])),
-                    childCount: isLoading ? 6 : displayList.length,
+                        : RepaintBoundary(child: ProductGridCard(filtered[i])),
+                    childCount: isLoading ? 6 : filtered.length,
                   ),
                   gridDelegate: _gridDelegate(constraints.maxWidth),
                 ),
@@ -548,85 +517,6 @@ class _BrowseState extends State<BrowseScreen>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildNoResultsBanner(String query) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(10, 10, 10, 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.search_off_rounded,
-              size: 18,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  query.isNotEmpty
-                      ? 'No results for "$query"'
-                      : 'No products in this category',
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Explore popular products you may like',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSuggestionsHeader() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Row(
-        children: [
-          Icon(Icons.auto_awesome_rounded, size: 15, color: Color(0xFF16A34A)),
-          SizedBox(width: 6),
-          Text(
-            'Suggested Products',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
-              letterSpacing: -0.2,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -649,9 +539,6 @@ class _BrowseState extends State<BrowseScreen>
 
   // ── SIDEBAR ─────────────────────────────────────────────────
   Widget _buildSidebar() {
-    final isLoadingState = context.select(
-      (CatalogBloc bloc) => bloc.state is CatalogLoading,
-    );
     final categories = context.select((CatalogBloc bloc) {
       final state = bloc.state;
       if (state is CatalogLoaded) {
@@ -660,36 +547,37 @@ class _BrowseState extends State<BrowseScreen>
           ...state.categories,
         ];
       }
-      return <Map<String, dynamic>>[];
+      return [
+        {'name': 'All', 'image_path': null},
+      ];
     });
 
     return Container(
-      width: 88,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+      width: 86,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
         border: Border(
-          right: BorderSide(
-            color: const Color(0xFFE2E8F0).withValues(alpha: 0.8),
-            width: 1,
-          ),
+          right: BorderSide(color: Color(0xFFEDF2F7), width: 1),
         ),
       ),
-      child: isLoadingState
-          ? const Center(child: CowLoadingWidget(size: 120))
-          : ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: _kBottomInset),
-              itemCount: categories.length,
-              itemBuilder: (context, i) {
-                final cat = categories[i];
-                final catName = cat['name'] as String? ?? '';
-                final catId = cat['category_id']?.toString() ?? 'All';
-                return _SidebarItem(
-                  cat: cat,
-                  isSelected: catName == _cat,
-                  onTap: () => _selectCat(catName, catId),
-                );
-              },
-            ),
+      child: ListView.builder(
+        padding: const EdgeInsets.only(top: 8, bottom: _kBottomInset),
+        itemCount: categories.length,
+        itemBuilder: (context, i) {
+          final cat = categories[i];
+          final catName = cat['name']?.toString() ?? '';
+          final isSelected = _cat.toLowerCase().trim() == catName.toLowerCase().trim();
+
+          return _SidebarItem(
+            cat: cat,
+            isSelected: isSelected,
+            onTap: () {
+              final catId = cat['category_id']?.toString() ?? (catName == 'All' ? 'All' : catName);
+              _selectCat(catName, catId);
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -700,28 +588,77 @@ class _BrowseState extends State<BrowseScreen>
 
 class _EmptyResults extends StatelessWidget {
   final String query;
-  const _EmptyResults({required this.query});
+  final VoidCallback? onClear;
+  const _EmptyResults({required this.query, this.onClear});
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, _kBottomInset),
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, _kBottomInset),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.search_off_outlined, size: 44, color: kMuted),
-          const SizedBox(height: 12),
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Icon(
+              Icons.search_off_rounded,
+              size: 38,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 18),
           Text(
             query.isEmpty
                 ? 'No products in this category'
-                : 'No results for "$query"',
+                : 'No products found for "$query"',
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: kMuted,
-              fontWeight: FontWeight.w600,
-              fontSize: 13.5,
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              letterSpacing: -0.2,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            query.isEmpty
+                ? 'We are restocking items for this category soon. Please check back later or explore other categories.'
+                : 'We couldn\'t find any items matching "$query". Please check the spelling or explore other categories.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          if (query.isNotEmpty && onClear != null) ...[
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: const Text('Clear Search'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16653A),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     ),
