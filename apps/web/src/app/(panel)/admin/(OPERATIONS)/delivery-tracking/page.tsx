@@ -94,8 +94,14 @@ function formatMoney(v: number | string) {
   return "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function isPartnerOnDuty(p: DeliveryPartner): boolean {
-  return Boolean(p.is_online && p.is_active !== false);
+function isPartnerActive(p?: DeliveryPartner | null): boolean {
+  if (!p) return false;
+  return Boolean(p.is_active);
+}
+
+function isPartnerOnDuty(p?: DeliveryPartner | null): boolean {
+  if (!isPartnerActive(p)) return false;
+  return Boolean(p?.is_online);
 }
 
 function isOrderInSlot(slotStr: string | undefined | null, targetSlot: string): boolean {
@@ -261,9 +267,11 @@ export default function DeliveryTrackingPage() {
         api.get<any>("/admin/zone/branches-list").catch(() => ({ data: [] })),
       ]);
 
-      const partnersList: DeliveryPartner[] = Array.isArray(partnersRes.data?.data)
+      const rawPartners: DeliveryPartner[] = Array.isArray(partnersRes.data?.data)
         ? partnersRes.data.data
         : Array.isArray(partnersRes.data) ? partnersRes.data : [];
+
+      const partnersList: DeliveryPartner[] = rawPartners.filter(p => isPartnerActive(p));
 
       const ordersList: Order[] = Array.isArray(ordersRes.data?.data)
         ? ordersRes.data.data
@@ -313,7 +321,7 @@ export default function DeliveryTrackingPage() {
         const list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
         const initialMap: Record<string, any> = {};
         list.forEach((p: any) => {
-          if (p.delivery_partner_id && p.current_lat && p.current_lng) {
+          if (isPartnerActive(p) && p.delivery_partner_id && p.current_lat && p.current_lng) {
             initialMap[p.delivery_partner_id] = {
               lat: Number(p.current_lat),
               lng: Number(p.current_lng),
@@ -365,7 +373,7 @@ export default function DeliveryTrackingPage() {
       if (b.branch_id && b.branch_name) map.set(b.branch_id, b);
     });
     partners.forEach(p => {
-      if (p.branch_id && p.branch_name && !map.has(p.branch_id)) {
+      if (isPartnerActive(p) && p.branch_id && p.branch_name && !map.has(p.branch_id)) {
         map.set(p.branch_id, { branch_id: p.branch_id, branch_name: p.branch_name });
       }
     });
@@ -378,11 +386,12 @@ export default function DeliveryTrackingPage() {
   }, [branches, partners, orders]);
 
   const activePartners = useMemo(() => {
-    return partners.filter(p => p.is_active !== false);
+    return partners.filter(p => isPartnerActive(p));
   }, [partners]);
 
   const filteredPartners = useMemo(() => {
     return activePartners.filter(p => {
+      if (!isPartnerActive(p)) return false;
       const onDuty = isPartnerOnDuty(p);
       if (statusFilter === "active" && !onDuty) return false;
       if (statusFilter === "idle" && onDuty) return false;
@@ -402,7 +411,7 @@ export default function DeliveryTrackingPage() {
 
   const selectedPartner = useMemo(() => {
     if (selectedPartnerId) {
-      const matched = activePartners.find(p => p.delivery_partner_id === selectedPartnerId);
+      const matched = activePartners.find(p => p.delivery_partner_id === selectedPartnerId && isPartnerActive(p));
       if (matched) return matched;
     }
     return filteredPartners[0] || activePartners[0] || null;
