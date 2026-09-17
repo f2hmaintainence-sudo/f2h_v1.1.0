@@ -466,8 +466,13 @@ export class AdminSystemService {
 
       if (!managementId) {
         const existingMs = await this.db.query(
-          `SELECT management_id FROM management_staff WHERE user_id = $1 AND deleted_at IS NULL LIMIT 1`,
-          [userId],
+          `SELECT management_id FROM management_staff 
+           WHERE user_id = $1 
+              OR management_id = $1 
+              OR management_id = $2 
+              OR management_id = $3 
+           LIMIT 1`,
+          [userId, cleanId, withMngPrefix],
         );
         if (existingMs.length > 0) {
           managementId = existingMs[0].management_id;
@@ -562,8 +567,8 @@ export class AdminSystemService {
 
         // Update or insert management_staff table without phone or user_name
         if (managementId) {
-          const msUpdates: string[] = ['updated_at = NOW()'];
-          const msParams: any[] = [managementId];
+          const msUpdates: string[] = ['updated_at = NOW()', 'deleted_at = NULL'];
+          const msParams: any[] = [managementId, userId];
 
           if (newRole) {
             msParams.push(newRole);
@@ -587,10 +592,39 @@ export class AdminSystemService {
             msUpdates.push(`is_active = $${msParams.length}`);
           }
 
-          await client.query(
-            `UPDATE management_staff SET ${msUpdates.join(', ')} WHERE management_id = $1`,
+          const updateRes = await client.query(
+            `UPDATE management_staff SET ${msUpdates.join(', ')} WHERE management_id = $1 OR user_id = $2`,
             msParams,
           );
+
+          if (updateRes.rowCount === 0) {
+            const targetRole = newRole || current.role_id || 'admin';
+            const isActive = body.is_active !== undefined ? (body.is_active === true || String(body.is_active) === 'true' || Number(body.is_active) === 1) : true;
+
+            await client.query(
+              `INSERT INTO management_staff (
+                 management_id, user_id, branch_id, role_id,
+                 department, designation, is_active, created_at, updated_at
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+               ON CONFLICT (management_id) DO UPDATE SET
+                 branch_id = EXCLUDED.branch_id,
+                 role_id = EXCLUDED.role_id,
+                 department = EXCLUDED.department,
+                 designation = EXCLUDED.designation,
+                 is_active = EXCLUDED.is_active,
+                 deleted_at = NULL,
+                 updated_at = NOW()`,
+              [
+                managementId,
+                userId,
+                body.branch_id?.trim() || null,
+                targetRole,
+                body.department?.trim() || null,
+                body.designation?.trim() || null,
+                isActive,
+              ],
+            );
+          }
         } else {
           // If no management_staff record exists yet for this user, insert one
           managementId = generateId('MNG', 12);
@@ -601,7 +635,15 @@ export class AdminSystemService {
             `INSERT INTO management_staff (
                management_id, user_id, branch_id, role_id,
                department, designation, is_active, created_at, updated_at
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+             ON CONFLICT (management_id) DO UPDATE SET
+               branch_id = EXCLUDED.branch_id,
+               role_id = EXCLUDED.role_id,
+               department = EXCLUDED.department,
+               designation = EXCLUDED.designation,
+               is_active = EXCLUDED.is_active,
+               deleted_at = NULL,
+               updated_at = NOW()`,
             [
               managementId,
               userId,
@@ -752,6 +794,21 @@ export class AdminSystemService {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `, []);
+
+    // 4. Synchronize management_staff identity/serial sequence if needed
+    await this.db.query(`
+      DO $$
+      BEGIN
+        BEGIN
+          PERFORM setval(
+            pg_get_serial_sequence('public.management_staff', 'id'),
+            GREATEST(COALESCE((SELECT MAX(id) FROM public.management_staff), 0), 1)
+          );
+        EXCEPTION WHEN OTHERS THEN
+          -- Table might not have serial 'id' or sequence differs
+        END;
+      END $$;
+    `, []).catch(() => {});
   }
 
   async getRoles() {
