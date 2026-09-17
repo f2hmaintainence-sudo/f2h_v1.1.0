@@ -103,7 +103,7 @@ const CATEGORY_OPTIONS = [
 
 function formatWhatsAppPhone(phone?: string | null): string {
   if (!phone) return "";
-  const digits = phone.replace(/\D/g, "");
+  const digits = String(phone).replace(/\D/g, "");
   if (!digits) return "";
   if (digits.length === 10) return `91${digits}`;
   if (digits.length === 11 && digits.startsWith("0")) return `91${digits.slice(1)}`;
@@ -187,9 +187,11 @@ export default function RegisteredVendorsPage() {
 
   // Filtered vendors
   const filteredVendors = useMemo(() => {
-    return vendors.filter((v) => {
+    return (vendors || []).filter((v) => {
+      if (!v) return false;
+      const vCat = String(v.category || "");
       // Category filter
-      if (selectedCategory !== "All" && !v.category.toLowerCase().includes(selectedCategory.toLowerCase())) {
+      if (selectedCategory !== "All" && !vCat.toLowerCase().includes(selectedCategory.toLowerCase())) {
         return false;
       }
       // Verification filter
@@ -199,13 +201,13 @@ export default function RegisteredVendorsPage() {
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesBusiness = v.business_name?.toLowerCase().includes(q);
-        const matchesContact = v.contact_person?.toLowerCase().includes(q);
-        const matchesPhone = v.phone?.toLowerCase().includes(q);
-        const matchesEmail = v.email?.toLowerCase().includes(q);
-        const matchesCity = v.city?.toLowerCase().includes(q);
-        const matchesCategory = v.category?.toLowerCase().includes(q);
-        const matchesProducts = v.products_supplied?.some((p) => p.name.toLowerCase().includes(q));
+        const matchesBusiness = String(v.business_name || "").toLowerCase().includes(q);
+        const matchesContact = String(v.contact_person || "").toLowerCase().includes(q);
+        const matchesPhone = String(v.phone || "").toLowerCase().includes(q);
+        const matchesEmail = String(v.email || "").toLowerCase().includes(q);
+        const matchesCity = String(v.city || "").toLowerCase().includes(q);
+        const matchesCategory = vCat.toLowerCase().includes(q);
+        const matchesProducts = Array.isArray(v.products_supplied) && v.products_supplied.some((p) => String(p?.name || "").toLowerCase().includes(q));
         return (
           matchesBusiness ||
           matchesContact ||
@@ -223,11 +225,12 @@ export default function RegisteredVendorsPage() {
 
   // Statistics calculation
   const stats = useMemo(() => {
-    const total = vendors.length;
-    const verified = vendors.filter((v) => v.is_verified).length;
-    const categoriesSet = new Set(vendors.map((v) => v.category));
-    const totalProducts = vendors.reduce(
-      (acc, v) => acc + (v.products_supplied?.length || v.total_products_supplied || 0),
+    const list = vendors || [];
+    const total = list.length;
+    const verified = list.filter((v) => v && v.is_verified).length;
+    const categoriesSet = new Set(list.map((v) => v?.category).filter(Boolean));
+    const totalProducts = list.reduce(
+      (acc, v) => acc + (Array.isArray(v?.products_supplied) ? v.products_supplied.length : (Number(v?.total_products_supplied) || 0)),
       0
     );
 
@@ -650,7 +653,7 @@ export default function RegisteredVendorsPage() {
                         </div>
                       ) : (
                         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold text-lg shadow-xs shrink-0">
-                          {vendor.business_name.charAt(0).toUpperCase()}
+                          {String(vendor.business_name || "V").charAt(0).toUpperCase()}
                         </div>
                       )}
                       <div>
@@ -733,10 +736,10 @@ export default function RegisteredVendorsPage() {
                       <Phone size={13} className="text-emerald-600" />
                       <span>{vendor.phone}</span>
                     </div>
-                    {vendor.rating && (
+                    {vendor.rating !== undefined && vendor.rating !== null && (
                       <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600">
                         <Star size={12} className="fill-amber-400 text-amber-400" />
-                        <span>{vendor.rating.toFixed(1)}</span>
+                        <span>{Number(vendor.rating || 0).toFixed(1)}</span>
                       </div>
                     )}
                   </div>
@@ -836,7 +839,7 @@ export default function RegisteredVendorsPage() {
                             </div>
                           ) : (
                             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                              {vendor.business_name.charAt(0).toUpperCase()}
+                              {String(vendor.business_name || "V").charAt(0).toUpperCase()}
                             </div>
                           )}
                           <div>
@@ -933,7 +936,7 @@ export default function RegisteredVendorsPage() {
                   </div>
                 ) : (
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold text-xl shrink-0">
-                    {selectedVendor.business_name.charAt(0).toUpperCase()}
+                    {String(selectedVendor.business_name || "V").charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div>
