@@ -11,7 +11,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Building2,
   Home,
@@ -641,13 +640,12 @@ export default function RegisteredVendorsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       {hasImage ? (
-                        <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-slate-200/60 bg-slate-50 shrink-0">
-                          <Image
+                        <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-200/60 bg-slate-50 shrink-0">
+                          <img
                             src={vendor.image_url!}
                             alt={vendor.business_name}
-                            fill
-                            className="object-cover"
-                            sizes="56px"
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                           />
                         </div>
                       ) : (
@@ -828,8 +826,13 @@ export default function RegisteredVendorsPage() {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
                           {hasImage ? (
-                            <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-slate-200 shrink-0">
-                              <Image src={vendor.image_url!} alt={vendor.business_name} fill className="object-cover" />
+                            <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-200 shrink-0">
+                              <img
+                                src={vendor.image_url!}
+                                alt={vendor.business_name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                              />
                             </div>
                           ) : (
                             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
@@ -920,12 +923,12 @@ export default function RegisteredVendorsPage() {
             <div className="p-5 md:p-6 border-b border-slate-100 flex items-start justify-between gap-4 sticky top-0 bg-white/95 backdrop-blur-md z-10 rounded-t-3xl">
               <div className="flex items-center gap-3.5">
                 {selectedVendor.image_url && selectedVendor.image_url.startsWith("http") ? (
-                  <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-slate-200 shrink-0">
-                    <Image
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-200 shrink-0">
+                    <img
                       src={selectedVendor.image_url}
                       alt={selectedVendor.business_name}
-                      fill
-                      className="object-cover"
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                     />
                   </div>
                 ) : (
@@ -942,11 +945,13 @@ export default function RegisteredVendorsPage() {
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
                     ID: <span className="font-mono text-slate-700">{selectedVendor.vendor_id}</span> • Registered on{" "}
-                    {new Date(selectedVendor.created_at).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric"
-                    })}
+                    {selectedVendor.created_at
+                      ? new Date(selectedVendor.created_at).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric"
+                        })
+                      : "Recent"}
                   </p>
                 </div>
               </div>
