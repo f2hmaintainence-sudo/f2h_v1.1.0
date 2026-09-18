@@ -319,47 +319,84 @@ export class RefundCandidatesRepository {
    * from and the order/run it relates to.
    */
   async getCandidateDetail(candidateId: string): Promise<any | null> {
-    const rows = await this.db.query(
-      `SELECT
-         src.*,
-         u.first_name || ' ' || u.last_name AS customer_name,
-         u.phone  AS customer_phone,
-         u.email  AS customer_email,
-         s.subscription_number,
-         s.payment_type,
-         s.branch_id,
-         b.branch_name,
-         si.final_price AS item_final_price,
-         si.unit_price  AS item_unit_price,
-         si.discount_amount,
-         si.coupon_amount,
-         p.name  AS product_name,
-         pv.name AS variant_name,
-         pv.unit_value,
-         pv.unit_type,
-         o.order_id     AS order_number,
-         o.status       AS order_status,
-         o.delivery_run_id,
-         dra.status         AS stop_status,
-         dra.failed_reason,
-         (src.quantity * src.final_price)::numeric AS recomputed_amount
-       FROM subscription_refund_candidates src
-       LEFT JOIN subscriptions s       ON s.subscription_id = src.subscription_id
-       LEFT JOIN branches b            ON b.branch_id = s.branch_id
-       LEFT JOIN users u               ON u.user_id = src.customer_id
-       LEFT JOIN subscription_items si ON si.subscription_item_id = src.subscription_item_id
-                                       OR si.id::text = src.subscription_item_id
-       LEFT JOIN product_variants pv   ON pv.variant_id = si.product_variant_id
-       LEFT JOIN products p            ON p.product_id = pv.product_id
-       LEFT JOIN orders o              ON o.order_id::text = src.order_id
-       LEFT JOIN delivery_run_addresses dra
-              ON dra.order_id = src.order_id AND dra.deleted_at IS NULL
-       WHERE src.refund_candidate_id = $1
-         AND src.deleted_at IS NULL
-       LIMIT 1`,
-      [candidateId],
-    );
-    return rows?.[0] ?? null;
+    try {
+      const rows = await this.db.query(
+        `SELECT
+           src.*,
+           COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.user_name, u.phone, 'Customer') AS customer_name,
+           u.phone  AS customer_phone,
+           u.email  AS customer_email,
+           s.subscription_number,
+           s.payment_type,
+           s.branch_id,
+           b.branch_name,
+           si.final_price AS item_final_price,
+           si.unit_price  AS item_unit_price,
+           si.discount_amount,
+           si.coupon_amount,
+           p.name  AS product_name,
+           pv.name AS variant_name,
+           pv.unit_value,
+           pv.unit_type,
+           o.order_id     AS order_number,
+           o.status       AS order_status,
+           o.delivery_run_id,
+           (
+             SELECT COALESCE(dra.delivery_status, 'pending')
+             FROM delivery_run_addresses dra
+             WHERE src.order_id IS NOT NULL
+               AND dra.order_ids::text LIKE '%' || src.order_id || '%'
+               AND dra.deleted_at IS NULL
+             ORDER BY dra.id DESC
+             LIMIT 1
+           ) AS stop_status,
+           (
+             SELECT dra.failed_reason
+             FROM delivery_run_addresses dra
+             WHERE src.order_id IS NOT NULL
+               AND dra.order_ids::text LIKE '%' || src.order_id || '%'
+               AND dra.deleted_at IS NULL
+             ORDER BY dra.id DESC
+             LIMIT 1
+           ) AS failed_reason,
+           COALESCE((src.quantity * src.final_price), src.refund_amount, 0)::numeric AS recomputed_amount
+         FROM subscription_refund_candidates src
+         LEFT JOIN subscriptions s       ON s.subscription_id = src.subscription_id
+         LEFT JOIN branches b            ON b.branch_id = s.branch_id
+         LEFT JOIN users u               ON u.user_id = src.customer_id
+         LEFT JOIN subscription_items si ON si.subscription_item_id = src.subscription_item_id
+                                         OR si.id::text = src.subscription_item_id
+         LEFT JOIN product_variants pv   ON pv.variant_id = si.product_variant_id
+                                         OR pv.variant_id = src.subscription_item_id
+         LEFT JOIN products p            ON p.product_id = pv.product_id
+         LEFT JOIN orders o              ON src.order_id IS NOT NULL AND o.order_id::text = src.order_id
+         WHERE src.refund_candidate_id = $1
+           AND src.deleted_at IS NULL
+         LIMIT 1`,
+        [candidateId],
+      );
+      return rows?.[0] ?? null;
+    } catch (err: any) {
+      this.logger.warn(`Candidate detail rich query failed, falling back to base query: ${err?.message}`);
+      const fallbackRows = await this.db.query(
+        `SELECT
+           src.*,
+           COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.user_name, u.phone, 'Customer') AS customer_name,
+           u.phone AS customer_phone,
+           u.email AS customer_email,
+           s.subscription_number,
+           s.payment_type,
+           s.branch_id
+         FROM subscription_refund_candidates src
+         LEFT JOIN subscriptions s ON s.subscription_id = src.subscription_id
+         LEFT JOIN users u         ON u.user_id = src.customer_id
+         WHERE src.refund_candidate_id = $1
+           AND src.deleted_at IS NULL
+         LIMIT 1`,
+        [candidateId],
+      );
+      return fallbackRows?.[0] ?? null;
+    }
   }
 
   // ─── Approve candidates (bulk) ───────────────────────────────────────────────
