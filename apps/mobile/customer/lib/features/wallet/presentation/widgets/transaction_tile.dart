@@ -362,18 +362,7 @@ class TransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCredit = _isCredit(transaction.transactionType);
     final amountText =
-        '${isCredit ? '+' : '-'}\u{20B9}${transaction.amount.toStringAsFixed(0)}';
-
-    Widget tile = _TransactionContainer(
-      icon: isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-      iconBackground: isCredit ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
-      iconColor: isCredit ? const Color(0xFF16A34A) : const Color(0xFFE53935),
-      title: _title(transaction),
-      subtitle: _subtitle(transaction),
-      amount: amountText,
-      amountColor: isCredit ? const Color(0xFF16A34A) : const Color(0xFFE53935),
-      showChevron: true,
-    );
+        '${isCredit ? '+' : '-'}\u{20B9}${transaction.amount.toStringAsFixed(2)}';
 
     return GestureDetector(
       onTap: () {
@@ -384,7 +373,13 @@ class TransactionTile extends StatelessWidget {
           ),
         );
       },
-      child: tile,
+      child: _TransactionContainer(
+        isCredit: isCredit,
+        title: _title(transaction),
+        subtitle: _subtitle(transaction),
+        amount: amountText,
+        typeLabel: _typeLabel(transaction.transactionType),
+      ),
     );
   }
 
@@ -393,6 +388,15 @@ class TransactionTile extends StatelessWidget {
     return normalized == 'credit' ||
         normalized == 'refund' ||
         normalized == 'cashback';
+  }
+
+  static String _typeLabel(String type) {
+    final normalized = type.toLowerCase().trim();
+    if (normalized == 'credit') return 'Credit';
+    if (normalized == 'debit') return 'Debit';
+    if (normalized == 'refund') return 'Refund';
+    if (normalized == 'cashback') return 'Cashback';
+    return type.isEmpty ? '' : type[0].toUpperCase() + type.substring(1).toLowerCase();
   }
 
   static String _title(CustomerWalletTransaction transaction) {
@@ -489,120 +493,187 @@ class TRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _TransactionContainer(
-      icon: t.isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-      iconBackground: t.isCredit ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
-      iconColor: t.isCredit ? const Color(0xFF16A34A) : const Color(0xFFE53935),
+      isCredit: t.isCredit,
       title: t.desc,
       subtitle: t.date,
-      amount:
-          '${t.isCredit ? '+' : '-'}\u{20B9}${t.amount.toStringAsFixed(0)}',
-      amountColor: t.isCredit ? const Color(0xFF16A34A) : const Color(0xFFE53935),
+      amount: '${t.isCredit ? '+' : '-'}\u{20B9}${t.amount.toStringAsFixed(0)}',
+      typeLabel: t.isCredit ? 'Credit' : 'Debit',
     );
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  PREMIUM TRANSACTION CONTAINER
+// ═══════════════════════════════════════════════════════════════
 class _TransactionContainer extends StatelessWidget {
-  final IconData icon;
-  final Color iconBackground;
-  final Color iconColor;
+  final bool isCredit;
   final String title;
   final String subtitle;
   final String amount;
-  final Color amountColor;
-  final bool showChevron;
+  final String typeLabel;
 
   const _TransactionContainer({
-    required this.icon,
-    required this.iconBackground,
-    required this.iconColor,
+    required this.isCredit,
     required this.title,
     required this.subtitle,
     required this.amount,
-    required this.amountColor,
-    this.showChevron = false,
+    required this.typeLabel,
   });
 
   @override
   Widget build(BuildContext context) {
+    final creditGreen = const Color(0xFF16A34A);
+    final debitRed   = const Color(0xFFDC2626);
+    final accentColor = isCredit ? creditGreen : debitRed;
+    final iconBg      = isCredit ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
+    final iconData    = isCredit
+        ? Icons.south_rounded
+        : Icons.north_rounded;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4.5),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF0F0F0), width: 1.0),
+        border: Border.all(
+          color: isCredit
+              ? const Color(0xFFBBF7D0)
+              : const Color(0xFFFECACA),
+          width: 1.0,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: iconBackground,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Icon(icon, color: iconColor, size: 18),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: AppTypography.titleMedium.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: kText,
-                    letterSpacing: 0.0,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left accent bar
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.6),
                 ),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: AppTypography.bodySmall.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: kTextSub,
-                      letterSpacing: 0.2,
-                    ),
+              ),
+
+              // Main content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Icon circle
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: iconBg,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(iconData, color: accentColor, size: 20),
+                      ),
+                      const SizedBox(width: 13),
+
+                      // Title + subtitle + type badge
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              style: AppTypography.titleMedium.copyWith(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: kText,
+                                letterSpacing: -0.1,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                if (typeLabel.isNotEmpty) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: iconBg,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      typeLabel,
+                                      style: AppTypography.labelSmall.copyWith(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: accentColor,
+                                        letterSpacing: 0.1,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Flexible(
+                                  child: Text(
+                                    subtitle,
+                                    style: AppTypography.bodySmall.copyWith(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w400,
+                                      color: kTextSub,
+                                      letterSpacing: 0.1,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // Amount + chevron
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            amount,
+                            style: AppTypography.labelLarge.copyWith(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: accentColor,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16,
+                            color: kMuted,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Text(
-            amount,
-            style: AppTypography.labelLarge.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: amountColor,
-              letterSpacing: 0.1,
-            ),
-          ),
-          if (showChevron) ...[
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: Color(0xFF9CA3AF),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
