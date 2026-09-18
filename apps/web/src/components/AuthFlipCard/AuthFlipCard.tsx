@@ -113,9 +113,8 @@ function HeroPanel({ side }: { side: AuthSide }) {
 
       <div className="f2h-tilt-wrap" ref={tiltRef}>
         <div className="f2h-hero-logo-row">
-          <img src="/assets/log1.webp" alt="F2H" className="f2h-logo-img" />
+          <img src="/assets/logo.svg" alt="F2H - Farm to Home" className="f2h-logo-img h-10 w-auto object-contain" />
           <div>
-            <div className="f2h-logo-tagline">Farm to Home</div>
             <div className="f2h-time-badge"><div className="f2h-time-dot" />Delivering before 7 AM</div>
           </div>
         </div>

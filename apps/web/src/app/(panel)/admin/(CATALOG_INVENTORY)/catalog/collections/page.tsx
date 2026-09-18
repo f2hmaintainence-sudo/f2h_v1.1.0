@@ -6,7 +6,7 @@
 //
 // Project     : F2H Fresh
 // File        : page.tsx (Daily Vendor Collections for Milk & Other Produce)
-// Description : Field-optimized procurement with Date-wise filter, Summary modal, Milk quality audit, and slip generation
+// Description : Field-optimized mobile-first procurement for Milk, Ghee, Fruits & Produce
 // ============================================================================
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -59,16 +59,7 @@ import {
   Tag,
   Warehouse,
   UserCheck,
-  User,
-  BarChart3,
-  PieChart,
-  CalendarRange,
-  Download,
-  Coins,
-  TrendingUp,
-  Receipt,
-  SlidersHorizontal,
-  ArrowUpDown
+  User
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
@@ -127,46 +118,18 @@ interface VendorOption {
   products_supplied?: { name: string; category?: string }[];
 }
 
-interface ProductBreakdownItem {
-  name: string;
-  quantity: number;
-  unit: string;
-  amount: number;
-  count: number;
-}
-
-interface VendorBreakdownItem {
-  vendor_id: string;
-  vendor_name: string;
-  vendor_phone?: string;
-  quantity: number;
-  amount: number;
-  count: number;
-  paid_amount: number;
-  pending_amount: number;
-}
-
 interface CollectionSummary {
   totalMilkQuantity: number;
   totalOthersQuantity: number;
   morningMilkQuantity: number;
   eveningMilkQuantity: number;
-  afternoonMilkQuantity?: number;
-  generalMilkQuantity?: number;
   totalAmount: number;
-  paidAmount?: number;
-  pendingAmount?: number;
-  partialAmount?: number;
   avgFat: number;
   avgSnf: number;
-  avgClr?: number;
-  avgTemperature?: number;
   totalCollections: number;
   milkCollectionsCount: number;
   othersCollectionsCount: number;
   activeVendorsCount: number;
-  productBreakdown?: ProductBreakdownItem[];
-  vendorBreakdown?: VendorBreakdownItem[];
 }
 
 const PRODUCE_CATEGORY_OPTIONS = [
@@ -212,32 +175,17 @@ export default function DailyCollectionsPage() {
     morningMilkQuantity: 0,
     eveningMilkQuantity: 0,
     totalAmount: 0,
-    paidAmount: 0,
-    pendingAmount: 0,
-    partialAmount: 0,
     avgFat: 0,
     avgSnf: 0,
-    avgClr: 0,
-    avgTemperature: 0,
     totalCollections: 0,
     milkCollectionsCount: 0,
     othersCollectionsCount: 0,
-    activeVendorsCount: 0,
-    productBreakdown: [],
-    vendorBreakdown: []
+    activeVendorsCount: 0
   });
   const [loading, setLoading] = useState(true);
 
-  // ---------------------------------------------------------------------------
-  // Date Filtering State
-  // ---------------------------------------------------------------------------
-  const [dateMode, setDateMode] = useState<"single" | "range">("single");
-  const [datePreset, setDatePreset] = useState<"today" | "yesterday" | "this_week" | "this_month" | "last_month" | "custom">("today");
+  // Filters
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const [startDate, setStartDate] = useState<string>(todayStr);
-  const [endDate, setEndDate] = useState<string>(todayStr);
-
-  // Other Filters
   const [selectedType, setSelectedType] = useState<"ALL" | "MILK" | "OTHERS">("ALL");
   const [selectedShift, setSelectedShift] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -248,8 +196,6 @@ export default function DailyCollectionsPage() {
 
   // Modals & Sliders
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
-  const [summaryModalTab, setSummaryModalTab] = useState<"overview" | "vendors" | "products" | "quality">("overview");
   const [addLoading, setAddLoading] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<VendorCollectionRecord | null>(null);
   const [collectionToDelete, setCollectionToDelete] = useState<VendorCollectionRecord | null>(null);
@@ -315,96 +261,21 @@ export default function DailyCollectionsPage() {
     setIsAddModalOpen(true);
   };
 
-  // ---------------------------------------------------------------------------
-  // Date Helpers & Presets
-  // ---------------------------------------------------------------------------
-  const applyPreset = (preset: "today" | "yesterday" | "this_week" | "this_month" | "last_month") => {
-    setDatePreset(preset);
-    const now = new Date();
-
-    if (preset === "today") {
-      setDateMode("single");
-      setSelectedDate(todayStr);
-      setStartDate(todayStr);
-      setEndDate(todayStr);
-    } else if (preset === "yesterday") {
-      setDateMode("single");
-      const y = new Date(now);
-      y.setDate(y.getDate() - 1);
-      const yStr = y.toISOString().split("T")[0];
-      setSelectedDate(yStr);
-      setStartDate(yStr);
-      setEndDate(yStr);
-    } else if (preset === "this_week") {
-      setDateMode("range");
-      const w = new Date(now);
-      w.setDate(w.getDate() - 6);
-      const wStr = w.toISOString().split("T")[0];
-      setStartDate(wStr);
-      setEndDate(todayStr);
-    } else if (preset === "this_month") {
-      setDateMode("range");
-      const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-      setStartDate(mStart);
-      setEndDate(todayStr);
-    } else if (preset === "last_month") {
-      setDateMode("range");
-      const lmStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split("T")[0];
-      const lmEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split("T")[0];
-      setStartDate(lmStart);
-      setEndDate(lmEnd);
-    }
-  };
-
-  // Date Navigation Helpers for Single Day mode
+  // Date Navigation Helpers
   const navigateDay = (offset: number) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + offset);
-    const nextDateStr = d.toISOString().split("T")[0];
-    setSelectedDate(nextDateStr);
-    setStartDate(nextDateStr);
-    setEndDate(nextDateStr);
-    setDatePreset(nextDateStr === todayStr ? "today" : "custom");
+    setSelectedDate(d.toISOString().split("T")[0]);
   };
 
-  const isToday = selectedDate === todayStr && dateMode === "single";
+  const isToday = selectedDate === todayStr;
 
-  // Active Date Range Label for header and modals
-  const activeDateLabel = useMemo(() => {
-    if (dateMode === "single") {
-      if (selectedDate === todayStr) return "Today (Daily)";
-      try {
-        const d = new Date(selectedDate + "T00:00:00");
-        return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-      } catch {
-        return selectedDate;
-      }
-    } else {
-      try {
-        const s = new Date(startDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-        const e = new Date(endDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-        return `${s} – ${e}`;
-      } catch {
-        return `${startDate} to ${endDate}`;
-      }
-    }
-  }, [dateMode, selectedDate, startDate, endDate, todayStr]);
-
-  // ---------------------------------------------------------------------------
   // Fetch Collections
-  // ---------------------------------------------------------------------------
   const fetchCollections = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-
-      if (dateMode === "single") {
-        if (selectedDate) params.append("date", selectedDate);
-      } else {
-        if (startDate) params.append("startDate", startDate);
-        if (endDate) params.append("endDate", endDate);
-      }
-
+      if (selectedDate) params.append("date", selectedDate);
       if (selectedType && selectedType !== "ALL") params.append("type", selectedType);
       if (selectedShift && selectedShift !== "ALL") params.append("shift", selectedShift);
       if (searchQuery.trim()) params.append("search", searchQuery.trim());
@@ -423,7 +294,7 @@ export default function DailyCollectionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateMode, selectedDate, startDate, endDate, selectedType, selectedShift, searchQuery]);
+  }, [selectedDate, selectedType, selectedShift, searchQuery]);
 
   // Fetch Registered Vendors for dropdown
   const fetchVendors = useCallback(async () => {
@@ -631,7 +502,7 @@ export default function DailyCollectionsPage() {
     }
   };
 
-  // Helper to standardize phone number for WhatsApp wa.me links
+  // Helper to standardize phone number for WhatsApp wa.me links with India country code 91
   const formatWhatsAppPhone = (phone?: string | null): string => {
     if (!phone) return "";
     const digits = phone.replace(/\D/g, "");
@@ -691,97 +562,6 @@ export default function DailyCollectionsPage() {
     return cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
   };
 
-  // WhatsApp Comprehensive Summary Share Builder
-  const getWhatsAppSummaryShareUrl = () => {
-    const text = encodeURIComponent(
-      `*📊 F2H FRESH - PROCUREMENT SUMMARY REPORT*\n` +
-      `*Period:* ${activeDateLabel}\n` +
-      `------------------------------------\n` +
-      `*Total Slips:* ${summary.totalCollections || collections.length}\n` +
-      `*Total Procurement Value:* ₹${(summary.totalAmount || 0).toLocaleString("en-IN")}\n` +
-      `*Settlement Paid:* ₹${(summary.paidAmount || 0).toLocaleString("en-IN")} | *Pending:* ₹${(summary.pendingAmount || 0).toLocaleString("en-IN")}\n` +
-      `------------------------------------\n` +
-      `*🥛 MILK PROCUREMENT:*\n` +
-      `• Total Volume: ${summary.totalMilkQuantity} L\n` +
-      `• Morning (AM): ${summary.morningMilkQuantity} L | Evening (PM): ${summary.eveningMilkQuantity} L\n` +
-      `• Avg Fat: ${summary.avgFat ? `${summary.avgFat}%` : "--"} | Avg SNF: ${summary.avgSnf ? `${summary.avgSnf}%` : "--"}\n` +
-      (summary.avgClr ? `• Avg CLR: ${summary.avgClr}\n` : "") +
-      (summary.avgTemperature ? `• Avg Temp: ${summary.avgTemperature} °C\n` : "") +
-      `------------------------------------\n` +
-      `*🍎 PRODUCE & GHEE:* ${summary.totalOthersQuantity} Units/Kg\n` +
-      `*👨‍🌾 ACTIVE SUPPLIERS:* ${summary.activeVendorsCount || 0} Vendors\n` +
-      `------------------------------------\n` +
-      `*Generated on:* ${new Date().toLocaleString("en-IN")}\n` +
-      `*Farm to Home Fresh (F2H)*`
-    );
-    return `https://wa.me/?text=${text}`;
-  };
-
-  // CSV Export
-  const exportCollectionsCSV = () => {
-    if (collections.length === 0) {
-      showErrorToast("No collections to export");
-      return;
-    }
-    const headers = [
-      "Slip ID",
-      "Date",
-      "Shift",
-      "Type",
-      "Vendor Name",
-      "Vendor Phone",
-      "Product Name",
-      "Category",
-      "Quantity",
-      "Unit",
-      "Rate Per Unit (Rs)",
-      "Total Amount (Rs)",
-      "Fat %",
-      "SNF %",
-      "CLR",
-      "Temp (C)",
-      "Can No",
-      "Batch Lot",
-      "Packaging",
-      "Payment Status",
-      "Collector Name"
-    ];
-
-    const rows = collections.map((c) => [
-      `"${c.collection_id}"`,
-      `"${c.collection_date}"`,
-      `"${c.shift}"`,
-      `"${c.collection_type}"`,
-      `"${c.vendor_name}"`,
-      `"${c.vendor_phone || ""}"`,
-      `"${c.product_name}"`,
-      `"${c.category}"`,
-      c.quantity,
-      `"${c.unit}"`,
-      c.rate_per_unit,
-      c.total_amount,
-      c.fat_percentage ?? "",
-      c.snf_percentage ?? "",
-      c.clr_reading ?? "",
-      c.temperature ?? "",
-      `"${c.container_can_no || ""}"`,
-      `"${c.batch_lot_no || ""}"`,
-      `"${c.packaging_type || ""}"`,
-      `"${c.payment_status}"`,
-      `"${c.collector_name}"`
-    ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `F2H_Collections_${dateMode === "single" ? selectedDate : `${startDate}_to_${endDate}`}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showSuccessToast("CSV report exported successfully");
-  };
-
   return (
     <div className="space-y-4 md:space-y-6 p-3 md:p-6 pb-24 md:pb-8 animate-in fade-in duration-200">
       {/* Desktop Breadcrumbs */}
@@ -795,390 +575,185 @@ export default function DailyCollectionsPage() {
         <span className="font-semibold text-slate-800">Daily Collections</span>
       </nav>
 
-      {/* Top Header & Summary / Record Controls */}
-      <div className="bg-white p-3.5 sm:p-5 rounded-2xl md:rounded-3xl border border-slate-100 shadow-xs space-y-3.5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      {/* Mobile Top Header & Date Navigation */}
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl md:rounded-3xl border border-slate-100 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center border border-emerald-100 shrink-0 shadow-2xs">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#16a34a] flex items-center justify-center border border-emerald-100 shrink-0">
               <ClipboardCheck size={22} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-snug">
-                  Vendor Procurement &amp; Intake
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  {collections.length} entries
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                <CalendarRange size={12} className="text-slate-400" />
-                <span>Showing: <strong className="text-slate-700">{activeDateLabel}</strong></span>
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-snug">
+                Daily Vendor Intake
+              </h1>
+              <p className="text-[11px] text-slate-500">
+                {collections.length} entries • Milk &amp; Produce
               </p>
             </div>
           </div>
 
-          {/* Header Action Buttons: Summary, Refresh, Record */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* SUMMARY BUTTON (Primary Action) */}
-            <button
-              onClick={() => setIsSummaryModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-900 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200 shadow-2xs transition-all hover:scale-[1.02] active:scale-[0.98]"
-              title="Open Procurement & Quality Audit Summary"
-            >
-              <BarChart3 size={15} className="text-emerald-700" />
-              <span>Summary</span>
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-md bg-emerald-700 text-white text-[10px] font-mono">
-                ₹{Math.round(summary.totalAmount || 0).toLocaleString("en-IN")}
-              </span>
-            </button>
-
+          <div className="flex items-center gap-1.5">
             <button
               onClick={fetchCollections}
               disabled={loading}
               className="p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs"
-              title="Refresh Records"
+              title="Refresh"
             >
               <RefreshCw size={15} className={loading ? "animate-spin text-emerald-600" : ""} />
               <span className="hidden sm:inline sm:ml-1">Refresh</span>
             </button>
 
-            {/* Export CSV */}
-            <button
-              onClick={exportCollectionsCSV}
-              className="hidden md:flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs"
-              title="Download CSV"
-            >
-              <Download size={14} />
-              <span>Export</span>
-            </button>
-
             {/* Desktop Add Button */}
             <button
               onClick={() => openAddModal()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#16a34a] hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#16a34a] hover:bg-emerald-700 shadow-sm shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <Plus size={15} />
-              <span>Record Intake</span>
+              <span>Record Collection</span>
             </button>
           </div>
         </div>
 
-        {/* ------------------------------------------------------------------- */}
-        {/* COMPREHENSIVE DATE-WISE FILTER BAR */}
-        {/* ------------------------------------------------------------------- */}
-        <div className="pt-3 border-t border-slate-100 space-y-2.5">
-          {/* Preset Pill Buttons */}
-          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase mr-1 hidden sm:inline">Date:</span>
-              <button
-                onClick={() => applyPreset("today")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 ${dateMode === "single" && selectedDate === todayStr
-                    ? "bg-emerald-600 text-white shadow-xs font-bold"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-              >
-                Today
-              </button>
-              <button
-                onClick={() => applyPreset("yesterday")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 ${datePreset === "yesterday"
-                    ? "bg-emerald-600 text-white shadow-xs font-bold"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-              >
-                Yesterday
-              </button>
-              <button
-                onClick={() => applyPreset("this_week")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 ${datePreset === "this_week"
-                    ? "bg-emerald-600 text-white shadow-xs font-bold"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-              >
-                Last 7 Days
-              </button>
-              <button
-                onClick={() => applyPreset("this_month")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 ${datePreset === "this_month"
-                    ? "bg-emerald-600 text-white shadow-xs font-bold"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-              >
-                This Month
-              </button>
-              <button
-                onClick={() => applyPreset("last_month")}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all shrink-0 ${datePreset === "last_month"
-                    ? "bg-emerald-600 text-white shadow-xs font-bold"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-              >
-                Last Month
-              </button>
-            </div>
-
-            {/* Mode Switch: Single Day vs Date Range */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl shrink-0 border border-slate-200/60">
-              <button
-                onClick={() => {
-                  setDateMode("single");
-                  setDatePreset("today");
-                }}
-                className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all ${dateMode === "single" ? "bg-white text-slate-900 shadow-2xs font-bold" : "text-slate-600"
-                  }`}
-              >
-                Single Day
-              </button>
-              <button
-                onClick={() => {
-                  setDateMode("range");
-                  setDatePreset("custom");
-                }}
-                className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all ${dateMode === "range" ? "bg-white text-slate-900 shadow-2xs font-bold" : "text-slate-600"
-                  }`}
-              >
-                Date Range
-              </button>
-            </div>
-          </div>
-
-          {/* Input Controls Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/80 p-2 rounded-2xl border border-slate-200/70">
-            {dateMode === "single" ? (
-              /* Single Day < Prev [Date] Next > Controls */
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <div className="flex items-center bg-white border border-slate-200 rounded-xl shadow-2xs">
-                  <button
-                    onClick={() => navigateDay(-1)}
-                    className="p-2 hover:bg-slate-100 text-slate-600 rounded-l-xl transition-colors"
-                    title="Previous Day"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => {
-                      setSelectedDate(e.target.value);
-                      setDatePreset(e.target.value === todayStr ? "today" : "custom");
-                    }}
-                    className="bg-transparent text-xs sm:text-sm font-bold text-slate-900 focus:outline-none cursor-pointer px-2 text-center"
-                  />
-                  <button
-                    onClick={() => navigateDay(1)}
-                    className="p-2 hover:bg-slate-100 text-slate-600 rounded-r-xl transition-colors"
-                    title="Next Day"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-
-                {!isToday && (
-                  <button
-                    onClick={() => {
-                      setSelectedDate(todayStr);
-                      setDatePreset("today");
-                    }}
-                    className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                  >
-                    Jump to Today
-                  </button>
-                )}
-              </div>
-            ) : (
-              /* Date Range Controls: From Date -> To Date */
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">From:</span>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      setDatePreset("custom");
-                    }}
-                    className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
-                  />
-                </div>
-
-                <ChevronRight size={14} className="text-slate-400 hidden sm:inline" />
-
-                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">To:</span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
-                      setDatePreset("custom");
-                    }}
-                    className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Shift Filter Switcher */}
-            <div className="flex items-center justify-between sm:justify-end gap-1.5">
-              <div className="flex items-center bg-white p-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
-                <button
-                  onClick={() => setSelectedShift("ALL")}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all ${selectedShift === "ALL" ? "bg-slate-900 text-white shadow-2xs" : "text-slate-600"
-                    }`}
-                >
-                  All Shifts
-                </button>
-                <button
-                  onClick={() => setSelectedShift("MORNING")}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all ${selectedShift === "MORNING" ? "bg-amber-500 text-white shadow-2xs font-bold" : "text-amber-800"
-                    }`}
-                >
-                  <Sun size={12} /> AM
-                </button>
-                <button
-                  onClick={() => setSelectedShift("EVENING")}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all ${selectedShift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs font-bold" : "text-indigo-800"
-                    }`}
-                >
-                  <Moon size={12} /> PM
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Category / Type Filter Tabs (ALL / MILK / OTHERS) */}
-          <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
+        {/* Date Row with < Today > Navigation */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 p-1 rounded-xl">
             <button
-              onClick={() => setSelectedType("ALL")}
-              className={`py-1.5 rounded-lg text-xs font-bold transition-all text-center ${selectedType === "ALL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-                }`}
+              onClick={() => navigateDay(-1)}
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+              title="Previous Day"
             >
-              All Intake ({collections.length})
+              <ChevronLeft size={16} />
             </button>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-transparent text-xs sm:text-sm font-bold text-slate-800 focus:outline-none cursor-pointer px-1 text-center"
+            />
             <button
-              onClick={() => setSelectedType("MILK")}
-              className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedType === "MILK"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-blue-700 hover:bg-blue-50"
-                }`}
+              onClick={() => navigateDay(1)}
+              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 transition-colors"
+              title="Next Day"
             >
-              <Milk size={14} /> Milk Intake ({summary.milkCollectionsCount || 0})
-            </button>
-            <button
-              onClick={() => setSelectedType("OTHERS")}
-              className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedType === "OTHERS"
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-emerald-700 hover:bg-emerald-50"
-                }`}
-            >
-              <Apple size={14} /> Others ({summary.othersCollectionsCount || 0})
+              <ChevronRight size={16} />
             </button>
           </div>
+
+          {!isToday && (
+            <button
+              onClick={() => setSelectedDate(todayStr)}
+              className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+            >
+              Today
+            </button>
+          )}
+
+          {/* Shift Filter Switcher */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
+            <button
+              onClick={() => setSelectedShift("ALL")}
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all ${selectedShift === "ALL" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600"
+                }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSelectedShift("MORNING")}
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${selectedShift === "MORNING" ? "bg-amber-500 text-white shadow-2xs" : "text-amber-800"
+                }`}
+            >
+              <Sun size={12} /> AM
+            </button>
+            <button
+              onClick={() => setSelectedShift("EVENING")}
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition-all ${selectedShift === "EVENING" ? "bg-indigo-600 text-white shadow-2xs" : "text-indigo-800"
+                }`}
+            >
+              <Moon size={12} /> PM
+            </button>
+          </div>
+        </div>
+
+        {/* Category / Type Filter Tabs (ALL / MILK / OTHERS) */}
+        <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
+          <button
+            onClick={() => setSelectedType("ALL")}
+            className={`py-1.5 rounded-lg text-xs font-bold transition-all text-center ${selectedType === "ALL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+          >
+            All Intake ({collections.length})
+          </button>
+          <button
+            onClick={() => setSelectedType("MILK")}
+            className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedType === "MILK"
+              ? "bg-blue-600 text-white shadow-xs"
+              : "text-blue-700 hover:bg-blue-50"
+              }`}
+          >
+            <Milk size={14} /> Milk Intake
+          </button>
+          <button
+            onClick={() => setSelectedType("OTHERS")}
+            className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${selectedType === "OTHERS"
+              ? "bg-emerald-600 text-white shadow-xs"
+              : "text-emerald-700 hover:bg-emerald-50"
+              }`}
+          >
+            <Apple size={14} /> Others
+          </button>
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------- */}
-      {/* KPI METRICS SUMMARY STRIP (Clicking any card opens Summary Modal!) */}
-      {/* ------------------------------------------------------------------- */}
+      {/* KPI Metrics Summary Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
         {/* Milk Volume */}
-        <div
-          onClick={() => {
-            setSummaryModalTab("quality");
-            setIsSummaryModalOpen(true);
-          }}
-          className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-blue-300 hover:shadow-sm transition-all group"
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
             <Droplet size={18} />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Milk Volume</p>
-              <BarChart3 size={12} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+          <div>
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Milk Volume</p>
             <p className="text-base sm:text-lg font-black text-slate-900">
               {summary.totalMilkQuantity} <span className="text-xs font-normal text-slate-500">L</span>
-            </p>
-            <p className="text-[10px] text-blue-700 font-medium truncate">
-              AM: {summary.morningMilkQuantity}L • PM: {summary.eveningMilkQuantity}L
             </p>
           </div>
         </div>
 
         {/* Produce & Ghee Quantity */}
-        <div
-          onClick={() => {
-            setSummaryModalTab("products");
-            setIsSummaryModalOpen(true);
-          }}
-          className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all group"
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
             <Apple size={18} />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Produce &amp; Ghee</p>
-              <BarChart3 size={12} className="text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+          <div>
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Produce &amp; Ghee</p>
             <p className="text-base sm:text-lg font-black text-slate-900">
               {summary.totalOthersQuantity} <span className="text-xs font-normal text-slate-500">Kg/Units</span>
-            </p>
-            <p className="text-[10px] text-amber-700 font-medium truncate">
-              {summary.othersCollectionsCount} entries logged
             </p>
           </div>
         </div>
 
         {/* Quality Index */}
-        <div
-          onClick={() => {
-            setSummaryModalTab("quality");
-            setIsSummaryModalOpen(true);
-          }}
-          className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-emerald-300 hover:shadow-sm transition-all group"
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <Gauge size={18} />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Avg Fat / SNF</p>
-              <BarChart3 size={12} className="text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+          <div>
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Avg Fat / SNF</p>
             <p className="text-xs sm:text-sm font-bold text-slate-900">
               {summary.avgFat ? `${summary.avgFat}%` : "--"} / {summary.avgSnf ? `${summary.avgSnf}%` : "--"}
-            </p>
-            <p className="text-[10px] text-emerald-700 font-medium truncate">
-              {summary.avgClr ? `CLR ${summary.avgClr}` : "Standard Quality"} • {summary.avgTemperature ? `${summary.avgTemperature}°C` : "Chilled"}
             </p>
           </div>
         </div>
 
         {/* Procurement Value */}
-        <div
-          onClick={() => {
-            setSummaryModalTab("overview");
-            setIsSummaryModalOpen(true);
-          }}
-          className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3 cursor-pointer hover:border-purple-300 hover:shadow-sm transition-all group"
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
             <IndianRupee size={18} />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Total Intake Value</p>
-              <BarChart3 size={12} className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+          <div>
+            <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase">Total Intake Value</p>
             <p className="text-base sm:text-lg font-black text-slate-900">
               ₹{summary.totalAmount.toLocaleString("en-IN")}
-            </p>
-            <p className="text-[10px] text-purple-700 font-medium truncate">
-              Paid: ₹{(summary.paidAmount || 0).toLocaleString("en-IN")} • Pend: ₹{(summary.pendingAmount || 0).toLocaleString("en-IN")}
             </p>
           </div>
         </div>
@@ -1230,7 +805,7 @@ export default function DailyCollectionsPage() {
       {loading ? (
         <div className="bg-white rounded-2xl md:rounded-3xl p-8 border border-slate-100 shadow-xs text-center space-y-3">
           <RefreshCw size={24} className="animate-spin text-emerald-600 mx-auto" />
-          <p className="text-xs text-slate-500 font-medium">Loading procurement records...</p>
+          <p className="text-xs text-slate-500 font-medium">Loading intake slips...</p>
         </div>
       ) : collections.length === 0 ? (
         <div className="bg-white rounded-2xl md:rounded-3xl p-8 border border-slate-100 shadow-xs text-center space-y-4">
@@ -1240,7 +815,7 @@ export default function DailyCollectionsPage() {
           <div>
             <h3 className="text-sm sm:text-base font-bold text-slate-800">No Intake Logged For This Selection</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-              No entries found for {activeDateLabel}. Tap below to log milk or produce collection.
+              No entries found for date {selectedDate}. Tap below to log milk or produce collection.
             </p>
           </div>
           <button
@@ -1285,7 +860,7 @@ export default function DailyCollectionsPage() {
                       <div>
                         <h3 className="font-bold text-sm text-slate-900 line-clamp-1">{item.vendor_name}</h3>
                         <p className="text-[10px] text-slate-400 font-mono">
-                          {item.collection_id} • {item.collection_date} • {item.shift}
+                          {item.collection_id} • {item.shift}
                         </p>
                       </div>
                     </div>
@@ -1293,8 +868,8 @@ export default function DailyCollectionsPage() {
                     <button
                       onClick={() => handleTogglePayment(item)}
                       className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${item.payment_status === "PAID"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
                         }`}
                       title="Tap to toggle payment status"
                     >
@@ -1329,11 +904,6 @@ export default function DailyCollectionsPage() {
                       {item.snf_percentage && (
                         <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
                           SNF: {item.snf_percentage}%
-                        </span>
-                      )}
-                      {item.clr_reading && (
-                        <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200/60">
-                          CLR: {item.clr_reading}
                         </span>
                       )}
                       {item.container_can_no && (
@@ -1427,7 +997,7 @@ export default function DailyCollectionsPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4">Date &amp; Slip</th>
+                  <th className="py-3 px-4">Type &amp; Slip</th>
                   <th className="py-3 px-4">Vendor</th>
                   <th className="py-3 px-4">Product &amp; Volume</th>
                   <th className="py-3 px-4">Quality / Lot</th>
@@ -1453,9 +1023,7 @@ export default function DailyCollectionsPage() {
                           )}
                           <div>
                             <p className="font-bold text-slate-900">{isMilk ? "Milk" : item.category}</p>
-                            <p className="text-[10px] text-slate-400 font-mono">
-                              {item.collection_date} • {item.collection_id} ({item.shift})
-                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono">{item.collection_id}</p>
                           </div>
                         </div>
                       </td>
@@ -1484,7 +1052,7 @@ export default function DailyCollectionsPage() {
 
                       <td className="py-3 px-4">
                         {isMilk ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5">
                             {item.fat_percentage && (
                               <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 font-bold text-[10px]">
                                 {item.fat_percentage}% Fat
@@ -1495,14 +1063,9 @@ export default function DailyCollectionsPage() {
                                 {item.snf_percentage}% SNF
                               </span>
                             )}
-                            {item.clr_reading && (
-                              <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 font-bold text-[10px]">
-                                CLR {item.clr_reading}
-                              </span>
-                            )}
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5">
                             {item.packaging_type && (
                               <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px]">
                                 {item.packaging_type}
@@ -1525,8 +1088,8 @@ export default function DailyCollectionsPage() {
                         <button
                           onClick={() => handleTogglePayment(item)}
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${item.payment_status === "PAID"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
                             }`}
                         >
                           {item.payment_status}
@@ -1539,7 +1102,7 @@ export default function DailyCollectionsPage() {
                             <a
                               href={`tel:${vendorPhone}`}
                               className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-                              title={`Call ${item.vendor_name}`}
+                              title={`Call ${item.vendor_name} (+91 ${vendorPhone.replace(/^(\+91|91|0)/, '')})`}
                             >
                               <PhoneCall size={14} />
                             </a>
@@ -1550,7 +1113,7 @@ export default function DailyCollectionsPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
-                            title={`Send WhatsApp Slip`}
+                            title={`Send WhatsApp Slip to ${item.vendor_name} (${vendorPhone ? `+91 ${vendorPhone.replace(/^(\+91|91|0)/, '')}` : 'Vendor'})`}
                           >
                             <MessageSquare size={15} />
                           </a>
@@ -1584,15 +1147,7 @@ export default function DailyCollectionsPage() {
       {/* ========================================================================= */}
       {/* MOBILE STICKY FLOATING ACTION BUTTON */}
       {/* ========================================================================= */}
-      <div className="fixed bottom-4 right-4 sm:hidden z-30 flex items-center gap-2">
-        <button
-          onClick={() => setIsSummaryModalOpen(true)}
-          className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-900 text-white font-extrabold shadow-xl shadow-emerald-950/40 active:scale-95 transition-all border border-emerald-700"
-          title="Summary"
-        >
-          <BarChart3 size={20} />
-        </button>
-
+      <div className="fixed bottom-4 right-4 sm:hidden z-30">
         <button
           onClick={() => openAddModal()}
           className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-[#16a34a] text-white font-extrabold text-sm shadow-xl shadow-emerald-700/40 active:scale-95 transition-all"
@@ -1601,457 +1156,6 @@ export default function DailyCollectionsPage() {
           <span>Record Intake</span>
         </button>
       </div>
-
-      {/* ========================================================================= */}
-      {/* DEDICATED PROCUREMENT & QUALITY AUDIT SUMMARY MODAL */}
-      {/* ========================================================================= */}
-      {isSummaryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col overflow-hidden">
-            {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-600/20">
-                  <BarChart3 size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-bold text-slate-900">Procurement &amp; Quality Audit</h2>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      {activeDateLabel}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Comprehensive procurement statistics, shift volumes, quality lab averages, and vendor balances
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs"
-                  title="Print Report"
-                >
-                  <Printer size={14} />
-                  <span>Print</span>
-                </button>
-
-                <button
-                  onClick={exportCollectionsCSV}
-                  className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs"
-                  title="Download CSV"
-                >
-                  <Download size={14} />
-                  <span>CSV</span>
-                </button>
-
-                <a
-                  href={getWhatsAppSummaryShareUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-[#16a34a] hover:bg-emerald-700 transition-colors shadow-xs"
-                  title="Share Summary via WhatsApp"
-                >
-                  <Share2 size={14} />
-                  <span className="hidden sm:inline">Share</span>
-                </a>
-
-                <button
-                  onClick={() => setIsSummaryModalOpen(false)}
-                  className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Tabs */}
-            <div className="flex items-center gap-2 px-4 sm:px-6 pt-3 border-b border-slate-100 bg-white overflow-x-auto">
-              <button
-                onClick={() => setSummaryModalTab("overview")}
-                className={`pb-2.5 px-2 text-xs font-bold transition-all border-b-2 shrink-0 ${summaryModalTab === "overview"
-                    ? "border-emerald-600 text-emerald-700"
-                    : "border-transparent text-slate-500 hover:text-slate-900"
-                  }`}
-              >
-                Executive Overview
-              </button>
-              <button
-                onClick={() => setSummaryModalTab("vendors")}
-                className={`pb-2.5 px-2 text-xs font-bold transition-all border-b-2 shrink-0 ${summaryModalTab === "vendors"
-                    ? "border-emerald-600 text-emerald-700"
-                    : "border-transparent text-slate-500 hover:text-slate-900"
-                  }`}
-              >
-                Supplier / Vendor Breakdown ({summary.vendorBreakdown?.length || summary.activeVendorsCount || 0})
-              </button>
-              <button
-                onClick={() => setSummaryModalTab("products")}
-                className={`pb-2.5 px-2 text-xs font-bold transition-all border-b-2 shrink-0 ${summaryModalTab === "products"
-                    ? "border-emerald-600 text-emerald-700"
-                    : "border-transparent text-slate-500 hover:text-slate-900"
-                  }`}
-              >
-                Product Breakdown ({summary.productBreakdown?.length || 0})
-              </button>
-              <button
-                onClick={() => setSummaryModalTab("quality")}
-                className={`pb-2.5 px-2 text-xs font-bold transition-all border-b-2 shrink-0 ${summaryModalTab === "quality"
-                    ? "border-emerald-600 text-emerald-700"
-                    : "border-transparent text-slate-500 hover:text-slate-900"
-                  }`}
-              >
-                Milk Shifts &amp; Quality Audit
-              </button>
-            </div>
-
-            {/* Scrollable Modal Content */}
-            <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
-              {summaryModalTab === "overview" && (
-                <div className="space-y-5">
-                  {/* Key KPI Strip */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="p-3.5 bg-purple-50/70 rounded-2xl border border-purple-100">
-                      <p className="text-[10px] font-bold text-purple-700 uppercase">Total Procurement</p>
-                      <p className="text-xl font-black text-purple-950 mt-1">
-                        ₹{summary.totalAmount.toLocaleString("en-IN")}
-                      </p>
-                      <p className="text-[10px] text-purple-600 mt-0.5">{summary.totalCollections} collection slips</p>
-                    </div>
-
-                    <div className="p-3.5 bg-blue-50/70 rounded-2xl border border-blue-100">
-                      <p className="text-[10px] font-bold text-blue-700 uppercase">Milk Volume</p>
-                      <p className="text-xl font-black text-blue-950 mt-1">
-                        {summary.totalMilkQuantity} <span className="text-xs font-semibold">Liters</span>
-                      </p>
-                      <p className="text-[10px] text-blue-600 mt-0.5">AM: {summary.morningMilkQuantity}L • PM: {summary.eveningMilkQuantity}L</p>
-                    </div>
-
-                    <div className="p-3.5 bg-amber-50/70 rounded-2xl border border-amber-100">
-                      <p className="text-[10px] font-bold text-amber-700 uppercase">Produce &amp; Ghee</p>
-                      <p className="text-xl font-black text-amber-950 mt-1">
-                        {summary.totalOthersQuantity} <span className="text-xs font-semibold">Kg/Units</span>
-                      </p>
-                      <p className="text-[10px] text-amber-600 mt-0.5">{summary.othersCollectionsCount} produce batches</p>
-                    </div>
-
-                    <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-100">
-                      <p className="text-[10px] font-bold text-emerald-700 uppercase">Active Farmers</p>
-                      <p className="text-xl font-black text-emerald-950 mt-1">
-                        {summary.activeVendorsCount} <span className="text-xs font-semibold">Suppliers</span>
-                      </p>
-                      <p className="text-[10px] text-emerald-600 mt-0.5">Verified deliveries</p>
-                    </div>
-                  </div>
-
-                  {/* Financial Settlement Progress Bar */}
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Coins size={15} className="text-emerald-600" /> Payment &amp; Settlement Status
-                      </span>
-                      <span className="text-xs font-mono font-bold text-slate-700">
-                        Total ₹{summary.totalAmount.toLocaleString("en-IN")}
-                      </span>
-                    </div>
-
-                    {/* Progress multi-color bar */}
-                    {summary.totalAmount > 0 ? (
-                      <div className="w-full h-3 rounded-full bg-slate-200 flex overflow-hidden">
-                        <div
-                          style={{ width: `${((summary.paidAmount || 0) / summary.totalAmount) * 100}%` }}
-                          className="bg-emerald-500 h-full"
-                          title={`Paid: ₹${(summary.paidAmount || 0).toLocaleString("en-IN")}`}
-                        />
-                        <div
-                          style={{ width: `${((summary.partialAmount || 0) / summary.totalAmount) * 100}%` }}
-                          className="bg-blue-500 h-full"
-                          title={`Partial: ₹${(summary.partialAmount || 0).toLocaleString("en-IN")}`}
-                        />
-                        <div
-                          style={{ width: `${((summary.pendingAmount || 0) / summary.totalAmount) * 100}%` }}
-                          className="bg-amber-500 h-full"
-                          title={`Pending: ₹${(summary.pendingAmount || 0).toLocaleString("en-IN")}`}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-3 rounded-full bg-slate-200" />
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2 text-xs pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-slate-500">Paid Settlement</p>
-                          <p className="font-bold text-emerald-700">₹{(summary.paidAmount || 0).toLocaleString("en-IN")}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-slate-500">Partial Settlement</p>
-                          <p className="font-bold text-blue-700">₹{(summary.partialAmount || 0).toLocaleString("en-IN")}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-slate-500">Pending Settlement</p>
-                          <p className="font-bold text-amber-700">₹{(summary.pendingAmount || 0).toLocaleString("en-IN")}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Top Quality Lab Averages */}
-                  <div className="p-4 bg-gradient-to-r from-blue-50/60 to-emerald-50/60 rounded-2xl border border-blue-200/60 space-y-2.5">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Gauge size={15} className="text-blue-600" /> Milk Quality Lab Audit Benchmarks
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="bg-white p-3 rounded-xl border border-slate-200/80">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Avg Fat</span>
-                        <p className="text-base font-black text-blue-800">{summary.avgFat ? `${summary.avgFat}%` : "--"}</p>
-                        <span className="text-[9px] text-slate-400">Target: &gt; 4.0%</span>
-                      </div>
-
-                      <div className="bg-white p-3 rounded-xl border border-slate-200/80">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Avg SNF</span>
-                        <p className="text-base font-black text-emerald-800">{summary.avgSnf ? `${summary.avgSnf}%` : "--"}</p>
-                        <span className="text-[9px] text-slate-400">Target: &gt; 8.5%</span>
-                      </div>
-
-                      <div className="bg-white p-3 rounded-xl border border-slate-200/80">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Avg CLR Reading</span>
-                        <p className="text-base font-black text-indigo-800">{summary.avgClr || "--"}</p>
-                        <span className="text-[9px] text-slate-400">Target: 28 – 30</span>
-                      </div>
-
-                      <div className="bg-white p-3 rounded-xl border border-slate-200/80">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Avg Intake Temp</span>
-                        <p className="text-base font-black text-teal-800">{summary.avgTemperature ? `${summary.avgTemperature}°C` : "--"}</p>
-                        <span className="text-[9px] text-slate-400">Chilled: &lt; 4°C</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Vendors Breakdown Tab */}
-              {summaryModalTab === "vendors" && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800">Supplier-wise Deliveries &amp; Balance</span>
-                    <span className="text-slate-500">{summary.vendorBreakdown?.length || 0} active vendors</span>
-                  </div>
-
-                  {(!summary.vendorBreakdown || summary.vendorBreakdown.length === 0) ? (
-                    <div className="p-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl">
-                      No vendor deliveries recorded for this selection.
-                    </div>
-                  ) : (
-                    <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] border-b border-slate-200">
-                          <tr>
-                            <th className="p-3">Farmer / Vendor</th>
-                            <th className="p-3">Slips</th>
-                            <th className="p-3">Total Volume</th>
-                            <th className="p-3">Total Payout</th>
-                            <th className="p-3">Paid / Pending</th>
-                            <th className="p-3 text-right">WhatsApp</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                          {summary.vendorBreakdown.map((v, i) => {
-                            const vCleanPhone = formatWhatsAppPhone(v.vendor_phone);
-                            const vendorWhatsAppUrl = vCleanPhone
-                              ? `https://wa.me/${vCleanPhone}?text=${encodeURIComponent(
-                                `*🥛 F2H Fresh Supplier Statement*\n` +
-                                `*Period:* ${activeDateLabel}\n` +
-                                `*Vendor:* ${v.vendor_name}\n` +
-                                `*Total Deliveries:* ${v.count}\n` +
-                                `*Total Volume:* ${v.quantity}\n` +
-                                `*Total Amount:* ₹${v.amount.toLocaleString("en-IN")}\n` +
-                                `*Paid:* ₹${v.paid_amount.toLocaleString("en-IN")} | *Pending:* ₹${v.pending_amount.toLocaleString("en-IN")}\n` +
-                                `Thank you for partnering with F2H Fresh!`
-                              )}`
-                              : "";
-
-                            return (
-                              <tr key={i} className="hover:bg-slate-50/70">
-                                <td className="p-3">
-                                  <p className="font-bold text-slate-900">{v.vendor_name}</p>
-                                  {v.vendor_phone && (
-                                    <span className="text-[10px] text-slate-500 font-mono">+91 {v.vendor_phone.replace(/^(\+91|91|0)/, '')}</span>
-                                  )}
-                                </td>
-                                <td className="p-3 font-mono">{v.count}</td>
-                                <td className="p-3 font-bold text-slate-800">{v.quantity}</td>
-                                <td className="p-3 font-bold text-emerald-800">₹{v.amount.toLocaleString("en-IN")}</td>
-                                <td className="p-3">
-                                  <div className="text-[10px]">
-                                    <span className="text-emerald-700 font-bold">Paid: ₹{v.paid_amount.toLocaleString("en-IN")}</span>
-                                    {v.pending_amount > 0 && (
-                                      <span className="text-amber-700 font-bold block">Pend: ₹{v.pending_amount.toLocaleString("en-IN")}</span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="p-3 text-right">
-                                  {vCleanPhone ? (
-                                    <a
-                                      href={vendorWhatsAppUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
-                                    >
-                                      <MessageSquare size={12} /> Send Statement
-                                    </a>
-                                  ) : (
-                                    <span className="text-[10px] text-slate-400">No phone</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Products Breakdown Tab */}
-              {summaryModalTab === "products" && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800">Product &amp; Commodity Breakdown</span>
-                    <span className="text-slate-500">{summary.productBreakdown?.length || 0} unique items</span>
-                  </div>
-
-                  {(!summary.productBreakdown || summary.productBreakdown.length === 0) ? (
-                    <div className="p-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl">
-                      No product data available for this range.
-                    </div>
-                  ) : (
-                    <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] border-b border-slate-200">
-                          <tr>
-                            <th className="p-3">Product Name</th>
-                            <th className="p-3">Entries</th>
-                            <th className="p-3">Total Quantity</th>
-                            <th className="p-3">Total Cost (₹)</th>
-                            <th className="p-3 text-right">Avg Rate / Unit</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                          {summary.productBreakdown.map((p, i) => (
-                            <tr key={i} className="hover:bg-slate-50/70">
-                              <td className="p-3 font-bold text-slate-900">{p.name}</td>
-                              <td className="p-3 font-mono">{p.count}</td>
-                              <td className="p-3 font-bold text-slate-800">
-                                {p.quantity} {p.unit}
-                              </td>
-                              <td className="p-3 font-bold text-emerald-800">₹{p.amount.toLocaleString("en-IN")}</td>
-                              <td className="p-3 text-right font-mono font-semibold text-slate-700">
-                                ₹{p.quantity > 0 ? (p.amount / p.quantity).toFixed(2) : "0.00"} / {p.unit}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Quality & Shifts Tab */}
-              {summaryModalTab === "quality" && (
-                <div className="space-y-4">
-                  {/* Shift Volumes Card */}
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Clock size={15} className="text-blue-600" /> Shift-wise Milk Volume Distribution
-                    </span>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-200">
-                        <span className="text-[10px] font-bold text-amber-800 flex items-center gap-1 uppercase">
-                          <Sun size={12} /> Morning (AM)
-                        </span>
-                        <p className="text-lg font-black text-amber-950 mt-1">{summary.morningMilkQuantity} L</p>
-                      </div>
-
-                      <div className="bg-indigo-50/80 p-3 rounded-xl border border-indigo-200">
-                        <span className="text-[10px] font-bold text-indigo-800 flex items-center gap-1 uppercase">
-                          <Moon size={12} /> Evening (PM)
-                        </span>
-                        <p className="text-lg font-black text-indigo-950 mt-1">{summary.eveningMilkQuantity} L</p>
-                      </div>
-
-                      <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200">
-                        <span className="text-[10px] font-bold text-blue-800 uppercase">Afternoon</span>
-                        <p className="text-lg font-black text-blue-950 mt-1">{summary.afternoonMilkQuantity || 0} L</p>
-                      </div>
-
-                      <div className="bg-slate-100 p-3 rounded-xl border border-slate-200">
-                        <span className="text-[10px] font-bold text-slate-700 uppercase">General</span>
-                        <p className="text-lg font-black text-slate-900 mt-1">{summary.generalMilkQuantity || 0} L</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quality Audit Cards */}
-                  <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Gauge size={15} className="text-emerald-600" /> Quality Averages Across All Intakes
-                    </span>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
-                        <span className="text-[10px] font-bold text-blue-800 uppercase block">Average Fat</span>
-                        <span className="text-2xl font-black text-blue-900">{summary.avgFat ? `${summary.avgFat}%` : "--"}</span>
-                      </div>
-
-                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                        <span className="text-[10px] font-bold text-emerald-800 uppercase block">Average SNF</span>
-                        <span className="text-2xl font-black text-emerald-900">{summary.avgSnf ? `${summary.avgSnf}%` : "--"}</span>
-                      </div>
-
-                      <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                        <span className="text-[10px] font-bold text-indigo-800 uppercase block">Average CLR</span>
-                        <span className="text-2xl font-black text-indigo-900">{summary.avgClr || "--"}</span>
-                      </div>
-
-                      <div className="p-3 bg-teal-50 rounded-xl border border-teal-100">
-                        <span className="text-[10px] font-bold text-teal-800 uppercase block">Average Temp</span>
-                        <span className="text-2xl font-black text-teal-900">{summary.avgTemperature ? `${summary.avgTemperature}°C` : "--"}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">
-                F2H Fresh Procurement Engine • {collections.length} entries analyzed
-              </span>
-              <button
-                onClick={() => setIsSummaryModalOpen(false)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-semibold hover:bg-slate-800 shadow-xs"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* RECORD INTAKE MODAL (SELECT MILK OR OTHERS) */}
@@ -2085,21 +1189,21 @@ export default function DailyCollectionsPage() {
                   type="button"
                   onClick={() => handleIntakeModeSwitch("MILK")}
                   className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${intakeMode === "MILK"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-700 hover:bg-slate-200"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-700 hover:bg-slate-200"
                     }`}
                 >
-                  <Droplet size={15} /> 🥛 Milk Procurement
+                  <Droplet size={15} />  Milk Procurement
                 </button>
                 <button
                   type="button"
                   onClick={() => handleIntakeModeSwitch("OTHERS")}
                   className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${intakeMode === "OTHERS"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-slate-700 hover:bg-slate-200"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-700 hover:bg-slate-200"
                     }`}
                 >
-                  <Apple size={15} /> 🍎 Ghee, Fruits &amp; Others
+                  <Apple size={15} />  Others
                 </button>
               </div>
             </div>
@@ -2368,7 +1472,7 @@ export default function DailyCollectionsPage() {
                     </div>
                   </div>
 
-                  {/* Rate per Unit */}
+                  {/* Rate per Unit & Rate Presets */}
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-800">
                       Rate per {formData.unit} (₹)
@@ -2643,12 +1747,6 @@ export default function DailyCollectionsPage() {
                             </span>
                           </div>
                         )}
-                        {selectedCollection.clr_reading && (
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-sans text-slate-600">CLR Reading:</span>
-                            <span className="font-bold text-indigo-700">{selectedCollection.clr_reading}</span>
-                          </div>
-                        )}
                         {selectedCollection.container_can_no && (
                           <div className="flex justify-between items-center text-xs">
                             <span className="font-sans text-slate-600">Can No:</span>
@@ -2740,8 +1838,8 @@ export default function DailyCollectionsPage() {
                   <button
                     onClick={() => handleTogglePayment(selectedCollection)}
                     className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${selectedCollection.payment_status === "PAID"
-                        ? "bg-amber-50 text-amber-800 border-amber-200"
-                        : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      ? "bg-amber-50 text-amber-800 border-amber-200"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-200"
                       }`}
                   >
                     {selectedCollection.payment_status === "PAID" ? "Mark Pending" : "Mark Paid"}

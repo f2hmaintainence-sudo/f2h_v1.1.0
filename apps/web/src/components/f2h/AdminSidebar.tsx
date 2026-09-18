@@ -313,15 +313,11 @@ export function AdminSidebar() {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-5 pt-6 pb-4 flex items-center gap-3">
-        <img src="/assets/log1.webp" alt="F2H" className="h-10 w-auto" />
-        {!collapsed && (
-          <div>
-            <span className="text-lg font-bold text-deep-green tracking-tight">F2H</span>
-            <span className="block text-[10px] font-medium text-deep-green/60 uppercase tracking-[0.2em] -mt-0.5">
-              Farm to Home
-            </span>
-          </div>
+      <div className={`pt-6 pb-4 flex items-center transition-all ${collapsed ? "px-3 justify-center" : "px-5"}`}>
+        {!collapsed ? (
+          <img src="/assets/logo.svg" alt="F2H - Farm to Home" className="h-10 w-auto max-w-[170px] object-contain" />
+        ) : (
+          <img src="/assets/log1.webp" alt="F2H" className="h-9 w-9 rounded-full object-contain mx-auto shadow-xs" />
         )}
       </div>
 
@@ -347,11 +343,10 @@ export function AdminSidebar() {
                       <div
                         onClick={() => toggleMenu(item.name)}
                         ref={isParentActive && !isExpanded ? (activeLinkRef as any) : null}
-                        className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group ${
-                          isParentActive && !isExpanded
+                        className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group ${isParentActive && !isExpanded
                             ? "bg-brand-blue/10 text-brand-blue font-bold"
                             : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <item.icon
@@ -363,9 +358,8 @@ export function AdminSidebar() {
                         {!collapsed && (
                           <ChevronDown
                             size={16}
-                            className={`text-deep-green/40 transition-transform duration-200 ${
-                              isExpanded ? "rotate-180" : ""
-                            }`}
+                            className={`text-deep-green/40 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+                              }`}
                           />
                         )}
                       </div>
@@ -385,11 +379,10 @@ export function AdminSidebar() {
                                   href={sub.href}
                                   ref={isSubActive ? (activeLinkRef as any) : null}
                                   onClick={() => setMobileOpen(false)}
-                                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 group ${
-                                    isSubActive
+                                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 group ${isSubActive
                                       ? "bg-[#388e3c] text-white shadow-md shadow-green-500/20"
                                       : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
-                                  }`}
+                                    }`}
                                 >
                                   <sub.icon
                                     size={14}
@@ -415,11 +408,10 @@ export function AdminSidebar() {
                     href={item.href || "#"}
                     ref={isActive ? (activeLinkRef as any) : null}
                     onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
-                      isActive
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${isActive
                         ? "bg-[#388e3c] text-white shadow-lg shadow-green-500/30"
                         : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
-                    }`}
+                      }`}
                   >
                     <Icon
                       size={18}
@@ -464,9 +456,8 @@ export function AdminSidebar() {
 
       {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col fixed top-0 left-0 h-screen bg-slate-50 border-r border-slate-200 z-40 transition-all duration-300 ${
-          collapsed ? "w-20" : "w-64"
-        }`}
+        className={`hidden lg:flex flex-col fixed top-0 left-0 h-screen bg-slate-50 border-r border-slate-200 z-40 transition-all duration-300 ${collapsed ? "w-20" : "w-64"
+          }`}
       >
         {sidebarContent}
       </aside>

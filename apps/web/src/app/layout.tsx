@@ -69,17 +69,30 @@ export const metadata: Metadata = {
     description:
       "Fresh, FSSAI-verified milk delivered to your doorstep every morning. Trusted by 10,000+ families.",
     siteName: "F2H",
+    images: [
+      {
+        url: "/assets/log1.webp",
+        width: 512,
+        height: 512,
+        alt: "F2H - Farm to Home",
+      },
+    ],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "F2H — Farm to Home | Fresh Milk Delivery",
     description:
       "Fresh, FSSAI-verified milk delivered to your doorstep every morning. Trusted by 10,000+ families.",
+    images: ["/assets/log1.webp"],
   },
   icons: {
-    icon: "/assets/log1.webp",
-    shortcut: "/assets/log1.webp",
-    apple: "/assets/log1.webp",
+    icon: [
+      { url: "/favicon.png", sizes: "64x64", type: "image/png" },
+      { url: "/assets/log1.webp", sizes: "512x512", type: "image/webp" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: "/favicon.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 
