@@ -11,6 +11,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/login_screen.dart';
+import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_customer/features/orders/presentation/screens/order_history_screen.dart';
 import 'package:f2h_customer/features/address/presentation/widgets/address_selector_drawer.dart';
 import 'package:f2h_customer/features/profile/data/models/profile_model.dart';
@@ -364,9 +365,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                     _buildTextField(
                       controller: phoneController,
                       label: 'Phone Number *',
-                      hint: 'Enter your phone number',
+                      hint: '10-digit mobile number',
                       icon: Icons.phone_android_outlined,
                       keyboardType: TextInputType.phone,
+                      maxLength: 10,
+                      prefixText: '+91 ',
+                      inputFormatters: [
+                        IndianMobileNumberInputFormatter(),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     _buildDatePickerField(
@@ -439,6 +445,24 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 _showToast(
                                   context,
                                   'Please enter a valid email address',
+                                  isError: true,
+                                );
+                                return;
+                              }
+
+                              if (mobile.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(mobile)) {
+                                _showToast(
+                                  context,
+                                  'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9',
+                                  isError: true,
+                                );
+                                return;
+                              }
+
+                              if (RegExp(r'^([6-9])\1{9}$').hasMatch(mobile)) {
+                                _showToast(
+                                  context,
+                                  'Please enter a valid mobile number (repeated digits not allowed)',
                                   isError: true,
                                 );
                                 return;
@@ -521,16 +545,28 @@ class _ProfileScreenState extends State<ProfileScreen>
     required String hint,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    String? prefixText,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      maxLength: maxLength,
       style: const TextStyle(
         fontWeight: FontWeight.w700,
         color: kText,
         fontSize: 15,
       ),
       decoration: InputDecoration(
+        counterText: '',
+        prefixText: prefixText,
+        prefixStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: kText,
+          fontSize: 15,
+        ),
         labelText: label,
         hintText: hint,
         prefixIcon: Icon(icon, color: kPrimaryMid, size: 20),

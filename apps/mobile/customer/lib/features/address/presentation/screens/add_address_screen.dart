@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
@@ -1662,11 +1664,25 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
                         const SizedBox(height: 12),
                         _buildField(
                           contactMobileController,
-                          'Mobile Number *',
+                          '10-digit Mobile Number *',
                           Icons.phone_outlined,
                           keyboard: TextInputType.phone,
-                          validator: (v) =>
-                              v!.length < 10 ? 'Enter valid 10-digit number' : null,
+                          maxLength: 10,
+                          prefixText: '+91 ',
+                          inputFormatters: [
+                            IndianMobileNumberInputFormatter(),
+                          ],
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Mobile number required';
+                            final clean = v.replaceAll(RegExp(r'\D'), '');
+                            if (clean.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+                              return 'Enter valid 10-digit number (starts with 6-9)';
+                            }
+                            if (RegExp(r'^([6-9])\1{9}$').hasMatch(clean)) {
+                              return 'Invalid repeated mobile number';
+                            }
+                            return null;
+                          },
                         ),
 
                         const SizedBox(height: 24),
@@ -2709,6 +2725,9 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     IconData icon, {
     TextInputType keyboard = TextInputType.text,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    String? prefixText,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -2720,13 +2739,22 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         controller: ctrl,
         keyboardType: keyboard,
         validator: validator,
+        inputFormatters: inputFormatters,
+        maxLength: maxLength,
         style: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: kText,
         ),
         decoration: InputDecoration(
+          counterText: '',
           prefixIcon: Icon(icon, color: kMuted, size: 18),
+          prefixText: prefixText,
+          prefixStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: kText,
+          ),
           hintText: hint,
           hintStyle: const TextStyle(
             color: kMuted,
