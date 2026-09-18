@@ -38,6 +38,12 @@ export class AuthService {
            ON CONFLICT (delivery_partner_id) DO NOTHING`,
           [userId, branchId],
         );
+        await this.db.query(
+          `INSERT INTO customers (customer_id, branch_id, wallet_balance, customer_type, first_order_completed, created_at, updated_at)
+           VALUES ($1, $2, 0.00, 'retail', false, NOW(), NOW())
+           ON CONFLICT (customer_id) DO NOTHING`,
+          [userId, branchId],
+        );
         boyRes = await this.db.query(
           `SELECT is_active, is_online, is_available, delivery_partner_id
            FROM delivery_partners

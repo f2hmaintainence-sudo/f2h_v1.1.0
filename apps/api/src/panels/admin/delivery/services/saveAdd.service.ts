@@ -118,7 +118,17 @@ export class DeliverySaveAddService {
           updated_at: now,
         }, { transaction: tx });
 
-
+        // 3. Insert into customers (every user is a customer)
+        await this.dataService.insert('customers', {
+          customer_id: partnerId,
+          branch_id: body.branch_id || null,
+          wallet_balance: 0,
+          customer_type: 'retail',
+          first_order_completed: false,
+          created_by: adminId,
+          created_at: now,
+          updated_at: now,
+        }, { transaction: tx });
       });
 
       await this.dataService.insert('admin_audit_logs', {

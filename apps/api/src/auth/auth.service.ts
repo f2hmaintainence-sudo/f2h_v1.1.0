@@ -611,13 +611,30 @@ export class AuthService {
           selectedBranchId = branches[0].branch_id;
         }
 
-        // Clean up any placeholder customer record created during preliminary OTP verification
+        // Every user is a customer — ensure customer record exists for delivery partners
         try {
-          await this.DataBase.query(
-            `DELETE FROM customers WHERE customer_id = $1`,
-            [userId],
-          );
-        } catch (_) {}
+          const existingCust = await this.Data.query('customers', {
+            where: [{ column: 'customer_id', operator: '=', value: userId }],
+            limit: 1,
+          });
+          if (!existingCust?.data?.length) {
+            await this.Data.insert(
+              'customers',
+              {
+                customer_id: userId,
+                branch_id: selectedBranchId || null,
+                wallet_balance: 0,
+                customer_type: 'retail',
+                first_order_completed: false,
+                created_at: now,
+                updated_at: now,
+              },
+              { transaction },
+            );
+          }
+        } catch (custErr) {
+          console.error('[AuthService] Failed to ensure customer record for delivery partner:', custErr);
+        }
 
         const existingDp = await this.Data.query('delivery_partners', {
           where: [{ column: 'delivery_partner_id', operator: '=', value: userId }],
@@ -964,17 +981,34 @@ export class AuthService {
 
       await this.Data.insert('users', userInsertData);
 
-      if (initialRole === 'CUSTOMER') {
+      // Every user is a customer — always create customer record
+      try {
+        const customerInsertData: any = {
+          customer_id: userId,
+          first_order_completed: false,
+          created_at: now,
+          updated_at: now,
+        };
+        await this.Data.insert('customers', customerInsertData);
+      } catch (custErr) {
+        console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
+      }
+
+      if (initialRole === 'DELIVERY_PARTNER') {
         try {
-          const customerInsertData: any = {
-            customer_id: userId,
-            first_order_completed: false,
+          await this.Data.insert('delivery_partners', {
+            delivery_partner_id: userId,
+            is_active: true,
+            is_verified: true,
+            is_available: true,
+            is_online: false,
+            vehicle_type: 'BIKE',
+            vehicle_number: 'N/A',
             created_at: now,
             updated_at: now,
-          };
-          await this.Data.insert('customers', customerInsertData);
-        } catch (custErr) {
-          console.error('[AuthService] Auto customer record creation failed during OTP verify:', custErr);
+          });
+        } catch (dpErr) {
+          console.error('[AuthService] Auto delivery partner record creation failed during OTP verify:', dpErr);
         }
       }
 
@@ -1625,28 +1659,30 @@ export class AuthService {
         updated_at: new Date(),
       });
 
-      if (roleId === ROLE.CUSTOMER) {
-        try {
-          const now = new Date();
-          const activeBranchRes = await this.Data.query('branches', {
-            select: ['branch_id'],
-            where: [{ column: 'is_active', operator: '=', value: true }],
-            limit: 1,
-          });
-          const targetBranchId = activeBranchRes?.data?.[0]?.branch_id || null;
+      // Every user is a customer — always create customer record
+      try {
+        const now = new Date();
+        const activeBranchRes = await this.Data.query('branches', {
+          select: ['branch_id'],
+          where: [{ column: 'is_active', operator: '=', value: true }],
+          limit: 1,
+        });
+        const targetBranchId = activeBranchRes?.data?.[0]?.branch_id || null;
 
-          await this.Data.insert('customers', {
-            customer_id: userId,
-            branch_id: targetBranchId,
-            wallet_balance: 0,
-            first_order_completed: false,
-            created_at: now,
-            updated_at: now,
-          });
-        } catch (custErr) {
-          console.error('[AuthService] Auto customer record creation failed during Google login:', custErr);
-        }
-      } else if (roleId === ROLE.DELIVERY_PARTNER) {
+        await this.Data.insert('customers', {
+          customer_id: userId,
+          branch_id: targetBranchId,
+          wallet_balance: 0,
+          customer_type: 'retail',
+          first_order_completed: false,
+          created_at: now,
+          updated_at: now,
+        });
+      } catch (custErr) {
+        console.error('[AuthService] Auto customer record creation failed during Google login:', custErr);
+      }
+
+      if (roleId === ROLE.DELIVERY_PARTNER) {
         try {
           const now = new Date();
           const activeBranchRes = await this.Data.query('branches', {
@@ -1682,8 +1718,11 @@ export class AuthService {
             [ROLE.DELIVERY_PARTNER, user.user_id],
           );
           user.role_id = ROLE.DELIVERY_PARTNER;
+          // Every user is a customer — ensure customer record is retained
           await this.DataBase.query(
-            `DELETE FROM customers WHERE customer_id = $1`,
+            `INSERT INTO customers (customer_id, wallet_balance, customer_type, first_order_completed, created_at, updated_at)
+             VALUES ($1, 0.00, 'retail', false, NOW(), NOW())
+             ON CONFLICT (customer_id) DO NOTHING`,
             [user.user_id],
           );
         } catch (upgradeErr) {

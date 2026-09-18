@@ -347,6 +347,15 @@ export class AdminSystemService {
             now,
           ],
         );
+
+        // Every user is a customer — insert into customers table
+        await client.query(
+          `INSERT INTO customers (
+             customer_id, branch_id, wallet_balance, customer_type, first_order_completed, created_at, updated_at
+           ) VALUES ($1, $2, 0.00, 'retail', false, $3, $3)
+           ON CONFLICT (customer_id) DO NOTHING`,
+          [userId, branch_id?.trim() || null, now],
+        );
       });
 
       await this.createAuditLog({
