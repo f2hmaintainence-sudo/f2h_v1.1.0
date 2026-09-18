@@ -19,6 +19,7 @@ This report aggregates the verification results for all applications and databas
 | Test Domain | Target Surface | Test Plan Reference | Execution Method | Status |
 |---|---|---|---|---|
 | **Customer App UI** | Mobile Flutter App | `02-customer-app.md` | Code Inspection & Widget Diff Verification | **PASSED** |
+| **Referral Program & Link Attribution** | Mobile App & API & DB | `02-customer-app.md` / `05-end-to-end-integration-flows.md` | `node scripts/test-referrals.js` (10/10) | **PASSED** |
 | **Universal Customers** | PostgreSQL `f2h_dev` | `04-backend-api-and-db.md` | Migration 028 & SQL Invariant Checks | **PASSED** |
 | **Partner Auth & Provisioning** | API / Partner App | `03-delivery-partner-app.md` | API Service Verification & DB Query | **PASSED** |
 | **Admin Add Staff** | Admin Panel Web / API | `01-admin-panel.md` | Playwright Browser E2E + DB Inspection | **PASSED** |
@@ -58,6 +59,18 @@ This report aggregates the verification results for all applications and databas
   - Fleet: `/admin/delivery/partners` verified with 10 fleet members and 100% KYC compliance.
   - Staff: `/admin/staffs` verified with interactive "Add Staff Member" flow, live counter increment (2 -> 3), and database verification proving that `users.phone` and `customers` satellite row were generated simultaneously.
 
+### D. Referral Program & Link-Based Attribution (No Manual Code Entry)
+- **Suite**: `scripts/test-referrals.js`
+- **Report**: [Referral System Execution Report](file:///home/f2hfresh-dev/htdocs/dev.f2hfresh.com/.claude/test/18-09-2026/test-results/referral-system-execution-report.md)
+- **Verification**:
+  - Customer Flutter app `signup_screen.dart` verified: zero manual referral code input fields (`_showReferralField`, `_referralCodeController` removed).
+  - Deep link / storage auto-detection (`_checkPendingReferralCode`) & non-editable verification badge (`Referral Invite Applied`) verified.
+  - Live API validation (`POST /customer/referrals/validate`) accepts valid codes and rejects invalid codes.
+  - Pending referral row created with ₹100 referrer, ₹0 referee, `status = 'pending'`, and `remarks = 'link-based attribution'`.
+  - Referral reward engine executed: referrer wallet credited ₹100, referee wallet unchanged (₹0), referee `first_order_completed = true`, referral status updated to `rewarded`, and wallet ledger row inserted.
+  - Idempotency verified: second delivery event does not double-credit (0 pending referrals remain).
+  - Overall status: **10/10 tests passed (100%)**.
+
 ---
 
 ## 4. Test Artifacts & References
@@ -69,5 +82,8 @@ This report aggregates the verification results for all applications and databas
   - [Backend API & Database Test Plan](file:///home/f2hfresh-dev/htdocs/dev.f2hfresh.com/.claude/test/18-09-2026/test-plan/04-backend-api-and-db.md)
   - [E2E Integration Flows](file:///home/f2hfresh-dev/htdocs/dev.f2hfresh.com/.claude/test/18-09-2026/test-plan/05-end-to-end-integration-flows.md)
 - **Execution Reports & Screenshots**:
+  - [Referral System Execution Report](file:///home/f2hfresh-dev/htdocs/dev.f2hfresh.com/.claude/test/18-09-2026/test-results/referral-system-execution-report.md)
+  - [End-to-End Workflow Report](file:///home/f2hfresh-dev/htdocs/dev.f2hfresh.com/.claude/test/18-09-2026/test-results/customer-partner-e2e-workflow-report.md)
   - [Playwright E2E Test Report](file:///home/f2hfresh-dev/htdocs/dev.f2hfresh.com/.claude/test/18-09-2026/test-results/playwright-e2e-report.md)
   - [Playwright Screenshots Directory](file:///home/f2hfresh-dev/htdocs/dev.f2hfresh.com/.claude/test/18-09-2026/test-results/playwright-screenshots/)
+

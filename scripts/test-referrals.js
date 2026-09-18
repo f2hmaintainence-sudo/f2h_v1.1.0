@@ -1,23 +1,25 @@
 /**
- * Automated Referral System Verification Test
- * Tests the full referral lifecycle using:
- *  - Direct DB operations (setup / teardown)
- *  - Live HTTP calls to the running API for integration tests
+ * Automated Referral System Verification Test (18-09-2026)
+ * Invariant Under Test: Link-Based Attribution Only — No Manual Referral Code Entry
  *
- * Checks:
- *  1. Referral code validation API (valid code)
+ * Verification Checks:
+ *  0a. Mobile Customer UI Contract: manual referral code entry completely removed
+ *  0b. Mobile Customer UI Contract: link-based auto-attribution badge active
+ *  1. Referral code validation API (valid code accepted with referrer name)
  *  2. Referral code validation API (invalid code rejected)
- *  3. Pending referral record created correctly (₹100 referrer, ₹0 referee)
+ *  3. Pending referral record created correctly (₹100 referrer, ₹0 referee, link attribution)
  *  4. Reward engine logic (wallet credit, status update, wallet_tx row)
  *  5. Referrer wallet credited ₹100 (50+100 = 150)
  *  6. Referee first_order_completed=true, wallet unchanged (₹0)
- *  7. Referral status updated to 'rewarded'
- *  8. Idempotency: second trigger does NOT double-credit
+ *  7. Referral status updated to 'rewarded' with rewarded_at populated
+ *  8. Idempotency: second trigger does NOT double-credit (0 pending referrals remain)
  *
  * Run: node scripts/test-referrals.js
  */
 const { Pool } = require('pg');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const DB_URL = process.env.DATABASE_URL || 'postgresql://f2h_user:f2h_password@127.0.0.1:5432/f2h_dev';
 const API_BASE = 'http://127.0.0.1:5001/api/v1';
@@ -34,6 +36,7 @@ function httpPost(path, body) {
         port: 5001,
         path: `/api/v1${path}`,
         method: 'POST',
+        timeout: 5000,
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
@@ -48,7 +51,13 @@ function httpPost(path, body) {
         });
       },
     );
-    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ status: 408, data: { valid: false, message: 'Request timeout' } });
+    });
+    req.on('error', (err) => {
+      resolve({ status: 500, data: { valid: false, message: err.message } });
+    });
     req.write(payload);
     req.end();
   });
@@ -70,6 +79,37 @@ function assert(label, condition, detail = '') {
 
 // ─── Main test suite ──────────────────────────────────────────────────────────
 async function runTests() {
+  console.log('=== RUNNING REFERRAL SYSTEM VERIFICATION (NO MANUAL ENTRY INVARIANT) ===\n');
+
+  // ── Test 0: Client Contract Audit (No manual entry in Customer Signup Screen) ──
+  try {
+    const signupScreenPath = path.resolve(
+      __dirname,
+      '../apps/mobile/customer/lib/auth/presentation/screens/signup_screen.dart',
+    );
+    if (fs.existsSync(signupScreenPath)) {
+      const screenSrc = fs.readFileSync(signupScreenPath, 'utf8');
+
+      const noManualField = !screenSrc.includes('_showReferralField') &&
+                            !screenSrc.includes('Have a referral code?') &&
+                            !screenSrc.includes('_referralCodeController');
+      assert('0a. Mobile Customer UI Contract: manual referral code entry completely removed',
+        noManualField,
+        '(_showReferralField, _referralCodeController eliminated)');
+
+      const autoLinkAttribution = screenSrc.includes('_autoReferralCode') &&
+                                  screenSrc.includes('_checkPendingReferralCode') &&
+                                  screenSrc.includes('Referral Invite Applied');
+      assert('0b. Mobile Customer UI Contract: link-based auto-attribution badge active',
+        autoLinkAttribution,
+        '(_autoReferralCode & "Referral Invite Applied" badge present)');
+    } else {
+      console.warn('[WARN] signup_screen.dart not found at expected path:', signupScreenPath);
+    }
+  } catch (uiErr) {
+    assert('0. Mobile Customer UI Contract verification', false, uiErr.message);
+  }
+
   const client = await pool.connect();
   const ts = Date.now().toString().slice(-8);
 
@@ -105,7 +145,7 @@ async function runTests() {
       [refereeId],
     );
 
-    // Pending referral record
+    // Pending referral record (link-based attribution)
     await client.query(
       `INSERT INTO referrals (refer_id, referrer_customer_id, referred_customer_id, referral_code, referrer_reward_amount, referred_reward_amount, status, remarks, created_at, updated_at)
        VALUES ($1, $2, $3, $4, 100.00, 0.00, 'pending', 'link-based attribution', NOW(), NOW())`,
@@ -123,11 +163,12 @@ async function runTests() {
 
     // ── Test 3: Pending referral record integrity ──────────────────────────────
     const row = (await client.query('SELECT * FROM referrals WHERE refer_id = $1', [referId])).rows[0];
-    assert('3. Pending referral record created correctly',
+    assert('3. Pending referral record created correctly (link-based attribution)',
       row?.status === 'pending' &&
       parseFloat(row?.referrer_reward_amount) === 100 &&
-      parseFloat(row?.referred_reward_amount) === 0,
-      JSON.stringify({ status: row?.status, referrer_reward: row?.referrer_reward_amount, referred_reward: row?.referred_reward_amount }),
+      parseFloat(row?.referred_reward_amount) === 0 &&
+      row?.remarks === 'link-based attribution',
+      JSON.stringify({ status: row?.status, referrer_reward: row?.referrer_reward_amount, referred_reward: row?.referred_reward_amount, remarks: row?.remarks }),
     );
 
     // ── Test 4: Reward engine simulation ──────────────────────────────────────

@@ -79,3 +79,38 @@ Verification of the complete customer experience across Mobile and Web applicati
   - **Endpoint**: `POST /api/v1/payments/razorpay/create-order`
   - **Payload**: Amount in INR
   - **Assert**: Returns Razorpay order ID for mobile SDK checkout.
+
+### 6. Referral Program & Link-Based Attribution (No Manual Code Entry)
+- **TC-CUST-013: Signup Screen Contract — Zero Manual Referral Code Entry**
+  - **Screen**: `apps/mobile/customer/lib/auth/presentation/screens/signup_screen.dart`
+  - **Verification Points**:
+    1. Confirm `_showReferralField`, `Have a referral code?` toggle, and `_referralCodeController` are completely removed.
+    2. Users cannot type or paste a referral code manually during registration.
+- **TC-CUST-014: Deep Link / Storage Auto-Attribution & Verification Badge**
+  - **Screen / Logic**: `_checkPendingReferralCode()` & `_validateDetectedReferral()` in `SignupScreen`
+  - **Verification Points**:
+    1. Referral code detected automatically from URL query (`?ref=`, `?code=`), path (`/r/<code>`), or `SharedPreferences`.
+    2. Automatically validated against `/api/v1/customer/referrals/validate/:code`.
+    3. If valid, renders non-editable green invitation pill badge (`Referral Invite Applied`).
+- **TC-CUST-015: Referral Code Validation API**
+  - **Endpoint**: `POST /api/v1/customer/referrals/validate`
+  - **Assert**:
+    1. Valid code: returns `{ status: true, valid: true, referrer_name: ... }`.
+    2. Invalid code: returns `{ status: true, valid: false }`.
+    3. Self-referral: returns `{ status: true, valid: false, message: 'Self-referral is not allowed' }`.
+- **TC-CUST-016: Automatic Pending Referral Creation on Registration**
+  - **Endpoint**: `POST /api/v1/auth/register` (payload passes auto-detected `referral_code`)
+  - **Assert**:
+    1. `users.referred_by` set to referrer ID.
+    2. `customers` table record created with `wallet_balance = 0.00`, `first_order_completed = false`.
+    3. `referrals` table record created with `status = 'pending'`, `referrer_reward_amount = 100.00`, `referred_reward_amount = 0.00`, `remarks = 'link-based attribution'`.
+- **TC-CUST-017: First Order Delivery Reward Processing**
+  - **Engine**: `ReferralRewardEngineService.processReferralReward(refereeId, orderId)`
+  - **Assert**:
+    1. Referrer wallet credited ₹100.00 (`customers.wallet_balance` += 100).
+    2. `customer_wallet_transactions` ledger entry created (`reference_type = 'referral_bonus'`).
+    3. Referee wallet balance remains unchanged (₹0.00) and `first_order_completed = true`.
+    4. `referrals` record updated to `status = 'rewarded'` with `rewarded_at = NOW()`.
+- **TC-CUST-018: Referral Reward Idempotency**
+  - **Assert**: Second delivery event on same referee skips reward processing without double-crediting (0 pending records remain).
+
