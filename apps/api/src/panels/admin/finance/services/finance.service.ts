@@ -238,7 +238,7 @@ export class FinanceService {
 
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: 28, bottom: 28, left: 32, right: 32 },
+      margins: { top: 28, bottom: 20, left: 32, right: 32 },
       bufferPages: true,
       autoFirstPage: true,
     });
@@ -319,7 +319,6 @@ export class FinanceService {
     doc.font('Helvetica-Bold').fillColor(isPaid ? '#059669' : '#dc2626').text(isPaid ? 'PAID' : (dueAmount > 0 ? `DUE (${fmtMoney(dueAmount)})` : 'PENDING'), 410, cardY + 66, { width: 145, align: 'right' });
 
     // -------------------------------------------------------------
-    // -------------------------------------------------------------
     // LINE ITEMS TABLE HEADER
     // -------------------------------------------------------------
     const tableTop = 196;
@@ -342,7 +341,7 @@ export class FinanceService {
     }];
 
     itemList.forEach((item: any, idx: number) => {
-      if (currentY > 670) {
+      if (currentY > 620) {
         doc.addPage();
         currentY = 40;
       }
@@ -354,7 +353,7 @@ export class FinanceService {
       doc.font('Helvetica').fontSize(8).fillColor('#64748b');
       doc.text(String(idx + 1), 40, currentY + 6, { width: 25 });
 
-      // Item Description (Expanded width since Delivery Date & Slot is removed)
+      // Item Description
       doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a');
       const itemName = String(item.item_name || item.product_name || 'Produce Item').trim();
       doc.text(itemName.length > 55 ? itemName.slice(0, 52) + '...' : itemName, 75, currentY + 6, { width: 305 });
@@ -378,7 +377,7 @@ export class FinanceService {
     // TOTALS CALCULATION BOX
     // -------------------------------------------------------------
     currentY += 12;
-    if (currentY > 640) {
+    if (currentY > 610) {
       doc.addPage();
       currentY = 40;
     }
@@ -501,10 +500,20 @@ export class FinanceService {
     const pageCount = doc.bufferedPageRange().count;
     for (let i = 0; i < pageCount; i++) {
       doc.switchToPage(i);
-      doc.rect(32, 800, 531, 0.5).fill('#e2e8f0');
+      doc.rect(32, 796, 531, 0.5).fill('#e2e8f0');
       doc.font('Helvetica').fontSize(7.5).fillColor('#94a3b8');
-      doc.text('This is a computer-generated tax invoice and requires no physical signature. Support: support@f2hfresh.com  •  www.f2hfresh.com', 32, 808, { width: 400, align: 'left' });
-      doc.text(`Page ${i + 1} of ${pageCount}`, 430, 808, { width: 133, align: 'right' });
+      doc.text(
+        'This is a computer-generated tax invoice and requires no physical signature. Support: support@f2hfresh.com  •  www.f2hfresh.com',
+        32,
+        802,
+        { width: 380, align: 'left', lineBreak: false },
+      );
+      doc.text(
+        `Page ${i + 1} of ${pageCount}`,
+        420,
+        802,
+        { width: 143, align: 'right', lineBreak: false },
+      );
     }
 
     doc.end();
