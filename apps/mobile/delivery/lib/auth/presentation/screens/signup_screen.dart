@@ -96,8 +96,12 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
       _showSnack('Please enter a valid email address', isError: true);
       return;
     }
-    if (!RegExp(r'^\d{10,15}$').hasMatch(phone)) {
-      _showSnack('Please enter a valid 10 digit phone number (digits only)', isError: true);
+    if (phone.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+      _showSnack('Please enter a valid 10-digit mobile number (starts with 6, 7, 8, or 9)', isError: true);
+      return;
+    }
+    if (RegExp(r'^([6-9])\1{9}$').hasMatch(phone)) {
+      _showSnack('Please enter a valid mobile number (repeated digits not allowed)', isError: true);
       return;
     }
     setState(() => _isLoading = true);
@@ -422,7 +426,17 @@ class _SignupScreenState extends State<SignupScreen> with TickerProviderStateMix
         const SizedBox(height: 14),
         _LightField(controller: _emailCtrl, hint: 'Email Address', icon: Icons.email_outlined, keyboard: TextInputType.emailAddress),
         const SizedBox(height: 14),
-        _LightField(controller: _phoneCtrl, hint: 'Phone Number', icon: Icons.phone_android_rounded, keyboard: TextInputType.phone),
+        _LightField(
+          controller: _phoneCtrl,
+          hint: '10-digit mobile number',
+          icon: Icons.phone_android_rounded,
+          keyboard: TextInputType.phone,
+          maxLength: 10,
+          prefixText: '+91 ',
+          inputFormatters: [
+            IndianMobileNumberInputFormatter(),
+          ],
+        ),
         const SizedBox(height: 32),
 
         _GreenButton(
@@ -791,7 +805,6 @@ class _OtpBoxState extends State<_OtpBox> {
   }
 }
 
-// ─── Underlined Input Field — matches the login screen ────────────────────────
 class _LightField extends StatefulWidget {
   final TextEditingController controller;
   final String hint;
@@ -800,6 +813,9 @@ class _LightField extends StatefulWidget {
   final bool obscure;
   final VoidCallback? onToggleObscure;
   final ValueChanged<String>? onChanged;
+  final List<TextInputFormatter>? inputFormatters;
+  final int? maxLength;
+  final String? prefixText;
 
   const _LightField({
     required this.controller,
@@ -809,6 +825,9 @@ class _LightField extends StatefulWidget {
     this.obscure = false,
     this.onToggleObscure,
     this.onChanged,
+    this.inputFormatters,
+    this.maxLength,
+    this.prefixText,
   });
 
   @override
@@ -839,6 +858,8 @@ class _LightFieldState extends State<_LightField> {
                   keyboardType: widget.keyboard,
                   obscureText: widget.obscure,
                   onChanged: widget.onChanged,
+                  inputFormatters: widget.inputFormatters,
+                  maxLength: widget.maxLength,
                   onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   style: GoogleFonts.roboto(
                     color: kAuthInk,
@@ -848,6 +869,13 @@ class _LightFieldState extends State<_LightField> {
                   decoration: InputDecoration(
                     isDense: true,
                     filled: false,
+                    counterText: '',
+                    prefixText: widget.prefixText,
+                    prefixStyle: GoogleFonts.roboto(
+                      color: kAuthInk,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w600,
+                    ),
                     hintText: widget.hint,
                     hintStyle: GoogleFonts.roboto(
                       color: kAuthHint,
@@ -881,6 +909,34 @@ class _LightFieldState extends State<_LightField> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class IndianMobileNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) {
+      return newValue;
+    }
+    // Only allow digits
+    final digits = text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue();
+    }
+    // First digit MUST start with 6, 7, 8, or 9
+    if (!RegExp(r'^[6-9]').hasMatch(digits)) {
+      return oldValue; // Rejects 0-5 as first character
+    }
+    // Maximum 10 digits
+    final clamped = digits.length > 10 ? digits.substring(0, 10) : digits;
+    return TextEditingValue(
+      text: clamped,
+      selection: TextSelection.collapsed(offset: clamped.length),
     );
   }
 }

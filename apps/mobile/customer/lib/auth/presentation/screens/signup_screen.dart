@@ -187,8 +187,12 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (!RegExp(r'^\d{10}$').hasMatch(phone)) {
-      _toast('Please enter a valid 10-digit mobile number');
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+      _toast('Please enter a valid 10-digit mobile number starting with 6-9');
+      return;
+    }
+    if (RegExp(r'^([6-9])\1{9}$').hasMatch(phone)) {
+      _toast('Please enter a valid mobile number (repeated digits not allowed)');
       return;
     }
 

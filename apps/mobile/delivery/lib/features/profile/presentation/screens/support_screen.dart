@@ -1,5 +1,5 @@
+import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -708,9 +708,19 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
         attachmentsList = ticket['attachments'] as List;
       } else if (ticket['attachments'] is String) {
         try {
-          // Attempt string parse
-          attachmentsList = [ticket['attachments']];
-        } catch (_) {}
+          final rawStr = (ticket['attachments'] as String).trim();
+          if (rawStr.startsWith('[')) {
+            final decoded = jsonDecode(rawStr);
+            if (decoded is List) {
+              attachmentsList = decoded;
+            }
+          } else if (rawStr.isNotEmpty) {
+            attachmentsList = [rawStr];
+          }
+        } catch (_) {
+          final rawStr = (ticket['attachments'] as String).trim();
+          if (rawStr.isNotEmpty) attachmentsList = [rawStr];
+        }
       }
     }
 
@@ -825,10 +835,11 @@ class _SupportScreenState extends State<SupportScreen> with SingleTickerProvider
                       scrollDirection: Axis.horizontal,
                       itemCount: attachmentsList.length,
                       itemBuilder: (context, idx) {
-                        final relativeUrl = attachmentsList[idx].toString().trim();
-                        final fullUrl = relativeUrl.startsWith('http')
-                            ? relativeUrl
-                            : '${ApiEndpoints.host}/${relativeUrl.replaceFirst(RegExp(r'^/+'), '')}';
+                        final itemStr = attachmentsList[idx].toString().trim();
+                        final cleanItem = itemStr.replaceAll(RegExp(r'^["\[\]\\]+|["\[\]\\]+$'), '').trim();
+                        final fullUrl = cleanItem.startsWith('http://') || cleanItem.startsWith('https://')
+                            ? cleanItem
+                            : '${ApiEndpoints.host}/${cleanItem.replaceFirst(RegExp(r'^/+'), '')}';
                         return GestureDetector(
                           onTap: () => _showAttachmentViewer(fullUrl),
                           child: Container(
