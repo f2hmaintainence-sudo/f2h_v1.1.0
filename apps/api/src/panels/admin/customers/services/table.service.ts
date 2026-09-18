@@ -198,23 +198,6 @@ export class CustomerTableService {
 
   async getWalletTransactionsTable(query: any) {
     try {
-      // Auto-ensure wallet transaction records exist for all registered customers
-      await this.db.query(`
-        INSERT INTO customer_wallet_transactions (customer_id, transaction_type, amount, balance_after, reference_type, remarks, created_by)
-        SELECT 
-          c.customer_id,
-          CASE WHEN COALESCE(c.wallet_balance, 0) > 0 THEN 'credit' ELSE 'topup' END,
-          COALESCE(c.wallet_balance, 0),
-          COALESCE(c.wallet_balance, 0),
-          'topup',
-          'Customer Wallet Balance Record',
-          'system'
-        FROM customers c
-        WHERE c.customer_id IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM customer_wallet_transactions cwt WHERE cwt.customer_id = c.customer_id
-          )
-      `).catch(() => {});
 
       const conditions: any[] = [];
 
