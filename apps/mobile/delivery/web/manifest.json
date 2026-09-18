@@ -1,11 +1,11 @@
 {
-    "name": "f2h_delivery",
-    "short_name": "f2h_delivery",
+    "name": "F2H Delivery Partner",
+    "short_name": "F2H Delivery",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#10B981",
+    "theme_color": "#10B981",
+    "description": "F2H Delivery Partner app for swift farm to home deliveries.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,11 +1,11 @@
 {
-    "name": "demo",
-    "short_name": "demo",
+    "name": "F2H Fresh - Farm to Home",
+    "short_name": "F2H Fresh",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#10B981",
+    "theme_color": "#10B981",
+    "description": "F2H Fresh - Farm to Home dairy, fresh products and groceries.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
