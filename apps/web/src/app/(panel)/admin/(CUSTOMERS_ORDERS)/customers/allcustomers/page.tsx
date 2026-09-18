@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ChevronRight,
+  ChevronLeft,
   Home,
   Search,
   Grid,
@@ -60,6 +61,12 @@ export default function AllCustomersPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(12);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 12,
+    total: 0,
+    totalPages: 1,
+  });
 
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
@@ -83,6 +90,21 @@ export default function AllCustomersPage() {
       return next;
     });
   };
+
+  const paginationPills = React.useMemo(() => {
+    const totalPages = pagination.totalPages;
+    const currentPage = pagination.page;
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  }, [pagination.page, pagination.totalPages]);
 
   useEffect(() => {
     fetchCustomers();
@@ -115,6 +137,14 @@ export default function AllCustomersPage() {
         setData(payload.data || []);
         setSummary(payload.summary || {});
         if (payload.branches) setBranches(payload.branches);
+        if (payload.pagination) {
+          setPagination({
+            page: payload.pagination.page || page,
+            limit: payload.pagination.limit || limit,
+            total: payload.pagination.total || 0,
+            totalPages: payload.pagination.totalPages || 1,
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch customers:', error);
@@ -125,8 +155,11 @@ export default function AllCustomersPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1);
-    fetchCustomers();
+    if (page === 1) {
+      fetchCustomers();
+    } else {
+      setPage(1);
+    }
   };
 
   return (
@@ -494,6 +527,122 @@ export default function AllCustomersPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination Footer */}
+      {!loading && pagination.total > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-xs text-gray-500 font-medium">
+            Showing <span className="font-bold text-gray-800">{Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total)}</span> to{' '}
+            <span className="font-bold text-gray-800">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> of{' '}
+            <span className="font-bold text-gray-800">{pagination.total}</span> customers
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* First Page */}
+            <button
+              type="button"
+              onClick={() => setPage(1)}
+              disabled={pagination.page <= 1 || loading}
+              className="inline-flex items-center justify-center h-8 px-2.5 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-semibold cursor-pointer"
+              title="First Page"
+            >
+              « First
+            </button>
+
+            {/* Prev Page */}
+            <button
+              type="button"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={pagination.page <= 1 || loading}
+              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-semibold cursor-pointer"
+              title="Previous Page"
+            >
+              <ChevronLeft size={14} /> Prev
+            </button>
+
+            {/* Page Pills */}
+            <div className="hidden sm:flex items-center gap-1">
+              {paginationPills.map((pItem, idx) => {
+                if (pItem === '...') {
+                  return (
+                    <span key={`ellipsis-${idx}`} className="px-1.5 text-gray-400 font-bold select-none">
+                      …
+                    </span>
+                  );
+                }
+                const pgNum = Number(pItem);
+                const isCurrent = pgNum === pagination.page;
+                return (
+                  <button
+                    key={pgNum}
+                    type="button"
+                    onClick={() => setPage(pgNum)}
+                    disabled={loading}
+                    className={`h-8 min-w-[32px] px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isCurrent
+                        ? 'bg-fresh-green text-white shadow-sm shadow-fresh-green/20'
+                        : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    {pgNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Page */}
+            <button
+              type="button"
+              onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+              disabled={pagination.page >= pagination.totalPages || loading}
+              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-semibold cursor-pointer"
+              title="Next Page"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+
+            {/* Last Page */}
+            <button
+              type="button"
+              onClick={() => setPage(pagination.totalPages)}
+              disabled={pagination.page >= pagination.totalPages || loading}
+              className="inline-flex items-center justify-center h-8 px-2.5 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-semibold cursor-pointer"
+              title="Last Page"
+            >
+              Last »
+            </button>
+
+            {/* Direct Jump */}
+            {pagination.totalPages > 5 && (
+              <div className="flex items-center gap-1.5 pl-2 ml-1 border-l border-gray-200">
+                <span className="text-xs text-gray-400 font-medium">Go:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={pagination.totalPages}
+                  defaultValue={pagination.page}
+                  key={pagination.page}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = Number((e.target as HTMLInputElement).value);
+                      if (val >= 1 && val <= pagination.totalPages) {
+                        setPage(val);
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const val = Number(e.target.value);
+                    if (val >= 1 && val <= pagination.totalPages && val !== pagination.page) {
+                      setPage(val);
+                    }
+                  }}
+                  className="w-12 h-8 px-1.5 text-center bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-fresh-green/20"
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
