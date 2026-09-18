@@ -33,10 +33,7 @@ class ApiEndpoints {
       }
       return origin;
     }
-    if (kReleaseMode) {
-      return 'https://dev.f2hfresh.com';
-    }
-    return 'http://localhost:5001';
+    return 'https://dev.f2hfresh.com';
   }
 
   /// Root host (scheme + host + port), no trailing slash or /api/v1 path.
