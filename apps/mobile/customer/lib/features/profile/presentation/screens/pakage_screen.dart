@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,6 +6,7 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+import 'package:f2h_customer/theme/app_typography.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
@@ -34,71 +36,88 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
 
     final rawBalances = response.data;
     if (rawBalances is Map && rawBalances['status'] == false) {
-      throw Exception(rawBalances['message'] ?? 'Failed to load container balances');
+      throw Exception(
+          rawBalances['message'] ?? 'Failed to load container balances');
     }
-    final balancesData = rawBalances is Map ? rawBalances['data'] : rawBalances;
+    final balancesData =
+        rawBalances is Map ? rawBalances['data'] : rawBalances;
     final List<ContainerBalanceModel> balances = [];
     if (balancesData is List) {
       for (final item in balancesData) {
         if (item is Map) {
-          balances.add(ContainerBalanceModel.fromJson(Map<String, dynamic>.from(item)));
+          balances.add(ContainerBalanceModel.fromJson(
+              Map<String, dynamic>.from(item)));
         }
       }
     }
     return balances;
   }
 
-  void _retry() {
-    setState(() {
-      _dataFuture = _loadData();
-    });
-  }
+  void _retry() => setState(() => _dataFuture = _loadData());
 
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
     final sessionState = context.watch<CustomerSessionCubit>().state;
-    final isLoggedIn = authState is Authenticated || sessionState.profile != null;
+    final isLoggedIn =
+        authState is Authenticated || sessionState.profile != null;
 
     if (!isLoggedIn) {
       return Scaffold(
+        backgroundColor: kBg,
+        appBar: _buildAppBar(),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.shopping_bag_outlined,
-                  size: 72,
-                  color: kPrimary,
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: const BoxDecoration(
+                    color: kPrimaryPl,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    size: 38,
+                    color: kPrimary,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'No Order Found',
-                  style: TextStyle(
-                    fontSize: 20,
+                const SizedBox(height: 20),
+                Text(
+                  'Sign In Required',
+                  style: AppTypography.titleLarge.copyWith(
                     fontWeight: FontWeight.w800,
+                    color: kText,
+                    fontSize: 20,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'You have not placed any order yet.',
+                Text(
+                  'Please sign in to view your container balance.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: kTextSub),
+                  style: AppTypography.bodyMedium.copyWith(color: kTextSub),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.shopping_cart_outlined),
-                  label: const Text('MAKE ORDER'),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const BrowseScreen(),
-                      ),
-                    );
-                  },
+                  label: const Text('Browse Products'),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const BrowseScreen()),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
                 ),
               ],
             ),
@@ -108,402 +127,624 @@ class _ContainerBalanceScreenState extends State<ContainerBalanceScreen> {
     }
 
     return Scaffold(
-      backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: kSurface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kText),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Container Balance',
-          style: TextStyle(fontWeight: FontWeight.w800, color: kText, fontSize: 18),
-        ),
-      ),
+      backgroundColor: const Color(0xFFF3F4F6),
       body: FutureBuilder<List<ContainerBalanceModel>>(
         future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
-              child: CowLoadingWidget(size: 140, message: 'Loading container balance...'),
+              child: CowLoadingWidget(
+                  size: 140, message: 'Loading container balance...'),
             );
           }
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline_rounded,
-                      size: 64,
-                      color: kRed,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage(snapshot.error),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: kText,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Something went wrong while retrieving your data.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: kTextSub,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: _retry,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+            return _buildError(snapshot.error);
           }
-
           final balances = snapshot.data ?? [];
-          return _buildBalancesTab(balances);
+          return _buildContent(balances);
         },
       ),
     );
   }
 
-  String _errorMessage(Object? error) {
+  AppBar _buildAppBar() => AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: kText),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Container Balance',
+          style: AppTypography.titleLarge.copyWith(
+            fontWeight: FontWeight.w800,
+            color: kText,
+            fontSize: 18,
+          ),
+        ),
+      );
+
+  Widget _buildError(Object? error) {
+    String msg = 'Failed to load container data';
     if (error is DioException) {
       final data = error.response?.data;
       if (data is Map && data['message'] != null) {
-        return data['message'].toString();
+        msg = data['message'].toString();
       }
     }
-    return 'Failed to load container data';
-  }
-
-  Widget _buildBalancesTab(List<ContainerBalanceModel> balances) {
-    if (balances.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.inventory_2_outlined, size: 64, color: kMuted),
-            const SizedBox(height: 16),
-            const Text(
-              'No container balances found',
-              style: TextStyle(fontWeight: FontWeight.w800, color: kText, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Containers will appear here once you receive items.',
-              style: TextStyle(color: kTextSub, fontSize: 14),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final totalBalance = balances.fold<int>(0, (sum, e) => sum + e.balanceQuantity);
-    final totalIssued = balances.fold<int>(0, (sum, e) => sum + e.issuedQuantity);
-    final totalReturned = balances.fold<int>(0, (sum, e) => sum + e.returnedQuantity);
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Total Containers Card
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: const LinearGradient(
-              colors: [
-                kPrimary,
-                kPrimaryMid,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: kPrimary.withValues(alpha: 0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: kBg,
+      appBar: _buildAppBar(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
           child: Column(
-            children: [
-              const Icon(
-                Icons.inventory_2_outlined,
-                color: Colors.white,
-                size: 44,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Total Containers Held',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '$totalBalance',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -1,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Summary Row
-        Row(
-          children: [
-            Expanded(
-              child: _summaryCard(
-                'Issued',
-                '$totalIssued',
-                Icons.outbox_outlined,
-                const Color(0xFFFFF3E0),
-                const Color(0xFFE65100),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _summaryCard(
-                'Returned',
-                '$totalReturned',
-                Icons.assignment_return_outlined,
-                const Color(0xFFE8F5E9),
-                const Color(0xFF2E7D32),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        const Text(
-          'Container Details',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: kText,
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        ...balances.map(
-          (item) => _containerCard(
-            name: item.packageName,
-            issued: item.issuedQuantity,
-            returned: item.returnedQuantity,
-            damaged: item.damagedQuantity,
-            lost: item.lostQuantity,
-            balance: item.balanceQuantity,
-          ),
-        ),
-      ],
-    );
-  }
-
-  static Widget _summaryCard(
-    String title,
-    String value,
-    IconData icon,
-    Color bg,
-    Color iconColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: bg,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: kText,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: kTextSub,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static Widget _containerCard({
-    required String name,
-    required int issued,
-    required int returned,
-    required int damaged,
-    required int lost,
-    required int balance,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: kRedLt,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  size: 36,
+                  color: kRed,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                msg,
+                textAlign: TextAlign.center,
+                style: AppTypography.titleMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: kText,
+                  fontSize: 17,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Something went wrong while retrieving your data.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyMedium.copyWith(color: kTextSub),
+              ),
+              const SizedBox(height: 28),
+              ElevatedButton.icon(
+                onPressed: _retry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 28, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(List<ContainerBalanceModel> balances) {
+    if (balances.isEmpty) {
+      return Scaffold(
+        backgroundColor: kBg,
+        appBar: _buildAppBar(),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
                 decoration: const BoxDecoration(
                   color: kPrimaryPl,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.local_drink_outlined,
+                  Icons.inventory_2_outlined,
+                  size: 36,
                   color: kPrimary,
-                  size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    color: kText,
-                  ),
+              const SizedBox(height: 20),
+              Text(
+                'No containers yet',
+                style: AppTypography.titleMedium.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: kText,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: balance > 0 ? kPrimaryPl : kBorderLt,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Balance: $balance',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                    color: balance > 0 ? kPrimary : kTextSub,
-                  ),
-                ),
+              const SizedBox(height: 8),
+              Text(
+                'Containers will appear here once\nyou receive your first order.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyMedium.copyWith(color: kTextSub),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          const Divider(height: 1, thickness: 1, color: kBorderLt),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _metric('Issued', issued),
+        ),
+      );
+    }
+
+    final totalBalance =
+        balances.fold<int>(0, (sum, e) => sum + e.balanceQuantity);
+    final totalIssued =
+        balances.fold<int>(0, (sum, e) => sum + e.issuedQuantity);
+    final totalReturned =
+        balances.fold<int>(0, (sum, e) => sum + e.returnedQuantity);
+
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        // ── Gradient SliverAppBar ──
+        SliverAppBar(
+          expandedHeight: 220,
+          pinned: true,
+          backgroundColor: const Color(0xFF064E3B),
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Container Balance',
+            style: AppTypography.titleMedium.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+            ),
+          ),
+          flexibleSpace: FlexibleSpaceBar(
+            collapseMode: CollapseMode.parallax,
+            background: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF064E3B), Color(0xFF15803D), Color(0xFF16A34A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-              Expanded(
-                child: _metric('Returned', returned),
+              child: SafeArea(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 32),
+                    // Icon with frosted container
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.inventory_2_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Total Containers Held',
+                      style: AppTypography.labelMedium.copyWith(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '$totalBalance',
+                      style: AppTypography.displayLarge.copyWith(
+                        color: Colors.white,
+                        fontSize: 52,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -2,
+                        height: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Expanded(
-                child: _metric('Damaged', damaged),
+            ),
+          ),
+        ),
+
+        // ── Stats Strip ──
+        SliverToBoxAdapter(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
               ),
-              Expanded(
-                child: _metric('Lost', lost),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                _StatCell(
+                  label: 'Issued',
+                  value: '$totalIssued',
+                  icon: Icons.outbox_rounded,
+                  iconColor: const Color(0xFFEA580C),
+                  iconBg: const Color(0xFFFFF7ED),
+                ),
+                Container(width: 1, height: 44, color: kBorderLt),
+                _StatCell(
+                  label: 'Returned',
+                  value: '$totalReturned',
+                  icon: Icons.assignment_return_rounded,
+                  iconColor: kPrimary,
+                  iconBg: kPrimaryPl,
+                ),
+                Container(width: 1, height: 44, color: kBorderLt),
+                _StatCell(
+                  label: 'Pending',
+                  value: '$totalBalance',
+                  icon: Icons.pending_actions_rounded,
+                  iconColor: const Color(0xFF7C3AED),
+                  iconBg: const Color(0xFFEDE9FE),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ── Section Header ──
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: Row(
+              children: [
+                Text(
+                  'Container Details',
+                  style: AppTypography.headlineSmall.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: kText,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kPrimaryPl,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${balances.length} type${balances.length != 1 ? 's' : ''}',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: kPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ── Container Cards ──
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _ContainerCard(item: balances[index]),
+            childCount: balances.length,
+          ),
+        ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STAT CELL
+// ═══════════════════════════════════════════════════════════════
+class _StatCell extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+
+  const _StatCell({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: iconBg,
+                shape: BoxShape.circle,
               ),
-            ],
+              child: Icon(icon, size: 16, color: iconColor),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: AppTypography.labelSmall.copyWith(
+                    fontSize: 10.5,
+                    color: kTextSub,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  style: AppTypography.titleMedium.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: kText,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTAINER CARD
+// ═══════════════════════════════════════════════════════════════
+class _ContainerCard extends StatelessWidget {
+  final ContainerBalanceModel item;
+
+  const _ContainerCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasBalance = item.balanceQuantity > 0;
+    final hasDamage = item.damagedQuantity > 0;
+    final hasLost = item.lostQuantity > 0;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasBalance
+              ? const Color(0xFFBBF7D0)
+              : const Color(0xFFE2E8F0),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          children: [
+            // ── Header ──
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+              decoration: BoxDecoration(
+                color: hasBalance
+                    ? const Color(0xFFF0FDF4)
+                    : const Color(0xFFF8FAFC),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: hasBalance ? kPrimaryPl : const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.local_drink_rounded,
+                      color: hasBalance ? kPrimary : kTextSub,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.packageName,
+                          style: AppTypography.titleMedium.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: kText,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        if (item.updatedAt != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Updated ${_formatDate(item.updatedAt!)}',
+                            style: AppTypography.labelSmall.copyWith(
+                              fontSize: 10.5,
+                              color: kTextSub,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  // Balance badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: hasBalance ? kPrimary : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      hasBalance
+                          ? '${item.balanceQuantity} Held'
+                          : 'All Returned',
+                      style: AppTypography.labelSmall.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11.5,
+                        color: hasBalance ? Colors.white : kTextSub,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Divider ──
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+
+            // ── Metrics Grid ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Row(
+                children: [
+                  _MetricCell(
+                    label: 'Issued',
+                    value: item.issuedQuantity,
+                    color: const Color(0xFFEA580C),
+                    bg: const Color(0xFFFFF7ED),
+                  ),
+                  _MetricCell(
+                    label: 'Returned',
+                    value: item.returnedQuantity,
+                    color: kPrimary,
+                    bg: kPrimaryPl,
+                  ),
+                  _MetricCell(
+                    label: 'Damaged',
+                    value: item.damagedQuantity,
+                    color: hasDamage
+                        ? const Color(0xFFD97706)
+                        : kMuted,
+                    bg: hasDamage
+                        ? const Color(0xFFFEF3C7)
+                        : const Color(0xFFF8FAFC),
+                  ),
+                  _MetricCell(
+                    label: 'Lost',
+                    value: item.lostQuantity,
+                    color: hasLost ? kRed : kMuted,
+                    bg: hasLost ? kRedLt : const Color(0xFFF8FAFC),
+                    isLast: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  static Widget _metric(
-    String title,
-    int value,
-  ) {
-    return Column(
-      children: [
-        Text(
-          '$value',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: kText,
-          ),
+  static String _formatDate(DateTime dt) {
+    final local = dt.toLocal();
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${local.day} ${months[local.month - 1]}';
+  }
+}
+
+class _MetricCell extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  final Color bg;
+  final bool isLast;
+
+  const _MetricCell({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.bg,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: EdgeInsets.only(right: isLast ? 0 : 8),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
         ),
-        const SizedBox(height: 4),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: kTextSub,
-          ),
+        child: Column(
+          children: [
+            Text(
+              '$value',
+              style: AppTypography.titleMedium.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: color,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: AppTypography.labelSmall.copyWith(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: color.withValues(alpha: 0.75),
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
