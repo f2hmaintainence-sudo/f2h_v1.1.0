@@ -611,10 +611,20 @@ export class VendorsService {
         query += ` AND c.collection_date = $${idx}`;
         params.push(filter.date.trim());
         idx++;
-      } else if (filter.startDate && filter.endDate) {
-        query += ` AND c.collection_date BETWEEN $${idx} AND $${idx + 1}`;
-        params.push(filter.startDate.trim(), filter.endDate.trim());
-        idx += 2;
+      } else {
+        if (filter.startDate && filter.startDate.trim() && filter.endDate && filter.endDate.trim()) {
+          query += ` AND c.collection_date BETWEEN $${idx} AND $${idx + 1}`;
+          params.push(filter.startDate.trim(), filter.endDate.trim());
+          idx += 2;
+        } else if (filter.startDate && filter.startDate.trim()) {
+          query += ` AND c.collection_date >= $${idx}`;
+          params.push(filter.startDate.trim());
+          idx++;
+        } else if (filter.endDate && filter.endDate.trim()) {
+          query += ` AND c.collection_date <= $${idx}`;
+          params.push(filter.endDate.trim());
+          idx++;
+        }
       }
 
       if (filter.type && filter.type !== 'ALL') {
@@ -664,7 +674,7 @@ export class VendorsService {
         idx++;
       }
 
-      query += ` ORDER BY c.created_at DESC LIMIT 200`;
+      query += ` ORDER BY c.collection_date DESC, c.created_at DESC LIMIT 500`;
 
       const rows = (await this.db.query<any>(query, params)) || [];
 
@@ -673,34 +683,98 @@ export class VendorsService {
       let totalOthersQuantity = 0;
       let morningMilkQuantity = 0;
       let eveningMilkQuantity = 0;
+      let afternoonMilkQuantity = 0;
+      let generalMilkQuantity = 0;
       let totalAmount = 0;
+      let paidAmount = 0;
+      let pendingAmount = 0;
+      let partialAmount = 0;
       let fatSum = 0;
       let fatCount = 0;
       let snfSum = 0;
       let snfCount = 0;
+      let clrSum = 0;
+      let clrCount = 0;
+      let tempSum = 0;
+      let tempCount = 0;
       let milkCollectionsCount = 0;
       let othersCollectionsCount = 0;
       const vendorsSet = new Set<string>();
+      const productSummaryMap = new Map<string, { name: string; quantity: number; unit: string; amount: number; count: number }>();
+      const vendorSummaryMap = new Map<string, { vendor_id: string; vendor_name: string; vendor_phone?: string; quantity: number; amount: number; count: number; paid_amount: number; pending_amount: number }>();
 
       for (const item of rows) {
         const isMilk = item.collection_type === 'MILK' || !item.collection_type;
         const qty = Number(item.quantity) || 0;
         const amt = Number(item.total_amount) || 0;
         totalAmount += amt;
-        vendorsSet.add(item.vendor_id);
+
+        if (item.payment_status === 'PAID') {
+          paidAmount += amt;
+        } else if (item.payment_status === 'PARTIAL') {
+          partialAmount += amt;
+        } else {
+          pendingAmount += amt;
+        }
+
+        if (item.vendor_id) {
+          vendorsSet.add(item.vendor_id);
+          const vKey = item.vendor_id || item.vendor_name;
+          const existingV = vendorSummaryMap.get(vKey) || {
+            vendor_id: item.vendor_id,
+            vendor_name: item.vendor_name || 'Vendor',
+            vendor_phone: item.vendor_phone || undefined,
+            quantity: 0,
+            amount: 0,
+            count: 0,
+            paid_amount: 0,
+            pending_amount: 0,
+          };
+          existingV.quantity += qty;
+          existingV.amount += amt;
+          existingV.count += 1;
+          if (item.payment_status === 'PAID') existingV.paid_amount += amt;
+          else existingV.pending_amount += amt;
+          vendorSummaryMap.set(vKey, existingV);
+        }
+
+        // Product Breakdown
+        const pKey = item.product_name || (isMilk ? 'Fresh Milk' : 'Produce');
+        const existingP = productSummaryMap.get(pKey) || {
+          name: pKey,
+          quantity: 0,
+          unit: item.unit || (isMilk ? 'Liters' : 'Kg'),
+          amount: 0,
+          count: 0,
+        };
+        existingP.quantity += qty;
+        existingP.amount += amt;
+        existingP.count += 1;
+        productSummaryMap.set(pKey, existingP);
 
         if (isMilk) {
           milkCollectionsCount++;
           totalMilkQuantity += qty;
           if (item.shift === 'MORNING') morningMilkQuantity += qty;
-          if (item.shift === 'EVENING') eveningMilkQuantity += qty;
-          if (item.fat_percentage != null) {
+          else if (item.shift === 'EVENING') eveningMilkQuantity += qty;
+          else if (item.shift === 'AFTERNOON') afternoonMilkQuantity += qty;
+          else generalMilkQuantity += qty;
+
+          if (item.fat_percentage != null && !isNaN(Number(item.fat_percentage))) {
             fatSum += Number(item.fat_percentage);
             fatCount++;
           }
-          if (item.snf_percentage != null) {
+          if (item.snf_percentage != null && !isNaN(Number(item.snf_percentage))) {
             snfSum += Number(item.snf_percentage);
             snfCount++;
+          }
+          if (item.clr_reading != null && !isNaN(Number(item.clr_reading))) {
+            clrSum += Number(item.clr_reading);
+            clrCount++;
+          }
+          if (item.temperature != null && !isNaN(Number(item.temperature))) {
+            tempSum += Number(item.temperature);
+            tempCount++;
           }
         } else {
           othersCollectionsCount++;
@@ -713,13 +787,22 @@ export class VendorsService {
         totalOthersQuantity: Number(totalOthersQuantity.toFixed(2)),
         morningMilkQuantity: Number(morningMilkQuantity.toFixed(2)),
         eveningMilkQuantity: Number(eveningMilkQuantity.toFixed(2)),
+        afternoonMilkQuantity: Number(afternoonMilkQuantity.toFixed(2)),
+        generalMilkQuantity: Number(generalMilkQuantity.toFixed(2)),
         totalAmount: Number(totalAmount.toFixed(2)),
+        paidAmount: Number(paidAmount.toFixed(2)),
+        pendingAmount: Number(pendingAmount.toFixed(2)),
+        partialAmount: Number(partialAmount.toFixed(2)),
         avgFat: fatCount > 0 ? Number((fatSum / fatCount).toFixed(2)) : 0,
         avgSnf: snfCount > 0 ? Number((snfSum / snfCount).toFixed(2)) : 0,
+        avgClr: clrCount > 0 ? Number((clrSum / clrCount).toFixed(2)) : 0,
+        avgTemperature: tempCount > 0 ? Number((tempSum / tempCount).toFixed(2)) : 0,
         totalCollections: rows.length,
         milkCollectionsCount,
         othersCollectionsCount,
         activeVendorsCount: vendorsSet.size,
+        productBreakdown: Array.from(productSummaryMap.values()),
+        vendorBreakdown: Array.from(vendorSummaryMap.values()).sort((a, b) => b.amount - a.amount),
       };
 
       return {
