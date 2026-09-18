@@ -6,7 +6,6 @@ import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/features/subscription/data/models/subscription_model.dart';
 import 'package:f2h_customer/features/subscription/presentation/widgets/subscription_card.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_bloc.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_event.dart';
 import 'package:f2h_customer/features/subscription/presentation/bloc/subscription_state.dart';

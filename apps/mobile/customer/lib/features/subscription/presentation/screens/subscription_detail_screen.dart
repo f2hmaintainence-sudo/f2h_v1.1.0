@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/session/customer_session_cubit.dart';
-import 'package:f2h_customer/core/session/customer_session_state.dart';
 import 'package:f2h_customer/features/catalog/data/models/product_model.dart';
 import 'package:f2h_customer/features/catalog/domain/entities/cart/cart_item_entity.dart';
 import 'package:f2h_customer/features/catalog/presentation/bloc/cart/cart_bloc.dart';
@@ -97,11 +96,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
       final info = await sl<SubscriptionRepository>().getSubscriptionDetail(
         _subscription.id,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _detailInfo = info;
           _loadingDetail = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingDetail = false);
     }
@@ -112,11 +112,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
       final bills = await sl<SubscriptionRepository>().getSubscriptionBills(
         _subscription.id,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _bills = bills;
           _loadingBills = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingBills = false);
     }
@@ -604,18 +605,19 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final addressType = address.addressType.isNotEmpty
         ? address.addressType.toUpperCase()
         : 'HOME';
+    final slot = _subscription.slot.isNotEmpty ? _subscription.slot : 'Morning';
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: kSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorderLt, width: 1.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorderLt, width: 1.2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -625,64 +627,68 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(7),
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: kPrimaryPl,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.location_on_rounded,
-                  size: 16,
+                  size: 17,
                   color: kPrimary,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               const Text(
                 'DELIVERY ADDRESS',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
                   color: kTextSub,
-                  letterSpacing: 0.6,
+                  letterSpacing: 0.8,
                 ),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
-                  color: kPrimary.withValues(alpha: 0.1),
+                  color: kPrimary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   addressType,
                   style: const TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
                     color: kPrimary,
-                    letterSpacing: 0.3,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           if (contactName.isNotEmpty || contactMobile.isNotEmpty) ...[
             Row(
               children: [
                 Text(
                   contactName,
                   style: const TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
                     color: kText,
                   ),
                 ),
                 if (contactMobile.isNotEmpty) ...[
-                  const Text(' · ', style: TextStyle(color: kTextSub, fontWeight: FontWeight.bold)),
+                  const Text(
+                    '  •  ',
+                    style: TextStyle(color: kMuted, fontWeight: FontWeight.bold),
+                  ),
                   Text(
                     contactMobile,
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: kTextSub,
                     ),
@@ -695,10 +701,38 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           Text(
             addressString,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 12.5,
               fontWeight: FontWeight.w500,
               color: kTextSub,
-              height: 1.35,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: kBorderLt),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.schedule_rounded,
+                  size: 13,
+                  color: kPrimary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Preferred Slot: $slot',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kTextMid,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -706,26 +740,31 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     );
   }
 
-
-
   // ─── Subscription details (collapsible) ─────────────────────
 
   Widget _buildSubscriptionDetailsSection(Subscription s) {
-    final unitPrice = (s.items.isNotEmpty && (s.items.first.finalPrice > 0 ? s.items.first.finalPrice : s.items.first.unitPrice) > 0)
-        ? (s.items.first.finalPrice > 0 ? s.items.first.finalPrice : s.items.first.unitPrice)
+    final firstItem = s.items.isNotEmpty ? s.items.first : null;
+    final unitPrice = (firstItem != null &&
+            (firstItem.finalPrice > 0 ? firstItem.finalPrice : firstItem.unitPrice) > 0)
+        ? (firstItem.finalPrice > 0 ? firstItem.finalPrice : firstItem.unitPrice)
         : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
     final isCancelled = s.status == 'cancelled';
     final isPostpaid = s.paymentType == 'postpaid';
-    final slot = s.slot.isNotEmpty ? s.slot : 'Morning';
-    final frequency = s.frequency.isNotEmpty ? s.frequency : 'Daily';
     final hasEndDate = s.endDate != null && s.endDate!.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: kSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorderLt, width: 1.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorderLt, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -733,35 +772,47 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           GestureDetector(
             onTap: () {
               HapticFeedback.selectionClick();
-              setState(() => _subscriptionDetailsExpanded = !_subscriptionDetailsExpanded);
+              setState(() =>
+                  _subscriptionDetailsExpanded = !_subscriptionDetailsExpanded);
             },
             behavior: HitTestBehavior.opaque,
             child: Row(
               children: [
-                const Icon(
-                  Icons.receipt_outlined,
-                  size: 16,
-                  color: kPrimary,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.receipt_long_rounded,
+                    size: 17,
+                    color: Color(0xFF2563EB),
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 const Text(
                   'Subscription Details',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w900,
                     color: kText,
                   ),
                 ),
                 const Spacer(),
                 if (!_subscriptionDetailsExpanded)
-                  Flexible(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: kPrimaryPl,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                     child: Text(
                       '#${s.id}',
-                      textAlign: TextAlign.end,
-                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
                         color: kPrimary,
                       ),
                     ),
@@ -787,32 +838,51 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, thickness: 1, color: kBorderLt),
+                      const SizedBox(height: 6),
                       _buildDetailRow('Subscription ID', '#${s.id}'),
                       _buildDetailRow(
                         'Product Price',
                         '₹${unitPrice.toStringAsFixed(2)} / unit',
                       ),
+                      _buildDetailRow(
+                        'Frequency',
+                        s.frequency.isNotEmpty ? s.frequency : 'Daily',
+                      ),
                       _buildDetailRow('Start Date', _formatDate(s.startDate)),
-                      if (hasEndDate)
-                        _buildDetailRow('End Date', _formatDate(s.endDate)),
+                      _buildDetailRow(
+                        'End Date',
+                        hasEndDate ? _formatDate(s.endDate) : 'Ongoing / Auto-renew',
+                      ),
                       _buildDetailRow(
                         'Payment Method',
-                        isPostpaid ? 'Postpaid' : 'Wallet',
+                        isPostpaid
+                            ? 'Postpaid (Monthly Invoice)'
+                            : 'Prepaid (Wallet)',
+                        valueColor:
+                            isPostpaid ? const Color(0xFFD97706) : kPrimary,
                       ),
                       if (isCancelled)
                         _buildDetailRow('Status', 'Cancelled', valueColor: kRed),
-                      if (!isPostpaid && _detailInfo != null && !_loadingDetail) ...[
+                      if (!isPostpaid &&
+                          _detailInfo != null &&
+                          !_loadingDetail) ...[
                         _buildDetailRow(
                           'Wallet Balance',
                           '₹${_detailInfo!.walletBalance.toStringAsFixed(2)}',
-                          valueColor: _detailInfo!.alertLowBalance ? kRed : kPrimary,
+                          valueColor: _detailInfo!.alertLowBalance
+                              ? kRed
+                              : kPrimary,
                         ),
                       ],
-                      if (_detailInfo != null && !_loadingDetail && _detailInfo!.nextRenewalEstimate > 0)
+                      if (_detailInfo != null &&
+                          !_loadingDetail &&
+                          _detailInfo!.nextRenewalEstimate > 0)
                         _buildDetailRow(
-                          'Est. Renewal',
-                          '₹${_detailInfo!.nextRenewalEstimate.toStringAsFixed(0)} / month',
+                          'Est. Monthly Renewal',
+                          '₹${_detailInfo!.nextRenewalEstimate.toStringAsFixed(0)}',
+                          valueColor: kText,
                         ),
                     ],
                   )
@@ -829,8 +899,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final dayQtys = s.getSelectedDayQuantities();
     if (dayQtys.isEmpty) return const SizedBox.shrink();
 
-    const morningColor = Color(0xFF14532D); // Dark green
-    const eveningColor = Color(0xFF16A34A); // Light green
+    const morningColor = Color(0xFF14532D); // Deep green
+    const eveningColor = Color(0xFF16A34A); // Emerald green
 
     final isSevenDays = dayQtys.length == 7;
     final first = dayQtys.first;
@@ -841,11 +911,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
             dq.quantity == first.quantity);
 
     return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
@@ -855,103 +925,120 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
             children: [
               const Icon(
                 Icons.calendar_today_rounded,
-                size: 11.5,
+                size: 12,
                 color: kPrimary,
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 6),
               const Text(
-                'Schedule & Quantity:',
+                'Schedule & Quantity',
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: kTextSub,
+                  color: kTextMid,
                 ),
               ),
               const Spacer(),
-              Text(
-                s.frequency.isNotEmpty ? s.frequency : 'Daily',
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: kPrimary,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: kPrimaryPl,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  s.frequency.isNotEmpty ? s.frequency : 'Daily',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: kPrimary,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           if (isAllSameSlots)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Daily  ',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      color: kText,
+            Row(
+              children: [
+                if (first.morningQty > 0) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.wb_sunny_rounded,
+                          size: 12,
+                          color: morningColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Morning: ${first.morningQty}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: morningColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (first.morningQty > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Morning: ${first.morningQty}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: morningColor,
-                        ),
+                  const SizedBox(width: 6),
+                ],
+                if (first.eveningQty > 0) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: eveningColor.withValues(alpha: 0.3),
                       ),
                     ),
-                    const SizedBox(width: 5),
-                  ],
-                  if (first.eveningQty > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: eveningColor.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        'Evening: ${first.eveningQty}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.nightlight_round,
+                          size: 12,
                           color: eveningColor,
                         ),
-                      ),
-                    ),
-                  ],
-                  if (first.morningQty == 0 && first.eveningQty == 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Qty: ${first.quantity}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: morningColor,
+                        const SizedBox(width: 4),
+                        Text(
+                          'Evening: ${first.eveningQty}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: eveningColor,
+                          ),
                         ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (first.morningQty == 0 && first.eveningQty == 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Qty: ${first.quantity}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        color: morningColor,
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             )
           else
             Wrap(
@@ -959,10 +1046,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
               runSpacing: 6,
               children: dayQtys.map((dq) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
                   ),
                   child: Row(
@@ -971,8 +1059,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                       Text(
                         '${dq.dayName} ',
                         style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                           color: kTextSub,
                         ),
                       ),
@@ -980,7 +1068,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         Text(
                           'M:${dq.morningQty} ',
                           style: const TextStyle(
-                            fontSize: 10,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w800,
                             color: morningColor,
                           ),
@@ -990,7 +1078,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         Text(
                           'E:${dq.eveningQty}',
                           style: const TextStyle(
-                            fontSize: 10,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w800,
                             color: eveningColor,
                           ),
@@ -1000,7 +1088,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         Text(
                           '${dq.quantity}',
                           style: const TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w900,
                             color: kPrimary,
                           ),
@@ -1018,7 +1106,50 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   // ─── Alert banners ──────────────────────────────────────────
 
   Widget _buildAlertBanners() {
-    return const SizedBox.shrink();
+    final s = _subscription;
+    final isPostpaid = s.paymentType == 'postpaid';
+    final hasLowBalance =
+        !isPostpaid && (_detailInfo?.alertLowBalance ?? false);
+    final hasDueBills = (_detailInfo?.outstandingBillCount ?? 0) > 0;
+
+    if (!hasLowBalance && !hasDueBills) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        children: [
+          if (hasLowBalance)
+            _AlertBanner(
+              icon: Icons.warning_amber_rounded,
+              message:
+                  'Wallet balance is low (₹${_detailInfo!.walletBalance.toStringAsFixed(0)}). Please recharge to ensure uninterrupted deliveries.',
+              color: const Color(0xFFB45309),
+              bgColor: const Color(0xFFFFFBEB),
+              borderColor: const Color(0xFFFDE68A),
+              actionLabel: 'Recharge',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WalletScreen()),
+                );
+              },
+            ),
+          if (hasDueBills) ...[
+            if (hasLowBalance) const SizedBox(height: 8),
+            _AlertBanner(
+              icon: Icons.receipt_long_rounded,
+              message:
+                  'You have ${_detailInfo!.outstandingBillCount} outstanding bill(s). Please clear dues.',
+              color: kRed,
+              bgColor: const Color(0xFFFEF2F2),
+              borderColor: const Color(0xFFFECACA),
+              actionLabel: 'View Bills',
+              onTap: _showBillsSheet,
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   // ─── Bills section ──────────────────────────────────────────
@@ -1027,7 +1158,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     if (_loadingBills) {
       return Container(
         margin: const EdgeInsets.only(top: 4),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: kSurface,
           borderRadius: BorderRadius.circular(16),
@@ -1053,18 +1184,28 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.receipt_long_rounded,
-              size: 28,
-              color: kMuted.withValues(alpha: 0.5),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.receipt_long_rounded,
+                size: 20,
+                color: kMuted.withValues(alpha: 0.7),
+              ),
             ),
             const SizedBox(width: 14),
-            const Text(
-              'No bills found for this subscription.',
-              style: TextStyle(
-                fontSize: 13,
-                color: kTextSub,
-                fontWeight: FontWeight.w500,
+            const Expanded(
+              child: Text(
+                'No bills found for this subscription yet.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: kTextSub,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -1084,10 +1225,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           GestureDetector(
             onTap: _showBillsSheet,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 11),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 color: kPrimaryPl,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
               ),
               child: Row(
@@ -1096,7 +1237,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   Text(
                     'View all ${_bills.length} bills',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w800,
                       color: kPrimary,
                     ),
@@ -1190,6 +1331,13 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 color: kSurface,
                 shape: BoxShape.circle,
                 border: Border.all(color: kBorderLt),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: IconButton(
                 icon: const Icon(
@@ -1204,16 +1352,66 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           title: const Text(
             'Subscription Details',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 17,
               fontWeight: FontWeight.w900,
               color: kText,
+              letterSpacing: -0.2,
             ),
           ),
           centerTitle: true,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        isActive
+                            ? 'Active'
+                            : isPaused
+                            ? 'Paused'
+                            : isExpired
+                            ? 'Expired'
+                            : isCompleted
+                            ? 'Completed'
+                            : 'Cancelled',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         body: BlocBuilder<CustomerSessionCubit, CustomerSessionState>(
           builder: (context, sessionState) {
-            final profile = sessionState.profile;
             final list = sessionState.addresses;
             final defaultAddress = list.firstWhere(
               (a) => a.isDefault,
@@ -1243,13 +1441,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                       status: '',
                     ),
             );
-
-            final contactInfo = [
-              if (defaultAddress.contactName.isNotEmpty)
-                defaultAddress.contactName,
-              if (defaultAddress.contactMobile.isNotEmpty)
-                defaultAddress.contactMobile,
-            ].join(' · ');
 
             final addressString = defaultAddress.id == null
                 ? 'No saved address'
@@ -1285,231 +1476,299 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
                   // ── 1. Subscription Product Card ───────────────
                   Container(
-                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: kSurface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isCancelled
-                            ? kRed.withValues(alpha: 0.15)
+                            ? kRed.withValues(alpha: 0.18)
                             : kBorderLt,
-                        width: 1.5,
+                        width: 1.2,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: kPrimary.withValues(alpha: 0.03),
-                          blurRadius: 16,
+                          color: statusColor.withValues(alpha: 0.05),
+                          blurRadius: 18,
                           offset: const Offset(0, 6),
                         ),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            // Product image
-                            Container(
-                              width: 64,
-                              height: 64,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Stack(
+                        children: [
+                          // Left status vertical accent line
+                          Positioned(
+                            top: 0,
+                            bottom: 0,
+                            left: 0,
+                            width: 4.5,
+                            child: DecoratedBox(
                               decoration: BoxDecoration(
-                                color: isActive
-                                    ? const Color(0xFFFAFBF9)
-                                    : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: kBorderLt, width: 1),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: buildProductImage(
-                                  s.productName,
-                                  imageAsset: s.imageUrl,
-                                  fit: BoxFit.cover,
-                                  fallbackColor: isActive ? kPrimary : kTextSub,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    statusColor,
+                                    statusColor.withValues(alpha: 0.4),
+                                  ],
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _prettifyName(s.productName),
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w900,
-                                      color: kText,
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    () {
-                                      final count = s.qty > 0 ? s.qty : 1;
-                                      String volume = '';
-                                      if (firstItem != null && firstItem.unitValue > 0) {
-                                        final type = firstItem.unitType.toLowerCase().trim();
-                                        if (type == 'ml') {
-                                          final totalMl = firstItem.unitValue * count;
-                                          if (totalMl == 500) {
-                                            volume = '0.5 Litre';
-                                          } else if (totalMl % 1000 == 0) {
-                                            final l = (totalMl / 1000).toInt();
-                                            volume = '$l Litre${l > 1 ? 's' : ''}';
-                                          } else if (totalMl >= 1000) {
-                                            final l = (totalMl / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
-                                            volume = '$l Litres';
-                                          } else {
-                                            volume = '${totalMl.toInt()} ml';
-                                          }
-                                        } else if (type == 'l' || type == 'litre' || type == 'litres') {
-                                          final totalL = firstItem.unitValue * count;
-                                          final formatted = totalL % 1 == 0 ? totalL.toInt().toString() : totalL.toString();
-                                          volume = '$formatted Litre${totalL > 1 ? 's' : ''}';
-                                        } else {
-                                          final totalVal = firstItem.unitValue * count;
-                                          final formatted = totalVal % 1 == 0 ? totalVal.toInt().toString() : totalVal.toString();
-                                          volume = '$formatted ${firstItem.unitType}';
-                                        }
-                                      } else if (firstItem != null && firstItem.variantName.isNotEmpty && firstItem.variantName.toLowerCase() != 'standard') {
-                                        volume = count > 1 ? '${firstItem.variantName} x$count' : firstItem.variantName;
-                                      } else {
-                                        volume = count > 1 ? '$count Units' : '1 Unit';
-                                      }
-                                      return s.frequency.isNotEmpty ? '$volume • ${s.frequency}' : volume;
-                                    }(),
-                                    style: const TextStyle(
-                                      fontSize: 12.5,
-                                      color: kTextSub,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Wrap(
-                                    crossAxisAlignment: WrapCrossAlignment.center,
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: [
-                                      if (unitPrice > 0)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 7,
-                                            vertical: 2.5,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Product image
+                                    Container(
+                                      width: 68,
+                                      height: 68,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFAFBF9),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: kBorderLt,
+                                          width: 1.2,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.03),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
                                           ),
-                                          decoration: BoxDecoration(
-                                            color: kPrimaryPl,
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            '₹${unitPrice.toStringAsFixed(2)} / unit',
+                                        ],
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: buildProductImage(
+                                          s.productName,
+                                          imageAsset: s.imageUrl,
+                                          fit: BoxFit.cover,
+                                          fallbackColor: isActive ? kPrimary : kTextSub,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _prettifyName(s.productName),
                                             style: const TextStyle(
-                                              fontSize: 11.5,
+                                              fontSize: 17,
                                               fontWeight: FontWeight.w900,
-                                              color: kPrimary,
+                                              color: kText,
+                                              letterSpacing: -0.3,
                                             ),
                                           ),
-                                        ),
-                                      if (originalPrice > unitPrice) ...[
-                                        Text(
-                                          'MRP ₹${originalPrice.toStringAsFixed(0)}',
-                                          style: const TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: kMuted,
-                                            decoration: TextDecoration.lineThrough,
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            () {
+                                              final count = s.qty > 0 ? s.qty : 1;
+                                              String volume = '';
+                                              if (firstItem != null && firstItem.unitValue > 0) {
+                                                final type = firstItem.unitType.toLowerCase().trim();
+                                                if (type == 'ml') {
+                                                  final totalMl = firstItem.unitValue * count;
+                                                  if (totalMl == 500) {
+                                                    volume = '0.5 Litre';
+                                                  } else if (totalMl % 1000 == 0) {
+                                                    final l = (totalMl / 1000).toInt();
+                                                    volume = '$l Litre${l > 1 ? 's' : ''}';
+                                                  } else if (totalMl >= 1000) {
+                                                    final l = (totalMl / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+                                                    volume = '$l Litres';
+                                                  } else {
+                                                    volume = '${totalMl.toInt()} ml';
+                                                  }
+                                                } else if (type == 'l' || type == 'litre' || type == 'litres') {
+                                                  final totalL = firstItem.unitValue * count;
+                                                  final formatted = totalL % 1 == 0 ? totalL.toInt().toString() : totalL.toString();
+                                                  volume = '$formatted Litre${totalL > 1 ? 's' : ''}';
+                                                } else {
+                                                  final totalVal = firstItem.unitValue * count;
+                                                  final formatted = totalVal % 1 == 0 ? totalVal.toInt().toString() : totalVal.toString();
+                                                  volume = '$formatted ${firstItem.unitType}';
+                                                }
+                                              } else if (firstItem != null && firstItem.variantName.isNotEmpty && firstItem.variantName.toLowerCase() != 'standard') {
+                                                volume = count > 1 ? '${firstItem.variantName} x$count' : firstItem.variantName;
+                                              } else {
+                                                volume = count > 1 ? '$count Units' : '1 Unit';
+                                              }
+                                              return s.frequency.isNotEmpty ? '$volume • ${s.frequency}' : volume;
+                                            }(),
+                                            style: const TextStyle(
+                                              fontSize: 12.5,
+                                              color: kTextSub,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
-                                        ),
-                                        if (discount > 0)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 5.5,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFDCFCE7),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              '$discount% OFF',
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(0xFF166534),
+                                          const SizedBox(height: 6),
+                                          Wrap(
+                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                            spacing: 6,
+                                            runSpacing: 4,
+                                            children: [
+                                              if (unitPrice > 0)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 7.5,
+                                                    vertical: 3,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: kPrimaryPl,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    '₹${unitPrice.toStringAsFixed(2)} / unit',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: kPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              if (originalPrice > unitPrice) ...[
+                                                Text(
+                                                  'MRP ₹${originalPrice.toStringAsFixed(0)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: kMuted,
+                                                    decoration: TextDecoration.lineThrough,
+                                                  ),
+                                                ),
+                                                if (discount > 0)
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 5.5,
+                                                      vertical: 2,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFDCFCE7),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Text(
+                                                      '$discount% OFF',
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: Color(0xFF166534),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                              Text(
+                                                '₹${monthlyPrice.toStringAsFixed(0)} / Month',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: isCancelled ? kTextSub : kText,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (s.pauseFromDate != null &&
+                                              s.pauseToDate != null) ...[
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 9,
+                                                vertical: 4.5,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: kAccentLt.withValues(alpha: 0.5),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: kAccent.withValues(alpha: 0.25),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.pause_circle_outline_rounded,
+                                                    size: 13,
+                                                    color: kAccent,
+                                                  ),
+                                                  const SizedBox(width: 5),
+                                                  Text(
+                                                    s.pauseFromDate == s.pauseToDate
+                                                        ? 'Paused: ${_formatDate(s.pauseFromDate)}'
+                                                        : 'Paused: ${_formatDate(s.pauseFromDate)} → ${_formatDate(s.pauseToDate)}',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w800,
+                                                      color: kAccent,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                          ),
-                                      ],
-                                      Text(
-                                        '₹${monthlyPrice.toStringAsFixed(0)} / Month',
-                                        style: TextStyle(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.w900,
-                                          color: isCancelled ? kTextSub : kText,
-                                        ),
+                                          ],
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                  if (s.pauseFromDate != null &&
-                                      s.pauseToDate != null) ...[
-                                    const SizedBox(height: 6),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Status badge
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
+                                        horizontal: 10,
+                                        vertical: 5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: kAccentLt.withValues(alpha: 0.5),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        s.pauseFromDate == s.pauseToDate
-                                            ? 'Paused: ${s.pauseFromDate}'
-                                            : 'Paused: ${s.pauseFromDate} → ${s.pauseToDate}',
-                                        style: const TextStyle(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: kAccent,
+                                        color: statusBg,
+                                        borderRadius: BorderRadius.circular(100),
+                                        border: Border.all(
+                                          color: statusColor.withValues(alpha: 0.2),
                                         ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 5,
+                                            height: 5,
+                                            decoration: BoxDecoration(
+                                              color: statusColor,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            isActive
+                                                ? 'Active'
+                                                : isPaused
+                                                ? 'Paused'
+                                                : isExpired
+                                                ? 'Expired'
+                                                : isCompleted
+                                                ? 'Completed'
+                                                : 'Cancelled',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w900,
+                                              color: statusColor,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Status badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusBg,
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Text(
-                                isActive
-                                    ? 'Active'
-                                    : isPaused
-                                    ? 'Paused'
-                                    : isExpired
-                                    ? 'Expired'
-                                    : isCompleted
-                                    ? 'Completed'
-                                    : 'Cancelled',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: statusColor,
                                 ),
-                              ),
+                                // Frequency & Day Quantities at bottom of Product Card
+                                _buildSubCardDaysWidget(s),
+                              ],
                             ),
-                          ],
-                        ),
-                        // Frequency & Day Quantities at bottom of Product Card
-                        _buildSubCardDaysWidget(s),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -1635,23 +1894,36 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
     if (isCancelled) {
       return Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
         decoration: BoxDecoration(
           color: kSurface,
-          border: const Border(top: BorderSide(color: kBorderLt)),
+          border: const Border(top: BorderSide(color: kBorderLt, width: 1.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, -3),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
             ),
           ],
         ),
         child: SafeArea(
           top: false,
-          child: SizedBox(
+          child: Container(
             height: 48,
             width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF16A34A), Color(0xFF22C55E)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: kPrimary.withValues(alpha: 0.28),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
             child: ElevatedButton.icon(
               onPressed: _handleRenew,
               icon: const Icon(
@@ -1665,12 +1937,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
+                  color: Colors.white,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
-                elevation: 0,
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1683,23 +1955,36 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
     if (isCompleted) {
       return Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
         decoration: BoxDecoration(
           color: kSurface,
-          border: const Border(top: BorderSide(color: kBorderLt)),
+          border: const Border(top: BorderSide(color: kBorderLt, width: 1.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, -3),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
             ),
           ],
         ),
         child: SafeArea(
           top: false,
-          child: SizedBox(
+          child: Container(
             height: 48,
             width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF16A34A), Color(0xFF22C55E)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: kPrimary.withValues(alpha: 0.28),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
             child: ElevatedButton.icon(
               onPressed: _handleRenew,
               icon: const Icon(
@@ -1713,12 +1998,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
+                  color: Colors.white,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
-                elevation: 0,
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1731,23 +2016,36 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
     if (isExpired) {
       return Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
         decoration: BoxDecoration(
           color: kSurface,
-          border: const Border(top: BorderSide(color: kBorderLt)),
+          border: const Border(top: BorderSide(color: kBorderLt, width: 1.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, -3),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
             ),
           ],
         ),
         child: SafeArea(
           top: false,
-          child: SizedBox(
+          child: Container(
             height: 48,
             width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: kRed.withValues(alpha: 0.28),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
             child: ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -1766,12 +2064,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
+                  color: Colors.white,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: kRed,
-                foregroundColor: Colors.white,
-                elevation: 0,
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1790,15 +2088,15 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final isCurrentlyPaused = pTo != null && pTo.compareTo(todayStr) >= 0;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
       decoration: BoxDecoration(
         color: kSurface,
-        border: const Border(top: BorderSide(color: kBorderLt)),
+        border: const Border(top: BorderSide(color: kBorderLt, width: 1.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, -3),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -1814,25 +2112,25 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   horizontal: 14,
                   vertical: 10,
                 ),
-                margin: const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: kBg,
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: kBorderLt),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
                         color: s.autoRenew
                             ? const Color(0xFFDCFCE7)
-                            : kBorderLt,
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         Icons.autorenew_rounded,
-                        size: 15,
+                        size: 16,
                         color: s.autoRenew ? const Color(0xFF15803D) : kMuted,
                       ),
                     ),
@@ -1851,8 +2149,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                           ),
                           Text(
                             s.autoRenew
-                                ? 'Subscription renews automatically'
-                                : 'Ends on current end date',
+                                ? 'Renews automatically each cycle'
+                                : 'Stops at current end date',
                             style: const TextStyle(
                               fontSize: 10.5,
                               color: kTextSub,
@@ -1872,7 +2170,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                           ),
                         );
                       },
-                      activeColor: const Color(0xFF15803D),
+                      activeTrackColor: const Color(0xFF15803D),
                     ),
                   ],
                 ),
@@ -1884,47 +2182,63 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                 // Pause button — disabled when currently paused
                 Expanded(
                   flex: 3,
-                  child: SizedBox(
-                    height: 46,
-                    child: isCurrentlyPaused
-                        ? Column(
+                  child: isCurrentlyPaused
+                      ? Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: kBorderLt),
+                          ),
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              SizedBox(
-                                height: 46,
-                                child: ElevatedButton.icon(
-                                  onPressed: null,
-                                  icon: const Icon(
-                                    Icons.pause_circle_outline_rounded,
-                                    size: 17,
+                              const Icon(
+                                Icons.pause_circle_outline_rounded,
+                                size: 16,
+                                color: kAccent,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Paused until ${_formatDate(pTo)}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: kTextMid,
                                   ),
-                                  label: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      'Paused until ${_formatDate(pTo!)}',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                      maxLines: 1,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    disabledBackgroundColor: kBorderLt,
-                                    disabledForegroundColor: kMuted,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
-                          )
-                        : ElevatedButton.icon(
+                          ),
+                        )
+                      : Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: isTerminal
+                                ? null
+                                : const LinearGradient(
+                                    colors: [
+                                      Color(0xFF16A34A),
+                                      Color(0xFF15803D),
+                                    ],
+                                  ),
+                            color: isTerminal ? kBorderLt : null,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: isTerminal
+                                ? null
+                                : [
+                                    BoxShadow(
+                                      color: kPrimary.withValues(alpha: 0.28),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                          ),
+                          child: ElevatedButton.icon(
                             onPressed: isTerminal ? null : _handlePause,
                             icon: const Icon(
                               Icons.pause_circle_outline_rounded,
@@ -1936,27 +2250,24 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                               child: Text(
                                 'Pause Subscription',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w900,
+                                  color: Colors.white,
                                 ),
-                                maxLines: 1,
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isTerminal ? kMuted : kPrimary,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                               ),
-                              disabledBackgroundColor: kBorderLt,
-                              disabledForegroundColor: kMuted,
-                              elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
                           ),
-                  ),
+                        ),
                 ),
                 if (!isTerminal) ...[
                   const SizedBox(width: 8),
@@ -1964,8 +2275,23 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   if (isCurrentlyPaused)
                     Expanded(
                       flex: 2,
-                      child: SizedBox(
-                        height: 46,
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF15803D).withValues(
+                                alpha: 0.28,
+                              ),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
                         child: ElevatedButton.icon(
                           onPressed: _showResumeDialog,
                           icon: const Icon(
@@ -1978,19 +2304,18 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                             child: Text(
                               'Resume',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w900,
+                                color: Colors.white,
                               ),
-                              maxLines: 1,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF15803D),
-                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                         ),
@@ -2000,17 +2325,17 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   Expanded(
                     flex: 2,
                     child: SizedBox(
-                      height: 46,
+                      height: 48,
                       child: OutlinedButton(
                         onPressed: _handleCancel,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           side: BorderSide(
-                            color: kRed.withValues(alpha: 0.5),
+                            color: kRed.withValues(alpha: 0.35),
                             width: 1.2,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           backgroundColor: kRed.withValues(alpha: 0.04),
                         ),
@@ -2019,11 +2344,10 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                           child: Text(
                             'Cancel',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w900,
                               color: kRed,
                             ),
-                            maxLines: 1,
                           ),
                         ),
                       ),
@@ -2045,18 +2369,18 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     Color? valueColor,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: 3,
+                flex: 4,
                 child: Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     color: kTextSub,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2096,49 +2420,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          const Divider(height: 1, thickness: 1, color: kBorderLt),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Info Pill ────────────────────────────────────────────────────────────────
-
-class _InfoPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _InfoPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, thickness: 0.8, color: kBorderLt),
         ],
       ),
     );
@@ -2252,6 +2535,7 @@ class _BillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasDue = bill.dueAmount > 0;
     final billMap = {
       'bill_id': bill.billId,
       'bill_type': bill.billType,
@@ -2283,18 +2567,29 @@ class _BillCard extends StatelessWidget {
     };
 
     return GestureDetector(
-      onTap: () => showBillDetailSheet(context, billMap),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        showBillDetailSheet(context, billMap);
+      },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
+        margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: kSurface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: bill.dueAmount > 0
-                ? kRed.withValues(alpha: 0.15)
+            color: hasDue
+                ? kRed.withValues(alpha: 0.25)
                 : kBorderLt,
+            width: 1.2,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2302,7 +2597,8 @@ class _BillCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: _statusColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
@@ -2319,9 +2615,9 @@ class _BillCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        bill.billId,
+                        '#${bill.billId}',
                         style: const TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
                           color: kText,
                         ),
@@ -2331,7 +2627,7 @@ class _BillCard extends StatelessWidget {
                         Text(
                           '${formatDate(bill.billingFrom)} → ${formatDate(bill.billingTo)}',
                           style: const TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             color: kTextSub,
                             fontWeight: FontWeight.w500,
                           ),
@@ -2341,31 +2637,45 @@ class _BillCard extends StatelessWidget {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
+                    horizontal: 9,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: _statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    _statusLabel,
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w900,
-                      color: _statusColor,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: _statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _statusLabel,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: _statusColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             const Divider(height: 1, color: kBorderLt),
             const SizedBox(height: 10),
             Row(
               children: [
                 _BillStat(
-                  label: 'Total',
+                  label: 'Total Amount',
                   value: '₹${bill.totalAmount.toStringAsFixed(0)}',
                 ),
                 _BillStat(
@@ -2373,9 +2683,9 @@ class _BillCard extends StatelessWidget {
                   value: '₹${bill.paidAmount.toStringAsFixed(0)}',
                   color: kPrimary,
                 ),
-                if (bill.dueAmount > 0)
+                if (hasDue)
                   _BillStat(
-                    label: 'Due',
+                    label: 'Due Amount',
                     value: '₹${bill.dueAmount.toStringAsFixed(0)}',
                     color: kRed,
                   ),
@@ -2387,7 +2697,7 @@ class _BillCard extends StatelessWidget {
                         const Text(
                           'Due Date',
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 10,
                             color: kMuted,
                             fontWeight: FontWeight.w500,
                           ),
@@ -2396,9 +2706,9 @@ class _BillCard extends StatelessWidget {
                         Text(
                           formatDate(bill.dueDate),
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w800,
-                            color: bill.dueAmount > 0 ? kRed : kTextSub,
+                            color: hasDue ? kRed : kTextSub,
                           ),
                         ),
                       ],
@@ -2429,16 +2739,16 @@ class _BillStat extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 9.5,
+              fontSize: 10,
               color: kMuted,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             value,
             style: TextStyle(
-              fontSize: 12.5,
+              fontSize: 13,
               fontWeight: FontWeight.w900,
               color: color ?? kText,
             ),
@@ -2469,34 +2779,55 @@ class _QuickActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.15)),
+          color: kSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kBorderLt, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: color, size: 20),
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 19),
+                ),
                 if (badge != null)
                   Positioned(
-                    top: -4,
-                    right: -8,
+                    top: -2,
+                    right: -4,
                     child: Container(
-                      padding: const EdgeInsets.all(3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1.5,
+                      ),
                       decoration: BoxDecoration(
                         color: color,
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         badge!,
                         style: const TextStyle(
-                          fontSize: 8,
+                          fontSize: 9,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
                         ),
@@ -2505,15 +2836,15 @@ class _QuickActionButton extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 10.5,
+                style: const TextStyle(
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w800,
-                  color: color,
+                  color: kText,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -2569,9 +2900,9 @@ class _PauseHistorySheet extends StatelessWidget {
         color: kSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.72,
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2579,11 +2910,11 @@ class _PauseHistorySheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 40,
-              height: 4,
+              width: 44,
+              height: 4.5,
               decoration: BoxDecoration(
                 color: kBorderLt,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
@@ -2591,41 +2922,56 @@ class _PauseHistorySheet extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: kAccentLt.withValues(alpha: 0.4),
+                  color: kAccentLt.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.history_rounded,
                   color: kAccent,
-                  size: 18,
+                  size: 19,
                 ),
               ),
               const SizedBox(width: 10),
               const Expanded(
-                child: Text(
-                  'Pause History',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pause History',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: kText,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    Text(
+                      'Past and scheduled subscription pauses',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, size: 20, color: kTextSub),
+                icon: const Icon(Icons.close_rounded, size: 20, color: kTextSub),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Divider(color: kBorderLt),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
+          const Divider(color: kBorderLt, height: 1),
+          const SizedBox(height: 12),
           if (isLoading)
             const Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(32),
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: kAccent,
@@ -2634,23 +2980,41 @@ class _PauseHistorySheet extends StatelessWidget {
             )
           else if (pauses.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.pause_circle_outline_rounded,
-                      size: 40,
-                      color: kMuted.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'No pause history yet.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: kTextSub,
-                        fontWeight: FontWeight.w600,
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: kAccentLt.withValues(alpha: 0.25),
+                        shape: BoxShape.circle,
                       ),
+                      child: Icon(
+                        Icons.pause_circle_outline_rounded,
+                        size: 28,
+                        color: kAccent.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No pause history yet',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: kText,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Scheduled and previous pauses will appear here.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -2660,6 +3024,7 @@ class _PauseHistorySheet extends StatelessWidget {
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 20),
                 itemCount: pauses.length,
                 itemBuilder: (_, i) {
                   final pause = pauses[i];
@@ -2674,8 +3039,8 @@ class _PauseHistorySheet extends StatelessWidget {
                   final statusBg = isResumed
                       ? const Color(0xFFDCFCE7)
                       : isLatestActive
-                      ? kAccentLt.withValues(alpha: 0.4)
-                      : const Color(0xFFF0F0F0);
+                      ? kAccentLt.withValues(alpha: 0.5)
+                      : const Color(0xFFF1F5F9);
                   final statusLabel = isResumed
                       ? 'Resumed'
                       : isLatestActive
@@ -2687,17 +3052,25 @@ class _PauseHistorySheet extends StatelessWidget {
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: isLatestActive
-                          ? kAccentLt.withValues(alpha: 0.15)
-                          : kBg,
-                      borderRadius: BorderRadius.circular(14),
+                          ? kAccentLt.withValues(alpha: 0.12)
+                          : kSurface,
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isLatestActive
-                            ? kAccentLt.withValues(alpha: 0.5)
+                            ? kAccent.withValues(alpha: 0.4)
                             : kBorderLt,
+                        width: 1.2,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2705,14 +3078,15 @@ class _PauseHistorySheet extends StatelessWidget {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(7),
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
                                 color: statusBg,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 iconData,
-                                size: 13,
+                                size: 16,
                                 color: statusColor,
                               ),
                             ),
@@ -2724,7 +3098,7 @@ class _PauseHistorySheet extends StatelessWidget {
                                   Text(
                                     '${formatDate(pause.startDate)} → ${formatDate(pause.endDate)}',
                                     style: const TextStyle(
-                                      fontSize: 12.5,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w800,
                                       color: kText,
                                     ),
@@ -2735,7 +3109,7 @@ class _PauseHistorySheet extends StatelessWidget {
                                     Text(
                                       pause.reason!,
                                       style: const TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 11.5,
                                         color: kTextSub,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -2746,8 +3120,8 @@ class _PauseHistorySheet extends StatelessWidget {
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
+                                horizontal: 8,
+                                vertical: 3.5,
                               ),
                               decoration: BoxDecoration(
                                 color: statusBg,
@@ -2756,8 +3130,8 @@ class _PauseHistorySheet extends StatelessWidget {
                               child: Text(
                                 statusLabel,
                                 style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
                                   color: statusColor,
                                 ),
                               ),
@@ -2766,9 +3140,25 @@ class _PauseHistorySheet extends StatelessWidget {
                         ),
                         // Resume button — only on latest active pause record
                         if (isLatestActive) ...[
-                          const SizedBox(height: 10),
-                          SizedBox(
+                          const SizedBox(height: 12),
+                          Container(
+                            height: 42,
                             width: double.infinity,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF15803D).withValues(
+                                    alpha: 0.25,
+                                  ),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
                             child: ElevatedButton.icon(
                               onPressed: () {
                                 Navigator.pop(context);
@@ -2776,25 +3166,23 @@ class _PauseHistorySheet extends StatelessWidget {
                               },
                               icon: const Icon(
                                 Icons.play_circle_outline_rounded,
-                                size: 15,
+                                size: 16,
                                 color: Colors.white,
                               ),
                               label: const Text(
                                 'Resume Subscription',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
                                 ),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF15803D),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                ),
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                             ),
@@ -2833,7 +3221,7 @@ class _BillsSheet extends StatelessWidget {
         color: kSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
@@ -2843,11 +3231,11 @@ class _BillsSheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 40,
-              height: 4,
+              width: 44,
+              height: 4.5,
               decoration: BoxDecoration(
                 color: kBorderLt,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
@@ -2855,15 +3243,16 @@ class _BillsSheet extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.receipt_long_rounded,
                   color: Color(0xFF7C3AED),
-                  size: 18,
+                  size: 19,
                 ),
               ),
               const SizedBox(width: 10),
@@ -2872,15 +3261,16 @@ class _BillsSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Bills',
+                      'Subscription Bills',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                         color: kText,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     Text(
-                      '${bills.length} bill${bills.length != 1 ? 's' : ''} for this subscription',
+                      '${bills.length} bill${bills.length != 1 ? 's' : ''} generated for this subscription',
                       style: const TextStyle(
                         fontSize: 11,
                         color: kTextSub,
@@ -2891,18 +3281,18 @@ class _BillsSheet extends StatelessWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, size: 20, color: kTextSub),
+                icon: const Icon(Icons.close_rounded, size: 20, color: kTextSub),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Divider(color: kBorderLt),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
+          const Divider(color: kBorderLt, height: 1),
+          const SizedBox(height: 12),
           if (isLoading)
             const Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.all(32),
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: kPrimary,
@@ -2911,23 +3301,41 @@ class _BillsSheet extends StatelessWidget {
             )
           else if (bills.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.receipt_long_outlined,
-                      size: 40,
-                      color: kMuted.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'No bills found yet.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: kTextSub,
-                        fontWeight: FontWeight.w600,
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
                       ),
+                      child: Icon(
+                        Icons.receipt_long_outlined,
+                        size: 28,
+                        color: kMuted.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No bills generated yet',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: kText,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Monthly bills and cycle statements will show up here.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -2937,7 +3345,7 @@ class _BillsSheet extends StatelessWidget {
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
-                padding: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.only(bottom: 20),
                 itemCount: bills.length,
                 itemBuilder: (_, i) =>
                     _BillCard(bill: bills[i], formatDate: formatDate),
@@ -2975,9 +3383,9 @@ class _OrdersHistorySheet extends StatelessWidget {
         color: kSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: MediaQuery.of(context).size.height * 0.78,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2985,11 +3393,11 @@ class _OrdersHistorySheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 40,
-              height: 4,
+              width: 44,
+              height: 4.5,
               decoration: BoxDecoration(
                 color: kBorderLt,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
@@ -2997,15 +3405,16 @@ class _OrdersHistorySheet extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0077B6).withValues(alpha: 0.08),
+                  color: const Color(0xFF0077B6).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
-                  Icons.receipt_long_rounded,
+                  Icons.local_shipping_rounded,
                   color: Color(0xFF0077B6),
-                  size: 18,
+                  size: 19,
                 ),
               ),
               const SizedBox(width: 10),
@@ -3019,6 +3428,7 @@ class _OrdersHistorySheet extends StatelessWidget {
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                         color: kText,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     Text(
@@ -3033,33 +3443,51 @@ class _OrdersHistorySheet extends StatelessWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, size: 20, color: kTextSub),
+                icon: const Icon(Icons.close_rounded, size: 20, color: kTextSub),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Divider(color: kBorderLt),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
+          const Divider(color: kBorderLt, height: 1),
+          const SizedBox(height: 12),
           if (orders.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.inbox_outlined,
-                      size: 40,
-                      color: kMuted.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'No delivery orders yet.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: kTextSub,
-                        fontWeight: FontWeight.w600,
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
                       ),
+                      child: Icon(
+                        Icons.inbox_outlined,
+                        size: 28,
+                        color: kMuted.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No delivery orders yet',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: kText,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Daily and recurring delivery orders will appear here.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: kTextSub,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -3069,6 +3497,7 @@ class _OrdersHistorySheet extends StatelessWidget {
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 20),
                 itemCount: orders.length,
                 itemBuilder: (_, i) {
                   final order = orders[i];
@@ -3077,27 +3506,34 @@ class _OrdersHistorySheet extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: kBg,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: kBorderLt),
+                      color: kSurface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: kBorderLt, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 40,
-                          height: 40,
+                          width: 42,
+                          height: 42,
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Center(
                             child: Text(
                               order.emoji,
-                              style: const TextStyle(fontSize: 18),
+                              style: const TextStyle(fontSize: 20),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3105,20 +3541,20 @@ class _OrdersHistorySheet extends StatelessWidget {
                               Text(
                                 order.productName,
                                 style: const TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                   color: kText,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Text(
                                 order.scheduledDate.isNotEmpty
                                     ? order.scheduledDate
                                     : order.date,
                                 style: const TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11,
                                   color: kTextSub,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -3132,16 +3568,16 @@ class _OrdersHistorySheet extends StatelessWidget {
                             Text(
                               '₹${order.amount.toStringAsFixed(0)}',
                               style: const TextStyle(
-                                fontSize: 13,
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.w900,
                                 color: kText,
                               ),
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
+                                horizontal: 8,
+                                vertical: 2.5,
                               ),
                               decoration: BoxDecoration(
                                 color: color.withValues(alpha: 0.1),
