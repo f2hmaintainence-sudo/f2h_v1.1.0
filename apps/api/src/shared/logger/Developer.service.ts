@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as winston from 'winston';
 import * as fs from 'fs';
@@ -117,6 +117,7 @@ export class DeveloperService {
         new winston.transports.File({
           filename: this.logFilePath,
         }),
+        new winston.transports.Console(),
       ],
     });
   }
