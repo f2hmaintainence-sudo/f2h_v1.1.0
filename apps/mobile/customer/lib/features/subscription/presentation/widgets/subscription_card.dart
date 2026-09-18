@@ -10,7 +10,6 @@ import '../../../catalog/presentation/bloc/cart/cart_event.dart';
 import '../../../catalog/presentation/screens/cart_screen.dart';
 import '../screens/subscription_detail_screen.dart';
 
-
 class SubCard extends StatelessWidget {
   final Subscription s;
   final VoidCallback? onPauseResume;
@@ -36,7 +35,7 @@ class SubCard extends StatelessWidget {
     final isCompleted = s.status == 'completed';
     final isTerminal = isCancelled || isExpired || isCompleted;
 
-    // Status visuals
+    // ── Status visuals ──────────────────────────────────────────────
     final Color statusColor = isActive
         ? kPrimary
         : isPaused
@@ -46,24 +45,27 @@ class SubCard extends StatelessWidget {
                 : isCompleted
                     ? Colors.grey
                     : kRed;
+
     final Color statusBg = isActive
         ? kPrimaryPl
         : isPaused
-            ? kAccentLt.withValues(alpha: 0.4)
+            ? kAccentLt.withValues(alpha: 0.45)
             : isExpired
-                ? kRed.withValues(alpha: 0.08)
+                ? kRed.withValues(alpha: 0.09)
                 : isCompleted
                     ? Colors.grey.withValues(alpha: 0.12)
-                    : kRed.withValues(alpha: 0.08);
+                    : kRed.withValues(alpha: 0.09);
+
     final IconData statusIcon = isActive
-        ? Icons.check_circle_outline_rounded
+        ? Icons.check_circle_rounded
         : isPaused
-            ? Icons.pause_circle_outline_rounded
+            ? Icons.pause_circle_rounded
             : isExpired
-                ? Icons.error_outline_rounded
+                ? Icons.error_rounded
                 : isCompleted
                     ? Icons.done_all_rounded
-                    : Icons.cancel_outlined;
+                    : Icons.cancel_rounded;
+
     final String statusLabel = isActive
         ? 'ACTIVE'
         : isPaused
@@ -74,13 +76,28 @@ class SubCard extends StatelessWidget {
                     ? 'COMPLETED'
                     : 'CANCELLED';
 
-    // Payment Type visuals
+    // ── Payment type visuals ────────────────────────────────────────
     final isPostpaid = s.paymentType.toLowerCase() == 'postpaid';
-    final Color paymentTypeColor = isPostpaid ? const Color(0xFF7E22CE) : const Color(0xFF047857);
-    final Color paymentTypeBg = isPostpaid ? const Color(0xFFF3E8FF) : const Color(0xFFECFDF5);
-    final Color paymentTypeBorder = isPostpaid ? const Color(0xFFD8B4FE) : const Color(0xFFA7F3D0);
-    final IconData paymentTypeIcon = isPostpaid ? Icons.credit_card_rounded : Icons.account_balance_wallet_outlined;
+    final Color paymentTypeColor =
+        isPostpaid ? const Color(0xFF7E22CE) : const Color(0xFF047857);
+    final Color paymentTypeBg =
+        isPostpaid ? const Color(0xFFF3E8FF) : const Color(0xFFECFDF5);
     final String paymentTypeLabel = isPostpaid ? 'POSTPAID' : 'PREPAID';
+
+    // ── Card background ─────────────────────────────────────────────
+    final cardBg = isActive
+        ? const Color(0xFFFAFFFB) // very faint green tint for active
+        : isTerminal
+            ? const Color(0xFFF8FAFC)
+            : Colors.white;
+
+    final cardBorderColor = isActive
+        ? kPrimary.withValues(alpha: 0.14)
+        : isTerminal
+            ? (isCancelled
+                ? kRed.withValues(alpha: 0.14)
+                : const Color(0xFFE2E8F0))
+            : const Color(0xFFE2E8F0);
 
     return GestureDetector(
       onTap: () {
@@ -98,325 +115,729 @@ class SubCard extends StatelessWidget {
         );
       },
       child: Opacity(
-        opacity: isTerminal ? 0.65 : 1.0,
+        opacity: isTerminal ? 0.72 : 1.0,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isActive
-                  ? kPrimary.withValues(alpha: 0.12)
-                  : isTerminal
-                      ? (isCancelled ? kRed.withValues(alpha: 0.15) : const Color(0xFFE2E8F0))
-                      : const Color(0xFFE2E8F0),
-              width: 1.5,
-            ),
+            border: Border.all(color: cardBorderColor, width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: isActive
-                    ? kPrimary.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.03),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                    ? kPrimary.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Product image
+                  // ── Left accent bar ─────────────────────────────
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 4,
                     decoration: BoxDecoration(
-                      color: isActive ? kPrimaryPl : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: isActive
-                            ? kPrimary.withValues(alpha: 0.08)
-                            : const Color(0xFFE2E8F0),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: buildProductImage(
-                        s.productName,
-                        imageAsset: s.imageUrl,
-                        fit: BoxFit.cover,
-                        fallbackColor: isActive ? kPrimary : kTextSub,
+                      gradient: LinearGradient(
+                        colors: [
+                          statusColor,
+                          statusColor.withValues(alpha: 0.4),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
 
-                  // Details
+                  // ── Card body ───────────────────────────────────
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _prettifyName(s.productName),
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  color: isActive ? kText : kTextSub,
-                                  letterSpacing: -0.2,
-                                  decoration: isCancelled ? TextDecoration.lineThrough : null,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Top row: image + details
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Product image with glow
+                              _ProductImage(
+                                subscription: s,
+                                isActive: isActive,
+                                statusColor: statusColor,
+                                isTerminal: isTerminal,
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            // Payment Type Badge (Prepaid / Postpaid)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                              decoration: BoxDecoration(
-                                color: paymentTypeBg,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: paymentTypeBorder,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(paymentTypeIcon, size: 10, color: paymentTypeColor),
-                                  const SizedBox(width: 3.5),
-                                  Text(
-                                    paymentTypeLabel,
-                                    style: TextStyle(
-                                      fontSize: 8.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: paymentTypeColor,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            // Dynamic status badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: statusBg,
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(
-                                  color: statusColor.withValues(alpha: 0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(statusIcon, size: 11, color: statusColor),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    statusLabel,
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w900,
-                                      color: statusColor,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
+                              const SizedBox(width: 12),
 
-                        // Pause date info
-                        if (s.pauseFromDate != null && s.pauseToDate != null) ...[
+                              // Right side details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Name row + badges
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _prettifyName(s.productName),
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              color: isActive
+                                                  ? kText
+                                                  : kTextSub,
+                                              letterSpacing: -0.3,
+                                              decoration: isCancelled
+                                                  ? TextDecoration.lineThrough
+                                                  : null,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        // Payment type badge (dot style)
+                                        _DotBadge(
+                                          label: paymentTypeLabel,
+                                          color: paymentTypeColor,
+                                          bg: paymentTypeBg,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        // Status badge
+                                        _DotBadge(
+                                          label: statusLabel,
+                                          color: statusColor,
+                                          bg: statusBg,
+                                          icon: statusIcon,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 5),
+
+                                    // Pause date chip (if applicable)
+                                    if (s.pauseFromDate != null &&
+                                        s.pauseToDate != null) ...[
+                                      Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              kAccentLt.withValues(alpha: 0.6),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.pause_circle_rounded,
+                                              size: 11,
+                                              color: kAccent,
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              s.pauseFromDate == s.pauseToDate
+                                                  ? 'Paused: ${s.pauseFromDate}'
+                                                  : 'Paused: ${s.pauseFromDate} → ${s.pauseToDate}',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: kAccent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+
+                                    // Price + Qty row
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        // Price pill
+                                        _PricePill(
+                                          subscription: s,
+                                          isActive: isActive,
+                                        ),
+                                        const Spacer(),
+                                        // Qty badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: isActive
+                                                ? kPrimary.withValues(
+                                                    alpha: 0.07)
+                                                : const Color(0xFFF1F5F9),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: isActive
+                                                  ? kPrimary.withValues(
+                                                      alpha: 0.12)
+                                                  : const Color(0xFFE2E8F0),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Qty: ${s.qty}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                              color: isActive
+                                                  ? kPrimary
+                                                  : kTextSub,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    // Days / Quantity widget
+                                    _buildSubCardDaysWidget(s),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // ── Divider ──────────────────────────────────
+                          const SizedBox(height: 10),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                            margin: const EdgeInsets.only(bottom: 5),
+                            height: 1,
                             decoration: BoxDecoration(
-                              color: kAccentLt.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.pause_circle_outline_rounded, size: 11, color: kAccent),
-                                const SizedBox(width: 5),
-                                Text(
-                                  s.pauseFromDate == s.pauseToDate
-                                      ? 'Paused: ${s.pauseFromDate}'
-                                      : 'Paused: ${s.pauseFromDate} → ${s.pauseToDate}',
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: kAccent,
-                                  ),
-                                ),
-                              ],
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.transparent,
+                                  const Color(0xFFE2E8F0),
+                                  Colors.transparent,
+                                ],
+                              ),
                             ),
                           ),
-                        ],
+                          const SizedBox(height: 8),
 
-                        const SizedBox(height: 6),
-
-                        // Price row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '₹${(s.totalDailyCost > 0 ? s.totalDailyCost : (s.pricePerDay > 0 ? s.pricePerDay * (s.qty > 0 ? s.qty : 1) : (s.items.isNotEmpty ? (s.items.first.finalPrice > 0 ? s.items.first.finalPrice : s.items.first.unitPrice) : 0))).toStringAsFixed(0)}',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: isActive ? kPrimary : kTextSub,
-                                  ),
-                                ),
-                                Text(
-                                  ' / day',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: kTextSub.withValues(alpha: isActive ? 1 : 0.7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isActive
-                                    ? kPrimary.withValues(alpha: 0.06)
-                                    : const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isActive
-                                      ? kPrimary.withValues(alpha: 0.1)
-                                      : const Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              child: Text(
-                                'Qty: ${s.qty}',
+                          // ── Footer ────────────────────────────────────
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isTerminal
+                                    ? 'Tap to view details'
+                                    : 'Tap to manage subscription',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  color: isActive ? kPrimary : kTextSub,
+                                  fontSize: 10.5,
+                                  color: kTextSub.withValues(alpha: 0.65),
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        _buildSubCardDaysWidget(s),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              // Tap to view details hint
-              const SizedBox(height: 10),
-              Container(height: 1, color: const Color(0xFFF1F5F9)),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 11,
-                    color: kTextSub.withValues(alpha: 0.6),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isTerminal
-                        ? 'Tap to view details'
-                        : 'Tap to manage subscription',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: kTextSub.withValues(alpha: 0.6),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  const Icon(Icons.chevron_right_rounded, size: 14, color: kMuted),
-                ],
-              ),
-              if (isCompleted) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 38,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      final firstItem = s.items.isNotEmpty ? s.items.first : null;
-                      final variantId = firstItem?.productVariantId ?? s.id;
-                      final productName = firstItem?.productName ?? s.productName;
-                      final variantName = (firstItem?.variantName.isNotEmpty ?? false) ? firstItem!.variantName : 'Standard';
-                      final price = (firstItem != null && firstItem.finalPrice > 0) ? firstItem.finalPrice : (firstItem?.unitPrice ?? s.pricePerDay);
-
-                      final cartItem = CartItemEntity(
-                        productId: variantId,
-                        variantId: variantId,
-                        productName: productName,
-                        variantName: variantName,
-                        unitPrice: price,
-                        purchaseType: 'subscription',
-                        schedules: [
-                          SubscriptionSchedule(
-                            day: 0,
-                            mQuantity: s.qty > 0 ? s.qty : 1,
-                            eQuantity: 0,
+                              Row(
+                                children: [
+                                  Text(
+                                    isTerminal
+                                        ? 'View Details'
+                                        : 'Manage',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: kPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  const Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 10,
+                                    color: kPrimary,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
+
+                          // ── Renew button (completed only) ─────────────
+                          if (isCompleted) ...[
+                            const SizedBox(height: 10),
+                            _RenewButton(subscription: s),
+                          ],
                         ],
-                        isSubscribable: true,
-                        isOneTime: true,
-                        subscriptionPrice: price,
-                      );
-                      context.read<CartBloc>().add(AddToCartEvent(cartItem));
-                      F2HToast.success(context, 'Subscription added to cart for renewal!');
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const CartScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.replay_rounded, size: 15, color: Colors.white),
-                    label: const Text(
-                      'RENEW SUBSCRIPTION',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kPrimary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                ),
-              ] else if (isExpired) ...[
-                // No button for expired — user can tap to view details
-              ],
-
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
-
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sub-widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProductImage extends StatelessWidget {
+  final Subscription subscription;
+  final bool isActive;
+  final Color statusColor;
+  final bool isTerminal;
+
+  const _ProductImage({
+    required this.subscription,
+    required this.isActive,
+    required this.statusColor,
+    required this.isTerminal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 68,
+      height: 68,
+      decoration: BoxDecoration(
+        color: isActive ? kPrimaryPl : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isActive
+              ? kPrimary.withValues(alpha: 0.1)
+              : const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: statusColor.withValues(alpha: 0.18),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: buildProductImage(
+          subscription.productName,
+          imageAsset: subscription.imageUrl,
+          fit: BoxFit.cover,
+          fallbackColor: isActive ? kPrimary : kTextSub,
+        ),
+      ),
+    );
+  }
+}
+
+class _DotBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color bg;
+  final IconData? icon;
+
+  const _DotBadge({
+    required this.label,
+    required this.color,
+    required this.bg,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 9, color: color),
+            const SizedBox(width: 3),
+          ] else ...[
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PricePill extends StatelessWidget {
+  final Subscription subscription;
+  final bool isActive;
+
+  const _PricePill({required this.subscription, required this.isActive});
+
+  double get _dailyCost {
+    final s = subscription;
+    if (s.totalDailyCost > 0) return s.totalDailyCost;
+    if (s.pricePerDay > 0) return s.pricePerDay * (s.qty > 0 ? s.qty : 1);
+    if (s.items.isNotEmpty) {
+      final item = s.items.first;
+      return item.finalPrice > 0 ? item.finalPrice : item.unitPrice;
+    }
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: isActive ? kPrimary : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            '₹${_dailyCost.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: isActive ? Colors.white : kTextSub,
+              letterSpacing: -0.3,
+            ),
+          ),
+          Text(
+            ' / day',
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+              color: isActive
+                  ? Colors.white.withValues(alpha: 0.7)
+                  : kMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RenewButton extends StatelessWidget {
+  final Subscription subscription;
+
+  const _RenewButton({required this.subscription});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 40,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [kPrimaryMid, kPrimary],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimary.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ElevatedButton.icon(
+          onPressed: () {
+            final s = subscription;
+            final firstItem = s.items.isNotEmpty ? s.items.first : null;
+            final variantId = firstItem?.productVariantId ?? s.id;
+            final productName = firstItem?.productName ?? s.productName;
+            final variantName =
+                (firstItem?.variantName.isNotEmpty ?? false)
+                    ? firstItem!.variantName
+                    : 'Standard';
+            final price = (firstItem != null && firstItem.finalPrice > 0)
+                ? firstItem.finalPrice
+                : (firstItem?.unitPrice ?? s.pricePerDay);
+
+            final cartItem = CartItemEntity(
+              productId: variantId,
+              variantId: variantId,
+              productName: productName,
+              variantName: variantName,
+              unitPrice: price,
+              purchaseType: 'subscription',
+              schedules: [
+                SubscriptionSchedule(
+                  day: 0,
+                  mQuantity: s.qty > 0 ? s.qty : 1,
+                  eQuantity: 0,
+                ),
+              ],
+              isSubscribable: true,
+              isOneTime: true,
+              subscriptionPrice: price,
+            );
+            context.read<CartBloc>().add(AddToCartEvent(cartItem));
+            F2HToast.success(
+                context, 'Subscription added to cart for renewal!');
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            );
+          },
+          icon: const Icon(Icons.replay_rounded,
+              size: 15, color: Colors.white),
+          label: const Text(
+            'RENEW SUBSCRIPTION',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.6,
+              color: Colors.white,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shadowColor: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Days / Quantity chip widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+Widget _buildSubCardDaysWidget(Subscription s) {
+  final dayQtys = s.getSelectedDayQuantities();
+  if (dayQtys.isEmpty) return const SizedBox.shrink();
+
+  const morningColor = Color(0xFF14532D);
+  const eveningColor = Color(0xFF16A34A);
+  const morningBg = Color(0xFFDCFCE7);
+  const eveningBg = Color(0xFFF0FDF4);
+
+  final isSevenDays = dayQtys.length == 7;
+  final first = dayQtys.first;
+  final isAllSameSlots = isSevenDays &&
+      dayQtys.every((dq) =>
+          dq.morningQty == first.morningQty &&
+          dq.eveningQty == first.eveningQty);
+
+  return Container(
+    margin: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFE9EFF5)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: kPrimaryPl,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Icon(
+                Icons.calendar_today_rounded,
+                size: 9,
+                color: kPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              'Selected Days & Quantity:',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: kTextSub,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+
+        if (isAllSameSlots)
+          _DayChip(
+            label: 'Daily',
+            morningQty: first.morningQty,
+            eveningQty: first.eveningQty,
+            morningColor: morningColor,
+            eveningColor: eveningColor,
+            morningBg: morningBg,
+            eveningBg: eveningBg,
+            quantity: first.quantity,
+          )
+        else
+          Wrap(
+            spacing: 5,
+            runSpacing: 5,
+            children: dayQtys
+                .map(
+                  (dq) => _DayChip(
+                    label: dq.dayName,
+                    morningQty: dq.morningQty,
+                    eveningQty: dq.eveningQty,
+                    morningColor: morningColor,
+                    eveningColor: eveningColor,
+                    morningBg: morningBg,
+                    eveningBg: eveningBg,
+                    quantity: dq.quantity,
+                  ),
+                )
+                .toList(),
+          ),
+      ],
+    ),
+  );
+}
+
+class _DayChip extends StatelessWidget {
+  final String label;
+  final int morningQty;
+  final int eveningQty;
+  final int quantity;
+  final Color morningColor;
+  final Color eveningColor;
+  final Color morningBg;
+  final Color eveningBg;
+
+  const _DayChip({
+    required this.label,
+    required this.morningQty,
+    required this.eveningQty,
+    required this.morningColor,
+    required this.eveningColor,
+    required this.morningBg,
+    required this.eveningBg,
+    required this.quantity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimary.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: kTextMid,
+            ),
+          ),
+          if (morningQty > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: morningBg,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'M:$morningQty',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  color: morningColor,
+                ),
+              ),
+            ),
+          ],
+          if (eveningQty > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: eveningBg,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                    color: eveningColor.withValues(alpha: 0.25)),
+              ),
+              child: Text(
+                'E:$eveningQty',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  color: eveningColor,
+                ),
+              ),
+            ),
+          ],
+          if (morningQty == 0 && eveningQty == 0 && quantity > 0) ...[
+            const SizedBox(width: 4),
+            Text(
+              '$quantity',
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+                color: kPrimary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 String _prettifyName(String name) {
   return name
@@ -427,167 +848,4 @@ String _prettifyName(String name) {
         return word[0].toUpperCase() + word.substring(1);
       })
       .join(' ');
-}
-
-Widget _buildSubCardDaysWidget(Subscription s) {
-  final dayQtys = s.getSelectedDayQuantities();
-  if (dayQtys.isEmpty) return const SizedBox.shrink();
-
-  const morningColor = Color(0xFF14532D); // Dark green
-  const eveningColor = Color(0xFF16A34A); // Light green
-
-  final isSevenDays = dayQtys.length == 7;
-  final first = dayQtys.first;
-  final isAllSameSlots = isSevenDays &&
-      dayQtys.every((dq) =>
-          dq.morningQty == first.morningQty && dq.eveningQty == first.eveningQty);
-
-  return Container(
-    margin: const EdgeInsets.only(top: 8),
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF8FAFC),
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: const Color(0xFFE2E8F0)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(
-              Icons.calendar_today_rounded,
-              size: 11,
-              color: kPrimary,
-            ),
-            SizedBox(width: 5),
-            Text(
-              'Selected Days & Quantity:',
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                color: kTextSub,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        if (isAllSameSlots)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Daily  ',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: kText,
-                  ),
-                ),
-                if (first.morningQty > 0) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'M: ${first.morningQty}',
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: morningColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-                if (first.eveningQty > 0) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: eveningColor.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      'E: ${first.eveningQty}',
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: eveningColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          )
-        else
-          Wrap(
-            spacing: 5,
-            runSpacing: 5,
-            children: dayQtys.map((dq) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${dq.dayName} ',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: kTextSub,
-                      ),
-                    ),
-                    if (dq.morningQty > 0) ...[
-                      Text(
-                        'M:${dq.morningQty} ',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: morningColor,
-                        ),
-                      ),
-                    ],
-                    if (dq.eveningQty > 0) ...[
-                      Text(
-                        'E:${dq.eveningQty}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: eveningColor,
-                        ),
-                      ),
-                    ],
-                    if (dq.morningQty == 0 && dq.eveningQty == 0)
-                      Text(
-                        '${dq.quantity}',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w900,
-                          color: kPrimary,
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-      ],
-    ),
-  );
 }

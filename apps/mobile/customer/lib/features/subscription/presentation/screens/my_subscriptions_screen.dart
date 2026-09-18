@@ -587,33 +587,51 @@ class _SubsScreenState extends State<SubsScreen>
                 return Container(
                   margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
-                        color: kPrimary.withValues(alpha: 0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+                        color: kPrimary.withValues(alpha: 0.22),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
                       )
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(22),
                     child: Stack(
                       children: [
+                        // Gradient background
                         Positioned.fill(
                           child: Container(
                             decoration: const BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [Color(0xFF123E24), Color(0xFF1F8A4D), Color(0xFF38A169)],
+                                colors: [
+                                  Color(0xFF0D3320),
+                                  Color(0xFF15803D),
+                                  Color(0xFF22C55E),
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                             ),
                           ),
                         ),
+                        // Decorative circles
                         Positioned(
-                          right: -15,
-                          top: -15,
+                          right: -20,
+                          top: -20,
+                          child: Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.05),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 30,
+                          bottom: -30,
                           child: Container(
                             width: 70,
                             height: 70,
@@ -623,65 +641,107 @@ class _SubsScreenState extends State<SubsScreen>
                             ),
                           ),
                         ),
+                        // Content
                         Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isCompact ? 12 : 16,
-                            vertical: isCompact ? 14 : 16,
+                          padding: EdgeInsets.fromLTRB(
+                            isCompact ? 14 : 18,
+                            isCompact ? 14 : 16,
+                            isCompact ? 14 : 18,
+                            isPostpaidEnabled ? (isCompact ? 14 : 16) : 8,
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                padding: EdgeInsets.all(isCompact ? 6 : 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  isPostpaidEnabled ? Icons.credit_card_rounded : Icons.credit_card_off_rounded,
-                                  color: kAccent,
-                                  size: isCompact ? 18 : 22,
-                                ),
-                              ),
-                              SizedBox(width: isCompact ? 8 : 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        isPostpaidEnabled ? 'POSTPAID CREDIT LIMIT' : 'POSTPAID STATUS',
-                                        style: TextStyle(
-                                          fontSize: isCompact ? 8.5 : 9.5,
-                                          color: Colors.white.withValues(alpha: 0.6),
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: isCompact ? 0.4 : 1.0,
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(isCompact ? 7 : 9),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      isPostpaidEnabled
+                                          ? Icons.credit_card_rounded
+                                          : Icons.credit_card_off_rounded,
+                                      color: kAccent,
+                                      size: isCompact ? 18 : 22,
+                                    ),
+                                  ),
+                                  SizedBox(width: isCompact ? 10 : 13),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          isPostpaidEnabled
+                                              ? 'POSTPAID CREDIT LIMIT'
+                                              : 'POSTPAID STATUS',
+                                          style: TextStyle(
+                                            fontSize: isCompact ? 8.5 : 9.5,
+                                            color: Colors.white.withValues(alpha: 0.6),
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: isCompact ? 0.5 : 1.1,
+                                          ),
                                         ),
-                                        maxLines: 1,
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          isPostpaidEnabled
+                                              ? '₹${creditLimit.toStringAsFixed(0)}  ·  Used: ₹${usedLimit.toStringAsFixed(0)}'
+                                              : 'Not Enabled',
+                                          style: TextStyle(
+                                            fontSize: isCompact ? 15 : 18,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: -0.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // CTA for non-postpaid users
+                              if (!isPostpaidEnabled) ...
+                                [
+                                  const SizedBox(height: 10),
+                                  GestureDetector(
+                                    onTap: () => _showContactSupportOptions(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 7),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.13),
+                                        borderRadius: BorderRadius.circular(30),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.18),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Contact Support to Enable',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white.withValues(alpha: 0.9),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Icon(
+                                            Icons.arrow_forward_ios_rounded,
+                                            size: 10,
+                                            color: Colors.white.withValues(alpha: 0.8),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        isPostpaidEnabled
-                                            ? '₹${creditLimit.toStringAsFixed(0)} · Used: ₹${usedLimit.toStringAsFixed(0)}'
-                                            : 'Not Enabled',
-                                        style: TextStyle(
-                                          fontSize: isCompact ? 14 : 17,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: -0.2,
-                                        ),
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                ],
                             ],
                           ),
                         ),
@@ -893,66 +953,103 @@ class _SubsScreenState extends State<SubsScreen>
   Widget _buildUnauthenticatedEmptyState(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 28),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Illustrated icon container
             Container(
-              width: 100,
-              height: 100,
-              decoration: const BoxDecoration(
-                color: kPrimaryPl,
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [kPrimaryPl, Color(0xFFBBF7D0)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimary.withValues(alpha: 0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: const Icon(
-                Icons.calendar_today_outlined,
-                size: 48,
+                Icons.subscriptions_rounded,
+                size: 50,
                 color: kPrimary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 26),
             const Text(
-              'Manage Subscriptions',
+              'Manage Your Subscriptions',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 19,
                 fontWeight: FontWeight.w900,
                 color: kText,
+                letterSpacing: -0.3,
               ),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             const Text(
-              'Subscribe to daily organic milk, fresh paneer, ghee, and dairy essentials delivered straight to your door.',
+              'Subscribe to daily organic milk, fresh paneer, ghee, and dairy essentials — delivered before 7 AM.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 13.5,
                 color: kTextSub,
-                height: 1.4,
+                height: 1.5,
               ),
             ),
-            const SizedBox(height: 28),
-            ElevatedButton(
-              onPressed: () {
-                AppShell.of(context)?.setTab(1);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            const SizedBox(height: 30),
+            // Gradient CTA button
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [kPrimaryMid, kPrimary],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
-                elevation: 0,
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Subscribe Products',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimary.withValues(alpha: 0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Icons.storefront_rounded, size: 16),
                 ],
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  AppShell.of(context)?.setTab(1);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.storefront_rounded, size: 18),
+                    SizedBox(width: 9),
+                    Text(
+                      'Browse Products',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -981,9 +1078,10 @@ class _SubsScreenState extends State<SubsScreen>
               color: kText,
               fontSize: 20,
               fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
             ),
           ),
-          centerTitle: true,
+          centerTitle: false,
         ),
         body: _buildUnauthenticatedEmptyState(context),
       );
@@ -1027,7 +1125,59 @@ class _SubsScreenState extends State<SubsScreen>
                   backgroundColor: kSurface,
                   surfaceTintColor: Colors.transparent,
                   pinned: true,
-                  title: const Text('My Subscriptions', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: kText)),
+                  expandedHeight: 72,
+                  collapsedHeight: 60,
+                  flexibleSpace: FlexibleSpaceBar(
+                    titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    title: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'My Subscriptions',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                            color: kText,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        Text(
+                          'Your daily deliveries',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: kTextSub,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12, top: 6, bottom: 6),
+                      child: Material(
+                        color: kPrimaryPl,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () {
+                            final bloc = context.read<SubscriptionBloc>();
+                            bloc.add(LoadSubscriptions());
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.refresh_rounded,
+                              size: 20,
+                              color: kPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SliverToBoxAdapter(
                   child: UnpaidBillBannerWidget(),
@@ -1119,58 +1269,89 @@ class _SubsScreenState extends State<SubsScreen>
     );
   }
 
-  Widget _summaryRow(int active, int expired, int cancelled) => Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kBorderLt, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: kPrimary.withValues(alpha: 0.03),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+  Widget _summaryRow(int active, int expired, int cancelled) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('$active', 'Active', kPrimary, Icons.check_circle_outline_rounded),
-            _buildStatDivider(),
-            _buildStatItem('$expired', 'Expired', kAccent, Icons.pause_circle_outline_rounded),
-            _buildStatDivider(),
-            _buildStatItem('$cancelled', 'Cancelled', kRed, Icons.cancel_outlined),
+            _buildStatPill(
+              value: '$active',
+              label: 'Active',
+              color: kPrimary,
+              bg: kPrimaryPl,
+              icon: Icons.check_circle_rounded,
+            ),
+            const SizedBox(width: 8),
+            _buildStatPill(
+              value: '$expired',
+              label: 'Expired',
+              color: kAccent,
+              bg: kAccentLt,
+              icon: Icons.schedule_rounded,
+            ),
+            const SizedBox(width: 8),
+            _buildStatPill(
+              value: '$cancelled',
+              label: 'Cancelled',
+              color: kRed,
+              bg: kRedLt,
+              icon: Icons.cancel_rounded,
+            ),
           ],
         ),
       );
 
-  Widget _buildStatItem(String val, String label, Color color, IconData icon) {
+  Widget _buildStatPill({
+    required String value,
+    required String label,
+    required Color color,
+    required Color bg,
+    required IconData icon,
+  }) {
     return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, size: 16, color: color.withValues(alpha: 0.8)),
-          const SizedBox(height: 4),
-          Text(
-            val,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: bg.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withValues(alpha: 0.18),
+            width: 1.2,
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 9.5, color: kTextSub, fontWeight: FontWeight.w600),
-          ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 5),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                color: color,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: color.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildStatDivider() {
-    return Container(
-      width: 1,
-      height: 32,
-      color: kBorderLt,
     );
   }
 
