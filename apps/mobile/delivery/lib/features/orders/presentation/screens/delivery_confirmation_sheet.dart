@@ -57,6 +57,7 @@ class DeliveryConfirmationSheet extends StatefulWidget {
   final GroupedStop stop;
   final Position? initialPosition;
   final double allowedRadiusMeters;
+  final bool enforceGeofence;
   final Function(
     String status,
     int emptyBottles,
@@ -76,6 +77,7 @@ class DeliveryConfirmationSheet extends StatefulWidget {
     required this.stop,
     this.initialPosition,
     this.allowedRadiusMeters = 100.0,
+    this.enforceGeofence = true,
     required this.onConfirm,
   });
 
@@ -105,6 +107,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   double? _distanceMeters;
   bool _isOutOfRadius = false;
   late double _allowedRadiusMeters;
+  late bool _enforceGeofence;
 
   final Map<String, ContainerItemState> _containerStates = {};
 
@@ -118,6 +121,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   void initState() {
     super.initState();
     _allowedRadiusMeters = widget.allowedRadiusMeters;
+    _enforceGeofence = widget.enforceGeofence && _allowedRadiusMeters > 0;
 
     // Instant 0ms evaluation from provided fix or cached location
     final fastPos = widget.initialPosition ?? sl<LocationService>().cachedPosition;
@@ -130,7 +134,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         widget.stop.addressLng,
       );
       _distanceMeters = distKm * 1000.0;
-      _isOutOfRadius = _distanceMeters! > _allowedRadiusMeters;
+      _isOutOfRadius = _enforceGeofence ? (_distanceMeters! > _allowedRadiusMeters) : false;
       _isCheckingGps = false;
     } else if (widget.stop.addressLat == 0 && widget.stop.addressLng == 0) {
       _distanceMeters = null;
@@ -325,7 +329,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
 
       final distKm = loc.haversineDistanceKm(pos.latitude, pos.longitude, destLat, destLng);
       final distMeters = distKm * 1000.0;
-      final isOut = distMeters > _allowedRadiusMeters;
+      final isOut = _enforceGeofence ? (distMeters > _allowedRadiusMeters) : false;
 
       if (mounted) {
         setState(() {
@@ -806,8 +810,8 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ),
         const SizedBox(height: 20),
 
-        // Geofence Warning Banner if Out of Radius
-        if (_isOutOfRadius && _distanceMeters != null) ...[
+        // Geofence Warning Banner if Out of Radius and Enforced
+        if (_enforceGeofence && _isOutOfRadius && _distanceMeters != null) ...[
           Container(
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(16),

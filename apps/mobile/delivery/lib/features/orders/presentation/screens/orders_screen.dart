@@ -118,10 +118,15 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DeliveryConfirmationSheet(
-        stop: stop,
-        initialPosition: currentPos,
-        onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
+      builder: (_) {
+        final sessionState = context.read<DeliverySessionBloc>().state;
+        final currentRun = sessionState is DeliverySessionLoaded ? sessionState.currentRun : null;
+        return DeliveryConfirmationSheet(
+          stop: stop,
+          initialPosition: currentPos,
+          enforceGeofence: currentRun?.enforceGeofence ?? true,
+          allowedRadiusMeters: currentRun?.allowedRadiusMeters ?? 100.0,
+          onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;
 
@@ -158,8 +163,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             },
           ));
         },
-      ),
-    );
+      );
+    },
+  );
 
     if (confirmedResult != null && mounted) {
       DeliveryResultDialog.show(

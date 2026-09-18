@@ -882,10 +882,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => DeliveryConfirmationSheet(
-        stop: stop,
-        initialPosition: pos,
-        onConfirm: (
+      builder: (sheetContext) {
+        final sessionState = context.read<DeliverySessionBloc>().state;
+        final currentRun = sessionState is DeliverySessionLoaded ? sessionState.currentRun : null;
+        return DeliveryConfirmationSheet(
+          stop: stop,
+          initialPosition: pos,
+          enforceGeofence: currentRun?.enforceGeofence ?? true,
+          allowedRadiusMeters: currentRun?.allowedRadiusMeters ?? 100.0,
+          onConfirm: (
           status,
           emptyBottles,
           returnedContainers,
@@ -932,8 +937,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             },
           ));
         },
-      ),
-    );
+      );
+    },
+  );
 
     if (confirmedResult != null && mounted) {
       DeliveryResultDialog.show(

@@ -1173,6 +1173,15 @@ export class DeliveryOrderService {
       }
     }
 
+    const configRes = await this.db.query(
+      `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' AND deleted_at IS NULL LIMIT 1`,
+    );
+    const deliveryRules = configRes?.[0]?.config_data || {};
+    const deliveryRulesPayload = {
+      enable_delivery_radius_check: deliveryRules.enable_delivery_radius_check !== false,
+      delivery_radius_meters: Number(deliveryRules.delivery_radius_meters ?? 100),
+    };
+
     if (!orders?.length) {
       return {
         status: true,
@@ -1185,6 +1194,7 @@ export class DeliveryOrderService {
         dispatch_id: activeDispatch?.dispatch_id || null,
         dispatch_status: dispatchStatus,
         pickup_confirmed: pickupConfirmed,
+        delivery_rules: deliveryRulesPayload,
         total: 0,
         deliveries: [],
       };
@@ -1203,6 +1213,7 @@ export class DeliveryOrderService {
       dispatch_id: activeDispatch?.dispatch_id || null,
       dispatch_status: dispatchStatus,
       pickup_confirmed: pickupConfirmed,
+      delivery_rules: deliveryRulesPayload,
       total: deliveries.length,
       deliveries,
     };

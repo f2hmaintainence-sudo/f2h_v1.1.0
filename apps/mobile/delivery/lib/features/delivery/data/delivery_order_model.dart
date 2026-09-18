@@ -412,6 +412,8 @@ class DeliveryRun {
   final bool shiftCompleted;
   final String? dispatchStatus;
   final List<DeliveryOrderModel> orders;
+  final bool enforceGeofence;
+  final double allowedRadiusMeters;
 
   const DeliveryRun({
     required this.runId,
@@ -422,6 +424,8 @@ class DeliveryRun {
     this.shiftCompleted = false,
     this.dispatchStatus,
     required this.orders,
+    this.enforceGeofence = true,
+    this.allowedRadiusMeters = 100.0,
   });
 
   factory DeliveryRun.fromJson(Map<String, dynamic> json) {
@@ -439,6 +443,15 @@ class DeliveryRun {
     final bool isShiftDone = json['shift_completed'] == true ||
         rStatus == 'completed' ||
         rStatus == 'handed_over';
+
+    final rules = json['delivery_rules'] as Map<String, dynamic>?;
+    final bool enforceGeo = rules != null
+        ? (rules['enable_delivery_radius_check'] != false)
+        : true;
+    final double radiusM = rules != null
+        ? (double.tryParse(rules['delivery_radius_meters']?.toString() ?? '100') ?? 100.0)
+        : 100.0;
+
     return DeliveryRun(
       runId: json['run_id']?.toString() ?? '',
       status: rStatus,
@@ -448,6 +461,8 @@ class DeliveryRun {
       shiftCompleted: isShiftDone,
       dispatchStatus: json['dispatch_status']?.toString(),
       orders: ordersList,
+      enforceGeofence: enforceGeo,
+      allowedRadiusMeters: radiusM,
     );
   }
 }
