@@ -295,7 +295,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
     final slotName = (sessionState is DeliverySessionLoaded && sessionState.currentRun?.slot != null && sessionState.currentRun!.slot.isNotEmpty)
         ? (sessionState.currentRun!.slot.toLowerCase() == 'evening' ? 'Evening Shift' : 'Morning Shift')
-        : (DateTime.now().hour >= 12 ? 'Evening Shift' : 'Morning Shift');
+        : (sessionState is DeliverySessionLoaded && sessionState.orders.isNotEmpty && sessionState.orders.first.deliverySlot != null
+            ? (sessionState.orders.first.deliverySlot!.toLowerCase() == 'evening' ? 'Evening Shift' : 'Morning Shift')
+            : (DateTime.now().hour >= 12 ? 'Evening Shift' : 'Morning Shift'));
 
     return RefreshIndicator(
       onRefresh: () async => context.read<DeliverySessionBloc>().add(ReloadSessionEvent()),

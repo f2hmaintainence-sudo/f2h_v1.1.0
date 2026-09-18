@@ -558,22 +558,44 @@ export class DeliveryOrderService {
     let targetSlot = slotParam ? (slotParam.toLowerCase() === 'evening' ? 'evening' : 'morning') : undefined;
 
     if (!targetSlot) {
-      // 1. If partnerId is provided, check if partner has active/uncompleted evening runs or assigned evening orders today
       if (partnerId) {
         try {
-          const eveningOrders = await this.db.query(
-            `SELECT 1 FROM orders
+          // 1. If partner has an active in_progress run on targetDate, that is their active shift
+          const inProgressRun = await this.db.query(
+            `SELECT delivery_slot FROM delivery_runs
              WHERE delivery_partner_id = $1
-               AND (scheduled_date::date = $2::date OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $2::date))
-               AND LOWER(delivery_slot) = 'evening'
-               AND status NOT IN ('delivered', 'failed', 'cancelled')
-             LIMIT 1`,
+               AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
+               AND status = 'in_progress'
+             ORDER BY created_at DESC LIMIT 1`,
             [partnerId, targetDate],
           );
-          if (eveningOrders?.length > 0) {
-            targetSlot = 'evening';
-          } else {
-            const eveningRun = await this.db.query(
+          if (inProgressRun?.length > 0 && inProgressRun[0].delivery_slot) {
+            targetSlot = inProgressRun[0].delivery_slot.toLowerCase();
+          }
+
+          // 2. If no in_progress run, check for uncompleted runs or orders in morning vs evening
+          if (!targetSlot) {
+            const morningRuns = await this.db.query(
+              `SELECT 1 FROM delivery_runs
+               WHERE delivery_partner_id = $1
+                 AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
+                 AND LOWER(delivery_slot) = 'morning'
+                 AND status NOT IN ('completed', 'handed_over', 'cancelled')
+               LIMIT 1`,
+              [partnerId, targetDate],
+            );
+            const morningOrders = await this.db.query(
+              `SELECT 1 FROM orders
+               WHERE delivery_partner_id = $1
+                 AND (scheduled_date::date = $2::date OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $2::date))
+                 AND (LOWER(delivery_slot) = 'morning' OR delivery_slot IS NULL)
+                 AND status NOT IN ('delivered', 'failed', 'cancelled')
+               LIMIT 1`,
+              [partnerId, targetDate],
+            );
+            const hasMorning = (morningRuns?.length > 0) || (morningOrders?.length > 0);
+
+            const eveningRuns = await this.db.query(
               `SELECT 1 FROM delivery_runs
                WHERE delivery_partner_id = $1
                  AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
@@ -582,14 +604,30 @@ export class DeliveryOrderService {
                LIMIT 1`,
               [partnerId, targetDate],
             );
-            if (eveningRun?.length > 0) {
+            const eveningOrders = await this.db.query(
+              `SELECT 1 FROM orders
+               WHERE delivery_partner_id = $1
+                 AND (scheduled_date::date = $2::date OR (scheduled_date IS NULL AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $2::date))
+                 AND LOWER(delivery_slot) = 'evening'
+                 AND status NOT IN ('delivered', 'failed', 'cancelled')
+               LIMIT 1`,
+              [partnerId, targetDate],
+            );
+            const hasEvening = (eveningRuns?.length > 0) || (eveningOrders?.length > 0);
+
+            if (hasMorning && !hasEvening) {
+              targetSlot = 'morning';
+            } else if (hasEvening && !hasMorning) {
               targetSlot = 'evening';
+            } else if (hasMorning && hasEvening) {
+              // If both shifts have uncompleted work, prioritize evening only after 4:00 PM (16:00)
+              targetSlot = timeMinutes >= 16 * 60 ? 'evening' : 'morning';
             }
           }
         } catch (_) {}
       }
 
-      // 2. If slot is still unresolved, use time-based default (12:00 PM / 720 mins onwards is evening)
+      // 3. If slot is still unresolved, use time-based default (12:00 PM / 720 mins onwards is evening)
       if (!targetSlot) {
         if (timeMinutes >= 12 * 60) {
           targetSlot = 'evening';
@@ -979,7 +1017,14 @@ export class DeliveryOrderService {
          AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
          AND LOWER(delivery_slot) = LOWER($3)
          AND status != 'cancelled'
-       ORDER BY run_date DESC, created_at DESC`,
+        ORDER BY
+          CASE
+            WHEN status = 'in_progress' THEN 1
+            WHEN status IN ('assigned', 'dispatched', 'pending') THEN 2
+            ELSE 3
+          END,
+          run_date DESC,
+          created_at DESC`,
       [String(boy.user_id), targetDate, targetSlot],
     );
 
@@ -1929,7 +1974,14 @@ export class DeliveryOrderService {
            AND DATE(run_date AT TIME ZONE 'Asia/Kolkata') = $2::date
            AND LOWER(delivery_slot) = LOWER($3)
            AND status NOT IN ('completed', 'handed_over', 'cancelled')
-         ORDER BY run_date DESC, created_at DESC`,
+         ORDER BY
+          CASE
+            WHEN status = 'in_progress' THEN 1
+            WHEN status IN ('assigned', 'dispatched', 'pending') THEN 2
+            ELSE 3
+          END,
+          run_date DESC,
+          created_at DESC`,
       [String(boy.user_id), targetDate, targetSlot],
     );
 
