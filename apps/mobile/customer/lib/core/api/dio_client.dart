@@ -141,23 +141,6 @@ class DioClient {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    // Resilient retry on transient socket reset / closed header errors
-    final isConnectionError = err.type == DioExceptionType.connectionError ||
-        err.error is HttpException ||
-        (err.message != null &&
-            (err.message!.contains('Connection closed') ||
-             err.message!.contains('Connection reset') ||
-             err.message!.contains('Software caused connection abort')));
-
-    if (isConnectionError && err.requestOptions.extra['f2h_conn_retry'] != true) {
-      err.requestOptions.extra['f2h_conn_retry'] = true;
-      try {
-        await Future.delayed(const Duration(milliseconds: 350));
-        final retryResp = await _dio.fetch(err.requestOptions);
-        return handler.resolve(retryResp);
-      } catch (_) {}
-    }
-
     if (err.response?.statusCode != 401) return handler.next(err);
 
     final refreshToken = await TokenStorage.getRefreshToken();

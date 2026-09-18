@@ -3,7 +3,7 @@ set -e
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CUSTOMER_DIR="$REPO/apps/mobile/customer"
 PARTNER_DIR="$REPO/apps/mobile/delivery"
-DART_API="${F2H_API_URL:-https://f2hfresh.com}"
+DART_API="${F2H_API_URL:-https://dev.f2hfresh.com}"
 FLUTTER="$(which flutter 2>/dev/null || echo /snap/bin/flutter)"
 
 G="\033[0;32m"; C="\033[0;36m"; Y="\033[1;33m"; NC="\033[0m"

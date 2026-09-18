@@ -159,6 +159,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             deliveryImage: deliveryImage,
             containerReturns: containerReturns,
             containerDeliveries: containerDeliveries,
+            onError: (errorMsg) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(errorMsg),
+                    backgroundColor: kDanger,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
           ));
         },
       ),

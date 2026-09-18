@@ -40,20 +40,16 @@ class StopActionButtons extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: () => launchUrl(Uri.parse('tel:${stop.customerPhone}')),
             icon: Icon(Icons.phone_in_talk_rounded, color: Colors.blue, size: iconSize),
-            label: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'Call',
-                maxLines: 1,
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w900,
-                  fontSize: fontSize,
-                ),
+            label: Text(
+              'Call',
+              style: TextStyle(
+                color: Colors.blue,
+                fontWeight: FontWeight.w900,
+                fontSize: fontSize,
               ),
             ),
             style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: vertPad),
+              padding: EdgeInsets.symmetric(vertical: vertPad),
               side: BorderSide(color: Colors.blue.withValues(alpha: compact ? 0.2 : 0.3)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radius),
@@ -71,20 +67,16 @@ class StopActionButtons extends StatelessWidget {
               MaterialPageRoute(builder: (_) => OrderDetailScreen(stop: stop)),
             ),
             icon: Icon(Icons.info_outline_rounded, color: kPrimary, size: iconSize),
-            label: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'Details',
-                maxLines: 1,
-                style: TextStyle(
-                  color: kPrimary,
-                  fontWeight: FontWeight.w900,
-                  fontSize: fontSize,
-                ),
+            label: Text(
+              'Details',
+              style: TextStyle(
+                color: kPrimary,
+                fontWeight: FontWeight.w900,
+                fontSize: fontSize,
               ),
             ),
             style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: vertPad),
+              padding: EdgeInsets.symmetric(vertical: vertPad),
               side: BorderSide(color: kPrimary.withValues(alpha: compact ? 0.2 : 0.3)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radius),
@@ -113,21 +105,17 @@ class StopActionButtons extends StatelessWidget {
               }
             },
             icon: Icon(Icons.navigation_rounded, color: Colors.white, size: iconSize),
-            label: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                compact ? 'Nav' : 'Navigate',
-                maxLines: 1,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: fontSize,
-                ),
+            label: Text(
+              compact ? 'Nav' : 'Navigate',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: fontSize,
               ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimary,
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: vertPad),
+              padding: EdgeInsets.symmetric(vertical: vertPad),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(radius),
               ),

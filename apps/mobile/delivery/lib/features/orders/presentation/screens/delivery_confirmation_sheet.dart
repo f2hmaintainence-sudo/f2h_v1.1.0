@@ -386,12 +386,12 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.location_off_rounded, color: Color(0xFF065F46), size: 28),
+            Icon(Icons.location_off_rounded, color: Color(0xFFDC2626), size: 28),
             SizedBox(width: 10),
             Expanded(
               child: Text(
                 'Out of Delivery Radius',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF064E3B)),
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF991B1B)),
               ),
             ),
           ],
@@ -408,21 +408,21 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
+                color: const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFA7F3D0)),
+                border: Border.all(color: const Color(0xFFFECACA)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Remaining Distance: $remainingStr to reach radius',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFF065F46)),
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFFDC2626)),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Allowed doorstep radius is ${_allowedRadiusMeters.round()} meters. Please reach the customer location to complete delivery.',
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF064E3B)),
+                    'Allowed doorstep radius is ${_allowedRadiusMeters.round()} meters. You must reach the customer doorstep before you can proceed with delivery.',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF991B1B)),
                   ),
                 ],
               ),
@@ -431,7 +431,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         ),
         actions: [
           if (widget.stop.addressLat != 0 && widget.stop.addressLng != 0)
-            TextButton.icon(
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(ctx);
                 sl<LocationService>().openNavigation(
@@ -439,27 +439,25 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   widget.stop.addressLng,
                 );
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               icon: const Icon(Icons.navigation_rounded, size: 16),
-              label: const Text('Navigate'),
+              label: const Text('Navigate via Maps'),
             ),
-          OutlinedButton(
+          OutlinedButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
               _checkGpsRadius(showFeedback: true);
             },
-            child: const Text('Re-check GPS'),
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Re-check GPS'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _nextStep();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF065F46),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Proceed to Deliver'),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -595,6 +593,12 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         'quantity': s.deliveringToday,
         'delivered': s.deliveringToday,
       });
+    }
+
+    // Final doorstep geofence guard: prevent submission if partner is outside radius
+    if (_isOutOfRadius && widget.stop.addressLat != 0 && widget.stop.addressLng != 0) {
+      _showOutOfRadiusDialog();
+      return;
     }
 
     final totalEmptyBottles = totalReturned + totalDamaged + totalLost;
@@ -1021,9 +1025,11 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
         const SizedBox(height: 8),
 
         ElevatedButton(
-          onPressed: _isCheckingGps && _distanceMeters == null ? null : _nextStep,
+          onPressed: (_isCheckingGps && _distanceMeters == null)
+              ? null
+              : (_isOutOfRadius ? _showOutOfRadiusDialog : _nextStep),
           style: ElevatedButton.styleFrom(
-            backgroundColor: _isOutOfRadius ? const Color(0xFF065F46) : kPrimary,
+            backgroundColor: _isOutOfRadius ? const Color(0xFFDC2626) : kPrimary,
             foregroundColor: Colors.white,
             disabledBackgroundColor: const Color(0xFFCBD5E1),
             disabledForegroundColor: const Color(0xFF64748B),
@@ -1046,11 +1052,14 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
                 ),
               ] else if (_isOutOfRadius) ...[
-                const Icon(Icons.check_circle_outline_rounded, size: 20),
+                const Icon(Icons.location_off_rounded, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  'ARRIVED AT LOCATION (${_formatDistance(_distanceMeters ?? 0)}) →',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'OUT OF RADIUS (${_formatDistance(_distanceMeters ?? 0)}) — REACH LOCATION',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.3),
+                  ),
                 ),
               ] else ...[
                 const Icon(Icons.check_circle_outline_rounded, size: 20),

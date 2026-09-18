@@ -108,16 +108,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     if (e.response?.statusCode == 403) {
       return 'Access denied. Account is restricted or delivery partner role is required.';
     }
-    if (e.type == DioExceptionType.connectionError ||
-        e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.sendTimeout ||
-        e.type == DioExceptionType.receiveTimeout ||
-        (e.message != null &&
-            (e.message!.contains('Connection closed') ||
-             e.message!.contains('Connection refused') ||
-             e.message!.contains('Network is unreachable')))) {
-      return 'Unable to reach the server. Please check your internet connection and try again.';
-    }
     return e.message ?? fallback;
   }
 
