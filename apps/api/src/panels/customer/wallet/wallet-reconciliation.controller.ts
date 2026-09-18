@@ -13,16 +13,14 @@ export class WalletReconciliationController {
 
   @Get()
   async getDrift() {
-    const { ledgerDrift, mirrorDrift } = await this.reconciliation.reconcile();
+    const { ledgerDrift } = await this.reconciliation.reconcile();
 
     return {
       status: true,
       data: {
-        clean: ledgerDrift.length === 0 && mirrorDrift.length === 0,
+        clean: ledgerDrift.length === 0,
         // `customers.wallet_balance` vs the sum of customer_wallet_transactions.
         ledgerDrift,
-        // `customers.wallet_balance` vs `customer_wallet_balances.wallet_balance`.
-        mirrorDrift,
       },
     };
   }

@@ -313,11 +313,15 @@ export function AdminSidebar() {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`pt-6 pb-4 flex items-center transition-all ${collapsed ? "px-3 justify-center" : "px-5"}`}>
-        {!collapsed ? (
-          <img src="/assets/logo.svg" alt="F2H - Farm to Home" className="h-10 w-auto max-w-[170px] object-contain" />
-        ) : (
-          <img src="/assets/log1.webp" alt="F2H" className="h-9 w-9 rounded-full object-contain mx-auto shadow-xs" />
+      <div className="px-5 pt-6 pb-4 flex items-center gap-3">
+        <img src="/assets/log1.webp" alt="F2H" className="h-10 w-auto" />
+        {!collapsed && (
+          <div>
+            <span className="text-lg font-bold text-deep-green tracking-tight">F2H</span>
+            <span className="block text-[10px] font-medium text-deep-green/60 uppercase tracking-[0.2em] -mt-0.5">
+              Farm to Home
+            </span>
+          </div>
         )}
       </div>
 
@@ -344,8 +348,8 @@ export function AdminSidebar() {
                         onClick={() => toggleMenu(item.name)}
                         ref={isParentActive && !isExpanded ? (activeLinkRef as any) : null}
                         className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group ${isParentActive && !isExpanded
-                            ? "bg-brand-blue/10 text-brand-blue font-bold"
-                            : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
+                          ? "bg-brand-blue/10 text-brand-blue font-bold"
+                          : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
                           }`}
                       >
                         <div className="flex items-center gap-3">
@@ -380,8 +384,8 @@ export function AdminSidebar() {
                                   ref={isSubActive ? (activeLinkRef as any) : null}
                                   onClick={() => setMobileOpen(false)}
                                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 group ${isSubActive
-                                      ? "bg-[#388e3c] text-white shadow-md shadow-green-500/20"
-                                      : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
+                                    ? "bg-[#388e3c] text-white shadow-md shadow-green-500/20"
+                                    : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
                                     }`}
                                 >
                                   <sub.icon
@@ -409,8 +413,8 @@ export function AdminSidebar() {
                     ref={isActive ? (activeLinkRef as any) : null}
                     onClick={() => setMobileOpen(false)}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${isActive
-                        ? "bg-[#388e3c] text-white shadow-lg shadow-green-500/30"
-                        : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
+                      ? "bg-[#388e3c] text-white shadow-lg shadow-green-500/30"
+                      : "text-slate-600 hover:text-brand-blue hover:bg-green-50"
                       }`}
                   >
                     <Icon

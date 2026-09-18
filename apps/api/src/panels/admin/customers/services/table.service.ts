@@ -91,7 +91,7 @@ export class CustomerTableService {
           is_postpaid_enabled: ['customers.is_postpaid_enabled', false],
           full_name: ["CONCAT_WS(' ', users.first_name, users.last_name)", true],
           postpaid_credit_limit: ['customers.postpaid_credit_limit', isPostpaidTable],
-          wallet_balance: ['customer_wallet_balances.wallet_balance', true],
+          wallet_balance: ['customers.wallet_balance', true],
           phone: ['users.phone', true],
           email: ['users.email', true],
           created_at: ['customers.created_at', true],
@@ -101,11 +101,6 @@ export class CustomerTableService {
             type: 'left',
             table: 'users',
             on: [['users.user_id', 'customers.customer_id']],
-          },
-          {
-            type: 'left',
-            table: 'customer_wallet_balances',
-            on: [['customers.customer_id', 'customer_wallet_balances.customer_id']],
           },
           // {
           //   type: 'left',

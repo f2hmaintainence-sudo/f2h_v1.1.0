@@ -11,20 +11,9 @@ export interface WalletDriftRow {
   difference: string;
 }
 
-export interface MirrorDriftRow {
-  customer_id: string;
-  on_customers: string;
-  on_balances: string;
-}
-
 /**
- * A wallet balance exists in three places: `customers.wallet_balance` (what
- * checkout debits), `customer_wallet_balances.wallet_balance` (what the admin
- * customer table reads), and the running sum of `customer_wallet_transactions`
- * (the ledger). Nothing kept them in step, and they have already drifted.
- *
- * `customer_wallet_transactions` is the ledger of record. The other two are cached
- * projections, and this job's whole purpose is to make a divergence loud instead of
+ * `customer_wallet_transactions` is the ledger of record, and `customers.wallet_balance`
+ * is the cached balance. This job's purpose is to make a divergence loud instead of
  * silent. It deliberately does NOT auto-correct: a mismatch means either money was
  * moved without a ledger entry or a ledger entry was written without moving money,
  * and which one it is decides whether the fix is a credit or a write-off.
@@ -65,42 +54,23 @@ export class WalletReconciliationService {
     `);
   }
 
-  /** Customers where the two cached balance columns disagree with each other. */
-  async findMirrorDrift(): Promise<MirrorDriftRow[]> {
-    return this.db.query<MirrorDriftRow>(`
-      SELECT c.customer_id,
-             c.wallet_balance::text AS on_customers,
-             b.wallet_balance::text AS on_balances
-        FROM customers c
-        JOIN customer_wallet_balances b ON b.customer_id = c.customer_id
-       WHERE c.wallet_balance IS DISTINCT FROM b.wallet_balance
-       ORDER BY c.customer_id
-    `);
-  }
+  async reconcile(): Promise<{ ledgerDrift: WalletDriftRow[] }> {
+    const ledgerDrift = await this.findLedgerDrift();
 
-  async reconcile(): Promise<{ ledgerDrift: WalletDriftRow[]; mirrorDrift: MirrorDriftRow[] }> {
-    const [ledgerDrift, mirrorDrift] = await Promise.all([
-      this.findLedgerDrift(),
-      this.findMirrorDrift(),
-    ]);
-
-    if (ledgerDrift.length || mirrorDrift.length) {
+    if (ledgerDrift.length) {
       this.logger.error(
-        `Wallet reconciliation found ${ledgerDrift.length} ledger mismatch(es) and ` +
-          `${mirrorDrift.length} mirror mismatch(es)`,
+        `Wallet reconciliation found ${ledgerDrift.length} ledger mismatch(es)`,
       );
       this.developer.error('Wallet reconciliation drift detected', {
         ledgerDriftCount: ledgerDrift.length,
-        mirrorDriftCount: mirrorDrift.length,
         // Customer ids only — amounts stay out of the log line.
         ledgerDriftCustomers: ledgerDrift.slice(0, 25).map((row) => row.customer_id),
-        mirrorDriftCustomers: mirrorDrift.slice(0, 25).map((row) => row.customer_id),
       });
     } else {
       this.logger.log('Wallet reconciliation clean: every balance matches its ledger');
     }
 
-    return { ledgerDrift, mirrorDrift };
+    return { ledgerDrift };
   }
 
   /** Daily at 02:30 IST, after the nightly order generation has settled. */

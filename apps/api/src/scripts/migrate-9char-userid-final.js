@@ -76,7 +76,6 @@ async function run() {
       { table: 'referrals', col: 'referred_customer_id' },
       { table: 'referrals', col: 'referrer_customer_id' },
       { table: 'refunds', col: 'customer_id' },
-      { table: 'role_assignments', col: 'user_id' },
       { table: 'subscription_refunds', col: 'customer_id' },
       { table: 'subscription_renewal_attempts', col: 'customer_id' },
       { table: 'subscriptions', col: 'customer_id' },

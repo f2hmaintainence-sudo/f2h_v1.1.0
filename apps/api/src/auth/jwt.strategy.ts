@@ -129,7 +129,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // `role` is what the token claimed at login. It is exposed for logging and for
     // handlers that want a hint, but authorization decisions go through RolesGuard,
-    // which re-reads role_assignments — a claim cannot outlive a revoked grant.
+    // which resolves active roles and permissions dynamically via RoleResolverService.
     return {
       user_id: user.user_id,
       email: user.email,

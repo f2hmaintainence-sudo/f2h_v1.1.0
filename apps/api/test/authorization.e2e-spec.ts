@@ -306,12 +306,6 @@ async function seed(db: DatabaseService) {
      ON CONFLICT (user_id) DO UPDATE SET cart_data = '[]'`,
     [CUSTOMER_ID],
   );
-  await db.query(
-    `INSERT INTO role_assignments (id, user_id, role_id, is_active)
-     VALUES (9001,$1,'CUSTOMER',1), (9002,$2,'ADMIN',1)
-     ON CONFLICT DO NOTHING`,
-    [CUSTOMER_ID, ADMIN_ID],
-  );
 }
 
 /**
@@ -327,7 +321,6 @@ async function cleanup(db: DatabaseService) {
   await db.query(`DELETE FROM customer_bills WHERE customer_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM customer_wallet_transactions WHERE customer_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM carts WHERE user_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
-  await db.query(`DELETE FROM role_assignments WHERE user_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM customer_addresses WHERE customer_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM customers WHERE customer_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
   await db.query(`DELETE FROM users WHERE user_id = ANY($1)`, [[CUSTOMER_ID, ADMIN_ID]]);
