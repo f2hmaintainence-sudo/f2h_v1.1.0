@@ -1715,51 +1715,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    // Status badge
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: statusBg,
-                                        borderRadius: BorderRadius.circular(100),
-                                        border: Border.all(
-                                          color: statusColor.withValues(alpha: 0.2),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 5,
-                                            height: 5,
-                                            decoration: BoxDecoration(
-                                              color: statusColor,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            isActive
-                                                ? 'Active'
-                                                : isPaused
-                                                ? 'Paused'
-                                                : isExpired
-                                                ? 'Expired'
-                                                : isCompleted
-                                                ? 'Completed'
-                                                : 'Cancelled',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w900,
-                                              color: statusColor,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
                                   ],
                                 ),
                                 // Frequency & Day Quantities at bottom of Product Card
@@ -3519,21 +3474,6 @@ class _OrdersHistorySheet extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Text(
-                              order.emoji,
-                              style: const TextStyle(fontSize: 20),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
