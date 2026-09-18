@@ -41,6 +41,8 @@ export class ProfileService {
           u.first_name,
           u.last_name,
           u.first_name || ' ' || u.last_name AS full_name,
+          COALESCE(u.gender, dp.gender) AS gender,
+          COALESCE(u.date_of_birth, dp.date_of_birth) AS date_of_birth,
           u.profile_image_url,
           u.last_login_at,
           u.account_status,
@@ -77,6 +79,8 @@ export class ProfileService {
               u.first_name,
               u.last_name,
               u.first_name || ' ' || u.last_name AS full_name,
+              COALESCE(u.gender, dp.gender) AS gender,
+              COALESCE(u.date_of_birth, dp.date_of_birth) AS date_of_birth,
               u.profile_image_url,
               u.last_login_at,
               u.account_status,
@@ -184,6 +188,9 @@ export class ProfileService {
         }
       }
 
+      // Update users table for shared identity fields (first_name, last_name, email, gender, date_of_birth)
+      const userUpdates: Record<string, any> = {};
+
       if (dto.date_of_birth !== undefined) {
         if (dto.date_of_birth && dto.date_of_birth.trim()) {
           const dob = new Date(dto.date_of_birth);
@@ -200,13 +207,17 @@ export class ProfileService {
             throw new BadRequestException('Delivery partner must be at least 18 years of age');
           }
           deliveryPartnerUpdates.date_of_birth = dto.date_of_birth.trim();
+          userUpdates.date_of_birth = dto.date_of_birth.trim();
         } else {
           deliveryPartnerUpdates.date_of_birth = null;
+          userUpdates.date_of_birth = null;
         }
       }
 
       if (dto.gender !== undefined) {
-        deliveryPartnerUpdates.gender = dto.gender?.trim() || null;
+        const gen = dto.gender?.trim() || null;
+        deliveryPartnerUpdates.gender = gen;
+        userUpdates.gender = gen;
       }
 
       if (dto.residential_address !== undefined) {
@@ -218,8 +229,6 @@ export class ProfileService {
       }
       deliveryPartnerUpdates.updated_at = new Date();
 
-      // Update users table for shared identity fields (first_name, last_name, email)
-      const userUpdates: Record<string, any> = {};
       if (dto.full_name !== undefined) {
         const fullName = dto.full_name.trim();
         if (fullName.length < 2) {

@@ -791,8 +791,9 @@ export class CustomerBootstrapController {
         c.first_order_completed,
         c.wallet_balance,
         c.reward_points,
-        c.gender,
-        c.dob,
+        COALESCE(u.gender, c.gender) AS gender,
+        COALESCE(u.date_of_birth, c.dob) AS dob,
+        COALESCE(u.date_of_birth, c.dob) AS date_of_birth,
         c.alternate_mobile,
         c.notes,
         c.branch_id,
@@ -806,6 +807,8 @@ export class CustomerBootstrapController {
         u.email,
         u.phone,
         u.phone AS mobile,
+        u.gender AS user_gender,
+        u.date_of_birth AS user_date_of_birth,
         u.referred_by
       FROM customers c
       JOIN users u ON u.user_id = c.customer_id
@@ -1412,7 +1415,7 @@ export class CustomerBootstrapController {
       profile,
     };
   }
-  @Patch('bootstrap/profile')
+  @Patch(['bootstrap/profile', 'profile'])
   @UseGuards(AuthGuard('jwt'))
   async updateProfile(@Req() req: Request, @Body() body: any) {
     const user = req.user as any;
@@ -1423,44 +1426,31 @@ export class CustomerBootstrapController {
       throw new BadRequestException('Invalid customer session');
     }
 
-    const updateData = {
-      first_name: String(body?.first_name ?? '').trim(),
-      last_name: String(body?.last_name ?? '').trim(),
-      email: String(body?.email ?? '').trim(),
-      mobile: String(body?.mobile ?? body?.phone ?? '').trim(),
-      phone: String(body?.mobile ?? body?.phone ?? '').trim(),
-      dob: this.formatDateForPostgres(body?.dob),
-      gender: String(body?.gender ?? '').trim(),
-      updated_at: new Date(),
-    };
-    if (!updateData.first_name || (!updateData.mobile && !updateData.phone) || !updateData.email) {
-      throw new BadRequestException('First name and mobile number are required');
+    const parsedDob = this.formatDateForPostgres(body?.dob || body?.date_of_birth);
+    const gender = String(body?.gender ?? '').trim() || null;
+    const firstName = String(body?.first_name ?? '').trim();
+    const lastName = String(body?.last_name ?? '').trim();
+    const email = String(body?.email ?? '').trim().toLowerCase();
+    const mobile = String(body?.mobile ?? body?.phone ?? '').trim();
+
+    if (!firstName || (!mobile && !email)) {
+      throw new BadRequestException('First name, email and mobile number are required');
     }
+
     const existingProfile = await this.resolveCustomer(userId, user?.email);
     if (!existingProfile) {
       throw new BadRequestException('Customer profile not found');
     }
 
-    const filteredCustProfile = await this.filterValidFields('customers', updateData);
-
-    const updateCustomer = await this.Data.update(
-      'customers',
-      filteredCustProfile,
-      [
-        {
-          column: 'customer_id',
-          operator: '=',
-          value: existingProfile.customer_id,
-        },
-      ],
-    );
-
-    const userUpdateData = {
-      first_name: updateData.first_name,
-      last_name: updateData.last_name,
-      user_name: `${updateData.first_name} ${updateData.last_name}`.trim(),
-      phone: updateData.mobile,
-      email: updateData.email,
+    // 1. Single source of truth: users table
+    const userUpdateData: Record<string, any> = {
+      first_name: firstName,
+      last_name: lastName,
+      user_name: `${firstName} ${lastName}`.trim(),
+      phone: mobile,
+      email: email,
+      gender: gender,
+      date_of_birth: parsedDob,
       updated_at: new Date(),
     };
 
@@ -1478,13 +1468,37 @@ export class CustomerBootstrapController {
       ],
     );
 
-    if (!updateCustomer?.status) {
-      await this.Developer.error('Customer update failed', updateCustomer);
+    // 2. Satellite table fallback: customers table
+    const custUpdateData: Record<string, any> = {
+      gender: gender,
+      dob: parsedDob,
+      updated_at: new Date(),
+    };
+    const filteredCustProfile = await this.filterValidFields('customers', custUpdateData);
+
+    let updateCustomer: any = null;
+    if (Object.keys(filteredCustProfile).length > 0) {
+      updateCustomer = await this.Data.update(
+        'customers',
+        filteredCustProfile,
+        [
+          {
+            column: 'customer_id',
+            operator: '=',
+            value: existingProfile.customer_id,
+          },
+        ],
+      );
     }
 
     if (!updateUser?.status) {
-      await this.Developer.error('User update failed', updateUser);
+      await this.Developer.error('User profile update failed', updateUser);
     }
+
+    if (updateCustomer && !updateCustomer?.status) {
+      await this.Developer.error('Customer satellite profile update failed', updateCustomer);
+    }
+
     const profile = await this.resolveCustomer(userId, user?.email);
     return {
       status: true,

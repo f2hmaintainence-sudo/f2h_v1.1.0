@@ -292,8 +292,8 @@ export class ProfileService {
             COALESCE(u.account_status, 'active') AS account_status,
             COALESCE(ms.created_at, u.created_at) AS user_created_at,
             COALESCE(ms.management_id, 'MNG-' || u.user_id) AS management_id,
-            COALESCE(ms.gender, '') AS gender,
-            ms.date_of_birth,
+            COALESCE(u.gender, ms.gender, '') AS gender,
+            COALESCE(u.date_of_birth, ms.date_of_birth) AS date_of_birth,
             COALESCE(ms.marital_status, '') AS marital_status,
             COALESCE(ms.bio, '') AS bio,
             COALESCE(ms.department, '') AS department,
@@ -491,12 +491,14 @@ export class ProfileService {
       // 1) Update users table (identity single source of truth)
       await this.db.query(
         `UPDATE users
-         SET first_name = COALESCE($2, first_name),
-             last_name  = COALESCE($3, last_name),
-             phone      = COALESCE($4, phone),
-             updated_at = NOW()
+         SET first_name    = COALESCE($2, first_name),
+             last_name     = COALESCE($3, last_name),
+             phone         = COALESCE($4, phone),
+             gender        = COALESCE($5, gender),
+             date_of_birth = COALESCE($6, date_of_birth),
+             updated_at    = NOW()
          WHERE user_id = $1`,
-        [actualUserId, keep(first_name), keep(last_name), keep(phone)],
+        [actualUserId, keep(first_name), keep(last_name), keep(phone), keep(gender), date_of_birth || null],
       );
 
       // 2) Upsert management_staff (WITHOUT user_name or phone; branch_id is managed by admin staff management)
