@@ -157,10 +157,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       );
 
       // Return to previous screen
-      Navigator.pop(context);
-      if (widget.order != null) {
-        Navigator.pop(context);
-      }
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       setState(() {

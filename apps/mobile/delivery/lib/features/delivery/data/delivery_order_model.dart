@@ -424,7 +424,7 @@ class DeliveryRun {
     this.shiftCompleted = false,
     this.dispatchStatus,
     required this.orders,
-    this.enforceGeofence = true,
+    this.enforceGeofence = false,
     this.allowedRadiusMeters = 100.0,
   });
 
@@ -446,8 +446,11 @@ class DeliveryRun {
 
     final rules = json['delivery_rules'] as Map<String, dynamic>?;
     final bool enforceGeo = rules != null
-        ? (rules['enable_delivery_radius_check'] != false)
-        : true;
+        ? (rules['enable_delivery_radius_check'] == true ||
+           (rules['enable_delivery_radius_check'] != false &&
+            rules['enable_delivery_radius_check'] != 'false' &&
+            rules['enable_delivery_radius_check'] != 0))
+        : false;
     final double radiusM = rules != null
         ? (double.tryParse(rules['delivery_radius_meters']?.toString() ?? '100') ?? 100.0)
         : 100.0;

@@ -135,12 +135,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) {
         final sessionState = context.read<DeliverySessionBloc>().state;
-        final currentRun = sessionState is DeliverySessionLoaded ? sessionState.currentRun : null;
+        final isEnforced = sessionState is DeliverySessionLoaded ? sessionState.isGeofenceEnforced : false;
+        final radiusMeters = sessionState is DeliverySessionLoaded ? sessionState.effectiveRadiusMeters : 100.0;
         return DeliveryConfirmationSheet(
           stop: _currentStop,
           initialPosition: currentPos,
-          enforceGeofence: currentRun?.enforceGeofence ?? true,
-          allowedRadiusMeters: currentRun?.allowedRadiusMeters ?? 100.0,
+          enforceGeofence: isEnforced,
+          allowedRadiusMeters: radiusMeters,
           onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (_currentStop.orders.isEmpty) return;
           final orderId = _currentStop.orders.first.orderId;

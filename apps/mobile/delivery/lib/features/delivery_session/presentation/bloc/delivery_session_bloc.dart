@@ -116,9 +116,13 @@ class DeliverySessionBloc
 
     bool ordersFailed = false;
     dynamic ordersError;
+    bool enforceGeofence = current.enforceGeofence;
+    double allowedRadiusMeters = current.allowedRadiusMeters;
     if (runRes is DeliveryRun) {
       currentRun = runRes;
       orders = runRes.orders;
+      enforceGeofence = runRes.enforceGeofence;
+      allowedRadiusMeters = runRes.allowedRadiusMeters;
     } else if (runRes == null) {
       // No run found — try the fallback orders endpoint.
       try {
@@ -161,6 +165,8 @@ class DeliverySessionBloc
       profilePhotoUrl: profilePhotoUrl,
       currentRun: currentRun,
       orders: orders,
+      enforceGeofence: enforceGeofence,
+      allowedRadiusMeters: allowedRadiusMeters,
     );
   }
 

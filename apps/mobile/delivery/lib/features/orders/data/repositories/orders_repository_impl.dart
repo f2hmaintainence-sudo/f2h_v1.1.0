@@ -128,7 +128,7 @@ class OrdersRepositoryImpl implements OrdersRepository {
         queryParameters: status != null ? {'status': status} : null,
       );
       final data = response.data;
-      if (data != null && data['status'] == true && data['run_id'] != null) {
+      if (data != null && data['status'] == true) {
         return DeliveryRun.fromJson(data);
       }
       return null;

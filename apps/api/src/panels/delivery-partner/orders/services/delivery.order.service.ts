@@ -61,8 +61,18 @@ export class DeliveryOrderService {
       const configRes = await this.db.query(
         `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' AND deleted_at IS NULL LIMIT 1`,
       );
-      const deliveryRules = configRes?.[0]?.config_data || {};
-      const enableRadiusCheck = deliveryRules.enable_delivery_radius_check !== false;
+      let deliveryRules = configRes?.[0]?.config_data || {};
+      if (typeof deliveryRules === 'string') {
+        try {
+          deliveryRules = JSON.parse(deliveryRules);
+        } catch (_) {
+          deliveryRules = {};
+        }
+      }
+      const enableRadiusCheck =
+        deliveryRules.enable_delivery_radius_check !== false &&
+        deliveryRules.enable_delivery_radius_check !== 'false' &&
+        deliveryRules.enable_delivery_radius_check !== 0;
       const maxRadiusMeters = Number(deliveryRules.delivery_radius_meters ?? 100);
 
       // If geofence verification is disabled in system config, bypass completely
@@ -1176,9 +1186,20 @@ export class DeliveryOrderService {
     const configRes = await this.db.query(
       `SELECT config_data FROM system_configurations WHERE config_key = 'delivery_rules' AND deleted_at IS NULL LIMIT 1`,
     );
-    const deliveryRules = configRes?.[0]?.config_data || {};
+    let deliveryRules = configRes?.[0]?.config_data || {};
+    if (typeof deliveryRules === 'string') {
+      try {
+        deliveryRules = JSON.parse(deliveryRules);
+      } catch (_) {
+        deliveryRules = {};
+      }
+    }
+    const enableRadiusCheck =
+      deliveryRules.enable_delivery_radius_check !== false &&
+      deliveryRules.enable_delivery_radius_check !== 'false' &&
+      deliveryRules.enable_delivery_radius_check !== 0;
     const deliveryRulesPayload = {
-      enable_delivery_radius_check: deliveryRules.enable_delivery_radius_check !== false,
+      enable_delivery_radius_check: enableRadiusCheck,
       delivery_radius_meters: Number(deliveryRules.delivery_radius_meters ?? 100),
     };
 

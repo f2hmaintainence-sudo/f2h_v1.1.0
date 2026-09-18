@@ -261,12 +261,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final sessionState = context.read<DeliverySessionBloc>().state;
-        final currentRun = sessionState is DeliverySessionLoaded ? sessionState.currentRun : null;
+        final isEnforced = sessionState is DeliverySessionLoaded ? sessionState.isGeofenceEnforced : false;
+        final radiusMeters = sessionState is DeliverySessionLoaded ? sessionState.effectiveRadiusMeters : 100.0;
         return DeliveryConfirmationSheet(
           stop: stop,
           initialPosition: fastPos,
-          enforceGeofence: currentRun?.enforceGeofence ?? true,
-          allowedRadiusMeters: currentRun?.allowedRadiusMeters ?? 100.0,
+          enforceGeofence: isEnforced,
+          allowedRadiusMeters: radiusMeters,
           onConfirm: (status, emptyBottles, returnedContainers, damagedContainers, lostContainers, notes, paymentMode, paymentStatus, deliveryImage, containerReturns, containerDeliveries) {
           if (stop.orders.isEmpty) return;
           final orderId = stop.orders.first.orderId;

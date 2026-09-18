@@ -884,12 +884,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final sessionState = context.read<DeliverySessionBloc>().state;
-        final currentRun = sessionState is DeliverySessionLoaded ? sessionState.currentRun : null;
+        final isEnforced = sessionState is DeliverySessionLoaded ? sessionState.isGeofenceEnforced : false;
+        final radiusMeters = sessionState is DeliverySessionLoaded ? sessionState.effectiveRadiusMeters : 100.0;
         return DeliveryConfirmationSheet(
           stop: stop,
           initialPosition: pos,
-          enforceGeofence: currentRun?.enforceGeofence ?? true,
-          allowedRadiusMeters: currentRun?.allowedRadiusMeters ?? 100.0,
+          enforceGeofence: isEnforced,
+          allowedRadiusMeters: radiusMeters,
           onConfirm: (
           status,
           emptyBottles,
@@ -1386,8 +1387,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // 6. Bottom Active Delivery Details HUD (Kept in comment)
-                // _buildBottomHUD(state, effectiveStops),
+                // 6. Bottom Active Delivery Details HUD
+                _buildBottomHUD(state, effectiveStops),
               ],
             ),
           );

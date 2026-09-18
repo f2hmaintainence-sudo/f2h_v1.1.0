@@ -77,7 +77,7 @@ class DeliveryConfirmationSheet extends StatefulWidget {
     required this.stop,
     this.initialPosition,
     this.allowedRadiusMeters = 100.0,
-    this.enforceGeofence = true,
+    this.enforceGeofence = false,
     required this.onConfirm,
   });
 
@@ -103,7 +103,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
   Timer? _paymentPollTimer;
 
   // Doorstep Geofence Verification State
-  bool _isCheckingGps = true;
+  bool _isCheckingGps = false;
   double? _distanceMeters;
   bool _isOutOfRadius = false;
   late double _allowedRadiusMeters;
@@ -123,7 +123,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
     _allowedRadiusMeters = widget.allowedRadiusMeters;
     _enforceGeofence = widget.enforceGeofence && _allowedRadiusMeters > 0;
 
-    // Instant 0ms evaluation from provided fix or cached location
+    // Instant evaluation from provided fix or cached location
     final fastPos = widget.initialPosition ?? sl<LocationService>().cachedPosition;
     if (fastPos != null && widget.stop.addressLat != 0 && widget.stop.addressLng != 0) {
       final loc = sl<LocationService>();
@@ -136,7 +136,7 @@ class _DeliveryConfirmationSheetState extends State<DeliveryConfirmationSheet> {
       _distanceMeters = distKm * 1000.0;
       _isOutOfRadius = _enforceGeofence ? (_distanceMeters! > _allowedRadiusMeters) : false;
       _isCheckingGps = false;
-    } else if (widget.stop.addressLat == 0 && widget.stop.addressLng == 0) {
+    } else if (widget.stop.addressLat == 0 && widget.stop.addressLng == 0 || !_enforceGeofence) {
       _distanceMeters = null;
       _isOutOfRadius = false;
       _isCheckingGps = false;

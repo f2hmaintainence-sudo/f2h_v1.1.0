@@ -24,6 +24,8 @@ class DeliverySessionLoaded extends DeliverySessionState {
   final DeliveryRun? currentRun;
   final List<DeliveryOrderModel> orders;
   final String? profilePhotoUrl;
+  final bool enforceGeofence;
+  final double allowedRadiusMeters;
 
   DeliverySessionLoaded({
     required this.driverName,
@@ -35,7 +37,12 @@ class DeliverySessionLoaded extends DeliverySessionState {
     this.profilePhotoUrl,
     required this.currentRun,
     required this.orders,
+    this.enforceGeofence = false,
+    this.allowedRadiusMeters = 100.0,
   });
+
+  bool get isGeofenceEnforced => currentRun?.enforceGeofence ?? enforceGeofence;
+  double get effectiveRadiusMeters => currentRun?.allowedRadiusMeters ?? allowedRadiusMeters;
 
   // ── Computed Getters (mirrors the old MockDataService getters) ───────────────
 
@@ -193,6 +200,8 @@ class DeliverySessionLoaded extends DeliverySessionState {
     String? profilePhotoUrl,
     DeliveryRun? currentRun,
     List<DeliveryOrderModel>? orders,
+    bool? enforceGeofence,
+    double? allowedRadiusMeters,
     bool clearRun = false,
   }) {
     return DeliverySessionLoaded(
@@ -205,6 +214,8 @@ class DeliverySessionLoaded extends DeliverySessionState {
       profilePhotoUrl: profilePhotoUrl ?? this.profilePhotoUrl,
       currentRun: clearRun ? null : (currentRun ?? this.currentRun),
       orders: orders ?? this.orders,
+      enforceGeofence: enforceGeofence ?? this.enforceGeofence,
+      allowedRadiusMeters: allowedRadiusMeters ?? this.allowedRadiusMeters,
     );
   }
 }
