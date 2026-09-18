@@ -35,51 +35,87 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _referralCodeController = TextEditingController();
 
   bool _agreeToTerms = false;
   bool _isSendingOtp = false;
-  bool _showReferralField = false;
 
-  // Referral auto-check state
+  // Automated link-only referral state (no manual entry)
+  String? _autoReferralCode;
   bool? _isReferralValid;
   String? _referralMessage;
   bool _isCheckingReferral = false;
-  Timer? _referralDebounce;
 
   @override
   void initState() {
     super.initState();
-    _referralCodeController.addListener(_onReferralChanged);
     _checkAlreadyAuthenticated();
     _checkPendingReferralCode();
   }
 
   Future<void> _checkPendingReferralCode() async {
     try {
+      String? code;
       if (widget.initialReferralCode != null && widget.initialReferralCode!.trim().isNotEmpty) {
-        _referralCodeController.text = widget.initialReferralCode!.trim().toUpperCase();
-        if (mounted) setState(() => _showReferralField = true);
-        return;
-      }
-      final uri = Uri.base;
-      String? code = uri.queryParameters['ref'] ?? uri.queryParameters['referral'] ?? uri.queryParameters['code'];
-      if (code == null || code.isEmpty) {
-        final segments = uri.pathSegments;
-        final rIdx = segments.indexOf('r');
-        if (rIdx != -1 && rIdx + 1 < segments.length) {
-          code = segments[rIdx + 1];
+        code = widget.initialReferralCode!.trim().toUpperCase();
+      } else {
+        final uri = Uri.base;
+        code = uri.queryParameters['ref'] ?? uri.queryParameters['referral'] ?? uri.queryParameters['code'];
+        if (code == null || code.isEmpty) {
+          final segments = uri.pathSegments;
+          final rIdx = segments.indexOf('r');
+          if (rIdx != -1 && rIdx + 1 < segments.length) {
+            code = segments[rIdx + 1];
+          }
+        }
+        if (code == null || code.isEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          code = prefs.getString('pending_referral_code') ?? prefs.getString('referral_code');
         }
       }
-      if (code == null || code.isEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        code = prefs.getString('pending_referral_code') ?? prefs.getString('referral_code');
-      }
-      if (code != null && code.trim().isNotEmpty && mounted) {
-        _referralCodeController.text = code.trim().toUpperCase();
-        setState(() => _showReferralField = true);
+
+      if (code != null && code.trim().isNotEmpty) {
+        await _validateDetectedReferral(code.trim().toUpperCase());
       }
     } catch (_) {}
+  }
+
+  Future<void> _validateDetectedReferral(String code) async {
+    if (!mounted) return;
+    setState(() {
+      _autoReferralCode = code;
+      _isCheckingReferral = true;
+      _isReferralValid = null;
+      _referralMessage = null;
+    });
+
+    try {
+      final dio = sl<DioClient>().dio;
+      final resp = await dio.get('${ApiEndpoints.validateReferralCode}/$code');
+      if (!mounted) return;
+      final data = resp.data;
+      final isValid = data['valid'] == true;
+      setState(() {
+        _isReferralValid = isValid;
+        _isCheckingReferral = false;
+        if (isValid) {
+          final refName = data['referrer_name']?.toString();
+          _referralMessage = (refName != null && refName.isNotEmpty)
+              ? 'Referral invite applied from $refName'
+              : 'Referral invite applied ($code)';
+        } else {
+          _autoReferralCode = null;
+          _referralMessage = null;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isCheckingReferral = false;
+        _isReferralValid = false;
+        _autoReferralCode = null;
+        _referralMessage = null;
+      });
+    }
   }
 
   void _checkAlreadyAuthenticated() async {
@@ -108,11 +144,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
-    _referralDebounce?.cancel();
-    _referralCodeController.removeListener(_onReferralChanged);
     _phoneController.dispose();
     _emailController.dispose();
-    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -126,47 +159,6 @@ class _SignupScreenState extends State<SignupScreen> {
       if (w.isEmpty) return '';
       return w[0].toUpperCase() + (w.length > 1 ? w.substring(1) : '');
     }).join(' ');
-  }
-
-  void _onReferralChanged() {
-    _referralDebounce?.cancel();
-    final code = _referralCodeController.text.trim();
-    if (code.isEmpty) {
-      setState(() {
-        _isReferralValid = null;
-        _referralMessage = null;
-        _isCheckingReferral = false;
-      });
-      return;
-    }
-    if (code.length < 3) return;
-    setState(() => _isCheckingReferral = true);
-    _referralDebounce = Timer(const Duration(milliseconds: 350), () async {
-      try {
-        final dio = sl<DioClient>().dio;
-        final resp = await dio.get('${ApiEndpoints.validateReferralCode}/$code');
-        if (!mounted) return;
-        final data = resp.data;
-        final isValid = data['valid'] == true;
-        setState(() {
-          _isReferralValid = isValid;
-          _referralMessage = isValid
-              ? (data['referrer_name'] != null &&
-                        data['referrer_name'].toString().isNotEmpty
-                    ? 'Valid referral code! (From ${data['referrer_name']})'
-                    : 'Referral code is valid!')
-              : (data['message']?.toString() ?? 'Invalid referral code');
-          _isCheckingReferral = false;
-        });
-      } catch (_) {
-        if (!mounted) return;
-        setState(() {
-          _isReferralValid = false;
-          _referralMessage = 'Invalid referral code';
-          _isCheckingReferral = false;
-        });
-      }
-    });
   }
 
   void _toast(String message, {Color? background}) {
@@ -203,12 +195,6 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    final referral = _referralCodeController.text.trim();
-    if (referral.isNotEmpty && _isReferralValid == false) {
-      _toast('Invalid referral code. Please correct or remove it.');
-      return;
-    }
-
     if (!_agreeToTerms) {
       _toast('Please agree to the Terms & Conditions and Privacy Policy');
       return;
@@ -229,7 +215,9 @@ class _SignupScreenState extends State<SignupScreen> {
             userName: userName,
             email: email,
             phone: phone,
-            referralCode: referral.isEmpty ? null : referral,
+            referralCode: (_autoReferralCode != null && _isReferralValid == true)
+                ? _autoReferralCode
+                : null,
           ),
         ),
       );
@@ -292,62 +280,94 @@ class _SignupScreenState extends State<SignupScreen> {
                 icon: Icons.mail_outline_rounded,
                 keyboardType: TextInputType.emailAddress,
               ),
-              const SizedBox(height: 14),
-              if (!_showReferralField)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: InkWell(
-                    onTap: () => setState(() => _showReferralField = true),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.card_giftcard_rounded, size: 16, color: kPrimaryMid),
-                          SizedBox(width: 6),
-                          Text(
-                            'Have a referral code?',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: kPrimaryMid,
-                            ),
-                          ),
-                        ],
+              if (_isCheckingReferral) ...[
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: const [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
                       ),
-                    ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Verifying referral link...',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: kAuthSubtitle,
+                        ),
+                      ),
+                    ],
                   ),
-                )
-              else ...[
-                AuthField(
-                  controller: _referralCodeController,
-                  hint: 'Referral Code (Optional)',
-                  icon: Icons.card_giftcard_rounded,
-                  textInputAction: TextInputAction.done,
-                  trailing: _isCheckingReferral
-                      ? const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: kAuthHint,
-                            ),
-                          ),
-                        )
-                      : _isReferralValid == true
-                      ? const Icon(Icons.check_circle_rounded, color: kPrimary)
-                      : _isReferralValid == false
-                      ? const Icon(Icons.cancel_rounded, color: kRed)
-                      : null,
                 ),
-                if (_referralMessage != null)
-                  _FieldHint(
-                    message: _referralMessage!,
-                    isPositive: _isReferralValid == true,
+                const SizedBox(height: 14),
+              ] else if (_autoReferralCode != null && _isReferralValid == true) ...[
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF86EFAC), width: 1.2),
                   ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFDCFCE7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.card_giftcard_rounded,
+                          size: 16,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Referral Invite Applied ($_autoReferralCode)',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF166534),
+                              ),
+                            ),
+                            if (_referralMessage != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                _referralMessage!,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF15803D),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        size: 18,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
               ],
               const SizedBox(height: 16),
               _TermsCheckbox(
@@ -394,38 +414,6 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
     );
   }
-}
-
-/// Inline validation note shown under a field.
-class _FieldHint extends StatelessWidget {
-  final String message;
-  final bool isPositive;
-  const _FieldHint({required this.message, required this.isPositive});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 6, top: 6),
-    child: Row(
-      children: [
-        Icon(
-          isPositive ? Icons.check_circle_rounded : Icons.error_outline_rounded,
-          size: 14,
-          color: isPositive ? kPrimary : kRed,
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            message,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-              color: isPositive ? kPrimaryMid : kRed,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class _TermsCheckbox extends StatelessWidget {

@@ -35,7 +35,7 @@ export class ReferralRewardEngineService {
 
       // 1. Fetch Referee Customer Profile via JOIN users
       const refereeRes = await client.query(
-        `SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email
+        `SELECT c.*, u.first_name, u.last_name, u.user_name, u.phone, u.email, u.referred_by
          FROM customers c
          JOIN users u ON u.user_id = c.customer_id
          WHERE c.customer_id = $1 OR u.email = $1 OR u.phone = $1 LIMIT 1`,

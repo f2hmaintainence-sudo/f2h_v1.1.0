@@ -98,15 +98,6 @@ export class CustomerShowEditService {
         //   validation: { maxLength: 50 },
         // },
         {
-          name: 'referral_status',
-          label: 'Referral Code',
-          type: 'text',
-          required: false,
-          width: 'half',
-          placeholder: 'e.g. REF-ABC123',
-          validation: { maxLength: 20 },
-        },
-        {
           name: 'postpaid_credit_limit',
           label: 'Postpaid Credit Limit (₹)',
           type: 'number',
