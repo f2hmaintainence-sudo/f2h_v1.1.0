@@ -4,7 +4,8 @@
 //
 // Project     : F2H Fresh
 // File        : page.tsx
-// Description : Catalog & Inventory Sales Report with granular filters & CSV export
+// Description : Ultra-polished Catalog & Inventory Sales Report with
+//               Product-level Profit & Loss Analytics, Granular Filters & Export
 // ============================================================================
 
 "use client";
@@ -28,12 +29,15 @@ import {
   Filter,
   X,
   FileSpreadsheet,
-  Calendar,
-  Tag,
   Boxes,
-  ArrowUpDown,
   ChevronLeft,
   Percent,
+  TrendingDown,
+  Coins,
+  Calendar,
+  Sparkles,
+  ArrowRight,
+  HelpCircle,
 } from "lucide-react";
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
@@ -42,6 +46,11 @@ interface Totals {
   total_net_sales: number;
   total_gross_sales: number;
   total_discounts: number;
+  total_cogs: number;
+  gross_profit: number;
+  total_profit: number;
+  total_loss: number;
+  gross_margin_pct: number;
   total_quantity: number;
   total_orders: number;
   total_products: number;
@@ -62,10 +71,17 @@ interface ProductRow {
   product_name: string;
   category_name: string;
   variant_name: string;
-  quantity_sold: number;
+  sku?: string;
+  pack_size?: string;
   orders_count: number;
+  quantity_sold: number;
+  gross_sales: number;
+  total_loss: number;
   revenue: number;
-  gross: number;
+  estimated_cogs: number;
+  gross_profit: number;
+  total_profit: number;
+  margin_pct: number;
   avg_price: number;
   share_pct: number;
 }
@@ -117,24 +133,16 @@ interface SalesReportData {
   };
 }
 
-interface FilterOption {
-  product_id?: string;
-  branch_id?: string;
-  category_id?: string;
-  name?: string;
-  branch_name?: string;
-}
-
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const formatMoney = (v: number) =>
-  "₹" + Number(v ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  "₹" + Number(v ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 1 });
 
 const formatCompactMoney = (v: number) => {
   const num = Number(v ?? 0);
   if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`;
   if (num >= 100000) return `₹${(num / 100000).toFixed(2)} L`;
-  if (num >= 1000) return `₹${(num / 1000).toFixed(1)} k`;
+  if (num >= 1000) return `₹${(num / 1000).toFixed(1)}k`;
   return `₹${num.toFixed(0)}`;
 };
 
@@ -150,6 +158,16 @@ const getMonthStart = () => {
   const d = new Date();
   d.setDate(1);
   return d.toISOString().slice(0, 10);
+};
+
+const formatDateLabel = (dateStr: string) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -194,7 +212,6 @@ export default function CatalogSalesReportPage() {
         }
       })
       .catch(() => {
-        // Fallback for branches
         api
           .get<any>("/admin/zone/branches-list")
           .then((res) => {
@@ -237,13 +254,11 @@ export default function CatalogSalesReportPage() {
     loadReport();
   }, [loadReport]);
 
-  // Reset page to 1 when filters change
   const handleFilterChange = (setter: (v: string) => void) => (val: string) => {
     setter(val);
     setPage(1);
   };
 
-  // Date preset helper
   const applyPreset = (preset: "today" | "yesterday" | "7d" | "30d" | "90d" | "this_month") => {
     setPage(1);
     const today = isoDaysAgo(0);
@@ -302,7 +317,7 @@ export default function CatalogSalesReportPage() {
     branchId || productId || categoryId || orderSource || orderStatus || search
   );
 
-  // 4. CSV Export Download
+  // 4. Product Summary CSV Export Download (Products, Total Orders, Total Profit, Total Loss, Gross Profit)
   const downloadCsv = async () => {
     setExporting(true);
     try {
@@ -325,13 +340,13 @@ export default function CatalogSalesReportPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `sales-report-${from}-to-${to}.csv`;
+      a.download = `product-sales-profit-loss-${from}-to-${to}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      alert("Failed to export sales report. Please try again.");
+      alert("Failed to export product sales report. Please try again.");
     } finally {
       setExporting(false);
     }
@@ -346,7 +361,7 @@ export default function CatalogSalesReportPage() {
   const pagination = report?.pagination || { page: 1, limit: 50, total_items: 0, total_pages: 1 };
 
   return (
-    <div className="space-y-6 p-4 md:p-6 animate-in fade-in duration-300">
+    <div className="space-y-6 p-4 md:p-6 animate-in fade-in duration-300 max-w-[1600px] mx-auto">
       {/* ── Breadcrumb ── */}
       <nav className="flex items-center gap-2 text-xs text-slate-500 font-medium">
         <Link
@@ -362,22 +377,22 @@ export default function CatalogSalesReportPage() {
       </nav>
 
       {/* ── Header Banner ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 md:p-6 rounded-3xl border border-slate-200/70 shadow-xs">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#16a34a] flex items-center justify-center border border-emerald-100/60 shadow-xs shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#16a34a] flex items-center justify-center border border-emerald-100 shadow-xs shrink-0">
             <TrendingUp size={24} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 Catalog &amp; Inventory Sales Report
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase">
-                Analytics &amp; Export
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 text-[10px] font-extrabold uppercase tracking-wide">
+                Products &amp; Profitability
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Analyze product sales velocity, branch fulfillment volume, and itemized orders with exportable data.
+              Analyze product sales velocity, total orders, profit &amp; loss, and gross profit with filterable CSV export.
             </p>
           </div>
         </div>
@@ -387,13 +402,14 @@ export default function CatalogSalesReportPage() {
             type="button"
             onClick={downloadCsv}
             disabled={exporting}
-            className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2.5 bg-[#16a34a] hover:bg-[#15803d] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            title="Export Products Summary (Products, Total Orders, Total Profit, Total Loss, Gross Profit)"
           >
             <FileSpreadsheet
               size={15}
-              className={`text-[#16a34a] ${exporting ? "animate-bounce" : ""}`}
+              className={exporting ? "animate-bounce" : ""}
             />
-            {exporting ? "Exporting CSV…" : "Export CSV"}
+            {exporting ? "Exporting…" : "Export Products (CSV)"}
           </button>
 
           <button
@@ -408,21 +424,22 @@ export default function CatalogSalesReportPage() {
         </div>
       </div>
 
-      {/* ── Filters Section ── */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+      {/* ── Filter Card ── */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-200/70 shadow-xs space-y-4">
+        {/* Filter Top Bar: Presets & Live Date Display */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-            <Filter size={14} className="text-[#16a34a]" />
-            <span>Filter Sales Report</span>
+            <Filter size={15} className="text-[#16a34a]" />
+            <span>Filter by Date, Product, Branch &amp; More</span>
             {hasActiveFilters && (
-              <span className="px-2 py-0.5 bg-emerald-50 text-[#16a34a] text-[10px] rounded-md font-extrabold">
+              <span className="px-2 py-0.5 bg-emerald-50 text-[#16a34a] text-[10px] rounded-md font-extrabold border border-emerald-100">
                 Active Filters
               </span>
             )}
           </div>
 
-          {/* Quick Date Presets */}
-          <div className="flex flex-wrap items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 text-xs">
+          {/* Date Presets */}
+          <div className="flex flex-wrap items-center gap-1 bg-slate-100/70 p-1 rounded-xl border border-slate-200/50 text-xs">
             {(
               [
                 { id: "today", label: "Today" },
@@ -437,7 +454,7 @@ export default function CatalogSalesReportPage() {
                 key={p.id}
                 type="button"
                 onClick={() => applyPreset(p.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   isPresetActive(p.id)
                     ? "bg-[#16a34a] text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white"
@@ -449,11 +466,11 @@ export default function CatalogSalesReportPage() {
           </div>
         </div>
 
-        {/* Filter Controls Grid */}
+        {/* Filter Controls Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {/* From Date */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               From Date
             </label>
             <input
@@ -464,13 +481,13 @@ export default function CatalogSalesReportPage() {
                 setFrom(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all"
+              className="w-full px-3 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all shadow-2xs"
             />
           </div>
 
           {/* To Date */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               To Date
             </label>
             <input
@@ -481,19 +498,19 @@ export default function CatalogSalesReportPage() {
                 setTo(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all"
+              className="w-full px-3 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all shadow-2xs"
             />
           </div>
 
           {/* Branch Filter */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               Branch / Hub
             </label>
             <select
               value={branchId}
               onChange={(e) => handleFilterChange(setBranchId)(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all"
+              className="w-full px-3 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all shadow-2xs cursor-pointer"
             >
               <option value="">All Branches</option>
               {branches.map((b) => (
@@ -506,13 +523,13 @@ export default function CatalogSalesReportPage() {
 
           {/* Product Filter */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               Product
             </label>
             <select
               value={productId}
               onChange={(e) => handleFilterChange(setProductId)(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all"
+              className="w-full px-3 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all shadow-2xs cursor-pointer"
             >
               <option value="">All Products</option>
               {products.map((p) => (
@@ -525,13 +542,13 @@ export default function CatalogSalesReportPage() {
 
           {/* Category Filter */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               Category
             </label>
             <select
               value={categoryId}
               onChange={(e) => handleFilterChange(setCategoryId)(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all"
+              className="w-full px-3 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all shadow-2xs cursor-pointer"
             >
               <option value="">All Categories</option>
               {categories.map((c) => (
@@ -544,13 +561,13 @@ export default function CatalogSalesReportPage() {
 
           {/* Order Source Filter */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               Order Source
             </label>
             <select
               value={orderSource}
               onChange={(e) => handleFilterChange(setOrderSource)(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all"
+              className="w-full px-3 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-[#16a34a] focus:bg-white transition-all shadow-2xs cursor-pointer"
             >
               <option value="">All Sources</option>
               <option value="subscription">Subscription Orders</option>
@@ -559,28 +576,28 @@ export default function CatalogSalesReportPage() {
           </div>
         </div>
 
-        {/* Search & Reset Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+        {/* Search & Active Filter Badges */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
           <div className="relative w-full sm:w-80">
             <Search
               size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               type="text"
-              placeholder="Search product, customer, or order ID…"
+              placeholder="Search product, SKU, customer, or order ID…"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 placeholder:text-slate-400 outline-none focus:border-[#16a34a] focus:bg-white transition-all"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 placeholder:text-slate-400 outline-none focus:border-[#16a34a] focus:bg-white transition-all shadow-2xs"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X size={13} />
               </button>
@@ -592,7 +609,7 @@ export default function CatalogSalesReportPage() {
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer border border-rose-100"
               >
                 <X size={13} /> Reset Filters
               </button>
@@ -601,92 +618,130 @@ export default function CatalogSalesReportPage() {
         </div>
       </div>
 
-      {/* ── KPI Summary Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Net Sales */}
-        <div className="bg-gradient-to-br from-[#15803d] to-[#16a34a] text-white p-5 rounded-3xl shadow-md relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100">
-              Total Net Sales
+      {/* ── KPI Summary Cards: Sales, Profit, Loss ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+        {/* Card 1: Net Sales */}
+        <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Net Sales
             </span>
-            <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
-              <IndianRupee size={16} />
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100/60">
+              <IndianRupee size={14} />
             </div>
           </div>
-          <p className="text-2xl md:text-3xl font-black mt-2">
+          <div className="text-xl font-black text-slate-900 tracking-tight">
             {formatMoney(totals?.total_net_sales || 0)}
-          </p>
-          <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-100/90 font-medium">
-            <span>Gross: {formatMoney(totals?.total_gross_sales || 0)}</span>
-            <span>•</span>
-            <span>Disc: {formatMoney(totals?.total_discounts || 0)}</span>
+          </div>
+          <div className="flex items-center gap-1 mt-1 text-[11px] text-slate-400">
+            <span>Gross:</span>
+            <span className="font-semibold text-slate-600">{formatMoney(totals?.total_gross_sales || 0)}</span>
           </div>
         </div>
 
-        {/* Total Units Sold */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-              Quantity / Units Sold
+        {/* Card 2: Gross Profit */}
+        <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">
+              Gross Profit
             </span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Boxes size={16} />
+            <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 border border-teal-100/60">
+              <Coins size={14} />
             </div>
           </div>
-          <p className="text-2xl md:text-3xl font-black text-slate-900 mt-2">
+          <div className="text-xl font-black text-teal-700 tracking-tight">
+            {formatMoney(totals?.gross_profit || 0)}
+          </div>
+          <div className="flex items-center gap-1.5 mt-1 text-[11px]">
+            <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 font-bold text-[10px] border border-teal-200/60">
+              {totals?.gross_margin_pct || 0}% Margin
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Total Profit */}
+        <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+              Total Profit
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100/60">
+              <TrendingUp size={14} />
+            </div>
+          </div>
+          <div className="text-xl font-black text-slate-900 tracking-tight">
+            {formatMoney(totals?.total_profit || 0)}
+          </div>
+          <div className="mt-1 text-[11px] text-slate-400 font-medium">
+            Positive product yield
+          </div>
+        </div>
+
+        {/* Card 4: Total Loss */}
+        <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">
+              Total Loss
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100/60">
+              <TrendingDown size={14} />
+            </div>
+          </div>
+          <div className="text-xl font-black text-rose-600 tracking-tight">
+            {formatMoney(totals?.total_loss || 0)}
+          </div>
+          <div className="mt-1 text-[11px] text-slate-400 font-medium">
+            Discounts &amp; deductions
+          </div>
+        </div>
+
+        {/* Card 5: Total Orders */}
+        <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Total Orders
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100/60">
+              <ShoppingCart size={14} />
+            </div>
+          </div>
+          <div className="text-xl font-black text-slate-900 tracking-tight">
+            {(totals?.total_orders || 0).toLocaleString("en-IN")}
+          </div>
+          <div className="flex items-center gap-1 mt-1 text-[11px] text-slate-400">
+            <span>AOV:</span>
+            <span className="font-semibold text-slate-600">{formatMoney(totals?.avg_order_value || 0)}</span>
+          </div>
+        </div>
+
+        {/* Card 6: Units Sold */}
+        <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Units Sold
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100/60">
+              <Boxes size={14} />
+            </div>
+          </div>
+          <div className="text-xl font-black text-slate-900 tracking-tight">
             {formatQty(totals?.total_quantity || 0)}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1 font-medium">
-            Across {totals?.total_products || 0} unique items
-          </p>
-        </div>
-
-        {/* Total Orders & AOV */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-              Orders Count
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <ShoppingCart size={16} />
-            </div>
           </div>
-          <p className="text-2xl md:text-3xl font-black text-slate-900 mt-2">
-            {totals?.total_orders?.toLocaleString("en-IN") || 0}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1 font-medium">
-            Avg Order Value: {formatMoney(totals?.avg_order_value || 0)}
-          </p>
-        </div>
-
-        {/* Unique Customers */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-              Unique Customers
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Package size={16} />
-            </div>
+          <div className="mt-1 text-[11px] text-slate-400 font-medium">
+            {totals?.total_products || 0} unique items
           </div>
-          <p className="text-2xl md:text-3xl font-black text-slate-900 mt-2">
-            {totals?.total_customers?.toLocaleString("en-IN") || 0}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1 font-medium">
-            Period: {report?.range?.from || from} to {report?.range?.to || to}
-          </p>
         </div>
       </div>
 
       {/* ── Daily Sales Trend Chart ── */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="bg-white p-5 rounded-3xl border border-slate-200/70 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <TrendingUp size={16} className="text-[#16a34a]" /> Daily Sales &amp; Quantity Trend
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Day-by-day sales revenue and fulfilled volume
+              Day-by-day sales revenue and volume fulfilled across the selected period
             </p>
           </div>
           <span className="text-xs font-bold text-slate-400">
@@ -700,7 +755,7 @@ export default function CatalogSalesReportPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-end gap-1.5 h-44 pt-4 overflow-x-auto pb-2 scrollbar-thin">
+            <div className="flex items-end gap-1.5 h-40 pt-4 overflow-x-auto pb-2 scrollbar-thin">
               {daily.map((d) => {
                 const heightPct = Math.round((d.revenue / maxDailyRevenue) * 100);
                 return (
@@ -710,7 +765,7 @@ export default function CatalogSalesReportPage() {
                   >
                     {/* Tooltip on hover */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 z-20 bg-slate-900 text-white text-[10px] font-semibold py-1 px-2 rounded-md shadow-lg pointer-events-none whitespace-nowrap">
-                      <div>{d.day}</div>
+                      <div>{formatDateLabel(d.day)}</div>
                       <div className="text-emerald-400 font-bold">{formatMoney(d.revenue)}</div>
                       <div className="text-slate-300">{d.orders} orders • {d.quantity} units</div>
                     </div>
@@ -736,7 +791,7 @@ export default function CatalogSalesReportPage() {
       </div>
 
       {/* ── Tabbed Detail Breakdowns ── */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200/70 shadow-xs overflow-hidden">
         {/* Navigation Tabs */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 pt-3">
           <div className="flex items-center gap-2">
@@ -750,7 +805,7 @@ export default function CatalogSalesReportPage() {
               }`}
             >
               <Package size={15} />
-              Sales by Product ({productsList.length})
+              Products Profit &amp; Loss ({productsList.length})
             </button>
 
             <button
@@ -776,18 +831,18 @@ export default function CatalogSalesReportPage() {
               }`}
             >
               <Layers size={15} />
-              Detailed Line Items ({pagination.total_items})
+              Order Items Log ({pagination.total_items})
             </button>
           </div>
 
           <span className="text-xs text-slate-400 hidden sm:inline-block">
             {activeTab === "items"
               ? `Showing page ${pagination.page} of ${pagination.total_pages}`
-              : "Sorted by revenue (descending)"}
+              : "Sorted by net sales (descending)"}
           </span>
         </div>
 
-        {/* Tab 1: Sales by Product */}
+        {/* Tab 1: Sales by Product (with Total Orders, Total Profit, Total Loss, Gross Profit) */}
         {activeTab === "products" && (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -795,18 +850,21 @@ export default function CatalogSalesReportPage() {
                 <tr className="bg-slate-50/60 text-slate-400 font-extrabold uppercase text-[10px] border-b border-slate-100 tracking-wider">
                   <th className="py-3 px-5">Product</th>
                   <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Variant / Pack</th>
+                  <th className="py-3 px-4">Pack / Variant</th>
+                  <th className="py-3 px-4 text-right">Total Orders</th>
                   <th className="py-3 px-4 text-right">Units Sold</th>
-                  <th className="py-3 px-4 text-right">Orders</th>
-                  <th className="py-3 px-4 text-right">Avg Price</th>
-                  <th className="py-3 px-4 text-right">Revenue</th>
+                  <th className="py-3 px-4 text-right">Gross Sales</th>
+                  <th className="py-3 px-4 text-right text-rose-500">Total Loss</th>
+                  <th className="py-3 px-4 text-right text-teal-600">Gross Profit</th>
+                  <th className="py-3 px-4 text-right text-[#15803d]">Total Profit</th>
+                  <th className="py-3 px-4 text-right">Margin %</th>
                   <th className="py-3 px-5 text-right">Share %</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {productsList.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 font-semibold">
+                    <td colSpan={11} className="py-12 text-center text-slate-400 font-semibold">
                       No product sales matching the filters.
                     </td>
                   </tr>
@@ -822,29 +880,38 @@ export default function CatalogSalesReportPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-600 font-medium">
-                        {p.variant_name || "Standard"}
+                        {p.pack_size || p.variant_name || "Standard"}
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-slate-900">
+                        {p.orders_count.toLocaleString("en-IN")}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-slate-700">
                         {formatQty(p.quantity_sold)}
                       </td>
                       <td className="py-3 px-4 text-right text-slate-600 font-medium">
-                        {p.orders_count}
+                        {formatMoney(p.gross_sales)}
                       </td>
-                      <td className="py-3 px-4 text-right text-slate-600 font-medium">
-                        {formatMoney(p.avg_price)}
+                      <td className="py-3 px-4 text-right font-bold text-rose-600">
+                        {formatMoney(p.total_loss)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-teal-700">
+                        {formatMoney(p.gross_profit)}
                       </td>
                       <td className="py-3 px-4 text-right font-black text-[#15803d]">
-                        {formatMoney(p.revenue)}
+                        {formatMoney(p.total_profit)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-semibold text-slate-700">
+                        {p.margin_pct}%
                       </td>
                       <td className="py-3 px-5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                             <div
                               className="h-full bg-emerald-500 rounded-full"
                               style={{ width: `${Math.min(100, Math.max(0, p.share_pct))}%` }}
                             />
                           </div>
-                          <span className="text-[11px] font-bold text-slate-500 w-10 text-right">
+                          <span className="text-[11px] font-bold text-slate-500 w-9 text-right">
                             {formatPct(p.share_pct)}
                           </span>
                         </div>
@@ -947,7 +1014,7 @@ export default function CatalogSalesReportPage() {
                     <tr key={item.item_id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-5">
                         <div className="font-bold text-slate-900">#{item.order_id}</div>
-                        <div className="text-[11px] text-slate-400">{item.order_date}</div>
+                        <div className="text-[11px] text-slate-400">{formatDateLabel(item.order_date)}</div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-semibold text-slate-800">

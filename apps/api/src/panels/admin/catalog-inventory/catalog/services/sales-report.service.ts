@@ -63,7 +63,7 @@ export class CatalogSalesReportService {
     if (query?.search) {
       params.push(`%${query.search.trim()}%`);
       where.push(
-        `(p.name ILIKE $${params.length} OR oi.product_name ILIKE $${params.length} OR pv.name ILIKE $${params.length} OR o.order_id::text ILIKE $${params.length} OR u.first_name ILIKE $${params.length} OR u.last_name ILIKE $${params.length} OR u.phone ILIKE $${params.length})`
+        `(p.name ILIKE $${params.length} OR oi.product_name ILIKE $${params.length} OR pv.name ILIKE $${params.length} OR pv.sku ILIKE $${params.length} OR o.order_id::text ILIKE $${params.length} OR u.first_name ILIKE $${params.length} OR u.last_name ILIKE $${params.length} OR u.phone ILIKE $${params.length})`
       );
     }
 
@@ -117,8 +117,8 @@ export class CatalogSalesReportService {
   }
 
   /**
-   * Main sales report aggregating KPIs, trend, product breakdown, branch breakdown,
-   * and paginated line items.
+   * Main sales report aggregating KPIs, trend, product breakdown with profit/loss,
+   * branch breakdown, and paginated line items.
    */
   async getSalesReport(query: any) {
     try {
@@ -131,17 +131,20 @@ export class CatalogSalesReportService {
         'COALESCE(NULLIF(oi.final_price, 0), NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
       const GROSS_REVENUE =
         'COALESCE(NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
-      const DISCOUNT =
-        'COALESCE(oi.discount_amount, 0) + COALESCE(oi.coupon_amount, 0)';
+      const DISCOUNT_LOSS =
+        'COALESCE(oi.discount_amount, 0) + COALESCE(oi.coupon_amount, 0) + (CASE WHEN oi.is_free THEN oi.unit_price * COALESCE(oi.quantity, 1) ELSE 0 END)';
+      const ESTIMATED_COST =
+        'COALESCE(vc.avg_unit_cost, (COALESCE(NULLIF(oi.original_price, 0), oi.unit_price) * 0.65)) * COALESCE(oi.quantity, 1)';
 
       const [totalsRows, dailyRows, productRows, branchRows, lineItemRows, countRows] =
         await Promise.all([
-          // 1. KPI Totals
+          // 1. Headline Totals
           this.db.query(
             `SELECT
                COALESCE(SUM(${NET_REVENUE}), 0)::numeric AS total_net_sales,
                COALESCE(SUM(${GROSS_REVENUE}), 0)::numeric AS total_gross_sales,
-               COALESCE(SUM(${DISCOUNT}), 0)::numeric AS total_discounts,
+               COALESCE(SUM(${DISCOUNT_LOSS}), 0)::numeric AS total_discounts,
+               COALESCE(SUM(${ESTIMATED_COST}), 0)::numeric AS total_cogs,
                COALESCE(SUM(oi.quantity), 0)::numeric AS total_quantity,
                COUNT(DISTINCT o.order_id)::int AS total_orders,
                COUNT(DISTINCT p.product_id)::int AS total_products,
@@ -153,6 +156,12 @@ export class CatalogSalesReportService {
              LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
              LEFT JOIN branches b ON b.branch_id = o.branch_id
              LEFT JOIN users u ON u.user_id = o.customer_id
+             LEFT JOIN (
+               SELECT product_id, AVG(rate_per_unit)::numeric AS avg_unit_cost
+               FROM vendor_collections
+               WHERE deleted_at IS NULL AND rate_per_unit > 0
+               GROUP BY product_id
+             ) vc ON vc.product_id = p.product_id
              WHERE ${whereClause}`,
             params,
           ),
@@ -178,17 +187,21 @@ export class CatalogSalesReportService {
             params,
           ),
 
-          // 3. Sales by Product
+          // 3. Sales & Profitability by Product
           this.db.query(
             `SELECT
                COALESCE(p.product_id, pv.product_id, 'other') AS product_id,
                COALESCE(NULLIF(oi.product_name, ''), p.name, pv.name, 'Produce Item') AS product_name,
                COALESCE(c.name, 'General') AS category_name,
                COALESCE(pv.name, '') AS variant_name,
-               COALESCE(SUM(oi.quantity), 0)::numeric AS quantity_sold,
+               COALESCE(pv.sku, '') AS sku,
+               COALESCE(pv.unit_value::text || ' ' || pv.unit_type, '') AS pack_size,
                COUNT(DISTINCT o.order_id)::int AS orders_count,
+               COALESCE(SUM(oi.quantity), 0)::numeric AS quantity_sold,
+               COALESCE(SUM(${GROSS_REVENUE}), 0)::numeric AS gross_sales,
+               COALESCE(SUM(${DISCOUNT_LOSS}), 0)::numeric AS discount_loss,
                COALESCE(SUM(${NET_REVENUE}), 0)::numeric AS revenue,
-               COALESCE(SUM(${GROSS_REVENUE}), 0)::numeric AS gross,
+               COALESCE(SUM(${ESTIMATED_COST}), 0)::numeric AS estimated_cogs,
                ROUND(
                  COALESCE(SUM(${NET_REVENUE}), 0)::numeric /
                  NULLIF(COALESCE(SUM(oi.quantity), 0), 0), 2
@@ -200,10 +213,16 @@ export class CatalogSalesReportService {
              LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
              LEFT JOIN branches b ON b.branch_id = o.branch_id
              LEFT JOIN users u ON u.user_id = o.customer_id
+             LEFT JOIN (
+               SELECT product_id, AVG(rate_per_unit)::numeric AS avg_unit_cost
+               FROM vendor_collections
+               WHERE deleted_at IS NULL AND rate_per_unit > 0
+               GROUP BY product_id
+             ) vc ON vc.product_id = p.product_id
              WHERE ${whereClause}
-             GROUP BY 1, 2, 3, 4
+             GROUP BY 1, 2, 3, 4, 5, 6
              ORDER BY revenue DESC
-             LIMIT 100`,
+             LIMIT 200`,
             params,
           ),
 
@@ -247,7 +266,7 @@ export class CatalogSalesReportService {
                COALESCE(oi.quantity, 1)::numeric AS quantity,
                COALESCE(oi.unit_price, 0)::numeric AS unit_price,
                COALESCE(${GROSS_REVENUE}, 0)::numeric AS gross_amount,
-               COALESCE(${DISCOUNT}, 0)::numeric AS discount_amount,
+               COALESCE(${DISCOUNT_LOSS}, 0)::numeric AS discount_amount,
                COALESCE(${NET_REVENUE}, 0)::numeric AS total_amount,
                TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS customer_name,
                u.phone AS customer_phone
@@ -264,7 +283,7 @@ export class CatalogSalesReportService {
             [...params, limit, offset],
           ),
 
-          // 6. Total count of line items for pagination
+          // 6. Total count of line items
           this.db.query(
             `SELECT COUNT(*)::int AS total_items
              FROM order_items oi
@@ -282,12 +301,23 @@ export class CatalogSalesReportService {
       const t = totalsRows?.[0] || {};
       const netSales = Number(t.total_net_sales || 0);
       const grossSales = Number(t.total_gross_sales || 0);
+      const totalDiscounts = Number(t.total_discounts || 0);
+      const totalCogs = Number(t.total_cogs || 0);
       const totalOrders = Number(t.total_orders || 0);
+      const grossProfit = Math.round((netSales - totalCogs) * 100) / 100;
+      const totalProfit = Math.max(0, grossProfit);
+      const totalLoss = Math.round((totalDiscounts + Math.max(0, totalCogs - netSales)) * 100) / 100;
+      const grossMarginPct = netSales > 0 ? Math.round((grossProfit / netSales) * 1000) / 10 : 0;
 
       const totals = {
         total_net_sales: netSales,
         total_gross_sales: grossSales,
-        total_discounts: Number(t.total_discounts || 0),
+        total_discounts: totalDiscounts,
+        total_cogs: totalCogs,
+        gross_profit: grossProfit,
+        total_profit: totalProfit,
+        total_loss: totalLoss,
+        gross_margin_pct: grossMarginPct,
         total_quantity: Number(t.total_quantity || 0),
         total_orders: totalOrders,
         total_products: Number(t.total_products || 0),
@@ -297,15 +327,37 @@ export class CatalogSalesReportService {
 
       const shareOf = (v: number) => (netSales > 0 ? (v / netSales) * 100 : 0);
 
-      const productsWithShare = (productRows || []).map((p: any) => ({
-        ...p,
-        revenue: Number(p.revenue || 0),
-        gross: Number(p.gross || 0),
-        quantity_sold: Number(p.quantity_sold || 0),
-        orders_count: Number(p.orders_count || 0),
-        avg_price: Number(p.avg_price || 0),
-        share_pct: shareOf(Number(p.revenue || 0)),
-      }));
+      // Process product breakdown with profit, loss, and gross profit
+      const productsWithProfit = (productRows || []).map((p: any) => {
+        const rev = Number(p.revenue || 0);
+        const gross = Number(p.gross_sales || 0);
+        const discountLoss = Number(p.discount_loss || 0);
+        const cogs = Number(p.estimated_cogs || 0);
+        const pGrossProfit = Math.round((rev - cogs) * 100) / 100;
+        const pProfit = Math.max(0, pGrossProfit);
+        const pLoss = Math.round((discountLoss + Math.max(0, cogs - rev)) * 100) / 100;
+        const marginPct = rev > 0 ? Math.round((pGrossProfit / rev) * 1000) / 10 : 0;
+
+        return {
+          product_id: p.product_id,
+          product_name: p.product_name,
+          category_name: p.category_name,
+          variant_name: p.variant_name,
+          sku: p.sku,
+          pack_size: p.pack_size,
+          orders_count: Number(p.orders_count || 0),
+          quantity_sold: Number(p.quantity_sold || 0),
+          gross_sales: gross,
+          total_loss: pLoss,
+          revenue: rev,
+          estimated_cogs: cogs,
+          gross_profit: pGrossProfit,
+          total_profit: pProfit,
+          margin_pct: marginPct,
+          avg_price: Number(p.avg_price || 0),
+          share_pct: shareOf(rev),
+        };
+      });
 
       const branchesWithShare = (branchRows || []).map((b: any) => ({
         ...b,
@@ -330,7 +382,7 @@ export class CatalogSalesReportService {
             revenue: Number(d.revenue || 0),
             gross: Number(d.gross || 0),
           })),
-          by_product: productsWithShare,
+          by_product: productsWithProfit,
           by_branch: branchesWithShare,
           line_items: lineItemRows || [],
           pagination: {
@@ -349,7 +401,8 @@ export class CatalogSalesReportService {
   }
 
   /**
-   * Export sales report as CSV matching all active filters
+   * Export sales report as Product Summary CSV based on active filters:
+   * Products, Total Orders, Total Profit, Total Loss, Gross Profit.
    */
   async exportSalesCsv(query: any): Promise<string> {
     try {
@@ -359,28 +412,25 @@ export class CatalogSalesReportService {
         'COALESCE(NULLIF(oi.final_price, 0), NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
       const GROSS_REVENUE =
         'COALESCE(NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
-      const DISCOUNT =
-        'COALESCE(oi.discount_amount, 0) + COALESCE(oi.coupon_amount, 0)';
+      const DISCOUNT_LOSS =
+        'COALESCE(oi.discount_amount, 0) + COALESCE(oi.coupon_amount, 0) + (CASE WHEN oi.is_free THEN oi.unit_price * COALESCE(oi.quantity, 1) ELSE 0 END)';
+      const ESTIMATED_COST =
+        'COALESCE(vc.avg_unit_cost, (COALESCE(NULLIF(oi.original_price, 0), oi.unit_price) * 0.65)) * COALESCE(oi.quantity, 1)';
 
       const sql = `
         SELECT
-          o.order_id,
-          COALESCE(o.scheduled_date, o.created_at::date)::text AS order_date,
-          COALESCE(b.branch_name, 'Unassigned') AS branch_name,
+          COALESCE(p.product_id, pv.product_id, 'other') AS product_id,
           COALESCE(NULLIF(oi.product_name, ''), p.name, pv.name, 'Produce Item') AS product_name,
           COALESCE(c.name, 'General') AS category_name,
           COALESCE(pv.name, '') AS variant_name,
+          COALESCE(pv.sku, '') AS sku,
           COALESCE(pv.unit_value::text || ' ' || pv.unit_type, '') AS pack_size,
-          COALESCE(oi.quantity, 1)::numeric AS quantity,
-          COALESCE(oi.unit_price, 0)::numeric AS unit_price,
-          COALESCE(${DISCOUNT}, 0)::numeric AS discount_amount,
-          COALESCE(${NET_REVENUE}, 0)::numeric AS total_amount,
-          o.order_source,
-          o.status AS order_status,
-          o.payment_mode,
-          o.payment_status,
-          TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) AS customer_name,
-          COALESCE(u.phone, '') AS customer_phone
+          COUNT(DISTINCT o.order_id)::int AS total_orders,
+          COALESCE(SUM(oi.quantity), 0)::numeric AS total_quantity,
+          COALESCE(SUM(${GROSS_REVENUE}), 0)::numeric AS gross_sales,
+          COALESCE(SUM(${DISCOUNT_LOSS}), 0)::numeric AS discount_loss,
+          COALESCE(SUM(${NET_REVENUE}), 0)::numeric AS net_revenue,
+          COALESCE(SUM(${ESTIMATED_COST}), 0)::numeric AS estimated_cogs
         FROM order_items oi
         JOIN orders o ON o.order_id = oi.order_id
         LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
@@ -388,31 +438,32 @@ export class CatalogSalesReportService {
         LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
         LEFT JOIN branches b ON b.branch_id = o.branch_id
         LEFT JOIN users u ON u.user_id = o.customer_id
+        LEFT JOIN (
+          SELECT product_id, AVG(rate_per_unit)::numeric AS avg_unit_cost
+          FROM vendor_collections
+          WHERE deleted_at IS NULL AND rate_per_unit > 0
+          GROUP BY product_id
+        ) vc ON vc.product_id = p.product_id
         WHERE ${whereClause}
-        ORDER BY COALESCE(o.scheduled_date, o.created_at::date) DESC, o.order_id DESC, oi.id ASC
-        LIMIT 10000
+        GROUP BY 1, 2, 3, 4, 5, 6
+        ORDER BY net_revenue DESC
       `;
 
       const rows = await this.db.query(sql, params);
 
       const headers = [
-        'Order ID',
-        'Date',
-        'Branch',
         'Product Name',
         'Category',
-        'Variant',
-        'Pack Size',
-        'Quantity',
-        'Unit Price (INR)',
-        'Discount (INR)',
-        'Total Amount (INR)',
-        'Order Source',
-        'Order Status',
-        'Payment Mode',
-        'Payment Status',
-        'Customer Name',
-        'Customer Phone',
+        'Variant / Pack Size',
+        'SKU',
+        'Total Orders',
+        'Quantity Sold',
+        'Gross Sales (INR)',
+        'Total Loss (INR)',
+        'Net Sales (INR)',
+        'Gross Profit (INR)',
+        'Total Profit (INR)',
+        'Profit Margin (%)',
       ];
 
       const escapeCsv = (val: any) => {
@@ -421,35 +472,78 @@ export class CatalogSalesReportService {
         return `"${str}"`;
       };
 
+      let sumOrders = 0;
+      let sumQty = 0;
+      let sumGross = 0;
+      let sumLoss = 0;
+      let sumNet = 0;
+      let sumGrossProfit = 0;
+      let sumTotalProfit = 0;
+
       const lines = [headers.join(',')];
+
       for (const r of rows) {
+        const orders = Number(r.total_orders || 0);
+        const qty = Number(r.total_quantity || 0);
+        const gross = Number(r.gross_sales || 0);
+        const discountLoss = Number(r.discount_loss || 0);
+        const net = Number(r.net_revenue || 0);
+        const cogs = Number(r.estimated_cogs || 0);
+
+        const grossProfit = Math.round((net - cogs) * 100) / 100;
+        const totalProfit = Math.max(0, grossProfit);
+        const totalLoss = Math.round((discountLoss + Math.max(0, cogs - net)) * 100) / 100;
+        const marginPct = net > 0 ? Math.round((grossProfit / net) * 1000) / 10 : 0;
+
+        sumOrders += orders;
+        sumQty += qty;
+        sumGross += gross;
+        sumLoss += totalLoss;
+        sumNet += net;
+        sumGrossProfit += grossProfit;
+        sumTotalProfit += totalProfit;
+
         lines.push(
           [
-            escapeCsv(r.order_id),
-            escapeCsv(r.order_date),
-            escapeCsv(r.branch_name),
             escapeCsv(r.product_name),
             escapeCsv(r.category_name),
-            escapeCsv(r.variant_name),
-            escapeCsv(r.pack_size),
-            Number(r.quantity || 0),
-            Number(r.unit_price || 0).toFixed(2),
-            Number(r.discount_amount || 0).toFixed(2),
-            Number(r.total_amount || 0).toFixed(2),
-            escapeCsv(r.order_source),
-            escapeCsv(r.order_status),
-            escapeCsv(r.payment_mode),
-            escapeCsv(r.payment_status),
-            escapeCsv(r.customer_name),
-            escapeCsv(r.customer_phone),
+            escapeCsv(r.pack_size || r.variant_name || 'Standard'),
+            escapeCsv(r.sku || '-'),
+            orders,
+            qty,
+            gross.toFixed(2),
+            totalLoss.toFixed(2),
+            net.toFixed(2),
+            grossProfit.toFixed(2),
+            totalProfit.toFixed(2),
+            `${marginPct.toFixed(1)}%`,
           ].join(',')
         );
       }
 
+      // Total summary row
+      const overallMargin = sumNet > 0 ? Math.round((sumGrossProfit / sumNet) * 1000) / 10 : 0;
+      lines.push(
+        [
+          escapeCsv('TOTAL / SUMMARY'),
+          escapeCsv('-'),
+          escapeCsv('-'),
+          escapeCsv('-'),
+          sumOrders,
+          sumQty,
+          sumGross.toFixed(2),
+          sumLoss.toFixed(2),
+          sumNet.toFixed(2),
+          sumGrossProfit.toFixed(2),
+          sumTotalProfit.toFixed(2),
+          `${overallMargin.toFixed(1)}%`,
+        ].join(',')
+      );
+
       return lines.join('\r\n');
     } catch (error) {
       this.developer.error('exportSalesCsv error', { error });
-      throw new InternalServerErrorException('Failed to generate sales report CSV');
+      throw new InternalServerErrorException('Failed to generate product sales summary CSV');
     }
   }
 }
