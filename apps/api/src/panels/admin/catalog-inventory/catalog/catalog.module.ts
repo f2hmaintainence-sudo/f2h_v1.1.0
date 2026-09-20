@@ -7,6 +7,7 @@ import { CatalogSaveAddService } from './services/saveAdd.service';
 import { CatalogShowEditService } from './services/showEdit.service';
 import { CatalogSaveEditService } from './services/saveEdit.service';
 import { CatalogSubscriptionConfigService } from './services/subscriptionConfig.service';
+import { CatalogSalesReportService } from './services/sales-report.service';
 import { HelpersModule } from '../../../../helpers/Helpers.module';
 import { DataService } from '../../../../shared/database/Data.service';
 import { DatabaseService } from '../../../../shared/database/Database.service';
@@ -29,9 +30,11 @@ import { ContainersService } from './containers.service';
     CatalogShowEditService,
     CatalogSaveEditService,
     CatalogSubscriptionConfigService,
+    CatalogSalesReportService,
     ContainersService,
     
     DeveloperService,
     LocalStorageService],
+  exports: [CatalogService, CatalogSalesReportService],
 })
 export class CatalogModule { }

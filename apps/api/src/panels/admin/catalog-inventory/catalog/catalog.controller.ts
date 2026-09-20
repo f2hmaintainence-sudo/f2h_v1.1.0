@@ -1,10 +1,12 @@
-import { UseGuards,Controller, Get, Post, Body, Query, Req, Param, Delete } from '@nestjs/common';
+import { UseGuards, Controller, Get, Post, Body, Query, Req, Param, Delete, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { CatalogService } from './services/catalog.service';
 import { CatalogShowAddService } from './services/showAdd.service';
 import { CatalogSaveAddService } from './services/saveAdd.service';
 import { CatalogShowEditService } from './services/showEdit.service';
 import { CatalogSaveEditService } from './services/saveEdit.service';
 import { CatalogSubscriptionConfigService } from './services/subscriptionConfig.service';
+import { CatalogSalesReportService } from './services/sales-report.service';
 import { AuthService } from 'src/panels/admin/auth/auth.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
@@ -20,6 +22,7 @@ export class CatalogController {
     private readonly showEditService: CatalogShowEditService,
     private readonly saveEditService: CatalogSaveEditService,
     private readonly subscriptionConfigService: CatalogSubscriptionConfigService,
+    private readonly salesReportService: CatalogSalesReportService,
     private readonly authService: AuthService,
   ) { }
 
@@ -271,4 +274,28 @@ export class CatalogController {
     const adminId = req.user?.user_id ?? req.user?.id ?? 'system';
     return this.catalogService.deleteOffer(id, adminId);
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // CATALOG SALES REPORT
+  // ═══════════════════════════════════════════════════════════════
+
+  @Get('sales-report/filter-options')
+  async getSalesReportFilterOptions() {
+    return this.salesReportService.getFilterOptions();
+  }
+
+  @Get('sales-report')
+  async getSalesReport(@Query() query: any) {
+    return this.salesReportService.getSalesReport(query);
+  }
+
+  @Get('sales-report/export/csv')
+  async exportSalesReportCsv(@Query() query: any, @Res() res: Response) {
+    const csv = await this.salesReportService.exportSalesCsv(query);
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="sales-report-${stamp}.csv"`);
+    res.send(csv);
+  }
 }
+

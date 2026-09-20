@@ -124,6 +124,7 @@ export const adminNav: NavGroup[] = [
       { name: "Vendors", href: "/admin/catalog/vendors", icon: Building2, permissions: ["vendors.view", "vendors.manage"] },
       { name: "Daily Collections", href: "/admin/catalog/collections", icon: ClipboardCheck, permissions: ["vendors.collections.view", "vendors.collections.create", "vendors.collections.manage", "vendors.slips.send"] },
       { name: "Promotions Coupons", href: "/admin/catalog/promotions-coupons", icon: TicketPercent, permissions: ["catalog.promotions", "catalog.view"] },
+      { name: "Sales Report", href: "/admin/catalog/sales-report", icon: TrendingUp, permissions: ["catalog.view", "inventory.view", "reports.view"] },
       {
         name: "Inventory & Warehouse",
         icon: Archive,
