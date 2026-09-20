@@ -725,7 +725,7 @@ export default function CatalogSalesReportPage() {
             {formatMoney(totals?.total_loss || 0)}
           </div>
           <div className="mt-2 text-[11px] text-slate-400 font-medium">
-            Discounts, coupons &amp; drops
+            MRP markdowns, discounts &amp; coupons
           </div>
         </div>
 

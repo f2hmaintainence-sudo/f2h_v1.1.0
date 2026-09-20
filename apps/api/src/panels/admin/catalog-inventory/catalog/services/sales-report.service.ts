@@ -37,7 +37,7 @@ export class CatalogSalesReportService {
       params.push(query.status);
       where.push(`o.status = $${params.length}`);
     } else {
-      where.push("o.status NOT IN ('cancelled', 'failed', 'rejected')");
+      where.push("o.status = 'delivered'");
     }
 
     if (query?.branch_id) {
@@ -128,13 +128,13 @@ export class CatalogSalesReportService {
       const offset = (page - 1) * limit;
 
       const NET_REVENUE =
-        'COALESCE(NULLIF(oi.final_price, 0), NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
+        'COALESCE(NULLIF(oi.total_price, 0), NULLIF(oi.final_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
       const GROSS_REVENUE =
-        'COALESCE(NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
+        'COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)';
       const DISCOUNT_LOSS =
-        'COALESCE(oi.discount_amount, 0) + COALESCE(oi.coupon_amount, 0) + (CASE WHEN oi.is_free THEN oi.unit_price * COALESCE(oi.quantity, 1) ELSE 0 END)';
+        'GREATEST(0, (COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)) - COALESCE(NULLIF(oi.total_price, 0), NULLIF(oi.final_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0))';
       const ESTIMATED_COST =
-        'COALESCE(vc.avg_unit_cost, (COALESCE(NULLIF(oi.original_price, 0), oi.unit_price) * 0.65)) * COALESCE(oi.quantity, 1)';
+        'COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)';
 
       const [totalsRows, dailyRows, productRows, branchRows, lineItemRows, countRows] =
         await Promise.all([
@@ -305,9 +305,47 @@ export class CatalogSalesReportService {
       const totalCogs = Number(t.total_cogs || 0);
       const totalOrders = Number(t.total_orders || 0);
       const grossProfit = Math.round((netSales - totalCogs) * 100) / 100;
-      const totalProfit = Math.max(0, grossProfit);
-      const totalLoss = Math.round((totalDiscounts + Math.max(0, totalCogs - netSales)) * 100) / 100;
       const grossMarginPct = netSales > 0 ? Math.round((grossProfit / netSales) * 1000) / 10 : 0;
+
+      const shareOf = (v: number) => (netSales > 0 ? (v / netSales) * 100 : 0);
+
+      // Process product breakdown with profit, loss, and gross profit
+      const productsWithProfit = (productRows || []).map((p: any) => {
+        const rev = Number(p.revenue || 0);
+        const gross = Number(p.gross_sales || 0);
+        const purchaseCost = Number(p.estimated_cogs || 0);
+        const pGrossProfit = Math.round((rev - purchaseCost) * 100) / 100;
+        const pProfit = Math.max(0, pGrossProfit);
+        const pLoss = Math.round(Math.max(0, purchaseCost - rev) * 100) / 100;
+        const marginPct = rev > 0 ? Math.round((pGrossProfit / rev) * 1000) / 10 : 0;
+
+        return {
+          product_id: p.product_id,
+          product_name: p.product_name,
+          category_name: p.category_name,
+          variant_name: p.variant_name,
+          sku: p.sku,
+          pack_size: p.pack_size,
+          orders_count: Number(p.orders_count || 0),
+          quantity_sold: Number(p.quantity_sold || 0),
+          gross_sales: gross,
+          total_loss: pLoss,
+          revenue: rev,
+          estimated_cogs: purchaseCost,
+          gross_profit: pGrossProfit,
+          total_profit: pProfit,
+          margin_pct: marginPct,
+          avg_price: Number(p.avg_price || 0),
+          share_pct: shareOf(rev),
+        };
+      });
+
+      const totalProfit = Math.round(
+        productsWithProfit.reduce((acc: number, item: any) => acc + (item.total_profit || 0), 0) * 100
+      ) / 100;
+      const totalLoss = Math.round(
+        productsWithProfit.reduce((acc: number, item: any) => acc + (item.total_loss || 0), 0) * 100
+      ) / 100;
 
       const totals = {
         total_net_sales: netSales,
@@ -324,40 +362,6 @@ export class CatalogSalesReportService {
         total_customers: Number(t.total_customers || 0),
         avg_order_value: totalOrders > 0 ? netSales / totalOrders : 0,
       };
-
-      const shareOf = (v: number) => (netSales > 0 ? (v / netSales) * 100 : 0);
-
-      // Process product breakdown with profit, loss, and gross profit
-      const productsWithProfit = (productRows || []).map((p: any) => {
-        const rev = Number(p.revenue || 0);
-        const gross = Number(p.gross_sales || 0);
-        const discountLoss = Number(p.discount_loss || 0);
-        const cogs = Number(p.estimated_cogs || 0);
-        const pGrossProfit = Math.round((rev - cogs) * 100) / 100;
-        const pProfit = Math.max(0, pGrossProfit);
-        const pLoss = Math.round((discountLoss + Math.max(0, cogs - rev)) * 100) / 100;
-        const marginPct = rev > 0 ? Math.round((pGrossProfit / rev) * 1000) / 10 : 0;
-
-        return {
-          product_id: p.product_id,
-          product_name: p.product_name,
-          category_name: p.category_name,
-          variant_name: p.variant_name,
-          sku: p.sku,
-          pack_size: p.pack_size,
-          orders_count: Number(p.orders_count || 0),
-          quantity_sold: Number(p.quantity_sold || 0),
-          gross_sales: gross,
-          total_loss: pLoss,
-          revenue: rev,
-          estimated_cogs: cogs,
-          gross_profit: pGrossProfit,
-          total_profit: pProfit,
-          margin_pct: marginPct,
-          avg_price: Number(p.avg_price || 0),
-          share_pct: shareOf(rev),
-        };
-      });
 
       const branchesWithShare = (branchRows || []).map((b: any) => ({
         ...b,
@@ -409,13 +413,13 @@ export class CatalogSalesReportService {
       const { params, whereClause } = this.buildFilters(query);
 
       const NET_REVENUE =
-        'COALESCE(NULLIF(oi.final_price, 0), NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
+        'COALESCE(NULLIF(oi.total_price, 0), NULLIF(oi.final_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
       const GROSS_REVENUE =
-        'COALESCE(NULLIF(oi.total_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0)';
+        'COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)';
       const DISCOUNT_LOSS =
-        'COALESCE(oi.discount_amount, 0) + COALESCE(oi.coupon_amount, 0) + (CASE WHEN oi.is_free THEN oi.unit_price * COALESCE(oi.quantity, 1) ELSE 0 END)';
+        'GREATEST(0, (COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)) - COALESCE(NULLIF(oi.total_price, 0), NULLIF(oi.final_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0))';
       const ESTIMATED_COST =
-        'COALESCE(vc.avg_unit_cost, (COALESCE(NULLIF(oi.original_price, 0), oi.unit_price) * 0.65)) * COALESCE(oi.quantity, 1)';
+        'COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)';
 
       const sql = `
         SELECT
@@ -492,7 +496,7 @@ export class CatalogSalesReportService {
 
         const grossProfit = Math.round((net - cogs) * 100) / 100;
         const totalProfit = Math.max(0, grossProfit);
-        const totalLoss = Math.round((discountLoss + Math.max(0, cogs - net)) * 100) / 100;
+        const totalLoss = Math.round(Math.max(0, cogs - net) * 100) / 100;
         const marginPct = net > 0 ? Math.round((grossProfit / net) * 1000) / 10 : 0;
 
         sumOrders += orders;
