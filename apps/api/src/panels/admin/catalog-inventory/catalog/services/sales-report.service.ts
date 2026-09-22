@@ -134,7 +134,7 @@ export class CatalogSalesReportService {
       const DISCOUNT_LOSS =
         'GREATEST(0, (COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)) - COALESCE(NULLIF(oi.total_price, 0), NULLIF(oi.final_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0))';
       const ESTIMATED_COST =
-        'COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)';
+        'COALESCE(NULLIF(pv.purchase_price, 0), NULLIF(pe.avg_unit_cost, 0), NULLIF(vc.avg_unit_cost, 0), 0) * COALESCE(oi.quantity, 1)';
 
       const [totalsRows, dailyRows, productRows, branchRows, lineItemRows, countRows] =
         await Promise.all([
@@ -156,6 +156,12 @@ export class CatalogSalesReportService {
              LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
              LEFT JOIN branches b ON b.branch_id = o.branch_id
              LEFT JOIN users u ON u.user_id = o.customer_id
+             LEFT JOIN (
+               SELECT variant_id, AVG(unit_cost)::numeric AS avg_unit_cost
+               FROM purchase_entries
+               WHERE deleted_at IS NULL AND unit_cost > 0
+               GROUP BY variant_id
+             ) pe ON pe.variant_id = pv.variant_id
              LEFT JOIN (
                SELECT product_id, AVG(rate_per_unit)::numeric AS avg_unit_cost
                FROM vendor_collections
@@ -202,6 +208,7 @@ export class CatalogSalesReportService {
                COALESCE(SUM(${DISCOUNT_LOSS}), 0)::numeric AS discount_loss,
                COALESCE(SUM(${NET_REVENUE}), 0)::numeric AS revenue,
                COALESCE(SUM(${ESTIMATED_COST}), 0)::numeric AS estimated_cogs,
+               COALESCE(MAX(pv.purchase_price), MAX(pe.avg_unit_cost), MAX(vc.avg_unit_cost), 0)::numeric AS unit_purchase_price,
                ROUND(
                  COALESCE(SUM(${NET_REVENUE}), 0)::numeric /
                  NULLIF(COALESCE(SUM(oi.quantity), 0), 0), 2
@@ -213,6 +220,12 @@ export class CatalogSalesReportService {
              LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
              LEFT JOIN branches b ON b.branch_id = o.branch_id
              LEFT JOIN users u ON u.user_id = o.customer_id
+             LEFT JOIN (
+               SELECT variant_id, AVG(unit_cost)::numeric AS avg_unit_cost
+               FROM purchase_entries
+               WHERE deleted_at IS NULL AND unit_cost > 0
+               GROUP BY variant_id
+             ) pe ON pe.variant_id = pv.variant_id
              LEFT JOIN (
                SELECT product_id, AVG(rate_per_unit)::numeric AS avg_unit_cost
                FROM vendor_collections
@@ -332,6 +345,7 @@ export class CatalogSalesReportService {
           total_loss: pLoss,
           revenue: rev,
           estimated_cogs: purchaseCost,
+          purchase_price: Number(p.unit_purchase_price || 0),
           gross_profit: pGrossProfit,
           total_profit: pProfit,
           margin_pct: marginPct,
@@ -419,7 +433,7 @@ export class CatalogSalesReportService {
       const DISCOUNT_LOSS =
         'GREATEST(0, (COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)) - COALESCE(NULLIF(oi.total_price, 0), NULLIF(oi.final_price, 0), (COALESCE(oi.quantity, 1) * oi.unit_price), 0))';
       const ESTIMATED_COST =
-        'COALESCE(NULLIF(pv.original_price, 0), NULLIF(oi.original_price, 0), oi.unit_price, 0) * COALESCE(oi.quantity, 1)';
+        'COALESCE(NULLIF(pv.purchase_price, 0), NULLIF(pe.avg_unit_cost, 0), NULLIF(vc.avg_unit_cost, 0), 0) * COALESCE(oi.quantity, 1)';
 
       const sql = `
         SELECT
@@ -442,6 +456,12 @@ export class CatalogSalesReportService {
         LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
         LEFT JOIN branches b ON b.branch_id = o.branch_id
         LEFT JOIN users u ON u.user_id = o.customer_id
+        LEFT JOIN (
+          SELECT variant_id, AVG(unit_cost)::numeric AS avg_unit_cost
+          FROM purchase_entries
+          WHERE deleted_at IS NULL AND unit_cost > 0
+          GROUP BY variant_id
+        ) pe ON pe.variant_id = pv.variant_id
         LEFT JOIN (
           SELECT product_id, AVG(rate_per_unit)::numeric AS avg_unit_cost
           FROM vendor_collections

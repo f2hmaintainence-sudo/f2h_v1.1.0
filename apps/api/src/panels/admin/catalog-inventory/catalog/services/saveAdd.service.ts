@@ -557,6 +557,7 @@ export class CatalogSaveAddService {
     try {
       await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS original_price NUMERIC(10,2) DEFAULT NULL;`);
       await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT NULL;`);
+      await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS purchase_price NUMERIC(10,2) DEFAULT NULL;`);
     } catch {
       // Ignore if column exists
     }
@@ -663,6 +664,12 @@ export class CatalogSaveAddService {
       insertData.original_price = originalPrice;
       insertData.discount = discount;
       
+      if (insertData.purchase_price !== undefined && insertData.purchase_price !== null && String(insertData.purchase_price).trim() !== '') {
+        const purPrice = Number(insertData.purchase_price);
+        insertData.purchase_price = Number.isNaN(purPrice) ? null : purPrice;
+      } else {
+        insertData.purchase_price = null;
+      }
 
       const variantImages = [
         body.variant_image,

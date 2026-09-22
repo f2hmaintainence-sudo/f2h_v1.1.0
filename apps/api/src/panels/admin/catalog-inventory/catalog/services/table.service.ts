@@ -258,6 +258,7 @@ export class CatalogTableService {
           unit_value: ['product_variants.unit_value', true],
           unit_type: ['product_variants.unit_type', true],
           price: ['product_variants.price', true],
+          purchase_price: ['product_variants.purchase_price', true],
           subscription_price: ['product_variants.subscription_price', true],
           is_subscribable: ['products.is_subscribable', false],
           manageable_qty: ['product_variants.manageable_qty', true],

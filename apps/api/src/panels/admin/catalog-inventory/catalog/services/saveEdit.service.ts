@@ -332,6 +332,7 @@ export class CatalogSaveEditService {
     try {
       await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS original_price NUMERIC(10,2) DEFAULT NULL;`);
       await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT NULL;`);
+      await this.db.query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS purchase_price NUMERIC(10,2) DEFAULT NULL;`);
     } catch {
       // Ignore if column exists
     }
@@ -484,6 +485,7 @@ export class CatalogSaveEditService {
         'sku',
         'original_price',
         'price',
+        'purchase_price',
         'subscription_price',
         'unit_value',
         'unit_type',
@@ -510,6 +512,7 @@ export class CatalogSaveEditService {
             [
               'original_price',
               'price',
+              'purchase_price',
               'subscription_price',
               'unit_value',
               'manageable_qty',

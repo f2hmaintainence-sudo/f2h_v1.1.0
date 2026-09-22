@@ -84,6 +84,7 @@ interface ProductRow {
   total_loss: number;
   revenue: number;
   estimated_cogs: number;
+  purchase_price?: number;
   gross_profit: number;
   total_profit: number;
   margin_pct: number;
@@ -725,7 +726,7 @@ export default function CatalogSalesReportPage() {
             {formatMoney(totals?.total_loss || 0)}
           </div>
           <div className="mt-2 text-[11px] text-slate-400 font-medium">
-            MRP markdowns, discounts &amp; coupons
+            Loss on sales below purchase cost
           </div>
         </div>
 
