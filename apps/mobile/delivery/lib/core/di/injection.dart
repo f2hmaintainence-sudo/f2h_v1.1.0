@@ -21,6 +21,8 @@ import 'package:f2h_delivery/services/route_optimization_service.dart';
 import 'package:f2h_delivery/services/location_tracking_service.dart';
 
 import 'package:f2h_delivery/core/config/config_repository.dart';
+import 'package:f2h_delivery/core/network/network_service.dart';
+import 'package:f2h_delivery/core/cache/offline_queue_manager.dart';
 
 final sl = GetIt.instance;
 
@@ -37,6 +39,14 @@ Future<void> init() async {
   final dioClient = DioClient();
   await dioClient.init();
   sl.registerLazySingleton(() => dioClient);
+
+  // Offline queue — singleton used by NetworkService and DeliverySessionBloc
+  sl.registerLazySingleton(() => OfflineQueueManager.instance);
+
+  // Network monitoring — initialise after DioClient so the flush can use it.
+  final networkService = NetworkService();
+  await networkService.init();
+  sl.registerLazySingleton(() => networkService);
   // The same instance the DioClient interceptor uses, so anything that
   // needs to check or re-warm Play Integrity shares one native provider.
   sl.registerLazySingleton<PlayIntegrityService>(() => dioClient.playIntegrity);

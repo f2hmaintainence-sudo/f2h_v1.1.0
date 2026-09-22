@@ -18,6 +18,7 @@ import 'package:f2h_delivery/features/delivery_session/presentation/bloc/deliver
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_delivery/core/config/app_config.dart';
 import 'package:f2h_delivery/core/widgets/f2h_app_bar.dart';
+import 'package:f2h_delivery/core/widgets/offline_banner.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_result_dialog.dart';
 
@@ -250,11 +251,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, isDone ? 24 : 110),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, isDone ? 24 : 110),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
             if (isDone) ...[
               _buildDeliveryReceiptCard(),
               const SizedBox(height: 16),
@@ -280,8 +285,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             // Delivery Notes Card
             if (_currentStop.specialInstructions != null && _currentStop.specialInstructions!.isNotEmpty)
               _buildSpecialInstructionsCard(),
-          ],
-        ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
       bottomSheet: isDone
           ? null

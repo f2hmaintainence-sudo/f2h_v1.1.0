@@ -33,6 +33,7 @@ import 'package:f2h_delivery/features/orders/presentation/widgets/containers_tra
 import 'package:f2h_delivery/features/orders/presentation/widgets/pickup_required_dialog.dart';
 import 'package:f2h_delivery/features/orders/presentation/widgets/delivery_result_dialog.dart';
 import 'package:f2h_delivery/features/notifications/services/notification_api_service.dart';
+import 'package:f2h_delivery/core/widgets/offline_banner.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -551,7 +552,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           floatingActionButton: _buildExpandableFab(session, currentRun),
           body: Column(
             children: [
-              // ── HERO GREETING HEADER ───────────────────────────────
+              // ── OFFLINE BANNER ───────────────────────────────
+              const OfflineBanner(),
+              // ── HERO GREETING HEADER ──────────────────────────
               F2hHeroHeader(
                 driverName: session.driverName,
                 isOnline: session.isOnline,

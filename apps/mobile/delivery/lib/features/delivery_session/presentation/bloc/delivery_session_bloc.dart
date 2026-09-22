@@ -1,7 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:dio/dio.dart';
 import 'package:f2h_delivery/core/api/api_endpoints.dart';
 import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
+import 'package:f2h_delivery/core/cache/offline_queue_manager.dart';
 import 'package:f2h_delivery/features/delivery/data/delivery_order_model.dart';
 import 'package:f2h_delivery/features/orders/domain/repositories/orders_repository.dart';
 import 'package:f2h_delivery/features/profile/data/profile_model.dart';
@@ -188,11 +190,15 @@ class DeliverySessionBloc
 
   Future<void> _onReload(
       ReloadSessionEvent event, Emitter<DeliverySessionState> emit) async {
-    // Reload without showing a full loading spinner — keep current state visible
+    // Reload without showing a full loading spinner — keep current state visible.
     try {
-      emit(await _fetchFresh());
-    } catch (_) {
-      // Swallow; user still sees last good state
+      final freshState = await _fetchFresh();
+      // When reload succeeds and there are no more pending mutations, clear the flag.
+      final pendingCount = await OfflineQueueManager.instance.getPendingCount();
+      emit(freshState.copyWith(hasPendingSync: pendingCount > 0));
+    } catch (e) {
+      // Network still down — leave the current (optimistic) state in place.
+      // The OfflineBanner widget shows the driver they're offline.
     }
   }
 
@@ -321,9 +327,40 @@ class DeliverySessionBloc
         event.onSuccess?.call();
       }
     } catch (e) {
-      // Roll back to original state on error and surface the message to the caller
-      emit(current);
-      event.onError?.call(e.toString());
+      // ── Offline-first: enqueue instead of rolling back ───────────────────
+      final isNetworkError = e is DioException &&
+          (e.type == DioExceptionType.connectionError ||
+           e.type == DioExceptionType.connectionTimeout ||
+           e.type == DioExceptionType.sendTimeout ||
+           e.type == DioExceptionType.receiveTimeout);
+
+      if (isNetworkError) {
+        // Keep the optimistic local update so the driver can continue their
+        // route. Persist the mutation to be flushed once the network returns.
+        final String apiPath = (existing.runId != null && existing.addressId.isNotEmpty)
+            ? ApiEndpoints.markStopDelivered(existing.runId!, existing.addressId)
+            : '${ApiEndpoints.updateOrderStatus}/${event.orderId}';
+
+        await OfflineQueueManager.instance.enqueue(
+          method: 'PATCH',
+          path: apiPath,
+          data: {
+            'status': event.newStatus,
+            'empty_bottles_collected': event.emptyBottles,
+            if (event.notes != null) 'remarks': event.notes,
+            if (event.paymentMode != null) 'payment_mode': event.paymentMode,
+            if (event.paymentStatus != null) 'payment_status': event.paymentStatus,
+          },
+        );
+
+        // Signal success so the UI advances — the driver continues their route.
+        emit(current.copyWith(orders: updated, hasPendingSync: true));
+        event.onSuccess?.call();
+      } else {
+        // Non-network error (e.g., validation, auth) — roll back and report.
+        emit(current);
+        event.onError?.call(e.toString());
+      }
     }
   }
 

@@ -27,6 +27,10 @@ class DeliverySessionLoaded extends DeliverySessionState {
   final bool enforceGeofence;
   final double allowedRadiusMeters;
 
+  /// True when at least one delivery status update was accepted locally while
+  /// offline and is waiting to be flushed to the server.
+  final bool hasPendingSync;
+
   DeliverySessionLoaded({
     required this.driverName,
     required this.isOnline,
@@ -39,6 +43,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
     required this.orders,
     this.enforceGeofence = false,
     this.allowedRadiusMeters = 100.0,
+    this.hasPendingSync = false,
   });
 
   bool get isGeofenceEnforced => currentRun?.enforceGeofence ?? enforceGeofence;
@@ -203,6 +208,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
     bool? enforceGeofence,
     double? allowedRadiusMeters,
     bool clearRun = false,
+    bool? hasPendingSync,
   }) {
     return DeliverySessionLoaded(
       driverName: driverName ?? this.driverName,
@@ -216,6 +222,7 @@ class DeliverySessionLoaded extends DeliverySessionState {
       orders: orders ?? this.orders,
       enforceGeofence: enforceGeofence ?? this.enforceGeofence,
       allowedRadiusMeters: allowedRadiusMeters ?? this.allowedRadiusMeters,
+      hasPendingSync: hasPendingSync ?? this.hasPendingSync,
     );
   }
 }
