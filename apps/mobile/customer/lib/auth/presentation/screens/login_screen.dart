@@ -9,6 +9,7 @@
 //               users whose phone numbers are null in the database.
 // ============================================================================
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -23,6 +24,8 @@ import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
+import 'package:f2h_customer/features/profile/presentation/screens/terms_conditions_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 enum LoginMode { phoneOtp, password }
@@ -51,6 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // Controller for Phone OTP mode
   final TextEditingController _phoneController = TextEditingController();
   bool _isSendingOtp = false;
+  bool _agreeToTerms = false;
 
   @override
   void initState() {
@@ -141,6 +145,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     if (phone.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
       _showError('Please enter a valid 10-digit Indian mobile number');
+      return;
+    }
+    if (!_agreeToTerms) {
+      _showError('Please agree to the Terms & Conditions and Privacy Policy');
       return;
     }
 
@@ -286,6 +294,19 @@ class _LoginScreenState extends State<LoginScreen> {
               onTap: () => setState(() => _currentMode = LoginMode.password),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        _TermsCheckbox(
+          value: _agreeToTerms,
+          onChanged: (v) => setState(() => _agreeToTerms = v),
+          onOpenTerms: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+          ),
+          onOpenPrivacy: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+          ),
         ),
         const SizedBox(height: 20),
         AuthPrimaryButton(
@@ -457,3 +478,71 @@ class _TabButton extends StatelessWidget {
     );
   }
 }
+
+class _TermsCheckbox extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onOpenTerms;
+  final VoidCallback onOpenPrivacy;
+
+  const _TermsCheckbox({
+    required this.value,
+    required this.onChanged,
+    required this.onOpenTerms,
+    required this.onOpenPrivacy,
+  });
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      SizedBox(
+        width: 24,
+        height: 24,
+        child: Checkbox(
+          value: value,
+          activeColor: kPrimary,
+          checkColor: Colors.white,
+          side: const BorderSide(color: kAuthHint, width: 1.6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+          ),
+          onChanged: (v) => onChanged(v ?? false),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: RichText(
+          text: TextSpan(
+            text: 'I agree to the ',
+            style: const TextStyle(
+              color: kAuthSubtitle,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+            children: [
+              TextSpan(
+                text: 'Terms & Conditions',
+                style: const TextStyle(
+                  color: kPrimaryMid,
+                  fontWeight: FontWeight.w800,
+                ),
+                recognizer: TapGestureRecognizer()..onTap = onOpenTerms,
+              ),
+              const TextSpan(text: ' and '),
+              TextSpan(
+                text: 'Privacy Policy',
+                style: const TextStyle(
+                  color: kPrimaryMid,
+                  fontWeight: FontWeight.w800,
+                ),
+                recognizer: TapGestureRecognizer()..onTap = onOpenPrivacy,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
