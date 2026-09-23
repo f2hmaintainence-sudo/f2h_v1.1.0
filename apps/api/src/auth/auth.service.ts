@@ -862,7 +862,10 @@ export class AuthService {
       throw new BadRequestException('Phone number or email is required');
     }
 
-    if (purpose === 'login') {
+    if (purpose === 'login' || !purpose) {
+      // For login or unified flows (no purpose), send OTP to any valid phone.
+      // Suspended/banned accounts are blocked; everyone else gets the OTP and
+      // loginWithOtp decides whether to log in or auto-register.
       if (normalizedPhone) {
         if (normalizedPhone.length !== 10) {
           throw new BadRequestException('Please enter a valid 10-digit mobile number');
@@ -877,7 +880,8 @@ export class AuthService {
           throw new UnauthorizedException('Your account has been suspended. Please contact support.');
         }
       }
-    } else if (purpose === 'registration' || !purpose) {
+    } else if (purpose === 'registration') {
+      // Explicit registration: reject if the phone/email is already fully registered.
       if (email) {
         const normalizedEmail = email.toLowerCase().trim();
         const existingEmailUser = await this.Data.query('users', {
@@ -952,7 +956,8 @@ export class AuthService {
       throw new BadRequestException('Phone number or email is required');
     }
 
-    const identifier = phone || email!;
+    const normalizedPhone = phone ? this.smsService.normalizePhone(phone) : undefined;
+    const identifier = normalizedPhone || email!;
     const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(identifier);
     const storedOtp = await this.redisService.fetch(redisKey);
 

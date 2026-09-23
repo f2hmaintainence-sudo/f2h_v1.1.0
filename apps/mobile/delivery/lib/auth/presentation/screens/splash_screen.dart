@@ -98,11 +98,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         );
         return;
       }
-      // Still supported, but a newer build exists — the existing optional
-      // prompt handles that and does not block navigation.
-      if (update.updateAvailable) {
-        VersionChecker.checkUpdates(context);
-      }
+      // Optional updates (updateAvailable) are handled by AppShell and LoginScreen
+      // on mount, where the BuildContext stays active and valid.
 
       // ── PRIORITY 1: Valid session → go straight to Dashboard ──────────────
       // This ensures a logged-in user NEVER gets sent back to onboarding,

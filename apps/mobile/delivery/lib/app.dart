@@ -19,6 +19,7 @@ import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/core/widgets/force_update_gate.dart';
+import 'package:f2h_delivery/core/utils/version_checker.dart';
 import 'package:f2h_delivery/services/location_tracking_service.dart';
 import 'package:f2h_delivery/services/mock_data_service.dart';
 
@@ -304,6 +305,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     _i = widget.initialIndex;
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        VersionChecker.checkUpdates(context);
+      }
+    });
 
     // Kick off the session load via BLoC
     context.read<DeliverySessionBloc>().add(LoadSessionEvent());
@@ -384,6 +390,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       // Reload session data on app foreground
       context.read<DeliverySessionBloc>().add(ReloadSessionEvent());
+      if (mounted) {
+        VersionChecker.checkUpdates(context);
+      }
     }
   }
 

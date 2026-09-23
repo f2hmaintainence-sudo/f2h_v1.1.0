@@ -8,13 +8,19 @@ import 'package:f2h_delivery/core/api/api_endpoints.dart';
 
 class VersionChecker {
   static const String _defaultPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.delivery';
+  static bool _dialogShowing = false;
 
   /// Checks for updates. Returns [true] if a forced update is required and active, blocking navigation.
   static Future<bool> checkUpdates(BuildContext context) async {
-    if (kIsWeb) return false;
     try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+      String currentVersion = '1.0.12+17';
+      try {
+        final packageInfo = await PackageInfo.fromPlatform();
+        if (packageInfo.version.isNotEmpty) {
+          currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+        }
+      } catch (_) {}
+
       final platform = defaultTargetPlatform == TargetPlatform.iOS
           ? 'ios_delivery'
           : 'android_delivery';
@@ -40,14 +46,15 @@ class VersionChecker {
 
         if (updateRequired) {
           if (!context.mounted) return false;
-          _showUpdateDialog(
+          if (_dialogShowing && !forceUpdate) return false;
+          showUpdateDialog(
             context,
-            updateUrl,
-            forceUpdate,
-            message,
-            title,
-            releaseNotes,
-            fileSize,
+            url: updateUrl,
+            forceUpdate: forceUpdate,
+            message: message,
+            title: title,
+            releaseNotes: releaseNotes,
+            fileSize: fileSize,
           );
           return forceUpdate; // Return true if it is a forced update
         }
@@ -58,15 +65,17 @@ class VersionChecker {
     return false;
   }
 
-  static void _showUpdateDialog(
-    BuildContext context,
-    String url,
-    bool forceUpdate,
-    String message,
-    String title,
-    String releaseNotes,
-    String fileSize,
-  ) {
+  static void showUpdateDialog(
+    BuildContext context, {
+    required String url,
+    required bool forceUpdate,
+    required String message,
+    required String title,
+    required String releaseNotes,
+    required String fileSize,
+  }) {
+    if (_dialogShowing && !forceUpdate) return;
+    _dialogShowing = true;
     showDialog(
       context: context,
       barrierDismissible: !forceUpdate,
@@ -238,6 +247,8 @@ class VersionChecker {
           ),
         );
       },
-    );
+    ).then((_) {
+      _dialogShowing = false;
+    });
   }
 }

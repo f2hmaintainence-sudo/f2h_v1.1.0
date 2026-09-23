@@ -11,6 +11,7 @@ import 'package:f2h_delivery/auth/presentation/screens/signup_screen.dart';
 import 'package:f2h_delivery/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_delivery/auth/presentation/widgets/forgot_password_sheet.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
+import 'package:f2h_delivery/core/utils/version_checker.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -23,6 +24,16 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _identifierCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        VersionChecker.checkUpdates(context);
+      }
+    });
+  }
 
   @override
   void dispose() {
