@@ -197,25 +197,30 @@ class ReferralBannerWidget extends StatelessWidget {
                           } else {
                             // Allow customer to share app referral link at any stage
                             const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
-                            const inviteMsg = 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🥛\nFresh farm products, delivered to your doorstep.\n$playStoreUrl';
+                            final safeCode = (rawCode != null && rawCode.isNotEmpty && !rawCode.startsWith('http')) ? rawCode : 'F2H';
+                            final inviteMsg =
+                                '🥛 Order 100% Pure, Farm-Fresh Milk, Organic Vegetables & Daily Groceries delivered to your doorstep with Farm to Home (F2H)!\n\n'
+                                '🎁 Use my Exclusive Customer Referral Code: *$safeCode* to get special introductory discounts on your first order!\n\n'
+                                '📲 Download the F2H Customer App now:\n'
+                                '$playStoreUrl';
                             try {
                               final encodedMsg = Uri.encodeComponent(inviteMsg);
                               final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
                               if (await canLaunchUrl(whatsappUri)) {
                                 await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
                               } else {
-                                await Clipboard.setData(const ClipboardData(text: playStoreUrl));
+                                await Clipboard.setData(ClipboardData(text: inviteMsg));
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Play Store app link copied to clipboard! 📋'),
+                                      content: Text('Referral invite copied to clipboard! 📋'),
                                       behavior: SnackBarBehavior.floating,
                                     ),
                                   );
                                 }
                               }
                             } catch (_) {
-                              await Clipboard.setData(const ClipboardData(text: playStoreUrl));
+                              await Clipboard.setData(ClipboardData(text: inviteMsg));
                             }
                           }
                         },

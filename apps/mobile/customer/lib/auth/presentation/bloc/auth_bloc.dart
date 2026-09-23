@@ -57,6 +57,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         phone: event.phone,
         otp: event.otp,
         fcmToken: fcmToken,
+        referralCode: event.referralCode,
       );
       emit(Authenticated(user: user));
     } catch (e) {

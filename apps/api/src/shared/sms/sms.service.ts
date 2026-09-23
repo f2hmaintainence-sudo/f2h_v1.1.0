@@ -27,7 +27,7 @@ export class SmsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly developer: DeveloperService,
-  ) {}
+  ) { }
 
   /**
    * Cleans an API key or auth token if it contains parameter wrappers or URLs
@@ -178,8 +178,7 @@ export class SmsService {
 
     // Resolve template once for either gateway
     const template =
-      (await this.getTemplate('CUSTOMER_LOGIN_OTP')) ||
-      (await this.getTemplate('ASSOCIATE_LOGIN_OTP'));
+      (await this.getTemplate('ASSOCIATE_LOGIN_OTP')) || (await this.getTemplate('CUSTOMER_LOGIN_OTP'));
 
     const dltTemplateId = template?.dlt_template_id;
     const senderId = template?.dlt_sender_id || config.sender_id || 'DIGKPM';

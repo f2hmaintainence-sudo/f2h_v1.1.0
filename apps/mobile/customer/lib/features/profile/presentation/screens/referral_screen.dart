@@ -141,19 +141,11 @@ class _ReferralScreenState extends State<ReferralScreen>
 
   // ── MULTI-OPTION SHARING ──────────────────────────────────
   String _getShareMessage() {
-    final link = _isLocked
-        ? _playStoreUrl
-        : 'https://c.f2hfresh.com/r/$_activeCode';
-    return _isLocked
-        ? 'Join F2H — Farm To Home & Get fresh farm produce delivered! 🥬🥛\n\n'
-          'Fresh farm products, delivered to your doorstep.\n'
-          '$link'
-        : 'Your F2H Invite is Ready 🥬🥛\n\n'
-          'Fresh farm products, delivered to your doorstep.\n\n'
-          'Use Referral Code: $_activeCode\n'
-          'Download App: $link\n\n'
-          'F2H — Farm To Home\n'
-          'Fresh. Smart. Rewarding.';
+    final code = (_activeCode.isNotEmpty && !_activeCode.startsWith('http')) ? _activeCode : 'F2H';
+    return '🥛 Order 100% Pure, Farm-Fresh Milk, Organic Vegetables & Daily Groceries delivered to your doorstep with Farm to Home (F2H)!\n\n'
+        '🎁 Use my Exclusive Customer Referral Code: *$code* to get special introductory discounts on your first order!\n\n'
+        '📲 Download the F2H Customer App now:\n'
+        '$_playStoreUrl';
   }
 
   Future<void> _shareGeneral() async {
@@ -194,7 +186,7 @@ class _ReferralScreenState extends State<ReferralScreen>
   void _showShareBottomSheet() {
     final message = _getShareMessage();
     final encoded = Uri.encodeComponent(message);
-    final link = _isLocked ? _playStoreUrl : 'https://c.f2hfresh.com/r/$_activeCode';
+    final link = _playStoreUrl;
 
     showModalBottomSheet(
       context: context,
@@ -272,7 +264,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                       if (await canLaunchUrl(url)) {
                         await launchUrl(url, mode: LaunchMode.externalApplication);
                       } else {
-                        _copyToClipboard(_activeCode, 'Referral copied to clipboard!');
+                        _copyToClipboard(message, 'Referral copied to clipboard!');
                       }
                     },
                   ),
@@ -286,7 +278,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                       if (await canLaunchUrl(url)) {
                         await launchUrl(url, mode: LaunchMode.externalApplication);
                       } else {
-                        _copyToClipboard(_activeCode, 'Referral copied to clipboard!');
+                        _copyToClipboard(message, 'Referral copied to clipboard!');
                       }
                     },
                   ),

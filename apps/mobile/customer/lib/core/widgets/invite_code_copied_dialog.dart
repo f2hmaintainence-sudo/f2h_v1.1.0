@@ -22,13 +22,12 @@ class InviteCodeCopiedDialog extends StatelessWidget {
 
   Future<void> _shareWhatsApp(BuildContext context) async {
     const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
+    final safeCode = (code.isNotEmpty && !code.startsWith('http')) ? code : 'F2H';
     final message =
-        'Your F2H Invite is Ready 🥬🥛\n\n'
-        'Fresh farm products, delivered to your doorstep.\n\n'
-        'Use Referral Code: $code\n'
-        'Download App: $playStoreUrl\n\n'
-        'F2H — Farm To Home\n'
-        'Fresh. Smart. Rewarding.';
+        '🥛 Order 100% Pure, Farm-Fresh Milk, Organic Vegetables & Daily Groceries delivered to your doorstep with Farm to Home (F2H)!\n\n'
+        '🎁 Use my Exclusive Customer Referral Code: *$safeCode* to get special introductory discounts on your first order!\n\n'
+        '📲 Download the F2H Customer App now:\n'
+        '$playStoreUrl';
     final encodedMsg = Uri.encodeComponent(message);
     final whatsappUri = Uri.parse('https://wa.me/?text=$encodedMsg');
 

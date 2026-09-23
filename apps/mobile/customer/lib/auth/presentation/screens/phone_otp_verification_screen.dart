@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:f2h_customer/app.dart';
 import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
@@ -26,11 +28,13 @@ import 'package:f2h_customer/theme/app_colors.dart';
 class PhoneOtpVerificationScreen extends StatefulWidget {
   final String phone;
   final bool popOnSuccess;
+  final String? referralCode;
 
   const PhoneOtpVerificationScreen({
     super.key,
     required this.phone,
     this.popOnSuccess = false,
+    this.referralCode,
   });
 
   @override
@@ -83,7 +87,7 @@ class _PhoneOtpVerificationScreenState extends State<PhoneOtpVerificationScreen>
     );
   }
 
-  void _onVerifyPressed() {
+  Future<void> _onVerifyPressed() async {
     final otp = _otpController.text.trim();
     if (otp.length != 6) {
       _toast('Please enter the 6-digit OTP', background: kRed);
@@ -91,8 +95,22 @@ class _PhoneOtpVerificationScreenState extends State<PhoneOtpVerificationScreen>
     }
 
     FocusScope.of(context).unfocus();
+
+    String? refCode = widget.referralCode;
+    if (refCode == null || refCode.trim().isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        refCode = prefs.getString('pending_referral_code') ?? prefs.getString('referral_code');
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
     context.read<AuthBloc>().add(
-      PhoneOtpLoginRequested(phone: widget.phone, otp: otp),
+      PhoneOtpLoginRequested(
+        phone: widget.phone,
+        otp: otp,
+        referralCode: refCode,
+      ),
     );
   }
 
