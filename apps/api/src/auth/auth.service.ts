@@ -936,10 +936,14 @@ export class AuthService {
 
     if (normalizedPhone) {
       this.logger.log(`[AUTH:sendOtp] Generating OTP for ${normalizedPhone}: ${otp}`);
+      this.developer.info(`[AUTH:sendOtp] Generating OTP for phone ${normalizedPhone}: ${otp}`);
       try {
         const sent = await this.smsService.sendOtp(normalizedPhone, otp);
         if (!sent) {
           this.logger.warn(`[AUTH:sendOtp] Gateway did not deliver SMS to ${normalizedPhone}. Current OTP is: ${otp}`);
+          this.developer.warn(`[AUTH:sendOtp] SMS gateway rejected OTP for ${normalizedPhone}. Current OTP is: ${otp}`);
+        } else {
+          this.developer.info(`[AUTH:sendOtp] OTP SMS dispatched for ${normalizedPhone}. OTP is: ${otp}`);
         }
       } catch (err) {
         this.developer.error(`Failed to send OTP SMS to ${normalizedPhone}. Fallback OTP: ${otp}`, { err, fallbackOtp: otp });

@@ -318,9 +318,15 @@ export class SmsService {
           this.logger.log(
             `[SMS] Custom gateway accepted SMS to ${normalizedPhone}: ${responseText}`,
           );
+          this.developer.info(
+            `[SMS] Custom gateway accepted SMS to ${normalizedPhone}: ${responseText} (OTP: ${otp})`,
+          );
           return true;
         } else {
           this.logger.warn(
+            `[SMS] Custom gateway rejected SMS to ${normalizedPhone} (status: ${res.status}): ${responseText}. Fallback OTP: ${otp}`,
+          );
+          this.developer.warn(
             `[SMS] Custom gateway rejected SMS to ${normalizedPhone} (status: ${res.status}): ${responseText}. Fallback OTP: ${otp}`,
           );
           return false;
