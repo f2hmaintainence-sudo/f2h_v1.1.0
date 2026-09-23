@@ -54,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // Controller for Phone OTP mode
   final TextEditingController _phoneController = TextEditingController();
   bool _isSendingOtp = false;
-  bool _agreeToTerms = false;
+  bool _agreeToTerms = true;
 
   @override
   void initState() {

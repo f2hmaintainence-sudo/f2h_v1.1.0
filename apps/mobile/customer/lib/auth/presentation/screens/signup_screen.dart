@@ -36,7 +36,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
-  bool _agreeToTerms = false;
+  bool _agreeToTerms = true;
   bool _isSendingOtp = false;
 
   // Automated link-only referral state (no manual entry)
