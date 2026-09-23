@@ -233,16 +233,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ? 'Sign in instantly with your mobile number'
                 : 'Sign in to access fresh dairy & daily farm picks',
             children: [
-              // Segmented Tab Toggle
-              _LoginModeSelector(
-                selectedMode: _currentMode,
-                onModeChanged: (mode) {
-                  setState(() => _currentMode = mode);
-                  FocusScope.of(context).unfocus();
-                },
-              ),
-              const SizedBox(height: 20),
-
               // Animated Form based on selected mode
               AnimatedCrossFade(
                 duration: const Duration(milliseconds: 250),
@@ -370,111 +360,6 @@ class _LoginScreenState extends State<LoginScreen> {
           onTap: loading || _isSendingOtp ? null : _onGooglePressed,
         ),
       ],
-    );
-  }
-}
-
-/// Modern pill-shaped tab selector for Phone OTP vs Password modes.
-class _LoginModeSelector extends StatelessWidget {
-  final LoginMode selectedMode;
-  final ValueChanged<LoginMode> onModeChanged;
-
-  const _LoginModeSelector({
-    required this.selectedMode,
-    required this.onModeChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9), // Slate 100 pill
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _TabButton(
-              label: 'Phone OTP',
-              icon: Icons.phone_iphone_rounded,
-              isSelected: selectedMode == LoginMode.phoneOtp,
-              onTap: () => onModeChanged(LoginMode.phoneOtp),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: _TabButton(
-              label: 'Password',
-              icon: Icons.lock_outline_rounded,
-              isSelected: selectedMode == LoginMode.password,
-              onTap: () => onModeChanged(LoginMode.password),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TabButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _TabButton({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 17,
-                color: isSelected ? kPrimaryMid : kTextSub,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? kPrimaryMid : kTextSub,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
