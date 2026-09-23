@@ -269,10 +269,14 @@ export class SmsService {
           url.searchParams.set('authkey', apiKey);
           url.searchParams.set('sender', senderId);
           url.searchParams.set('mobiles', `91${normalizedPhone}`);
+          url.searchParams.set('country', '91');
           url.searchParams.set('message', messageText);
           url.searchParams.set('route', routeVal);
+          url.searchParams.set('response', 'json');
           if (dltTemplateId) {
             url.searchParams.set('DLT_TE_ID', dltTemplateId);
+            url.searchParams.set('dlt_te_id', dltTemplateId);
+            url.searchParams.set('template_id', dltTemplateId);
           }
         } else {
           // Generic Custom REST Gateway: populate standard parameters
@@ -281,11 +285,14 @@ export class SmsService {
           url.searchParams.set('sender', senderId);
           url.searchParams.set('mobileno', normalizedPhone);
           url.searchParams.set('mobiles', `91${normalizedPhone}`);
+          url.searchParams.set('country', '91');
           url.searchParams.set('msg', messageText);
           url.searchParams.set('message', messageText);
           url.searchParams.set('route', routeVal);
+          url.searchParams.set('response', 'json');
           if (dltTemplateId) {
             url.searchParams.set('DLT_TE_ID', dltTemplateId);
+            url.searchParams.set('dlt_te_id', dltTemplateId);
             url.searchParams.set('template_id', dltTemplateId);
           }
         }

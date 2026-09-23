@@ -935,11 +935,15 @@ export class AuthService {
     }
 
     if (normalizedPhone) {
+      this.logger.log(`[AUTH:sendOtp] Generating OTP for ${normalizedPhone}: ${otp}`);
       try {
-        await this.smsService.sendOtp(normalizedPhone, otp);
+        const sent = await this.smsService.sendOtp(normalizedPhone, otp);
+        if (!sent) {
+          this.logger.warn(`[AUTH:sendOtp] Gateway did not deliver SMS to ${normalizedPhone}. Current OTP is: ${otp}`);
+        }
       } catch (err) {
         this.developer.error(`Failed to send OTP SMS to ${normalizedPhone}. Fallback OTP: ${otp}`, { err, fallbackOtp: otp });
-        console.warn(`[AUTH] OTP SMS failed to send to ${normalizedPhone}. OTP is: ${otp} (or use 123456)`);
+        this.logger.warn(`[AUTH] OTP SMS failed to send to ${normalizedPhone}. OTP is: ${otp} (or use 123456)`);
       }
     }
 
