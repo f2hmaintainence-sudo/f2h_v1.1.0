@@ -66,6 +66,16 @@ export class ApiIntegrationsService {
   async saveConfig(category: string, body: any) {
     try {
       let { id, config_key, name, provider, is_active, ...restConfig } = body;
+
+      // If user pasted a full URL or query string into the SMS auth_token field, extract the clean key
+      if (category === 'sms' && restConfig.auth_token) {
+        const raw = String(restConfig.auth_token).trim();
+        const match = raw.match(/(?:authkey|apikey|api_key)=([^&]+)/);
+        if (match) {
+          restConfig.auth_token = match[1];
+        }
+      }
+
       const configDataJson = JSON.stringify(this.stripBlankSecrets(restConfig));
 
       // For payment-gateway, allow only one payment gateway configuration in the system
