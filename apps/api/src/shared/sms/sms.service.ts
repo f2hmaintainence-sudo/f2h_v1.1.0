@@ -297,6 +297,20 @@ export class SmsService {
           }
         }
 
+        const payloadParams: Record<string, string> = {};
+        url.searchParams.forEach((val, key) => {
+          if (key === 'authkey' || key === 'apikey') {
+            payloadParams[key] = val.length > 8 ? `${val.substring(0, 6)}...${val.slice(-4)}` : '***';
+          } else {
+            payloadParams[key] = val;
+          }
+        });
+
+        this.logger.log(`[SMS] Sending payload: ${JSON.stringify(payloadParams)}`);
+        this.developer.info(
+          `[SMS:dispatch] Endpoint: ${url.origin}${url.pathname}, Payload: ${JSON.stringify(payloadParams)}`,
+        );
+
         const res = await fetch(url.toString(), {
           method: 'GET',
           signal: controller.signal,
