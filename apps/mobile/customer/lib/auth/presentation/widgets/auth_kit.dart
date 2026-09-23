@@ -46,6 +46,7 @@ class AuthScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final List<Widget> children;
+  final Widget? footer;
 
   /// Optional pill rendered in the hero's top-right corner (e.g. "Skip").
   final Widget? heroAction;
@@ -58,6 +59,7 @@ class AuthScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.children,
+    this.footer,
     this.heroAction,
     this.showBack = false,
   });
@@ -107,6 +109,7 @@ class AuthScaffold extends StatelessWidget {
                             title: title,
                             subtitle: subtitle,
                             minHeight: sheetMinHeight,
+                            footer: footer,
                             children: children,
                           ),
                         ],
@@ -159,12 +162,14 @@ class _FormSheet extends StatelessWidget {
   final String subtitle;
   final double minHeight;
   final List<Widget> children;
+  final Widget? footer;
 
   const _FormSheet({
     required this.title,
     required this.subtitle,
     required this.minHeight,
     required this.children,
+    this.footer,
   });
 
   @override
@@ -178,31 +183,42 @@ class _FormSheet extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 50, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF17211B),
-              letterSpacing: -0.3,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF17211B),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: kAuthSubtitle,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Center(child: _AccentRule()),
+              const SizedBox(height: 16),
+              ...children,
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: kAuthSubtitle,
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Center(child: _AccentRule()),
-          const SizedBox(height: 16),
-          ...children,
+          if (footer != null) ...[
+            const SizedBox(height: 20),
+            footer!,
+          ],
         ],
       ),
     ),

@@ -233,27 +233,34 @@ class _LoginScreenState extends State<LoginScreen> {
                 ? 'Sign in instantly with your mobile number'
                 : 'Sign in to access fresh dairy & daily farm picks',
             children: [
-              // Animated Form based on selected mode
               AnimatedCrossFade(
                 duration: const Duration(milliseconds: 250),
                 crossFadeState: _currentMode == LoginMode.phoneOtp
                     ? CrossFadeState.showFirst
                     : CrossFadeState.showSecond,
-                firstChild: _buildPhoneOtpForm(loading),
-                secondChild: _buildPasswordForm(loading),
+                firstChild: _buildPhoneOtpTop(loading),
+                secondChild: _buildPasswordTop(loading),
               ),
-              const SizedBox(height: 16),
             ],
+            footer: AnimatedCrossFade(
+              duration: const Duration(milliseconds: 250),
+              crossFadeState: _currentMode == LoginMode.phoneOtp
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              firstChild: _buildPhoneOtpBottom(loading),
+              secondChild: _buildPasswordBottom(loading),
+            ),
           );
         },
       ),
     );
   }
 
-  /// Phone + OTP form widgets
-  Widget _buildPhoneOtpForm(bool loading) {
+  /// Phone + OTP top input widgets
+  Widget _buildPhoneOtpTop(bool loading) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         AuthField(
           controller: _phoneController,
@@ -285,7 +292,16 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  /// Phone + OTP bottom actions (Terms & Get OTP button)
+  Widget _buildPhoneOtpBottom(bool loading) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
         _TermsCheckbox(
           value: _agreeToTerms,
           onChanged: (v) => setState(() => _agreeToTerms = v),
@@ -298,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen> {
             MaterialPageRoute(builder: (_) => const PrivacyScreen()),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         AuthPrimaryButton(
           label: 'Get OTP',
           loading: _isSendingOtp,
@@ -308,10 +324,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Classic Email/Phone + Password form widgets
-  Widget _buildPasswordForm(bool loading) {
+  /// Classic Email/Phone + Password top input widgets
+  Widget _buildPasswordTop(bool loading) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         AuthField(
           controller: _usernameController,
@@ -347,17 +364,26 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  /// Classic Email/Phone + Password bottom actions (Google + Sign In button)
+  Widget _buildPasswordBottom(bool loading) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const AuthDivider(label: 'or continue with'),
+        const SizedBox(height: 14),
+        GoogleAuthButton(
+          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
+        ),
+        const SizedBox(height: 14),
         AuthPrimaryButton(
           label: 'Sign In',
           loading: loading,
           onTap: loading || _isSendingOtp ? null : _onPasswordLoginPressed,
-        ),
-        const SizedBox(height: 20),
-        const AuthDivider(label: 'or continue with'),
-        const SizedBox(height: 16),
-        GoogleAuthButton(
-          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
         ),
       ],
     );
