@@ -21,6 +21,7 @@ import { AuditLoggerService } from './audit-logger.service';
 import {
   RegisterDto,
   LoginDto,
+  LoginWithOtpDto,
   SendOtpDto,
   VerifyOtpDto,
 } from './dto/auth.dto';
@@ -197,6 +198,42 @@ export class AuthController {
       accessToken,
       refreshToken,
     };
+  }
+
+  @Public()
+  @Post(['login-with-otp', 'login-otp'])
+  @Throttle({
+    short: { limit: 10, ttl: 60_000 },
+    medium: { limit: 30, ttl: 900_000 },
+  })
+  @HttpCode(HttpStatus.OK)
+  async loginWithOtp(
+    @Body() body: LoginWithOtpDto,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ) {
+    const ip =
+      req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    const rawClientRole = req.headers['x-role'];
+    let clientRole =
+      typeof rawClientRole === 'string'
+        ? rawClientRole.trim().toUpperCase()
+        : 'CUSTOMER';
+    if (clientRole === 'A') {
+      clientRole = 'ADMIN';
+    }
+
+    const result = await this.authService.loginWithOtp(
+      body,
+      clientRole,
+      ip,
+      userAgent,
+    );
+
+    this.setCookies(res, result.accessToken, result.refreshToken);
+
+    return result;
   }
 
   @Public()

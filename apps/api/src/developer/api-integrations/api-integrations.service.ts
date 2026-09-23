@@ -221,4 +221,163 @@ export class ApiIntegrationsService {
       };
     }
   }
+
+  // ── DLT / Message Templates by Category (e.g. sms/templates) ──
+  async getTemplatesByCategory(category: string) {
+    try {
+      const sql = `
+        SELECT id, category, config_key, name, provider, is_active, config_data, created_at, updated_at
+        FROM api_integrations_config
+        WHERE (category = $1 OR category = $2) AND deleted_at IS NULL
+        ORDER BY created_at ASC;
+      `;
+      const rows = await this.db.query(sql, [`${category}-template`, `${category}_template`]);
+      const list = (Array.isArray(rows) ? rows : []).map((r: any) => {
+        const data = typeof r.config_data === 'string' ? JSON.parse(r.config_data) : (r.config_data || {});
+        return {
+          id: r.id,
+          template_key: r.config_key,
+          name: r.name,
+          dlt_template_id: data.dlt_template_id || '',
+          dlt_sender_id: data.dlt_sender_id || r.provider || '',
+          placeholders: Array.isArray(data.placeholders)
+            ? data.placeholders
+            : typeof data.placeholders === 'string'
+              ? data.placeholders.split(',').map((s: string) => s.trim()).filter(Boolean)
+              : [],
+          body: data.body || '',
+          is_active: r.is_active,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        };
+      });
+      return { status: true, data: list };
+    } catch (error) {
+      this.developer.error(`Error fetching templates for ${category}`, { error });
+      return { status: false, message: 'Failed to fetch templates', data: [] };
+    }
+  }
+
+  async saveTemplate(category: string, body: any) {
+    try {
+      const { id, template_key, name, dlt_template_id, dlt_sender_id, placeholders, body: templateBody } = body;
+      const templateCategory = `${category}-template`;
+
+      const placeholdersArray = Array.isArray(placeholders)
+        ? placeholders
+        : typeof placeholders === 'string'
+          ? placeholders.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : [];
+
+      const configData = {
+        dlt_template_id: dlt_template_id || '',
+        dlt_sender_id: dlt_sender_id || '',
+        placeholders: placeholdersArray,
+        body: templateBody || '',
+      };
+      const configDataJson = JSON.stringify(configData);
+
+      if (id) {
+        const sql = `
+          UPDATE api_integrations_config
+          SET config_key = $1,
+              name = $2,
+              provider = $3,
+              config_data = $4::jsonb,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $5 AND (category = $6 OR category = $7)
+          RETURNING *;
+        `;
+        const rows = await this.db.query(sql, [
+          template_key,
+          name,
+          dlt_sender_id || 'DLT',
+          configDataJson,
+          id,
+          templateCategory,
+          `${category}_template`,
+        ]);
+
+        if (!rows || rows.length === 0) {
+          throw new NotFoundException('Template not found');
+        }
+
+        const r = rows[0];
+        const data = typeof r.config_data === 'string' ? JSON.parse(r.config_data) : (r.config_data || {});
+        return {
+          status: true,
+          message: 'Template updated successfully',
+          data: {
+            id: r.id,
+            template_key: r.config_key,
+            name: r.name,
+            dlt_template_id: data.dlt_template_id || '',
+            dlt_sender_id: data.dlt_sender_id || r.provider || '',
+            placeholders: data.placeholders || [],
+            body: data.body || '',
+            is_active: r.is_active,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+          },
+        };
+      } else {
+        const sql = `
+          INSERT INTO api_integrations_config (category, config_key, name, provider, is_active, config_data)
+          VALUES ($1, $2, $3, $4, true, $5::jsonb)
+          RETURNING *;
+        `;
+        const rows = await this.db.query(sql, [
+          templateCategory,
+          template_key,
+          name,
+          dlt_sender_id || 'DLT',
+          configDataJson,
+        ]);
+
+        const r = rows[0];
+        const data = typeof r.config_data === 'string' ? JSON.parse(r.config_data) : (r.config_data || {});
+        return {
+          status: true,
+          message: 'Template created successfully',
+          data: {
+            id: r.id,
+            template_key: r.config_key,
+            name: r.name,
+            dlt_template_id: data.dlt_template_id || '',
+            dlt_sender_id: data.dlt_sender_id || r.provider || '',
+            placeholders: data.placeholders || [],
+            body: data.body || '',
+            is_active: r.is_active,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+          },
+        };
+      }
+    } catch (error: any) {
+      this.developer.error(`Error saving template for ${category}`, { error, body });
+      return { status: false, message: error?.message || 'Failed to save template' };
+    }
+  }
+
+  async deleteTemplate(category: string, id: string) {
+    try {
+      const sql = `
+        DELETE FROM api_integrations_config
+        WHERE id = $1 AND (category = $2 OR category = $3)
+        RETURNING id;
+      `;
+      const rows = await this.db.query(sql, [
+        id,
+        `${category}-template`,
+        `${category}_template`,
+      ]);
+      if (!rows || rows.length === 0) {
+        throw new NotFoundException('Template not found');
+      }
+      return { status: true, message: 'Template deleted successfully' };
+    } catch (error: any) {
+      this.developer.error(`Error deleting template ${id}`, { error });
+      return { status: false, message: error?.message || 'Failed to delete template' };
+    }
+  }
 }

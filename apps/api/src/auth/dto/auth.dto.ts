@@ -144,7 +144,7 @@ export class SendOtpDto {
 
   @IsOptional()
   @IsString()
-  purpose?: 'registration' | 'forgot_password' | 'email_change';
+  purpose?: 'registration' | 'forgot_password' | 'email_change' | 'login';
 
   @IsString()
   @IsOptional()
@@ -175,7 +175,7 @@ export class VerifyOtpDto {
 
   @IsOptional()
   @IsString()
-  purpose?: 'registration' | 'forgot_password' | 'email_change';
+  purpose?: 'registration' | 'forgot_password' | 'email_change' | 'login';
 
   @IsString()
   @MinLength(6, { message: 'OTP must be 6 characters' })
@@ -188,6 +188,31 @@ export class VerifyOtpDto {
   @IsOptional()
   @IsString()
   fcmToken?: string;
+}
+
+export class LoginWithOtpDto {
+  @IsString()
+  phone: string;
+
+  @IsString()
+  @MinLength(6, { message: 'OTP must be at least 6 characters' })
+  otp: string;
+
+  @IsOptional()
+  @IsString()
+  fcm_token?: string;
+
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
+
+  @IsOptional()
+  @IsString()
+  referral_code?: string;
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 }
 
 export class DeviceFingerprintDto {

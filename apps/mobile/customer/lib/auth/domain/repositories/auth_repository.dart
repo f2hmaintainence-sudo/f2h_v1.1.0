@@ -13,6 +13,13 @@ abstract class AuthRepository {
   });
   Future<User> signInWithGoogle({String? fcmToken});
   Future<void> sendRegistrationOtp(String email, {String? userName});
+  Future<void> sendLoginOtp(String phone);
+  Future<User> loginWithOtp({
+    required String phone,
+    required String otp,
+    String? fcmToken,
+    String? referralCode,
+  });
   Future<String> verifyOtp({
     required String email,
     required String otp,

@@ -28,6 +28,13 @@ abstract class AuthRemoteDataSource {
     String? fcmToken,
   });
   Future<void> sendRegistrationOtp(String email, {String? userName});
+  Future<void> sendLoginOtp(String phone);
+  Future<UserModel> loginWithOtp({
+    required String phone,
+    required String otp,
+    String? fcmToken,
+    String? referralCode,
+  });
   Future<String> verifyOtp({
     required String email,
     required String otp,
@@ -204,6 +211,60 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     } on DioException catch (e) {
       throw _extractError(e, 'Unable to send OTP');
+    }
+  }
+
+  @override
+  Future<void> sendLoginOtp(String phone) async {
+    try {
+      await dioClient.dio.post(
+        ApiEndpoints.sendOtp,
+        data: {
+          'phone': phone,
+          'purpose': 'login',
+        },
+      );
+    } on DioException catch (e) {
+      throw _extractError(e, 'Unable to send login OTP');
+    }
+  }
+
+  @override
+  Future<UserModel> loginWithOtp({
+    required String phone,
+    required String otp,
+    String? fcmToken,
+    String? referralCode,
+  }) async {
+    try {
+      final response = await dioClient.dio.post(
+        ApiEndpoints.loginWithOtp,
+        data: {
+          'phone': phone,
+          'otp': otp,
+          if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
+          if (referralCode != null && referralCode.isNotEmpty)
+            'referral_code': referralCode,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final userMap = Map<String, dynamic>.from(
+          response.data['user'] as Map? ?? {},
+        );
+        userMap['accessToken'] = response.data['accessToken'];
+        userMap['refreshToken'] = response.data['refreshToken'];
+        dioClient.setAuthToken(response.data['accessToken']?.toString());
+        return UserModel.fromJson(userMap);
+      } else {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          error: response.data['message'] ?? 'OTP Login failed',
+        );
+      }
+    } on DioException catch (e) {
+      throw _extractError(e, 'Connection error');
     }
   }
 

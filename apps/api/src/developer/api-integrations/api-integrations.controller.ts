@@ -19,6 +19,34 @@ import { Roles, ROLE } from 'src/auth/decorators/roles.decorator';
 export class ApiIntegrationsController {
   constructor(private readonly apiIntegrationsService: ApiIntegrationsService) { }
 
+  // ── DLT / Message Templates by Category (e.g. sms/templates) ──
+  @Get(':category/templates')
+  async getTemplates(@Param('category') category: string) {
+    return this.apiIntegrationsService.getTemplatesByCategory(category);
+  }
+
+  @Post(':category/templates')
+  async saveTemplate(@Param('category') category: string, @Body() body: any) {
+    return this.apiIntegrationsService.saveTemplate(category, body);
+  }
+
+  @Put(':category/templates/:id')
+  async updateTemplate(
+    @Param('category') category: string,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return this.apiIntegrationsService.saveTemplate(category, { ...body, id });
+  }
+
+  @Delete(':category/templates/:id')
+  async deleteTemplate(
+    @Param('category') category: string,
+    @Param('id') id: string,
+  ) {
+    return this.apiIntegrationsService.deleteTemplate(category, id);
+  }
+
   // ── Configs by Category (email, sms, firebase, payment-gateway) ──
   @Get(':category')
   async getConfigs(@Param('category') category: string) {

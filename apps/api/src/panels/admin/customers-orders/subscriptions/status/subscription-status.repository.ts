@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../../../shared/database/Database.service';
+import { createSubscriptionBillItems } from '../../../../customer/subscriptions/utils/subscription-billing-helper';
 
 /**
  * SQL-first repository for subscription status management.
@@ -290,6 +291,28 @@ export class SubscriptionStatusRepository {
     ]);
     const rows = client ? res.rows : res;
     return rows?.[0]?.bill_id || data.bill_id;
+  }
+
+  /**
+   * Create bill items for a subscription bill with calculated subscription quantities.
+   */
+  async createSubscriptionBillItems(
+    billId: string,
+    subscriptionId: string,
+    billingFrom: string | Date,
+    billingTo: string | Date,
+    fallbackTotalAmount?: number,
+    client?: any,
+  ): Promise<any> {
+    const execDb = client || this.db;
+    return createSubscriptionBillItems(
+      execDb,
+      billId,
+      subscriptionId,
+      billingFrom,
+      billingTo,
+      fallbackTotalAmount,
+    );
   }
 
   /**

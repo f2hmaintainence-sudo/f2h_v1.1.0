@@ -53,6 +53,7 @@ class ApiEndpoints {
   static const String _auth = '/auth';
   static const String csrfToken = '/csrf/token';
   static const String login = '$_auth/login';
+  static const String loginWithOtp = '$_auth/login-with-otp';
   static const String register = '$_auth/register';
   static const String sendOtp = '$_auth/send-otp';
   static const String verifyOtp = '$_auth/verify-otp';

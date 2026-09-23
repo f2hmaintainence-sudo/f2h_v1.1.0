@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/shared/database/Database.service';
+import { calculateSubscriptionBillItems } from '../../../customer/subscriptions/utils/subscription-billing-helper';
 
 @Injectable()
 export class FinanceRepository {
@@ -1105,7 +1106,29 @@ export class FinanceRepository {
       `;
       const itemRows = await this.db.query(itemsSql, [rawBill.bill_id, cleanId]).catch(() => []);
       if (Array.isArray(itemRows) && itemRows.length > 0) {
-        orderItems = itemRows;
+        if (rawBill.bill_type === 'subscription' && itemRows.some(r => r.reference_type === 'order')) {
+          const consolidatedMap = new Map<string, any>();
+          for (const row of itemRows) {
+            const vKey = row.product_variant_id || row.item_name;
+            const existing = consolidatedMap.get(vKey);
+            if (existing) {
+              existing.quantity += Number(row.quantity || 1);
+              existing.discount_amount += Number(row.discount_amount || 0);
+              existing.total_amount += Number(row.total_amount || 0);
+            } else {
+              consolidatedMap.set(vKey, {
+                ...row,
+                quantity: Number(row.quantity || 1),
+                unit_price: Number(row.unit_price || 0),
+                discount_amount: Number(row.discount_amount || 0),
+                total_amount: Number(row.total_amount || 0),
+              });
+            }
+          }
+          orderItems = Array.from(consolidatedMap.values());
+        } else {
+          orderItems = itemRows;
+        }
       }
     } catch {
       // Deliberately tolerated: the caller has a valid fallback for this failure.
@@ -1129,11 +1152,9 @@ export class FinanceRepository {
             ) AS item_name,
             COALESCE(pr.name, '') AS product_name,
             COALESCE(pv.name, '') AS variant_name,
-            1 AS quantity,
             COALESCE(si.final_price, si.unit_price, 0) AS unit_price,
             COALESCE(si.discount_amount, 0) AS discount_amount,
             0 AS tax_amount,
-            COALESCE(si.final_price, si.unit_price, 0) AS total_amount,
             si.created_at
           FROM public.subscription_items si
           LEFT JOIN public.product_variants pv ON pv.variant_id = si.product_variant_id
@@ -1148,12 +1169,38 @@ export class FinanceRepository {
         ]).catch(() => []);
 
         if (Array.isArray(subItems) && subItems.length > 0) {
-          orderItems = subItems.map(item => ({
-            ...item,
-            quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
-            unit_price: Number(item.unit_price || 0),
-            total_amount: Number(item.total_amount || 0) * (Number(item.quantity) > 0 ? Number(item.quantity) : 1),
-          }));
+          let calculatedItems: any[] = [];
+          if (rawBill.billing_from && rawBill.billing_to) {
+            calculatedItems = await calculateSubscriptionBillItems(
+              this.db,
+              subId,
+              rawBill.billing_from,
+              rawBill.billing_to,
+              Number(rawBill.total_amount || 0),
+            ).catch(() => []);
+          }
+
+          orderItems = subItems.map(item => {
+            const matchedCalc = calculatedItems.find(c => c.product_variant_id === item.product_variant_id);
+            const unitPrice = Number(item.unit_price || 0);
+            const totalBillAmt = Number(rawBill.total_amount || 0);
+            let qty = matchedCalc ? matchedCalc.quantity : 0;
+            if (qty <= 0 && unitPrice > 0 && totalBillAmt > 0 && subItems.length === 1) {
+              qty = Math.max(1, Math.round(totalBillAmt / unitPrice));
+            } else if (qty <= 0) {
+              qty = 1;
+            }
+            const itemTotal = matchedCalc && matchedCalc.total_amount > 0
+              ? matchedCalc.total_amount
+              : (unitPrice * qty);
+
+            return {
+              ...item,
+              quantity: qty,
+              unit_price: unitPrice,
+              total_amount: itemTotal,
+            };
+          });
         }
       } catch {
         // Deliberately tolerated: the caller has a valid fallback for this failure.

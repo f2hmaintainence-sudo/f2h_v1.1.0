@@ -290,6 +290,15 @@ export class SubscriptionStatusService {
         client,
       );
 
+      await this.repository.createSubscriptionBillItems(
+        billId,
+        sub.subscription_id,
+        oldEndDate,
+        newEndDate,
+        renewalAmount,
+        client,
+      );
+
       // 4. Extend subscription end_date (keep status active)
       await this.repository.updateSubscriptionStatus(
         sub.subscription_id,
@@ -400,6 +409,15 @@ export class SubscriptionStatusService {
               status: 'unpaid',
               remarks: `Converted from prepaid — auto-renewal with postpaid fallback`,
             },
+            client,
+          );
+
+          await this.repository.createSubscriptionBillItems(
+            billId,
+            sub.subscription_id,
+            oldEndDate,
+            newEndDate,
+            renewalAmount,
             client,
           );
 
@@ -607,6 +625,15 @@ export class SubscriptionStatusService {
         client,
       );
 
+      await this.repository.createSubscriptionBillItems(
+        billId,
+        sub.subscription_id,
+        oldEndDate,
+        newEndDate,
+        renewalAmount,
+        client,
+      );
+
       // 3. Log
       await this.repository.insertRenewalAttempt(
         {
@@ -735,6 +762,15 @@ export class SubscriptionStatusService {
           status: paymentType === 'prepaid' ? 'paid' : 'unpaid',
           remarks: 'Admin override renewal',
         },
+        client,
+      );
+
+      await this.repository.createSubscriptionBillItems(
+        billId,
+        subscriptionId,
+        oldEndDate,
+        newEndDate,
+        renewalAmount,
         client,
       );
 

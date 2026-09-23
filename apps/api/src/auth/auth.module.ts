@@ -15,6 +15,7 @@ import { PasswordSecurityService } from './password-security.service';
 import { GoogleStrategy } from './social.strategies';
 import { GoogleOAuthService } from './google-oauth.service';
 import { MailService } from 'src/mail/mail.service';
+import { SmsService } from 'src/shared/sms/sms.service';
 import { FieldEncryptionModule } from 'src/encryption/field-encryption.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -63,6 +64,7 @@ import { JwtStrategy } from './jwt.strategy';
     GoogleStrategy,
     GoogleOAuthService,
     MailService,
+    SmsService,
   ],
   exports: [
     AuthService,
@@ -76,6 +78,7 @@ import { JwtStrategy } from './jwt.strategy';
     PasswordSecurityService,
     GoogleStrategy,
     MailService,
+    SmsService,
     JwtModule,
     PassportModule,
   ],

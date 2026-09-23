@@ -17,6 +17,21 @@ class LoginRequested extends AuthEvent {
   List<Object> get props => [identifier, password];
 }
 
+class PhoneOtpLoginRequested extends AuthEvent {
+  final String phone;
+  final String otp;
+  final String? referralCode;
+
+  const PhoneOtpLoginRequested({
+    required this.phone,
+    required this.otp,
+    this.referralCode,
+  });
+
+  @override
+  List<Object> get props => [phone, otp, referralCode ?? ''];
+}
+
 class SignupRequested extends AuthEvent {
   final String user_name;
   final String email;

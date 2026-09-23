@@ -13,6 +13,7 @@ import { NotificationService } from 'src/notifications/notification.service';
 import { MailService } from 'src/mail/mail.service';
 import { CustomerPaymentService } from '../../payment/payment.service';
 import { StockAvailabilityService } from 'src/shared/services/stock-availability.service';
+import { createSubscriptionBillItems } from '../utils/subscription-billing-helper';
 
 const DEFAULT_BRANCH_ID = 'ALL';
 const DEFAULT_ADDRESS_ID = 'ADDR_DEFAULT';
@@ -287,8 +288,8 @@ export class SubscriptionsService {
         );
 
         const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
-        const startDateStr = body.start_date;
-        const endDateStr = body.end_date || calcMonthEndDate(startDateStr);
+        const startDateStr = body.start_date || new Date().toISOString().split('T')[0];
+        const endDateStr = body.end_date || calcMonthEndDate(startDateStr) || startDateStr;
 
         await this.data.insert('customer_bills', {
           bill_id: billId,
@@ -311,6 +312,15 @@ export class SubscriptionsService {
           created_at: new Date(),
           updated_at: new Date(),
         });
+
+        await createSubscriptionBillItems(
+          this.db,
+          billId,
+          createResult.subscription_id,
+          startDateStr,
+          endDateStr,
+          estimatedTotal,
+        );
       } else if (['online', 'upi', 'razorpay'].includes(paymentMethod)) {
         if (consumedOnlineTxn?.transaction_id) {
           await this.customerPaymentService.attachOrderReference(
@@ -320,8 +330,8 @@ export class SubscriptionsService {
         }
 
         const billId = `BILL_${Date.now().toString(36).toUpperCase()}`;
-        const startDateStr = body.start_date;
-        const endDateStr = body.end_date || calcMonthEndDate(startDateStr);
+        const startDateStr = body.start_date || new Date().toISOString().split('T')[0];
+        const endDateStr = body.end_date || calcMonthEndDate(startDateStr) || startDateStr;
 
         await this.data.insert('customer_bills', {
           bill_id: billId,
@@ -344,6 +354,15 @@ export class SubscriptionsService {
           created_at: new Date(),
           updated_at: new Date(),
         });
+
+        await createSubscriptionBillItems(
+          this.db,
+          billId,
+          createResult.subscription_id,
+          startDateStr,
+          endDateStr,
+          estimatedTotal,
+        );
       }
     }
 

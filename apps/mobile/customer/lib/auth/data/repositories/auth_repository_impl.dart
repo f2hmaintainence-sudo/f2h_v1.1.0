@@ -92,6 +92,38 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<void> sendLoginOtp(String phone) {
+    return remoteDataSource.sendLoginOtp(phone);
+  }
+
+  @override
+  Future<User> loginWithOtp({
+    required String phone,
+    required String otp,
+    String? fcmToken,
+    String? referralCode,
+  }) async {
+    final userModel = await remoteDataSource.loginWithOtp(
+      phone: phone,
+      otp: otp,
+      fcmToken: fcmToken,
+      referralCode: referralCode,
+    );
+    final access = userModel.token;
+    final refresh = userModel.refreshToken;
+    if (access != null && access.isNotEmpty) {
+      await TokenStorage.saveTokens(
+        accessToken: access,
+        refreshToken: refresh ?? '',
+        userId: userModel.userId.toString(),
+        role: 'C',
+      );
+    }
+    await localDataSource.cacheUser(userModel);
+    return userModel.toEntity();
+  }
+
+  @override
   Future<String> verifyOtp({
     required String email,
     required String otp,

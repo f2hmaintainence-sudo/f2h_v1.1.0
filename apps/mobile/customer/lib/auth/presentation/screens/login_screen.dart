@@ -1,31 +1,61 @@
+// ============================================================================
+// ChronoSparkSolutions — A Software Company
+// © 2026 ChronoSparkSolutions. All rights reserved.
+//
+// Project     : F2H Fresh
+// File        : login_screen.dart
+// Description : Dual-mode customer login supporting modern Phone OTP login
+//               alongside classic Email & Password authentication for legacy
+//               users whose phone numbers are null in the database.
+// ============================================================================
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:f2h_customer/app.dart';
+import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/forgot_password_screen.dart';
-import 'package:f2h_customer/auth/presentation/screens/signup_screen.dart';
+import 'package:f2h_customer/auth/presentation/screens/phone_otp_verification_screen.dart';
 import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
+import 'package:f2h_customer/core/di/injection.dart';
+import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
+
+enum LoginMode { phoneOtp, password }
 
 class LoginScreen extends StatefulWidget {
   final bool popOnSuccess;
-  const LoginScreen({this.popOnSuccess = false, super.key});
+  final LoginMode initialMode;
+
+  const LoginScreen({
+    this.popOnSuccess = false,
+    this.initialMode = LoginMode.phoneOtp,
+    super.key,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  late LoginMode _currentMode;
+
+  // Controllers for Email/Password mode
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  // Controller for Phone OTP mode
+  final TextEditingController _phoneController = TextEditingController();
+  bool _isSendingOtp = false;
 
   @override
   void initState() {
     super.initState();
+    _currentMode = widget.initialMode;
     _checkAlreadyAuthenticated();
   }
 
@@ -61,21 +91,29 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
-  void _showError(String message) {
+  void _showError(String message, {VoidCallback? onAction, String? actionLabel}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: kRed,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        action: actionLabel != null && onAction != null
+            ? SnackBarAction(
+                label: actionLabel,
+                textColor: Colors.white,
+                onPressed: onAction,
+              )
+            : null,
       ),
     );
   }
 
-  void _onLoginPressed() {
+  void _onPasswordLoginPressed() {
     final identifier = _usernameController.text.trim();
     final password = _passwordController.text;
 
@@ -92,6 +130,57 @@ class _LoginScreenState extends State<LoginScreen> {
     context.read<AuthBloc>().add(
       LoginRequested(identifier: identifier, password: password),
     );
+  }
+
+  Future<void> _onSendPhoneOtpPressed() async {
+    final phone = _phoneController.text.trim();
+
+    if (phone.isEmpty) {
+      _showError('Please enter your 10-digit mobile number');
+      return;
+    }
+    if (phone.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+      _showError('Please enter a valid 10-digit Indian mobile number');
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => _isSendingOtp = true);
+
+    try {
+      await sl<AuthRepository>().sendLoginOtp(phone);
+      if (!mounted) return;
+      setState(() => _isSendingOtp = false);
+
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PhoneOtpVerificationScreen(
+            phone: phone,
+            popOnSuccess: widget.popOnSuccess,
+          ),
+        ),
+      );
+
+      if (result == 'switch_to_password' && mounted) {
+        setState(() => _currentMode = LoginMode.password);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSendingOtp = false);
+      final errorMsg = extractErrorMessage(e, fallback: 'Failed to send OTP. Please try again.');
+      
+      // If user has no phone in DB, guide them to switch to Password mode
+      if (errorMsg.contains('email and password')) {
+        _showError(
+          errorMsg,
+          actionLabel: 'Use Password',
+          onAction: () => setState(() => _currentMode = LoginMode.password),
+        );
+      } else {
+        _showError(errorMsg);
+      }
+    }
   }
 
   void _onGooglePressed() {
@@ -129,56 +218,241 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
           final loading = state is AuthLoading;
+
           return AuthScaffold(
             title: 'Welcome to F2H Fresh!',
-            subtitle: 'Login to access fresh dairy & more!',
+            subtitle: _currentMode == LoginMode.phoneOtp
+                ? 'Sign in instantly with your mobile number'
+                : 'Sign in to access fresh dairy & daily farm picks',
             children: [
-              AuthField(
-                controller: _usernameController,
-                hint: 'Email or Phone',
-                icon: Icons.mail_outline_rounded,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 14),
-              AuthField(
-                controller: _passwordController,
-                hint: 'Password',
-                icon: Icons.lock_outline_rounded,
-                isPassword: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _onLoginPressed(),
-              ),
-              const SizedBox(height: 8),
-              AuthTextLink(
-                label: 'Forgot Password?',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
-                ),
+              // Segmented Tab Toggle
+              _LoginModeSelector(
+                selectedMode: _currentMode,
+                onModeChanged: (mode) {
+                  setState(() => _currentMode = mode);
+                  FocusScope.of(context).unfocus();
+                },
               ),
               const SizedBox(height: 20),
-              AuthPrimaryButton(
-                label: 'Sign In',
-                loading: loading,
-                onTap: loading ? null : _onLoginPressed,
+
+              // Animated Form based on selected mode
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 250),
+                crossFadeState: _currentMode == LoginMode.phoneOtp
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                firstChild: _buildPhoneOtpForm(loading),
+                secondChild: _buildPasswordForm(loading),
               ),
-              const SizedBox(height: 22),
-              const AuthDivider(),
-              const SizedBox(height: 18),
-              GoogleAuthButton(onTap: loading ? null : _onGooglePressed),
-              const SizedBox(height: 26),
-              AuthFooterPrompt(
-                question: "Don't have an account?",
-                action: 'Sign Up',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SignupScreen()),
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// Phone + OTP form widgets
+  Widget _buildPhoneOtpForm(bool loading) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthField(
+          controller: _phoneController,
+          hint: '10-digit mobile number',
+          icon: Icons.phone_android_rounded,
+          prefixText: '+91  ',
+          keyboardType: TextInputType.phone,
+          inputFormatters: [IndianMobileNumberInputFormatter()],
+          textInputAction: TextInputAction.done,
+          maxLength: 10,
+          onSubmitted: (_) => _onSendPhoneOtpPressed(),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'We will send a 6-digit verification code',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: kAuthSubtitle,
+              ),
+            ),
+            AuthTextLink(
+              label: 'Use Password',
+              alignment: Alignment.centerRight,
+              onTap: () => setState(() => _currentMode = LoginMode.password),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        AuthPrimaryButton(
+          label: 'Get OTP',
+          loading: _isSendingOtp,
+          onTap: _isSendingOtp || loading ? null : _onSendPhoneOtpPressed,
+        ),
+      ],
+    );
+  }
+
+  /// Classic Email/Phone + Password form widgets
+  Widget _buildPasswordForm(bool loading) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthField(
+          controller: _usernameController,
+          hint: 'Email or Mobile Number',
+          icon: Icons.mail_outline_rounded,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 14),
+        AuthField(
+          controller: _passwordController,
+          hint: 'Password',
+          icon: Icons.lock_outline_rounded,
+          isPassword: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _onPasswordLoginPressed(),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            AuthTextLink(
+              label: 'Sign in with OTP instead',
+              alignment: Alignment.centerLeft,
+              onTap: () => setState(() => _currentMode = LoginMode.phoneOtp),
+            ),
+            AuthTextLink(
+              label: 'Forgot Password?',
+              alignment: Alignment.centerRight,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        AuthPrimaryButton(
+          label: 'Sign In',
+          loading: loading,
+          onTap: loading || _isSendingOtp ? null : _onPasswordLoginPressed,
+        ),
+        const SizedBox(height: 20),
+        const AuthDivider(label: 'or continue with'),
+        const SizedBox(height: 16),
+        GoogleAuthButton(
+          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
+        ),
+      ],
+    );
+  }
+}
+
+/// Modern pill-shaped tab selector for Phone OTP vs Password modes.
+class _LoginModeSelector extends StatelessWidget {
+  final LoginMode selectedMode;
+  final ValueChanged<LoginMode> onModeChanged;
+
+  const _LoginModeSelector({
+    required this.selectedMode,
+    required this.onModeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9), // Slate 100 pill
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _TabButton(
+              label: 'Phone OTP',
+              icon: Icons.phone_iphone_rounded,
+              isSelected: selectedMode == LoginMode.phoneOtp,
+              onTap: () => onModeChanged(LoginMode.phoneOtp),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _TabButton(
+              label: 'Password',
+              icon: Icons.lock_outline_rounded,
+              isSelected: selectedMode == LoginMode.password,
+              onTap: () => onModeChanged(LoginMode.password),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TabButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 17,
+                color: isSelected ? kPrimaryMid : kTextSub,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? kPrimaryMid : kTextSub,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

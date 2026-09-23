@@ -311,9 +311,93 @@ export class CustomerOrderController {
         item_name: '',
       }));
 
-      // 2. Fetch item descriptions from subscription_items for subscription bills
+      // 2. Fetch line items from customer_bill_items first (for both order and subscription bills)
+      const allBillIds = bills.map(b => b.bill_id).filter(Boolean);
+      const allRefIds = bills.map(b => b.reference_id).filter(Boolean);
+
+      if (allBillIds.length > 0 || allRefIds.length > 0) {
+        try {
+          const billItems = await this.db.query(
+            `SELECT cbi.bill_id,
+                    cbi.reference_id,
+                    COALESCE(
+                      NULLIF(TRIM(CONCAT(p.name, ' - ', pv.name)), ' - '),
+                      p.name,
+                      pv.name,
+                      'Produce Item'
+                    ) AS item_name,
+                    COALESCE(p.name, '') AS product_name,
+                    COALESCE(pv.name, '') AS variant_name,
+                    COALESCE(cbi.quantity, 1) AS quantity,
+                    COALESCE(cbi.unit_price, 0) AS unit_price,
+                    COALESCE(cbi.discount_amount, 0) AS discount_amount,
+                    COALESCE(cbi.total_amount, 0) AS total_amount
+             FROM customer_bill_items cbi
+             LEFT JOIN product_variants pv ON pv.variant_id = cbi.product_variant_id
+             LEFT JOIN products p ON p.product_id = pv.product_id
+             WHERE cbi.bill_id = ANY($1::text[])
+                OR cbi.reference_id = ANY($2::text[])
+             ORDER BY cbi.id ASC`,
+            [allBillIds, allRefIds],
+          );
+
+          if (billItems && billItems.length > 0) {
+            const billItemsMap = new Map<string, any[]>();
+            for (const bi of billItems) {
+              if (bi.bill_id) {
+                const list = billItemsMap.get(bi.bill_id) || [];
+                list.push(bi);
+                billItemsMap.set(bi.bill_id, list);
+              }
+              if (bi.reference_id) {
+                const list2 = billItemsMap.get(bi.reference_id) || [];
+                list2.push(bi);
+                billItemsMap.set(bi.reference_id, list2);
+              }
+            }
+
+            for (const bill of bills) {
+              if (bill.items.length === 0) {
+                const matched = (bill.bill_id && billItemsMap.get(bill.bill_id)) ||
+                  (bill.reference_id && billItemsMap.get(bill.reference_id));
+                if (matched && matched.length > 0) {
+                  if (bill.bill_type === 'subscription' && matched.some((m: any) => m.reference_id && m.reference_id.startsWith('ORD'))) {
+                    const variantMap = new Map<string, any>();
+                    for (const it of matched) {
+                      const vId = it.product_variant_id || it.item_name;
+                      const existing = variantMap.get(vId);
+                      if (existing) {
+                        existing.quantity += Number(it.quantity || 1);
+                        existing.discount_amount += Number(it.discount_amount || 0);
+                        existing.total_amount += Number(it.total_amount || 0);
+                      } else {
+                        variantMap.set(vId, {
+                          ...it,
+                          quantity: Number(it.quantity || 1),
+                          unit_price: Number(it.unit_price || 0),
+                          discount_amount: Number(it.discount_amount || 0),
+                          total_amount: Number(it.total_amount || 0),
+                        });
+                      }
+                    }
+                    bill.items = Array.from(variantMap.values());
+                  } else {
+                    bill.items = matched;
+                  }
+                  const uniqueNames = Array.from(new Set(bill.items.map((i: any) => i.item_name)));
+                  bill.item_name = uniqueNames.join(', ');
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('getBills: Error fetching customer bill items', err);
+        }
+      }
+
+      // 3. Fallback: Fetch item descriptions from subscription_items for subscription bills with no items yet
       const subRefIds = bills
-        .filter(b => b.bill_type === 'subscription' || (typeof b.reference_id === 'string' && (b.reference_id.startsWith('SUB_') || b.reference_id.startsWith('MSH') || b.reference_id.startsWith('BILL_MS') || b.reference_id.startsWith('BILL_MT'))))
+        .filter(b => b.items.length === 0 && (b.bill_type === 'subscription' || (typeof b.reference_id === 'string' && (b.reference_id.startsWith('SUB_') || b.reference_id.startsWith('MSH') || b.reference_id.startsWith('BILL_MS') || b.reference_id.startsWith('BILL_MT')))))
         .map(b => b.reference_id || b.bill_id)
         .filter(id => typeof id === 'string' && (id.startsWith('SUB_') || id.startsWith('MSH') || id.startsWith('BILL_MS') || id.startsWith('BILL_MT')));
 
@@ -354,84 +438,26 @@ export class CustomerOrderController {
             }
 
             for (const bill of bills) {
-              const refId = bill.reference_id || bill.bill_id;
-              const matched = subItemsMap.get(refId) ||
-                subItemsMap.get(String(refId).replace(/^SUB_/, '')) ||
-                subItemsMap.get(String(refId).replace(/^BILL_/, ''));
-              if (matched && matched.length > 0) {
-                bill.items = matched;
-                bill.item_name = matched.map(i => i.item_name).join(', ');
-              }
-            }
-          }
-        } catch (err) {
-          console.error('getBills: Error fetching subscription items', err);
-        }
-      }
-
-      // 3. Fetch item descriptions for order bills (from customer_bill_items)
-      const orderBillIds = bills
-        .filter(b => b.items.length === 0)
-        .map(b => b.bill_id)
-        .filter(Boolean);
-      const orderRefIds = bills
-        .filter(b => b.items.length === 0 && b.reference_id)
-        .map(b => b.reference_id)
-        .filter(Boolean);
-
-      if (orderBillIds.length > 0 || orderRefIds.length > 0) {
-        try {
-          const billItems = await this.db.query(
-            `SELECT cbi.bill_id,
-                    cbi.reference_id AS order_id,
-                    COALESCE(
-                      NULLIF(TRIM(CONCAT(p.name, ' - ', pv.name)), ' - '),
-                      p.name,
-                      pv.name,
-                      'Order Item'
-                    ) AS item_name,
-                    COALESCE(p.name, '') AS product_name,
-                    COALESCE(pv.name, '') AS variant_name,
-                    COALESCE(cbi.quantity, 1) AS quantity,
-                    COALESCE(cbi.unit_price, 0) AS unit_price,
-                    COALESCE(cbi.discount_amount, 0) AS discount_amount,
-                    COALESCE(cbi.total_amount, 0) AS total_amount
-             FROM customer_bill_items cbi
-             LEFT JOIN product_variants pv ON pv.variant_id = cbi.product_variant_id
-             LEFT JOIN products p ON p.product_id = pv.product_id
-             WHERE cbi.bill_id = ANY($1::text[])
-                OR cbi.reference_id = ANY($2::text[])`,
-            [orderBillIds, orderRefIds],
-          );
-
-          if (billItems && billItems.length > 0) {
-            const billItemsMap = new Map<string, any[]>();
-            for (const bi of billItems) {
-              if (bi.bill_id) {
-                const list = billItemsMap.get(bi.bill_id) || [];
-                list.push(bi);
-                billItemsMap.set(bi.bill_id, list);
-              }
-              if (bi.order_id) {
-                const list2 = billItemsMap.get(bi.order_id) || [];
-                list2.push(bi);
-                billItemsMap.set(bi.order_id, list2);
-              }
-            }
-
-            for (const bill of bills) {
               if (bill.items.length === 0) {
-                const matched = (bill.bill_id && billItemsMap.get(bill.bill_id)) ||
-                  (bill.reference_id && billItemsMap.get(bill.reference_id));
+                const refId = bill.reference_id || bill.bill_id;
+                const matched = subItemsMap.get(refId) ||
+                  subItemsMap.get(String(refId).replace(/^SUB_/, '')) ||
+                  subItemsMap.get(String(refId).replace(/^BILL_/, ''));
                 if (matched && matched.length > 0) {
+                  const unitPrice = Number(matched[0]?.unit_price || 0);
+                  const totalBillAmt = Number(bill.total_amount || 0);
+                  if (matched.length === 1 && unitPrice > 0 && totalBillAmt > 0) {
+                    matched[0].quantity = Math.max(1, Math.round(totalBillAmt / unitPrice));
+                    matched[0].total_amount = totalBillAmt;
+                  }
                   bill.items = matched;
-                  bill.item_name = matched.map((i: any) => i.item_name).join(', ');
+                  bill.item_name = matched.map(i => i.item_name).join(', ');
                 }
               }
             }
           }
         } catch (err) {
-          console.error('getBills: Error fetching customer bill items', err);
+          console.error('getBills: Error fetching subscription items fallback', err);
         }
       }
 
