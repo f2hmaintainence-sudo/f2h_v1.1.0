@@ -38,11 +38,23 @@ const _kDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 class SubscriptionSetupScreen extends StatefulWidget {
   final Product product;
   final ProductVariant? initialVariant;
+  final String? initialFrequency;
+  final int? initialMorningQty;
+  final int? initialEveningQty;
+  final Map<String, Map<String, int>>? initialWeeklySchedule;
+  final bool? initialAutoRenew;
+  final String? initialPaymentType;
 
   const SubscriptionSetupScreen({
     super.key,
     required this.product,
     this.initialVariant,
+    this.initialFrequency,
+    this.initialMorningQty,
+    this.initialEveningQty,
+    this.initialWeeklySchedule,
+    this.initialAutoRenew,
+    this.initialPaymentType,
   });
 
   @override
@@ -141,13 +153,38 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       );
     }
 
+    if (widget.initialFrequency != null && widget.initialFrequency!.isNotEmpty) {
+      _frequency = widget.initialFrequency!;
+    }
+    if (widget.initialMorningQty != null) {
+      _morningQty = widget.initialMorningQty!;
+    }
+    if (widget.initialEveningQty != null) {
+      _eveningQty = widget.initialEveningQty!;
+    }
+    if (widget.initialAutoRenew != null) {
+      _autoRenew = widget.initialAutoRenew!;
+    }
+    if (widget.initialPaymentType != null && widget.initialPaymentType!.isNotEmpty) {
+      _paymentType = widget.initialPaymentType!;
+    }
+
     _startDate = DateTime.now().add(const Duration(days: 1));
 
-    // Init weekly schedule defaults: 0 morning, 0 evening per day
-    // User must explicitly set quantities for each day they want delivery
-    _weeklySchedule = {
-      for (final d in _kDays) d: {'morning': 0, 'evening': 0},
-    };
+    // Init weekly schedule defaults
+    if (widget.initialWeeklySchedule != null && widget.initialWeeklySchedule!.isNotEmpty) {
+      _weeklySchedule = {
+        for (final d in _kDays)
+          d: {
+            'morning': widget.initialWeeklySchedule![d]?['morning'] ?? 0,
+            'evening': widget.initialWeeklySchedule![d]?['evening'] ?? 0,
+          },
+      };
+    } else {
+      _weeklySchedule = {
+        for (final d in _kDays) d: {'morning': 0, 'evening': 0},
+      };
+    }
 
     // Load default address from session and initialize default quantities based on open slots
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -167,24 +204,24 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       final morningWin = getMorningSlotWindow(now, timings);
       final eveningWin = getEveningSlotWindow(now, timings);
 
-      // Seed from which slots the admin has enabled, not from the clock —
-      // otherwise opening this screen outside a delivery window zeroed the
-      // quantities and left the Confirm button permanently disabled.
-      if (!eveningWin.isEnabled && morningWin.isEnabled) {
-        setState(() {
-          _morningQty = 1;
-          _eveningQty = 0;
-        });
-      } else if (!morningWin.isEnabled && eveningWin.isEnabled) {
-        setState(() {
-          _morningQty = 0;
-          _eveningQty = 1;
-        });
-      } else if (!morningWin.isEnabled && !eveningWin.isEnabled) {
-        setState(() {
-          _morningQty = 0;
-          _eveningQty = 0;
-        });
+      // Seed from which slots the admin has enabled if not passed via initial parameters
+      if (widget.initialMorningQty == null && widget.initialEveningQty == null) {
+        if (!eveningWin.isEnabled && morningWin.isEnabled) {
+          setState(() {
+            _morningQty = 1;
+            _eveningQty = 0;
+          });
+        } else if (!morningWin.isEnabled && eveningWin.isEnabled) {
+          setState(() {
+            _morningQty = 0;
+            _eveningQty = 1;
+          });
+        } else if (!morningWin.isEnabled && !eveningWin.isEnabled) {
+          setState(() {
+            _morningQty = 0;
+            _eveningQty = 0;
+          });
+        }
       }
 
       // Ensure subscriptions are loaded so existing postpaid committed
@@ -1574,8 +1611,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                             qty: morQty,
                             accentColor: morningColor,
                             onDecrement: () => setState(() {
-                              if (morQty > 0)
+                              if (morQty > 0) {
                                 _weeklySchedule[day]!['morning'] = morQty - 1;
+                              }
                             }),
                             onIncrement: () => setState(() {
                               _weeklySchedule[day]!['morning'] = morQty + 1;
@@ -1589,8 +1627,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                             qty: eveQty,
                             accentColor: eveningColor,
                             onDecrement: () => setState(() {
-                              if (eveQty > 0)
+                              if (eveQty > 0) {
                                 _weeklySchedule[day]!['evening'] = eveQty - 1;
+                              }
                             }),
                             onIncrement: () => setState(() {
                               _weeklySchedule[day]!['evening'] = eveQty + 1;
@@ -2190,13 +2229,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 class _SectionCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
-  final Color? backgroundColor;
   final Border? border;
   final List<BoxShadow>? boxShadow;
   const _SectionCard({
     required this.child,
     this.padding,
-    this.backgroundColor,
     this.border,
     this.boxShadow,
   });
@@ -2206,7 +2243,7 @@ class _SectionCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border:
             border ?? Border.all(color: const Color(0xFFE5E7EB), width: 1.0),

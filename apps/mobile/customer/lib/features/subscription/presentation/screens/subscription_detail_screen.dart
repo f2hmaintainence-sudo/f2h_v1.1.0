@@ -21,6 +21,7 @@ import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
+import 'package:f2h_customer/features/subscription/presentation/screens/subscription_setup_screen.dart';
 
 class SubscriptionDetailScreen extends StatefulWidget {
   final Subscription subscription;
@@ -893,212 +894,152 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     );
   }
 
-  // ─── Sub Card Days & Frequency Widget ───────────────────────
+  // ─── Edit Schedule & Quantity Button ────────────────────────
 
-  Widget _buildSubCardDaysWidget(Subscription s) {
+  void _navigateToEditSubscription(Subscription s) {
+    final item = s.items.isNotEmpty ? s.items.first : null;
+    final variantId = (item != null && item.productVariantId.isNotEmpty)
+        ? item.productVariantId
+        : (s.id.isNotEmpty ? s.id : 'var_default');
+    final unitPrice = (item != null && item.unitPrice > 0)
+        ? item.unitPrice
+        : (s.pricePerDay > 0 ? s.pricePerDay : 0.0);
+    final originalPrice = (item != null && item.originalPrice > 0)
+        ? item.originalPrice
+        : ((item != null && item.finalPrice > 0) ? item.finalPrice : unitPrice);
+    final productName = s.productName.isNotEmpty
+        ? s.productName
+        : (item?.productName ?? 'Subscription Product');
+    final variantLabel = (item != null && item.variantName.isNotEmpty)
+        ? item.variantName
+        : (s.frequency.isNotEmpty ? s.frequency : 'Standard');
+    final imageUrl = s.imageUrl ?? item?.imageUrl;
+
+    final variant = ProductVariant(
+      id: variantId,
+      label: variantLabel,
+      price: originalPrice > 0 ? originalPrice : unitPrice,
+      originalPrice: originalPrice > 0 ? originalPrice : unitPrice,
+      subscriptionPrice: unitPrice > 0 ? unitPrice : null,
+      imagePath: imageUrl,
+      images: (imageUrl != null && imageUrl.isNotEmpty) ? [imageUrl] : const [],
+    );
+
+    final product = Product(
+      id: variantId,
+      name: productName,
+      vendor: s.vendorName.isNotEmpty ? s.vendorName : 'Farm2Home',
+      unit: variantLabel,
+      category: 'Subscription',
+      emoji: s.emoji.isNotEmpty ? s.emoji : '🥛',
+      price: originalPrice > 0 ? originalPrice : unitPrice,
+      originalPrice: originalPrice > 0 ? originalPrice : unitPrice,
+      subscriptionPrice: unitPrice > 0 ? unitPrice : null,
+      rating: 4.8,
+      reviews: 120,
+      badge: 'Fresh',
+      badgeColor: kPrimary,
+      imageAsset: imageUrl,
+      images: (imageUrl != null && imageUrl.isNotEmpty) ? [imageUrl] : const [],
+      variants: [variant],
+    );
+
     final dayQtys = s.getSelectedDayQuantities();
-    if (dayQtys.isEmpty) return const SizedBox.shrink();
+    const kDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    const morningColor = Color(0xFF14532D); // Deep green
-    const eveningColor = Color(0xFF16A34A); // Emerald green
+    final Map<String, Map<String, int>> weeklySchedule = {
+      for (final d in kDays) d: {'morning': 0, 'evening': 0},
+    };
 
-    final isSevenDays = dayQtys.length == 7;
-    final first = dayQtys.first;
-    final isAllSameSlots = isSevenDays &&
+    for (final dq in dayQtys) {
+      final matchedKey = kDays.firstWhere(
+        (d) => dq.dayName.toLowerCase().startsWith(d.toLowerCase()),
+        orElse: () => '',
+      );
+      if (matchedKey.isNotEmpty) {
+        weeklySchedule[matchedKey] = {
+          'morning': dq.morningQty,
+          'evening': dq.eveningQty,
+        };
+      }
+    }
+
+    final isAllSame = dayQtys.length == 7 &&
         dayQtys.every((dq) =>
-            dq.morningQty == first.morningQty &&
-            dq.eveningQty == first.eveningQty &&
-            dq.quantity == first.quantity);
+            dq.morningQty == dayQtys.first.morningQty &&
+            dq.eveningQty == dayQtys.first.eveningQty);
 
+    final isWeekly = s.frequency.toLowerCase().contains('weekly') ||
+        (dayQtys.isNotEmpty && !isAllSame);
+
+    final mQty = dayQtys.isNotEmpty
+        ? dayQtys.first.morningQty
+        : (s.deliverySlot.toLowerCase().contains('morning') ? s.qty : (s.qty > 0 ? s.qty : 1));
+    final eQty = dayQtys.isNotEmpty
+        ? dayQtys.first.eveningQty
+        : (s.deliverySlot.toLowerCase().contains('evening') ? s.qty : 0);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SubscriptionSetupScreen(
+          product: product,
+          initialVariant: variant,
+          initialFrequency: isWeekly ? 'weekly' : 'daily',
+          initialMorningQty: isWeekly ? 0 : mQty,
+          initialEveningQty: isWeekly ? 0 : eQty,
+          initialWeeklySchedule: weeklySchedule,
+          initialAutoRenew: s.autoRenew,
+          initialPaymentType: s.paymentType,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditScheduleButton(Subscription s) {
     return Container(
       margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.calendar_today_rounded,
-                size: 12,
-                color: kPrimary,
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'Schedule & Quantity',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: kTextMid,
+      width: double.infinity,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _navigateToEditSubscription(s),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: kPrimaryPl,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.edit_calendar_rounded,
+                  size: 16,
+                  color: kPrimary,
                 ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: kPrimaryPl,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  s.frequency.isNotEmpty ? s.frequency : 'Daily',
-                  style: const TextStyle(
-                    fontSize: 10,
+                const SizedBox(width: 8),
+                const Text(
+                  'Edit Schedule & Quantity',
+                  style: TextStyle(
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w800,
                     color: kPrimary,
+                    letterSpacing: 0.2,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (isAllSameSlots)
-            Row(
-              children: [
-                if (first.morningQty > 0) ...[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.wb_sunny_rounded,
-                          size: 12,
-                          color: morningColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Morning: ${first.morningQty}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: morningColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                if (first.eveningQty > 0) ...[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: eveningColor.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.nightlight_round,
-                          size: 12,
-                          color: eveningColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Evening: ${first.eveningQty}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: eveningColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                if (first.morningQty == 0 && first.eveningQty == 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Qty: ${first.quantity}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: morningColor,
-                      ),
-                    ),
-                  ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 12,
+                  color: kPrimary,
+                ),
               ],
-            )
-          else
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: dayQtys.map((dq) {
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${dq.dayName} ',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: kTextSub,
-                        ),
-                      ),
-                      if (dq.morningQty > 0) ...[
-                        Text(
-                          'M:${dq.morningQty} ',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            color: morningColor,
-                          ),
-                        ),
-                      ],
-                      if (dq.eveningQty > 0) ...[
-                        Text(
-                          'E:${dq.eveningQty}',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            color: eveningColor,
-                          ),
-                        ),
-                      ],
-                      if (dq.morningQty == 0 && dq.eveningQty == 0)
-                        Text(
-                          '${dq.quantity}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: kPrimary,
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }).toList(),
             ),
-        ],
+          ),
+        ),
       ),
     );
   }
@@ -1593,8 +1534,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                     ),
                                   ],
                                 ),
-                                // Frequency & Day Quantities at bottom of Product Card
-                                _buildSubCardDaysWidget(s),
+                                // Edit Schedule & Quantity button
+                                _buildEditScheduleButton(s),
                               ],
                             ),
                           ),
