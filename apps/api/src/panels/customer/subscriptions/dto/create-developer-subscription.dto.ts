@@ -76,7 +76,7 @@ export class CreateDeveloperSubscriptionDto {
   @Type(() => DeveloperSubscriptionItemDto)
   items: DeveloperSubscriptionItemDto[];
 
+  @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  custom_dates: string[];
+  custom_dates?: any[];
 }
