@@ -85,19 +85,11 @@ class SubCard extends StatelessWidget {
     final String paymentTypeLabel = isPostpaid ? 'POSTPAID' : 'PREPAID';
 
     // ── Card background ─────────────────────────────────────────────
-    final cardBg = isActive
-        ? const Color(0xFFFAFFFB) // very faint green tint for active
-        : isTerminal
-            ? const Color(0xFFF8FAFC)
-            : Colors.white;
+    final cardBg = isTerminal ? const Color(0xFFF8FAFC) : Colors.white;
 
-    final cardBorderColor = isActive
-        ? kPrimary.withValues(alpha: 0.14)
-        : isTerminal
-            ? (isCancelled
-                ? kRed.withValues(alpha: 0.14)
-                : const Color(0xFFE2E8F0))
-            : const Color(0xFFE2E8F0);
+    final cardBorderColor = isTerminal && isCancelled
+        ? kRed.withValues(alpha: 0.14)
+        : const Color(0xFFE2E8F0);
 
     return GestureDetector(
       onTap: () {
@@ -121,56 +113,33 @@ class SubCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: cardBorderColor, width: 1.5),
+            border: Border.all(color: cardBorderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: isActive
-                    ? kPrimary.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Left accent bar ─────────────────────────────
-                  Container(
-                    width: 4,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          statusColor,
-                          statusColor.withValues(alpha: 0.4),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
+                  // Top row: image + details
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Product image
+                      _ProductImage(
+                        subscription: s,
+                        isActive: isActive,
+                        statusColor: statusColor,
+                        isTerminal: isTerminal,
                       ),
-                    ),
-                  ),
-
-                  // ── Card body ───────────────────────────────────
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Top row: image + details
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Product image with glow
-                              _ProductImage(
-                                subscription: s,
-                                isActive: isActive,
-                                statusColor: statusColor,
-                                isTerminal: isTerminal,
-                              ),
                               const SizedBox(width: 12),
 
                               // Right side details
@@ -371,13 +340,9 @@ class SubCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
-      ),
-    );
+            );
   }
 }
 
@@ -404,26 +369,22 @@ class _ProductImage extends StatelessWidget {
       width: 68,
       height: 68,
       decoration: BoxDecoration(
-        color: isActive ? kPrimaryPl : const Color(0xFFF1F5F9),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isActive
-              ? kPrimary.withValues(alpha: 0.1)
-              : const Color(0xFFE2E8F0),
-          width: 1.5,
+          color: const Color(0xFFE2E8F0),
+          width: 1.0,
         ),
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: statusColor.withValues(alpha: 0.18),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(19),
         child: buildProductImage(
           subscription.productName,
           imageAsset: subscription.imageUrl,
@@ -758,10 +719,10 @@ class _DayChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: kPrimary.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),

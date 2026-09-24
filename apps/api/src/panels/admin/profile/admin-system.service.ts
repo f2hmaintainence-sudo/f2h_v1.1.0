@@ -399,6 +399,17 @@ export class AdminSystemService {
            b.branch_name,
            ms.department,
            ms.designation,
+           COALESCE(u.gender, ms.gender, '') AS gender,
+           COALESCE(u.date_of_birth, ms.date_of_birth) AS date_of_birth,
+           ms.marital_status,
+           ms.bio,
+           ms.education,
+           ms.address_line1,
+           ms.address_line2,
+           ms.city,
+           ms.state,
+           ms.postal_code,
+           ms.alt_phone,
            COALESCE(ms.is_active, CASE WHEN u.account_status = 'active' THEN true ELSE false END) AS is_active,
            COALESCE(ms.created_at, u.created_at) AS created_at,
            COALESCE(ms.updated_at, u.updated_at) AS updated_at
@@ -538,6 +549,14 @@ export class AdminSystemService {
           userParams.push(body.last_name?.trim() || null);
           userUpdates.push(`last_name = $${userParams.length}`);
         }
+        if (body.gender !== undefined) {
+          userParams.push(body.gender?.trim() || null);
+          userUpdates.push(`gender = $${userParams.length}`);
+        }
+        if (body.date_of_birth !== undefined) {
+          userParams.push(body.date_of_birth || null);
+          userUpdates.push(`date_of_birth = $${userParams.length}`);
+        }
         if (newRole) {
           userParams.push(newRole);
           userUpdates.push(`role_id = $${userParams.length}`);
@@ -557,8 +576,6 @@ export class AdminSystemService {
           `UPDATE users SET ${userUpdates.join(', ')} WHERE user_id = $1`,
           userParams,
         );
-
-
 
         // Update or insert management_staff table without phone or user_name
         if (managementId) {
@@ -581,6 +598,50 @@ export class AdminSystemService {
             msParams.push(body.designation?.trim() || null);
             msUpdates.push(`designation = $${msParams.length}`);
           }
+          if (body.gender !== undefined) {
+            msParams.push(body.gender?.trim() || null);
+            msUpdates.push(`gender = $${msParams.length}`);
+          }
+          if (body.date_of_birth !== undefined) {
+            msParams.push(body.date_of_birth || null);
+            msUpdates.push(`date_of_birth = $${msParams.length}`);
+          }
+          if (body.marital_status !== undefined) {
+            msParams.push(body.marital_status?.trim() || null);
+            msUpdates.push(`marital_status = $${msParams.length}`);
+          }
+          if (body.bio !== undefined) {
+            msParams.push(body.bio?.trim() || null);
+            msUpdates.push(`bio = $${msParams.length}`);
+          }
+          if (body.education !== undefined) {
+            msParams.push(body.education?.trim() || null);
+            msUpdates.push(`education = $${msParams.length}`);
+          }
+          if (body.address_line1 !== undefined) {
+            msParams.push(body.address_line1?.trim() || null);
+            msUpdates.push(`address_line1 = $${msParams.length}`);
+          }
+          if (body.address_line2 !== undefined) {
+            msParams.push(body.address_line2?.trim() || null);
+            msUpdates.push(`address_line2 = $${msParams.length}`);
+          }
+          if (body.city !== undefined) {
+            msParams.push(body.city?.trim() || null);
+            msUpdates.push(`city = $${msParams.length}`);
+          }
+          if (body.state !== undefined) {
+            msParams.push(body.state?.trim() || null);
+            msUpdates.push(`state = $${msParams.length}`);
+          }
+          if (body.postal_code !== undefined) {
+            msParams.push(body.postal_code?.trim() || null);
+            msUpdates.push(`postal_code = $${msParams.length}`);
+          }
+          if (body.alt_phone !== undefined) {
+            msParams.push(body.alt_phone?.trim() || null);
+            msUpdates.push(`alt_phone = $${msParams.length}`);
+          }
           if (body.is_active !== undefined) {
             const isActive = body.is_active === true || String(body.is_active) === 'true' || Number(body.is_active) === 1;
             msParams.push(isActive);
@@ -599,13 +660,26 @@ export class AdminSystemService {
             await client.query(
               `INSERT INTO management_staff (
                  management_id, user_id, branch_id, role_id,
-                 department, designation, is_active, created_at, updated_at
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+                 department, designation, gender, date_of_birth, marital_status,
+                 bio, education, address_line1, address_line2, city, state, postal_code,
+                 alt_phone, is_active, created_at, updated_at
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
                ON CONFLICT (management_id) DO UPDATE SET
                  branch_id = EXCLUDED.branch_id,
                  role_id = EXCLUDED.role_id,
                  department = EXCLUDED.department,
                  designation = EXCLUDED.designation,
+                 gender = EXCLUDED.gender,
+                 date_of_birth = EXCLUDED.date_of_birth,
+                 marital_status = EXCLUDED.marital_status,
+                 bio = EXCLUDED.bio,
+                 education = EXCLUDED.education,
+                 address_line1 = EXCLUDED.address_line1,
+                 address_line2 = EXCLUDED.address_line2,
+                 city = EXCLUDED.city,
+                 state = EXCLUDED.state,
+                 postal_code = EXCLUDED.postal_code,
+                 alt_phone = EXCLUDED.alt_phone,
                  is_active = EXCLUDED.is_active,
                  deleted_at = NULL,
                  updated_at = NOW()`,
@@ -616,6 +690,17 @@ export class AdminSystemService {
                 targetRole,
                 body.department?.trim() || null,
                 body.designation?.trim() || null,
+                body.gender?.trim() || null,
+                body.date_of_birth || null,
+                body.marital_status?.trim() || null,
+                body.bio?.trim() || null,
+                body.education?.trim() || null,
+                body.address_line1?.trim() || null,
+                body.address_line2?.trim() || null,
+                body.city?.trim() || null,
+                body.state?.trim() || null,
+                body.postal_code?.trim() || null,
+                body.alt_phone?.trim() || null,
                 isActive,
               ],
             );
@@ -629,13 +714,26 @@ export class AdminSystemService {
           await client.query(
             `INSERT INTO management_staff (
                management_id, user_id, branch_id, role_id,
-               department, designation, is_active, created_at, updated_at
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+               department, designation, gender, date_of_birth, marital_status,
+               bio, education, address_line1, address_line2, city, state, postal_code,
+               alt_phone, is_active, created_at, updated_at
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
              ON CONFLICT (management_id) DO UPDATE SET
                branch_id = EXCLUDED.branch_id,
                role_id = EXCLUDED.role_id,
                department = EXCLUDED.department,
                designation = EXCLUDED.designation,
+               gender = EXCLUDED.gender,
+               date_of_birth = EXCLUDED.date_of_birth,
+               marital_status = EXCLUDED.marital_status,
+               bio = EXCLUDED.bio,
+               education = EXCLUDED.education,
+               address_line1 = EXCLUDED.address_line1,
+               address_line2 = EXCLUDED.address_line2,
+               city = EXCLUDED.city,
+               state = EXCLUDED.state,
+               postal_code = EXCLUDED.postal_code,
+               alt_phone = EXCLUDED.alt_phone,
                is_active = EXCLUDED.is_active,
                deleted_at = NULL,
                updated_at = NOW()`,
@@ -646,6 +744,17 @@ export class AdminSystemService {
               targetRole,
               body.department?.trim() || null,
               body.designation?.trim() || null,
+              body.gender?.trim() || null,
+              body.date_of_birth || null,
+              body.marital_status?.trim() || null,
+              body.bio?.trim() || null,
+              body.education?.trim() || null,
+              body.address_line1?.trim() || null,
+              body.address_line2?.trim() || null,
+              body.city?.trim() || null,
+              body.state?.trim() || null,
+              body.postal_code?.trim() || null,
+              body.alt_phone?.trim() || null,
               isActive,
             ],
           );
