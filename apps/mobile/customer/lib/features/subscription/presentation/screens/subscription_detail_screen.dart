@@ -1487,44 +1487,23 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: statusColor.withValues(alpha: 0.05),
-                          blurRadius: 18,
-                          offset: const Offset(0, 6),
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20),
-                      child: Stack(
-                        children: [
-                          // Left status vertical accent line
-                          Positioned(
-                            top: 0,
-                            bottom: 0,
-                            left: 0,
-                            width: 4.5,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    statusColor,
-                                    statusColor.withValues(alpha: 0.4),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
-                            child: Column(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Product image
+                                // Product image
                                     Container(
                                       width: 68,
                                       height: 68,
@@ -1722,10 +1701,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                               ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
                   const SizedBox(height: 14),
 
                   // ── 2. Quick action buttons (All Green Theme) ──
