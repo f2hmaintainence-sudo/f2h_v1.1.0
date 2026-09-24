@@ -563,25 +563,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
     HapticFeedback.mediumImpact();
 
-    SubscriptionPaymentSheet.show(
-      context: context,
+    _executeCheckout(
       paymentType: _paymentType,
-      estimatedTotal: estimate.total,
-      // Use full-month estimate for postpaid credit limit check (not partial-month)
-      monthlyEstimateForCreditCheck: _fullMonthEstimate.total,
-      profile: context.read<CustomerSessionCubit>().state.profile,
-      existingPostpaidCommitted: _calculateExistingPostpaidCommitted(),
-      onConfirm:
-          ({required String paymentType, required String paymentMethod}) {
-            _executeCheckout(
-              paymentType: paymentType,
-              paymentMethod: paymentMethod,
-            );
-          },
-      onSwitchToPrepaid: () {
-        setState(() => _paymentType = 'prepaid');
-        _confirmSubscription();
-      },
+      paymentMethod: 'wallet',
     );
   }
 
@@ -694,39 +678,6 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     String? razorpayPaymentId;
     String? razorpaySignature;
 
-    if (paymentType == 'prepaid' &&
-        (paymentMethod == 'upi' || paymentMethod == 'online' || paymentMethod == 'razorpay')) {
-      final payResult = await PaymentService.instance.payForOrder(
-        amount: effectiveEstimatedTotal,
-        notes: {
-          'customer_id': customerId,
-          'purpose': 'subscription',
-          'variant_id': _variant.id,
-        },
-      );
-
-      if (!mounted) return;
-
-      if (payResult.cancelled) {
-        F2HToast.show(context, 'Payment cancelled');
-        return;
-      }
-
-      if (!payResult.success) {
-        F2HToast.error(
-          context,
-          payResult.message.isNotEmpty
-              ? payResult.message
-              : 'Payment failed. Please try again.',
-        );
-        return;
-      }
-
-      razorpayOrderId = payResult.razorpayOrderId;
-      razorpayPaymentId = payResult.razorpayPaymentId;
-      razorpaySignature = payResult.razorpaySignature;
-    }
-
     if (!mounted) return;
 
     final checkoutStartDate = (_frequency == 'custom' && _customDates.isNotEmpty)
@@ -739,7 +690,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         branchId: branchId,
         addressId: addressId,
         variantId: _variant.id,
-        scheduleType: _frequency,
+        scheduleType: _frequency == 'custom' ? 'custom_dates' : _frequency,
         deliverySlot: deliverySlot,
         startDate: checkoutStartDate,
         unitPrice: _subscriptionUnitPrice,

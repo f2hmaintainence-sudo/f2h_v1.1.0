@@ -206,19 +206,22 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     required bool autoRenew,
   }) async {
     try {
-      final schedules = _buildSchedulesWithSplit(
-        scheduleType: scheduleType,
-        morningQty: morningQty,
-        eveningQty: eveningQty,
-        customDays: customDays,
-      );
+      final isCustom = scheduleType == 'custom' || scheduleType == 'custom_dates';
+      final schedules = isCustom
+          ? <Map<String, dynamic>>[]
+          : _buildSchedulesWithSplit(
+              scheduleType: scheduleType,
+              morningQty: morningQty,
+              eveningQty: eveningQty,
+              customDays: customDays,
+            );
       final data = {
         'customer_id': customerId,
         'branch_id': branchId,
-        'schedule_type': scheduleType == 'custom' ? 'custom_days' : 'weekly',
+        'schedule_type': isCustom ? 'custom_dates' : 'weekly',
         'payment_type': paymentType,
         'auto_renew': autoRenew,
-        'custom_dates': scheduleType == 'custom' ? customDays : <String>[],
+        'custom_dates': isCustom ? customDays : <String>[],
         'items': [
           {
             'product_variant_id': variantId,
@@ -267,9 +270,12 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     String? razorpaySignature,
   }) async {
     try {
+      final isCustom = scheduleType == 'custom' || scheduleType == 'custom_dates';
       final List<Map<String, dynamic>> schedules;
 
-      if (scheduleType == 'weekly' && weeklySchedule.isNotEmpty) {
+      if (isCustom) {
+        schedules = [];
+      } else if (scheduleType == 'weekly' && weeklySchedule.isNotEmpty) {
         // Build per-day schedules from the weekly schedule map
         // Only include days that have at least 1 unit (morning or evening)
         const dayIndexMap = <String, int>{
@@ -317,7 +323,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'customer_id': customerId,
         'branch_id': branchId,
         if (addressId != null && addressId.isNotEmpty) 'address_id': addressId,
-        'schedule_type': (scheduleType == 'daily' || scheduleType == 'weekly') ? 'weekly' : 'custom_dates',
+        'schedule_type': isCustom ? 'custom_dates' : 'weekly',
         'payment_type': paymentType,
         'payment_method': paymentMethod,
         'auto_renew': autoRenew,
@@ -330,14 +336,14 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         if (razorpaySignature != null && razorpaySignature.isNotEmpty)
           'razorpay_signature': razorpaySignature,
 
-        'custom_dates': scheduleType == 'custom'
+        'custom_dates': isCustom
             ? (customSchedule.isNotEmpty ? customSchedule : customDays)
             : <dynamic>[],
         'items': [
           {
             'product_variant_id': variantId,
             'unit_price': unitPrice,
-            'schedules': schedules,
+            'schedules': isCustom ? <dynamic>[] : schedules,
           }
         ],
         'start_date': startDate,
@@ -599,7 +605,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     required List<SubscriptionCustomDateModel> customDates,
     required String scheduleType,
   }) {
-    if (scheduleType == 'custom_dates') {
+    if (scheduleType == 'custom_dates' || scheduleType == 'custom' || customDates.isNotEmpty) {
       if (customDates.isEmpty) return 'Custom';
       return '${customDates.length} custom dates';
     }

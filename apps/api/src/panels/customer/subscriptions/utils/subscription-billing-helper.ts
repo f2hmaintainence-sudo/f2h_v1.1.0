@@ -55,26 +55,39 @@ export async function calculateSubscriptionBillItems(
     return [];
   }
 
-  // 3. Fetch weekly schedules
-  const schedRes = await dbOrClient.query(
-    `SELECT subscription_item_id, day_of_week, m_quantity, e_quantity
-     FROM public.subscription_weekly_schedule
-     WHERE subscription_id = $1 AND deleted_at IS NULL`,
-    [subscriptionId],
-  );
+  // 3. Fetch weekly or custom schedules
+  const isCustomDates = sub?.schedule_type === 'custom_dates' || sub?.schedule_type === 'custom';
+
+  const schedRes = !isCustomDates
+    ? await dbOrClient.query(
+        `SELECT subscription_item_id, day_of_week, m_quantity, e_quantity
+         FROM public.subscription_weekly_schedule
+         WHERE subscription_id = $1 AND deleted_at IS NULL`,
+        [subscriptionId],
+      )
+    : [];
   const schedRows = schedRes?.rows || schedRes || [];
+
+  const customSchedRes = isCustomDates
+    ? await dbOrClient.query(
+        `SELECT subscription_item_id, delivery_date, m_quantity, e_quantity
+         FROM public.subscription_custom_schedule
+         WHERE subscription_id = $1 AND deleted_at IS NULL`,
+        [subscriptionId],
+      )
+    : [];
+  const customSchedRows = customSchedRes?.rows || customSchedRes || [];
 
   const startUtc = parseDateToUtcMs(billingFrom);
   const endUtc = parseDateToUtcMs(billingTo);
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-  const isCustomDates = sub?.schedule_type === 'custom_dates' || sub?.schedule_type === 'custom';
   let customDatesSet: Set<string> | null = null;
   if (isCustomDates) {
     try {
       const meta = typeof sub?.metadata === 'string' ? JSON.parse(sub.metadata) : sub?.metadata;
       const dates = Array.isArray(meta?.custom_dates) ? meta.custom_dates : [];
-      customDatesSet = new Set(dates.map((d: any) => String(d).split('T')[0]));
+      customDatesSet = new Set(dates.map((d: any) => (typeof d === 'string' ? d : d?.delivery_date || d?.date || '').split('T')[0]).filter(Boolean));
     } catch {
       customDatesSet = null;
     }
@@ -87,20 +100,26 @@ export async function calculateSubscriptionBillItems(
     const unitPrice = Number(item.unit_price ?? item.final_price ?? 0);
     const perUnitDiscount = Number(item.discount_amount ?? 0);
     const itemScheds = schedRows.filter((s: any) => s.subscription_item_id === itemId);
+    const itemCustomScheds = customSchedRows.filter((s: any) => s.subscription_item_id === itemId);
 
     let calculatedQty = 0;
 
-    if (isCustomDates && customDatesSet) {
-      for (let t = startUtc; t <= endUtc; t += ONE_DAY_MS) {
-        const dtStr = new Date(t).toISOString().split('T')[0];
-        if (customDatesSet.has(dtStr)) {
-          // Default to sum of schedule quantities or 1
-          const dayOfWeek = new Date(t).getUTCDay();
-          const match = itemScheds.find((s: any) => Number(s.day_of_week) === dayOfWeek);
-          const dayQty = match
-            ? Number(match.m_quantity || 0) + Number(match.e_quantity || 0)
-            : 1;
-          calculatedQty += dayQty > 0 ? dayQty : 1;
+    if (isCustomDates) {
+      if (itemCustomScheds.length > 0) {
+        for (const cs of itemCustomScheds) {
+          const csDateStr = String(cs.delivery_date).split('T')[0];
+          const csDateMs = parseDateToUtcMs(csDateStr);
+          if (csDateMs >= startUtc && csDateMs <= endUtc) {
+            const dayQty = Number(cs.m_quantity || 0) + Number(cs.e_quantity || 0);
+            calculatedQty += dayQty > 0 ? dayQty : 1;
+          }
+        }
+      } else if (customDatesSet) {
+        for (let t = startUtc; t <= endUtc; t += ONE_DAY_MS) {
+          const dtStr = new Date(t).toISOString().split('T')[0];
+          if (customDatesSet.has(dtStr)) {
+            calculatedQty += 1;
+          }
         }
       }
     } else {

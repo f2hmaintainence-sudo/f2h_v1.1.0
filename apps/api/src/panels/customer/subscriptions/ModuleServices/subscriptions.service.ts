@@ -177,40 +177,22 @@ export class SubscriptionsService {
       };
     }
 
-    // 2. PREPAID validation & payment gate
+    // 2. PREPAID validation & payment gate (No upfront payment required)
     let consumedOnlineTxn: any = null;
     if (paymentType === 'prepaid') {
-      if (paymentMethod === 'wallet') {
-        if (walletBalance < estimatedTotal) {
-          this.developer.warn('SubscriptionsService.checkout insufficient wallet balance', {
+      if (['online', 'upi', 'razorpay'].includes(paymentMethod) && body.razorpay_order_id) {
+        try {
+          consumedOnlineTxn = await this.customerPaymentService.consumeOrderPayment({
             customerId,
-            walletBalance,
-            estimatedTotal,
+            razorpayOrderId: body.razorpay_order_id,
+            razorpayPaymentId: body.razorpay_payment_id,
+            razorpaySignature: body.razorpay_signature,
+            expectedAmount: estimatedTotal,
+            orderReference: 'SUBSCRIPTION_PENDING',
           });
-          return {
-            status: false,
-            error_code: 'insufficient_wallet',
-            message: 'Insufficient wallet balance',
-            wallet_balance: walletBalance,
-            required: estimatedTotal,
-          };
+        } catch (txnErr) {
+          this.developer.warn('consumeOrderPayment optional warning', { error: txnErr });
         }
-      } else if (['online', 'upi', 'razorpay'].includes(paymentMethod)) {
-        if (!body.razorpay_order_id) {
-          return {
-            status: false,
-            error_code: 'missing_razorpay_order',
-            message: 'razorpay_order_id is required for online subscription checkout.',
-          };
-        }
-        consumedOnlineTxn = await this.customerPaymentService.consumeOrderPayment({
-          customerId,
-          razorpayOrderId: body.razorpay_order_id,
-          razorpayPaymentId: body.razorpay_payment_id,
-          razorpaySignature: body.razorpay_signature,
-          expectedAmount: estimatedTotal,
-          orderReference: 'SUBSCRIPTION_PENDING',
-        });
       }
     }
 
@@ -441,6 +423,12 @@ export class SubscriptionsService {
   }
 
   async create(body: CreateSubscriptionDto) {
+    const rawScheduleType = (body.schedule_type || 'weekly').toLowerCase();
+    const dbScheduleType = (rawScheduleType === 'custom' || rawScheduleType === 'custom_days' || rawScheduleType === 'custom_dates')
+      ? 'custom_dates'
+      : 'weekly';
+    const isCustomDates = dbScheduleType === 'custom_dates';
+
     const itemsList = body.items || [];
     const validItems = itemsList
       .map((item) => ({
@@ -454,14 +442,9 @@ export class SubscriptionsService {
           }))
           .filter((schedule) => schedule.m_quantity > 0 || schedule.e_quantity > 0),
       }))
-      .filter((item) => item.schedules.length > 0 && Boolean(item.product_variant_id));
+      .filter((item) => Boolean(item.product_variant_id) && (isCustomDates || item.schedules.length > 0));
 
     const customerIdStr = (body.customer_id || '').trim();
-
-    const rawScheduleType = (body.schedule_type || 'weekly').toLowerCase();
-    const dbScheduleType = (rawScheduleType === 'custom' || rawScheduleType === 'custom_days' || rawScheduleType === 'custom_dates')
-      ? 'custom_dates'
-      : 'weekly';
 
     if (!customerIdStr) {
       throw new BadRequestException('customer_id is required');
@@ -670,66 +653,73 @@ export class SubscriptionsService {
     item: SubscriptionItemDto,
     body: CreateSubscriptionDto,
   ) {
-    const schedules = item.schedules || [];
+    const rawScheduleType = (body.schedule_type || 'weekly').toLowerCase();
+    const isCustomDates = rawScheduleType === 'custom' || rawScheduleType === 'custom_days' || rawScheduleType === 'custom_dates';
 
-    for (const schedule of schedules) {
-      const day = schedule.day_of_week ?? schedule.day ?? 0;
-      const mQty = Number(schedule.m_quantity ?? schedule.m_qty ?? schedule.morning_qty ?? 0);
-      const eQty = Number(schedule.e_quantity ?? schedule.e_qty ?? schedule.evening_qty ?? 0);
+    if (!isCustomDates) {
+      const schedules = item.schedules || [];
 
-      await client.query(
-        `
-        INSERT INTO subscription_weekly_schedule (
-          subscription_item_id,
-          subscription_id,
-          day_of_week,
-          m_quantity,
-          e_quantity,
-          effective_from,
-          effective_to
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `,
-        [
-          itemId,
-          subscriptionId,
-          day,
-          mQty,
-          eQty,
-          body.start_date,
-          body.end_date || null,
-        ],
-      );
-    }
+      for (const schedule of schedules) {
+        const day = schedule.day_of_week ?? schedule.day ?? 0;
+        const mQty = Number(schedule.m_quantity ?? schedule.m_qty ?? schedule.morning_qty ?? 0);
+        const eQty = Number(schedule.e_quantity ?? schedule.e_qty ?? schedule.evening_qty ?? 0);
 
-    const customDates = (body.custom_dates || []) as any[];
-    for (const cDate of customDates) {
-      const dateStr = typeof cDate === 'string' ? cDate : (cDate?.delivery_date || cDate?.date);
-      const mQty = typeof cDate === 'object' ? Number(cDate?.m_quantity ?? cDate?.morning_qty ?? item.schedules?.[0]?.m_quantity ?? 0) : Number(item.schedules?.[0]?.m_quantity ?? 0);
-      const eQty = typeof cDate === 'object' ? Number(cDate?.e_quantity ?? cDate?.evening_qty ?? item.schedules?.[0]?.e_quantity ?? 0) : Number(item.schedules?.[0]?.e_quantity ?? 0);
-      if (dateStr) {
-        await client.query(
-          `
-          INSERT INTO subscription_custom_schedule (
-            subscription_item_id,
-            subscription_id,
-            delivery_date,
-            m_quantity,
-            e_quantity
-          )
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (subscription_item_id, delivery_date) DO UPDATE SET
-            m_quantity = EXCLUDED.m_quantity,
-            e_quantity = EXCLUDED.e_quantity
-          `,
-          [
-            itemId,
-            subscriptionId,
-            dateStr,
-            mQty,
-            eQty,
-          ],
-        );
+        if (mQty > 0 || eQty > 0) {
+          await client.query(
+            `
+            INSERT INTO subscription_weekly_schedule (
+              subscription_item_id,
+              subscription_id,
+              day_of_week,
+              m_quantity,
+              e_quantity,
+              effective_from,
+              effective_to
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `,
+            [
+              itemId,
+              subscriptionId,
+              day,
+              mQty,
+              eQty,
+              body.start_date,
+              body.end_date || null,
+            ],
+          );
+        }
+      }
+    } else {
+      const customDates = (body.custom_dates || []) as any[];
+      for (const cDate of customDates) {
+        const dateStr = typeof cDate === 'string' ? cDate : (cDate?.delivery_date || cDate?.date);
+        const mQty = typeof cDate === 'object' ? Number(cDate?.m_quantity ?? cDate?.morning_qty ?? item.schedules?.[0]?.m_quantity ?? 0) : Number(item.schedules?.[0]?.m_quantity ?? 0);
+        const eQty = typeof cDate === 'object' ? Number(cDate?.e_quantity ?? cDate?.evening_qty ?? item.schedules?.[0]?.e_quantity ?? 0) : Number(item.schedules?.[0]?.e_quantity ?? 0);
+        if (dateStr && (mQty > 0 || eQty > 0)) {
+          await client.query(
+            `
+            INSERT INTO subscription_custom_schedule (
+              subscription_item_id,
+              subscription_id,
+              delivery_date,
+              m_quantity,
+              e_quantity
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (subscription_item_id, delivery_date) DO UPDATE SET
+              m_quantity = EXCLUDED.m_quantity,
+              e_quantity = EXCLUDED.e_quantity
+            `,
+            [
+              itemId,
+              subscriptionId,
+              dateStr,
+              mQty,
+              eQty,
+            ],
+          );
+        }
       }
     }
   }
@@ -878,6 +868,7 @@ export class SubscriptionsService {
     const result = await this.data.query('subscriptions', {
       select: [
         'subscriptions.subscription_id',
+        'subscriptions.schedule_type',
         'subscriptions.start_date',
         'subscriptions.end_date',
         'subscriptions.created_at',
@@ -903,6 +894,7 @@ export class SubscriptionsService {
 
     // Extract subscriptionId if isItemId was passed
     const resolvedSubId = items[0]?.subscription_id || subscriptionId;
+    const isCustomDates = items[0]?.schedule_type === 'custom_dates' || items[0]?.schedule_type === 'custom';
 
     // Determine start & end date
     const rawStart = items[0]?.start_date || items[0]?.created_at;
@@ -918,13 +910,22 @@ export class SubscriptionsService {
 
     const itemIds = items.map(item => item.subscription_item_id).filter(Boolean);
     let schedules: any[] = [];
+    let customSchedules: any[] = [];
 
     try {
-      const scheduleResult = await this.db.query(
-        `SELECT * FROM subscription_weekly_schedule WHERE subscription_id = $1 OR subscription_item_id = ANY($2::text[])`,
-        [resolvedSubId, itemIds.length ? itemIds : ['NONE']],
-      );
-      schedules = Array.isArray(scheduleResult) ? scheduleResult : (scheduleResult as any)?.rows || [];
+      if (isCustomDates) {
+        const customResult = await this.db.query(
+          `SELECT * FROM subscription_custom_schedule WHERE subscription_id = $1 OR subscription_item_id = ANY($2::text[])`,
+          [resolvedSubId, itemIds.length ? itemIds : ['NONE']],
+        );
+        customSchedules = Array.isArray(customResult) ? customResult : (customResult as any)?.rows || [];
+      } else {
+        const scheduleResult = await this.db.query(
+          `SELECT * FROM subscription_weekly_schedule WHERE subscription_id = $1 OR subscription_item_id = ANY($2::text[])`,
+          [resolvedSubId, itemIds.length ? itemIds : ['NONE']],
+        );
+        schedules = Array.isArray(scheduleResult) ? scheduleResult : (scheduleResult as any)?.rows || [];
+      }
     } catch (e) {
       this.developer.warn('makeSubscriptionCalender schedule query failed', { error: e });
     }
@@ -935,21 +936,26 @@ export class SubscriptionsService {
     const calendar: any[] = [];
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dayOfWeek = d.getDay();
-      const schedule = schedules.find(s => Number(s.day_of_week) === dayOfWeek);
-
       const offset = d.getTimezoneOffset() * 60 * 1000;
       const localDateStr = new Date(d.getTime() - offset).toISOString().split('T')[0];
 
-      // If no explicit schedule row exists, check if weekly schedule has any entries;
-      // if schedules table is empty for this sub, default m_quantity to 1.00 for all days
       let mQty = '0.00';
       let eQty = '0.00';
 
-      if (schedule) {
-        mQty = schedule.m_quantity?.toString() ?? '0.00';
-        eQty = schedule.e_quantity?.toString() ?? '0.00';
-      } else if (schedules.length === 0) {
-        mQty = '1.00';
+      if (isCustomDates) {
+        const cMatch = customSchedules.find(cs => String(cs.delivery_date).split('T')[0] === localDateStr);
+        if (cMatch) {
+          mQty = cMatch.m_quantity?.toString() ?? '0.00';
+          eQty = cMatch.e_quantity?.toString() ?? '0.00';
+        }
+      } else {
+        const schedule = schedules.find(s => Number(s.day_of_week) === dayOfWeek);
+        if (schedule) {
+          mQty = schedule.m_quantity?.toString() ?? '0.00';
+          eQty = schedule.e_quantity?.toString() ?? '0.00';
+        } else if (schedules.length === 0) {
+          mQty = '1.00';
+        }
       }
 
       const hasDelivery = Number(mQty) > 0 || Number(eQty) > 0;

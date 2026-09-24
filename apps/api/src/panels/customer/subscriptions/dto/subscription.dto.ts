@@ -147,8 +147,7 @@ export class CreateSubscriptionDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  custom_dates?: string[];
+  custom_dates?: any[];
 
   // ── Online / Razorpay payment identifiers ──
   @IsOptional()
