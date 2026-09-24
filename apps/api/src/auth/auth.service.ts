@@ -780,11 +780,16 @@ export class AuthService {
     const variations = Array.from(new Set([cleanCode, noHyphen, withHyphen]));
 
     for (const vCode of variations) {
-      const res = await this.Data.query('customers', {
-        where: [{ column: 'referral_code', operator: '=', value: vCode }],
-        limit: 1,
-      });
-      if (res?.data?.length) return res.data[0];
+      const varRes = await this.DataBase.query(
+        `SELECT c.*, u.user_id, u.first_name, u.last_name, u.user_name, u.email, u.phone
+         FROM users u
+         LEFT JOIN customers c ON c.customer_id = u.user_id
+         WHERE UPPER(u.user_id) = $1
+            OR UPPER(COALESCE(c.customer_id, '')) = $1
+         LIMIT 1`,
+        [vCode],
+      );
+      if (varRes?.[0]) return varRes[0];
     }
 
     // 3. Search by phone or email in users
@@ -1126,6 +1131,7 @@ export class AuthService {
     });
     let user = userRes?.data?.[0];
     const incomingFcmToken = body.fcm_token || body.fcmToken;
+    const isNewUser = !user;
 
     if (!user) {
       // New phone number -> auto-register as new customer account
@@ -1157,7 +1163,6 @@ export class AuthService {
         password: hashedPassword,
         role_id: initialRole,
         account_status: 'active',
-        referral_code: generatedRefCode,
         created_at: now,
         updated_at: now,
       };
@@ -1173,8 +1178,10 @@ export class AuthService {
       try {
         const customerInsertData: any = {
           customer_id: userId,
+          branch_id: 'BRANCH_KUPPAM_01',
+          customer_type: 'retail',
+          wallet_balance: 0,
           first_order_completed: false,
-          referral_code: generatedRefCode,
           created_at: now,
           updated_at: now,
         };
@@ -1269,8 +1276,21 @@ export class AuthService {
       },
     );
 
+    let hasAddress = false;
+    if (user && !isNewUser) {
+      try {
+        const addrCheck = await this.DataBase.query(
+          `SELECT id FROM customer_addresses WHERE customer_id = $1 AND status = true LIMIT 1`,
+          [user.user_id],
+        );
+        hasAddress = (addrCheck?.length || 0) > 0;
+      } catch (_) {
+        hasAddress = false;
+      }
+    }
+
     return {
-      message: 'Login successful',
+      message: isNewUser ? 'Registration successful' : 'Login successful',
       user: {
         user_id: user.user_id,
         email: user.email,
@@ -1280,6 +1300,8 @@ export class AuthService {
         last_name: user.last_name,
         user_name: user.user_name,
       },
+      is_new_user: isNewUser,
+      needs_address: isNewUser || !hasAddress,
       accessToken,
       refreshToken,
       token: accessToken,
@@ -2035,9 +2057,9 @@ export class AuthService {
 
     while (!isUnique && attempts < 10) {
       try {
-        // referral_code lives on users, not customers — see referral.repository
+        // referral_code is represented by user.user_id
         const checkRes: any = await this.DataBase.query(
-          `SELECT user_id FROM users WHERE UPPER(referral_code) = $1 LIMIT 1`,
+          `SELECT user_id FROM users WHERE UPPER(user_id) = $1 LIMIT 1`,
           [code.toUpperCase()],
         );
         const rows = Array.isArray(checkRes) ? checkRes : (checkRes?.rows || []);

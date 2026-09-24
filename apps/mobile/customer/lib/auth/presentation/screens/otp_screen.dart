@@ -12,6 +12,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -146,11 +147,21 @@ class _OtpScreenState extends State<OtpScreen> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
-            (route) => false,
-          );
+          if (state.user.isNewUser || state.user.needsAddress) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AddAddressScreen(isInitialSetup: true),
+              ),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
+              (route) => false,
+            );
+          }
         } else if (state is AuthFailure) {
           _toast(state.error, background: kRed);
         }

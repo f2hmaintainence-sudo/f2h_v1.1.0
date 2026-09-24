@@ -76,7 +76,11 @@ class F2HApp extends StatelessWidget {
           child: BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
               if (state is Authenticated) {
-                context.read<CustomerSessionCubit>().bootstrap();
+                final isNewOrNeedsAddr = state.user.isNewUser || state.user.needsAddress;
+                context.read<CustomerSessionCubit>().bootstrap(
+                  expectedUserId: state.user.userId,
+                  skipCache: isNewOrNeedsAddr,
+                );
               } else if (state is Unauthenticated || state is AuthFailure) {
                 // Clear session cubit on logout so re-login always starts fresh
                 context.read<CustomerSessionCubit>().clear(clearToken: false);
@@ -121,7 +125,15 @@ class _CustomerSessionGateState extends State<CustomerSessionGate> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<CustomerSessionCubit>().bootstrap();
+        final authState = context.read<AuthBloc>().state;
+        final userId = authState is Authenticated ? authState.user.userId : null;
+        final isNewOrNeedsAddr = authState is Authenticated
+            ? (authState.user.isNewUser || authState.user.needsAddress)
+            : false;
+        context.read<CustomerSessionCubit>().bootstrap(
+          expectedUserId: userId,
+          skipCache: isNewOrNeedsAddr,
+        );
       }
     });
   }

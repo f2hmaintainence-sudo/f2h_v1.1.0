@@ -49,6 +49,7 @@ class AuthRepositoryImpl implements AuthRepository {
         role: 'C',
       );
     }
+    await CustomerSessionCache().clear();
     await localDataSource.cacheUser(userModel);
     return userModel.toEntity();
   }
@@ -82,6 +83,7 @@ class AuthRepositoryImpl implements AuthRepository {
         role: 'C',
       );
     }
+    await CustomerSessionCache().clear();
     await localDataSource.cacheUser(userModel);
     return userModel.toEntity();
   }
@@ -119,6 +121,7 @@ class AuthRepositoryImpl implements AuthRepository {
         role: 'C',
       );
     }
+    await CustomerSessionCache().clear();
     await localDataSource.cacheUser(userModel);
     return userModel.toEntity();
   }
@@ -170,6 +173,7 @@ class AuthRepositoryImpl implements AuthRepository {
           role: 'C',
         );
       }
+      await CustomerSessionCache().clear();
       await localDataSource.cacheUser(userModel);
       return userModel.toEntity();
     } catch (e) {

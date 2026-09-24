@@ -23,6 +23,7 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
+import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 class PhoneOtpVerificationScreen extends StatefulWidget {
@@ -136,7 +137,15 @@ class _PhoneOtpVerificationScreenState extends State<PhoneOtpVerificationScreen>
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          if (widget.popOnSuccess) {
+          if (state.user.isNewUser || state.user.needsAddress) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AddAddressScreen(isInitialSetup: true),
+              ),
+              (route) => false,
+            );
+          } else if (widget.popOnSuccess) {
             Navigator.pop(context, true);
           } else {
             Navigator.pushAndRemoveUntil(

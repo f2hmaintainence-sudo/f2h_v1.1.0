@@ -36,7 +36,7 @@ class CustomerSessionCache {
     );
   }
 
-  Future<CustomerSessionState?> read() async {
+  Future<CustomerSessionState?> read({String? expectedUserId}) async {
     final prefs = await SharedPreferences.getInstance();
     final profileJson = prefs.getString(_profileKey);
 
@@ -47,6 +47,15 @@ class CustomerSessionCache {
     final profile = ProfileModel.fromJson(
       jsonDecode(profileJson) as Map<String, dynamic>,
     );
+
+    if (expectedUserId != null && expectedUserId.isNotEmpty) {
+      final pUserId = profile.userId.trim();
+      final pCustId = profile.customerId.trim();
+      if (pUserId != expectedUserId && pCustId != expectedUserId) {
+        await clear();
+        return null;
+      }
+    }
 
     final addressesJson = prefs.getString(_addressesKey);
     final addresses = addressesJson == null

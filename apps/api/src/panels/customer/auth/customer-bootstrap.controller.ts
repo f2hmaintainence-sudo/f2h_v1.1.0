@@ -268,7 +268,7 @@ export class CustomerBootstrapController {
       addresses: normalizedAddresses,
       wallet: {
         balance: Number(profile?.wallet_balance || 0),
-        referral_code: profile?.referral_code || null,
+        referral_code: profile?.referral_code || profile?.customer_id || profile?.user_id || userId,
         referral_status: profile?.referral_status || 'unlocked',
       },
       subscription_summary: subscriptionSummary,
@@ -890,7 +890,7 @@ export class CustomerBootstrapController {
               [{ column: 'customer_id', operator: '=', value: customer.customer_id || userId }],
             );
           } else {
-            customer.referral_code = null;
+            customer.referral_code = customer.customer_id || customer.user_id || userId;
             customer.referral_status = 'locked';
             customer.first_order_completed = false;
           }
@@ -1442,17 +1442,43 @@ export class CustomerBootstrapController {
       throw new BadRequestException('Customer profile not found');
     }
 
+    const normalizedEmail = email.length > 0 ? email : null;
+    if (normalizedEmail) {
+      const emailCheck = await this.Data.query('users', {
+        select: ['user_id', 'email'],
+        where: [{ column: 'email', operator: '=', value: normalizedEmail }],
+      });
+      const dupUser = (emailCheck?.data || []).find((u: any) => u.user_id !== userId);
+      if (dupUser) {
+        throw new BadRequestException('This email address is already in use by another account');
+      }
+    }
+
+    if (mobile && mobile.length > 0) {
+      const phoneCheck = await this.Data.query('users', {
+        select: ['user_id', 'phone'],
+        where: [{ column: 'phone', operator: '=', value: mobile }],
+      });
+      const dupUser = (phoneCheck?.data || []).find((u: any) => u.user_id !== userId);
+      if (dupUser) {
+        throw new BadRequestException('This mobile number is already in use by another account');
+      }
+    }
+
     // 1. Single source of truth: users table
     const userUpdateData: Record<string, any> = {
       first_name: firstName,
       last_name: lastName,
       user_name: `${firstName} ${lastName}`.trim(),
       phone: mobile,
-      email: email,
+      email: normalizedEmail,
       gender: gender,
       date_of_birth: parsedDob,
       updated_at: new Date(),
     };
+    if (!normalizedEmail) {
+      delete userUpdateData.email;
+    }
 
     const filteredUserProfile = await this.filterValidFields('users', userUpdateData);
 
@@ -1463,7 +1489,7 @@ export class CustomerBootstrapController {
         {
           column: 'user_id',
           operator: '=',
-          value: existingProfile.customer_id,
+          value: userId,
         },
       ],
     );
@@ -1485,7 +1511,7 @@ export class CustomerBootstrapController {
           {
             column: 'customer_id',
             operator: '=',
-            value: existingProfile.customer_id,
+            value: userId,
           },
         ],
       );
@@ -1499,7 +1525,7 @@ export class CustomerBootstrapController {
       await this.Developer.error('Customer satellite profile update failed', updateCustomer);
     }
 
-    const profile = await this.resolveCustomer(userId, user?.email);
+    const profile = await this.resolveCustomer(userId, normalizedEmail || user?.email);
     return {
       status: true,
       message: 'Profile updated successfully',

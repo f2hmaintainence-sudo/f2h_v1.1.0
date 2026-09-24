@@ -17,12 +17,16 @@ class CustomerSessionCubit extends Cubit<CustomerSessionState> {
     required this.cache,
   }) : super(const CustomerSessionState.initial());
 
-  Future<void> bootstrap() async {
+  Future<void> bootstrap({String? expectedUserId, bool skipCache = false}) async {
     // 1. Instantly read and emit cached session if available for 0ms load
-    final cached = await cache.read();
-    if (cached != null) {
-      emit(cached);
-    } else if (state.status == CustomerSessionStatus.initial) {
+    CustomerSessionState? cached;
+    if (!skipCache) {
+      cached = await cache.read(expectedUserId: expectedUserId);
+      if (cached != null) {
+        emit(cached);
+      }
+    }
+    if (cached == null && state.status == CustomerSessionStatus.initial) {
       emit(state.copyWith(status: CustomerSessionStatus.loading));
     }
 

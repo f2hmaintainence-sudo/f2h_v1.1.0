@@ -21,6 +21,8 @@ import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_customer/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:f2h_customer/auth/presentation/screens/phone_otp_verification_screen.dart';
 import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
+import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
+import 'package:f2h_customer/auth/domain/entities/user_entity.dart';
 import 'package:f2h_customer/core/auth/token_storage.dart';
 import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
@@ -66,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _checkAlreadyAuthenticated() async {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
-      _redirectToApp();
+      _redirectToApp(authState.user);
       return;
     }
     final hasSession = await TokenStorage.hasSession();
@@ -76,15 +78,23 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _redirectToApp() {
+  void _redirectToApp([User? user]) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (widget.popOnSuccess) {
+      if (user != null && (user.isNewUser || user.needsAddress)) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AddAddressScreen(isInitialSetup: true),
+          ),
+          (route) => false,
+        );
+      } else if (widget.popOnSuccess) {
         Navigator.pop(context, true);
       } else {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const AppShell()),
+          MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
           (route) => false,
         );
       }
@@ -201,7 +211,15 @@ class _LoginScreenState extends State<LoginScreen> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          if (widget.popOnSuccess) {
+          if (state.user.isNewUser || state.user.needsAddress) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AddAddressScreen(isInitialSetup: true),
+              ),
+              (route) => false,
+            );
+          } else if (widget.popOnSuccess) {
             Navigator.pop(context, true);
           } else {
             Navigator.pushAndRemoveUntil(
@@ -217,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
           if (state is Authenticated) {
-            _redirectToApp();
+            _redirectToApp(state.user);
             return const Scaffold(
               backgroundColor: Colors.white,
               body: Center(

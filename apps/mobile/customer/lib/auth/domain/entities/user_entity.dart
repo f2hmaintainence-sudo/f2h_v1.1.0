@@ -6,6 +6,8 @@ class User extends Equatable {
   final bool mustChangePassword;
   final String? token;
   final DateTime? cachedAt;
+  final bool isNewUser;
+  final bool needsAddress;
 
   const User({
     required this.userId,
@@ -13,8 +15,18 @@ class User extends Equatable {
     this.mustChangePassword = false,
     this.token,
     this.cachedAt,
+    this.isNewUser = false,
+    this.needsAddress = false,
   });
 
   @override
-  List<Object?> get props => [userId, email, mustChangePassword, token, cachedAt];
+  List<Object?> get props => [
+        userId,
+        email,
+        mustChangePassword,
+        token,
+        cachedAt,
+        isNewUser,
+        needsAddress,
+      ];
 }

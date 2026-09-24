@@ -184,6 +184,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
         userMap['accessToken'] = response.data['accessToken'];
         userMap['refreshToken'] = response.data['refreshToken'];
+        userMap['is_new_user'] = true;
+        userMap['needs_address'] = true;
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {
@@ -254,6 +256,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
         userMap['accessToken'] = response.data['accessToken'];
         userMap['refreshToken'] = response.data['refreshToken'];
+        userMap['is_new_user'] = response.data['is_new_user'] ?? userMap['is_new_user'] ?? false;
+        userMap['needs_address'] = response.data['needs_address'] ?? userMap['needs_address'] ?? false;
         dioClient.setAuthToken(response.data['accessToken']?.toString());
         return UserModel.fromJson(userMap);
       } else {

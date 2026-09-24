@@ -19,6 +19,12 @@ class UserModel {
 
   final DateTime? cachedAt;
 
+  @ignore
+  final bool isNewUser;
+
+  @ignore
+  final bool needsAddress;
+
   UserModel({
     required this.userId,
     required this.email,
@@ -26,9 +32,18 @@ class UserModel {
     this.token,
     this.refreshToken,
     this.cachedAt,
+    this.isNewUser = false,
+    this.needsAddress = false,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final isNew = json['is_new_user'] == true || json['isNewUser'] == true;
+    final hasAddr = json['has_address'] == true || json['hasAddress'] == true;
+    final needsAddr = json['needs_address'] == true ||
+        json['needsAddress'] == true ||
+        isNew ||
+        (json.containsKey('has_address') && !hasAddr);
+
     return UserModel(
       userId: json['user_id']?.toString() ?? json['userId']?.toString() ?? '',
       email: json['email'] ?? '',
@@ -36,6 +51,8 @@ class UserModel {
       token: json['accessToken'] ?? json['token'] ?? json['access_token'],
       refreshToken: json['refreshToken'] ?? json['refresh_token'],
       cachedAt: DateTime.now(),
+      isNewUser: isNew,
+      needsAddress: needsAddr,
     );
   }
 
@@ -47,6 +64,8 @@ class UserModel {
       'token': token,
       'refreshToken': refreshToken,
       'cachedAt': cachedAt?.toIso8601String(),
+      'is_new_user': isNewUser,
+      'needs_address': needsAddress,
     };
   }
 
@@ -57,6 +76,8 @@ class UserModel {
       mustChangePassword: mustChangePassword,
       token: token,
       cachedAt: cachedAt,
+      isNewUser: isNewUser,
+      needsAddress: needsAddress,
     );
   }
 
@@ -67,6 +88,8 @@ class UserModel {
       mustChangePassword: user.mustChangePassword,
       token: user.token,
       cachedAt: user.cachedAt,
+      isNewUser: user.isNewUser,
+      needsAddress: user.needsAddress,
     );
   }
 }

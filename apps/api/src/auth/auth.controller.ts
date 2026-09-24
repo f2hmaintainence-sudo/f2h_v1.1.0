@@ -274,6 +274,8 @@ export class AuthController {
         email: body.email,
         role_id: roleId,
       },
+      is_new_user: true,
+      needs_address: true,
       accessToken,
       refreshToken,
       token: accessToken,

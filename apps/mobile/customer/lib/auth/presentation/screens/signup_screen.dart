@@ -19,6 +19,8 @@ import 'package:f2h_customer/core/di/injection.dart';
 import 'package:f2h_customer/core/errors/error_handler.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/privacy_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/terms_conditions_screen.dart';
+import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
+import 'package:f2h_customer/auth/domain/entities/user_entity.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -121,7 +123,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void _checkAlreadyAuthenticated() async {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
-      _redirectToApp();
+      _redirectToApp(authState.user);
       return;
     }
     final hasSession = await TokenStorage.hasSession();
@@ -131,14 +133,24 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  void _redirectToApp() {
+  void _redirectToApp([User? user]) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const AppShell()),
-        (route) => false,
-      );
+      if (user != null && (user.isNewUser || user.needsAddress)) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AddAddressScreen(isInitialSetup: true),
+          ),
+          (route) => false,
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
+          (route) => false,
+        );
+      }
     });
   }
 
@@ -236,11 +248,21 @@ class _SignupScreenState extends State<SignupScreen> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
-            (route) => false,
-          );
+          if (state.user.isNewUser || state.user.needsAddress) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AddAddressScreen(isInitialSetup: true),
+              ),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const CustomerSessionGate()),
+              (route) => false,
+            );
+          }
         } else if (state is AuthFailure) {
           _toast(state.error, background: kRed);
         }
@@ -248,7 +270,7 @@ class _SignupScreenState extends State<SignupScreen> {
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
           if (state is Authenticated) {
-            _redirectToApp();
+            _redirectToApp(state.user);
             return const Scaffold(
               backgroundColor: Colors.white,
               body: Center(
