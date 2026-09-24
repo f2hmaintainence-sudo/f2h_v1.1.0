@@ -267,7 +267,8 @@ export class CustomersService {
                 COALESCE(u.last_name, '') as last_name,
                 COALESCE(u.phone, '') as phone,
                 COALESCE(u.email, '') as email,
-                u.profile_image_url as profile_image
+                u.profile_image_url as profile_image,
+                u.referred_by
          FROM customers c
          JOIN users u ON u.user_id = c.customer_id
          WHERE c.customer_id = $1`,
@@ -730,6 +731,127 @@ export class CustomersService {
         [customerId]
       ).catch(() => []);
 
+      // Referrals made by this customer
+      const referralsRes: any[] = await this.databaseService.query(
+        `SELECT 
+           r.refer_id,
+           r.referrer_customer_id,
+           r.referred_customer_id,
+           r.referral_code,
+           COALESCE(r.referrer_reward_amount, 0)::numeric as referrer_reward_amount,
+           COALESCE(r.referred_reward_amount, 0)::numeric as referred_reward_amount,
+           r.status,
+           r.rewarded_at,
+           r.remarks,
+           r.created_at,
+           r.updated_at,
+           COALESCE(u.first_name, '') as referee_first_name,
+           COALESCE(u.last_name, '') as referee_last_name,
+           COALESCE(u.phone, '') as referee_phone,
+           COALESCE(u.email, '') as referee_email,
+           u.account_status as referee_account_status,
+           u.created_at as referee_created_at,
+           COALESCE(c.first_order_completed, false) as referee_first_order_completed,
+           COALESCE(c.wallet_balance, 0)::numeric as referee_wallet_balance
+         FROM referrals r
+         LEFT JOIN users u ON u.user_id = r.referred_customer_id
+         LEFT JOIN customers c ON c.customer_id = r.referred_customer_id
+         WHERE r.referrer_customer_id = $1
+         ORDER BY r.created_at DESC`,
+        [customerId]
+      ).catch(() => []);
+
+      let referredByInfo: any = null;
+      const referredByRes: any[] = await this.databaseService.query(
+        `SELECT 
+           r.refer_id,
+           r.referrer_customer_id,
+           r.referred_customer_id,
+           r.referral_code,
+           COALESCE(r.referrer_reward_amount, 0)::numeric as referrer_reward_amount,
+           r.status,
+           r.rewarded_at,
+           r.created_at,
+           COALESCE(u.first_name, '') as referrer_first_name,
+           COALESCE(u.last_name, '') as referrer_last_name,
+           COALESCE(u.phone, '') as referrer_phone,
+           COALESCE(u.email, '') as referrer_email
+         FROM referrals r
+         LEFT JOIN users u ON u.user_id = r.referrer_customer_id
+         WHERE r.referred_customer_id = $1
+         ORDER BY r.created_at DESC
+         LIMIT 1`,
+        [customerId]
+      ).catch(() => []);
+
+      if (referredByRes && referredByRes.length > 0) {
+        const ref = referredByRes[0];
+        referredByInfo = {
+          referrer_id: ref.referrer_customer_id,
+          referrer_name: `${ref.referrer_first_name || ''} ${ref.referrer_last_name || ''}`.trim() || 'Referrer',
+          referrer_phone: ref.referrer_phone || '',
+          referrer_email: ref.referrer_email || '',
+          referral_code: ref.referral_code || ref.referrer_customer_id,
+          status: ref.status,
+          rewarded_at: ref.rewarded_at,
+          created_at: ref.created_at,
+        };
+      } else if (customer.referred_by) {
+        const referrerUser: any[] = await this.databaseService.query(
+          `SELECT user_id, first_name, last_name, phone, email, created_at FROM users WHERE user_id = $1`,
+          [customer.referred_by]
+        ).catch(() => []);
+        if (referrerUser && referrerUser.length > 0) {
+          const u = referrerUser[0];
+          referredByInfo = {
+            referrer_id: u.user_id,
+            referrer_name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Referrer',
+            referrer_phone: u.phone || '',
+            referrer_email: u.email || '',
+            referral_code: u.user_id,
+            status: 'pending',
+            rewarded_at: null,
+            created_at: u.created_at,
+          };
+        }
+      }
+
+      const formattedReferrals = referralsRes.map((r: any) => ({
+        refer_id: r.refer_id,
+        referrer_customer_id: r.referrer_customer_id,
+        referred_customer_id: r.referred_customer_id,
+        referral_code: r.referral_code || r.referrer_customer_id,
+        referee_id: r.referred_customer_id,
+        referee_name: `${r.referee_first_name || ''} ${r.referee_last_name || ''}`.trim() || 'New Customer',
+        referee_phone: r.referee_phone || '',
+        referee_email: r.referee_email || '',
+        referee_account_status: r.referee_account_status || 'active',
+        referee_created_at: r.referee_created_at,
+        referee_first_order_completed: Boolean(r.referee_first_order_completed),
+        referee_wallet_balance: Number(r.referee_wallet_balance || 0),
+        referrer_reward_amount: Number(r.referrer_reward_amount || 0),
+        referred_reward_amount: Number(r.referred_reward_amount || 0),
+        status: r.status || 'pending',
+        rewarded_at: r.rewarded_at,
+        remarks: r.remarks || '',
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      }));
+
+      const totalRewardsEarned = formattedReferrals
+        .filter((r: any) => r.status === 'rewarded')
+        .reduce((sum: number, r: any) => sum + r.referrer_reward_amount, 0);
+
+      const referralsPayload = {
+        referral_code: customer.customer_id,
+        referred_by: referredByInfo,
+        total_referrals: formattedReferrals.length,
+        rewarded_count: formattedReferrals.filter((r: any) => r.status === 'rewarded').length,
+        pending_count: formattedReferrals.filter((r: any) => r.status === 'pending' || r.status === 'registered' || r.status === 'first_order').length,
+        total_rewards_earned: totalRewardsEarned,
+        list: formattedReferrals,
+      };
+
       const customerProfileObj = {
         id: customer.id,
         customer_id: customer.customer_id,
@@ -753,6 +875,8 @@ export class CustomersService {
         is_blocked: customer.is_blocked || false,
         block_reason: customer.block_reason || '',
         subscription_number: customer.subscription_number,
+        referred_by: customer.referred_by || referredByInfo?.referrer_id || null,
+        referral_code: customer.customer_id,
         created_at: customer.created_at,
       };
 
@@ -766,6 +890,7 @@ export class CustomersService {
           all_addresses: addresses,
           formattedOrders: formattedOrders,
           orders: formattedOrders,
+          referrals: referralsPayload,
           stats: {
             lifetime_revenue: lifetimeRevenue,
             lifetimeRevenue: lifetimeRevenue,

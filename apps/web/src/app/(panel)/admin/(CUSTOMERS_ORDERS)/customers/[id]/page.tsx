@@ -41,6 +41,12 @@ import {
   TrendingDown,
   RefreshCw,
   Camera,
+  Gift,
+  Users,
+  Share2,
+  Copy,
+  ExternalLink,
+  CheckCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import CustomerSpecialPriceModal from '@/components/f2h/CustomerSpecialPriceModal';
@@ -141,9 +147,13 @@ export default function CustomerDetailsPage() {
   const deliveredCount = formattedOrders.filter((o: any) => o.status === 'delivered').length;
   const cancelledCount = formattedOrders.filter((o: any) => o.status === 'cancelled').length;
 
+  const referralsList = data.referrals?.list || [];
+  const totalReferralsCount = referralsList.length;
+
   const tabs = [
     { name: 'Overview & Insights', icon: <Sparkles size={16} /> },
     { name: `Orders (${totalOrdersCount})`, icon: <ShoppingBag size={16} /> },
+    { name: `Referrals (${totalReferralsCount})`, icon: <Gift size={16} /> },
     { name: 'Special Prices', icon: <Tag size={16} /> },
     { name: 'Containers & Returns', icon: <Box size={16} /> },
     { name: 'Payments', icon: <CreditCard size={16} /> },
@@ -376,8 +386,23 @@ export default function CustomerDetailsPage() {
 
         {/* Tab Content */}
         <div className="p-6">
-          {activeTab === 'Overview & Insights' && <OverviewTab customer={customer} formattedOrders={formattedOrders} primaryAddress={primaryAddress} />}
+          {activeTab === 'Overview & Insights' && (
+            <OverviewTab 
+              customer={customer} 
+              formattedOrders={formattedOrders} 
+              primaryAddress={primaryAddress}
+              referrals={data.referrals}
+              onGoToReferrals={() => setActiveTab(`Referrals (${totalReferralsCount})`)}
+            />
+          )}
           {activeTab.startsWith('Orders') && <OrdersTab orders={formattedOrders} />}
+          {activeTab.startsWith('Referrals') && (
+            <ReferralsTab 
+              referrals={data.referrals} 
+              customer={customer} 
+              customerId={customer.customer_id || id}
+            />
+          )}
           {activeTab === 'Special Prices' && (
             <SpecialPricesTab
               specialPrices={data.special_prices || []}
@@ -425,7 +450,7 @@ export default function CustomerDetailsPage() {
           )}
           {activeTab === 'Revenue Trends' && <RevenueTrendsTab revenueAnalytics={data.revenue_analytics} />}
           {activeTab === 'Activity Log' && <ActivityLogTab timeline={data.activity_timeline} />}
-          {!activeTab.startsWith('Orders') && !['Overview & Insights', 'Containers & Returns', 'Payments', 'Postpaid Ledger', 'Wallet Analytics', 'Subscription', 'Revenue Trends', 'Activity Log'].includes(activeTab) && (
+          {!activeTab.startsWith('Orders') && !activeTab.startsWith('Referrals') && !['Overview & Insights', 'Containers & Returns', 'Payments', 'Postpaid Ledger', 'Wallet Analytics', 'Subscription', 'Revenue Trends', 'Activity Log'].includes(activeTab) && (
             <div className="text-center py-10 text-gray-400 font-medium flex flex-col items-center justify-center">
               <Box size={40} className="mb-4 text-gray-200" />
               This section is under construction. Check back soon.
@@ -454,7 +479,7 @@ function MetricCard({ title, value, sub, onClick }: { title: string, value: stri
   );
 }
 
-function OverviewTab({ customer, formattedOrders, primaryAddress }: { customer: any, formattedOrders: any[], primaryAddress: any }) {
+function OverviewTab({ customer, formattedOrders, primaryAddress, referrals, onGoToReferrals }: { customer: any, formattedOrders: any[], primaryAddress: any, referrals?: any, onGoToReferrals?: () => void }) {
   const preferredSlot = formattedOrders[0]?.delivery_slot || 'N/A';
   const preferredPayment = formattedOrders[0]?.payment_mode || 'N/A';
 
@@ -499,6 +524,431 @@ function OverviewTab({ customer, formattedOrders, primaryAddress }: { customer: 
           )}
         </div>
       </div>
+
+      {/* Referral Program Summary Block */}
+      <div className="bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-slate-50 p-6 rounded-2xl border border-emerald-100/80">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+              <Gift size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Referral Program Summary</h4>
+              <p className="text-[11px] text-gray-500 font-medium">Customer referral code, bonuses earned & conversion tracking</p>
+            </div>
+          </div>
+          {onGoToReferrals && (
+            <button
+              type="button"
+              onClick={onGoToReferrals}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+            >
+              <span>View All Referrals ({referrals?.total_referrals || 0})</span>
+              <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Referral Code</p>
+            <p className="text-sm font-mono font-extrabold text-emerald-700">#{customer.customer_id}</p>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Referred By</p>
+            <p className="text-sm font-bold text-gray-800 truncate">
+              {referrals?.referred_by ? `${referrals.referred_by.referrer_name || 'Referrer'} (#${referrals.referred_by.referrer_id})` : 'Direct / Organic'}
+            </p>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Referees</p>
+            <p className="text-sm font-extrabold text-gray-900">{referrals?.total_referrals || 0} customers</p>
+          </div>
+          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Rewards Credited</p>
+            <p className="text-sm font-extrabold text-emerald-600">₹{(referrals?.total_rewards_earned || 0).toFixed(2)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReferralsTab({ referrals, customer, customerId }: { referrals?: any; customer: any; customerId: string }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [copied, setCopied] = useState(false);
+
+  const referralCode = referrals?.referral_code || customer?.customer_id || customerId;
+  const referredBy = referrals?.referred_by;
+  const list: any[] = referrals?.list || [];
+  const totalRewardsEarned = Number(referrals?.total_rewards_earned || 0);
+  const rewardedCount = Number(referrals?.rewarded_count || list.filter((r: any) => r.status === 'rewarded').length);
+  const pendingCount = Number(referrals?.pending_count || list.filter((r: any) => r.status === 'pending' || r.status === 'first_order' || r.status === 'registered').length);
+
+  const handleCopyCode = () => {
+    if (!referralCode) return;
+    navigator.clipboard.writeText(referralCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const filteredList = list.filter((item: any) => {
+    const matchesSearch =
+      !searchQuery ||
+      item.referee_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.referee_phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.referee_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.referee_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.referral_code?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'REWARDED' && item.status === 'rewarded') ||
+      (statusFilter === 'PENDING' && (item.status === 'pending' || item.status === 'registered')) ||
+      (statusFilter === 'FIRST_ORDER' && item.status === 'first_order') ||
+      (statusFilter === 'CANCELLED' && item.status === 'cancelled');
+
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div className="space-y-6 font-sans">
+      {/* Top Header Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Referral Code Card */}
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 p-5 rounded-2xl border border-emerald-200/80 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800">
+                Customer Referral Code
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/60 text-emerald-900">
+                Active
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-mono text-xl font-extrabold text-emerald-950 bg-white px-3 py-1 rounded-xl border border-emerald-200 shadow-xs">
+                #{referralCode}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="p-2 rounded-xl bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-xs transition-all cursor-pointer"
+                title="Copy Referral Code"
+              >
+                {copied ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+              </button>
+            </div>
+          </div>
+          <p className="text-[11px] text-emerald-800/80 font-medium">
+            ₹100 bonus awarded to referrer upon referee&apos;s 1st delivered order.
+          </p>
+        </div>
+
+        {/* Referred By Card */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col justify-between shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                Referred By
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                referredBy ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {referredBy ? 'Referred User' : 'Direct Signup'}
+              </span>
+            </div>
+            {referredBy ? (
+              <div>
+                <Link
+                  href={`/admin/customers/${referredBy.referrer_id}`}
+                  className="font-bold text-gray-900 hover:text-emerald-600 transition-colors flex items-center gap-1.5 group text-sm"
+                >
+                  <span className="truncate">{referredBy.referrer_name || 'Referrer'}</span>
+                  <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+                <p className="font-mono text-xs text-gray-500 mt-0.5">#{referredBy.referrer_id}</p>
+                {referredBy.referrer_phone && (
+                  <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                    <Phone size={12} className="text-emerald-600" /> {referredBy.referrer_phone}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className="font-bold text-gray-700 text-sm">Direct / Organic Customer</p>
+                <p className="text-xs text-gray-400 mt-1">No referrer code applied during signup.</p>
+              </div>
+            )}
+          </div>
+          {referredBy?.created_at && (
+            <p className="text-[10px] text-gray-400 mt-2">
+              Joined on {new Date(referredBy.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </p>
+          )}
+        </div>
+
+        {/* Total Referees & Rewarded Count */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col justify-between shadow-2xs">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              Total Referees
+            </span>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-2xl font-extrabold text-gray-900">{list.length}</span>
+              <span className="text-xs font-semibold text-gray-500">invitations</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 pt-3 border-t border-gray-100 text-xs font-semibold">
+            <span className="text-emerald-600 flex items-center gap-1">
+              <CheckCircle2 size={12} /> {rewardedCount} Rewarded
+            </span>
+            <span className="text-amber-600 flex items-center gap-1">
+              <Clock size={12} /> {pendingCount} Pending
+            </span>
+          </div>
+        </div>
+
+        {/* Total Rewards Earned Card */}
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-100">
+                Total Referral Rewards
+              </span>
+              <Wallet size={16} className="text-emerald-200" />
+            </div>
+            <p className="text-3xl font-extrabold tracking-tight mt-1">
+              ₹{totalRewardsEarned.toFixed(2)}
+            </p>
+          </div>
+          <p className="text-[11px] text-emerald-100/90 font-medium">
+            Auto-credited to customer wallet upon order fulfillment
+          </p>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Status Filters */}
+        <div className="flex items-center gap-1.5 flex-wrap w-full md:w-auto">
+          {[
+            { id: 'ALL', label: `All (${list.length})` },
+            { id: 'REWARDED', label: `Rewarded (${rewardedCount})` },
+            { id: 'PENDING', label: `Pending (${pendingCount})` },
+            { id: 'FIRST_ORDER', label: 'First Order' },
+            { id: 'CANCELLED', label: 'Cancelled' },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setStatusFilter(f.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                statusFilter === f.id
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full md:w-72">
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search referee name, phone, ID..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-gray-400 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Referrals List Table */}
+      {filteredList.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-2xs">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100">
+            <Gift size={28} />
+          </div>
+          <h4 className="text-base font-bold text-gray-900 mb-1">
+            {searchQuery || statusFilter !== 'ALL' ? 'No matching referrals found' : 'No referrals recorded yet'}
+          </h4>
+          <p className="text-xs text-gray-500 max-w-md mx-auto mb-6">
+            {searchQuery || statusFilter !== 'ALL'
+              ? 'Try adjusting your search query or status filter to view other referral entries.'
+              : `This customer has not referred anyone yet. Share referral code #${referralCode} to begin tracking invitations and reward bonuses.`}
+          </p>
+          <button
+            type="button"
+            onClick={handleCopyCode}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+          >
+            <Copy size={14} />
+            <span>Copy Referral Code #{referralCode}</span>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-sans">
+              <thead className="bg-slate-50 border-b border-gray-100 text-gray-500 uppercase font-extrabold text-[10px] tracking-wider">
+                <tr>
+                  <th className="py-3.5 px-4">Referee Customer</th>
+                  <th className="py-3.5 px-4">Contact</th>
+                  <th className="py-3.5 px-4">Registered Date</th>
+                  <th className="py-3.5 px-4">1st Order Status</th>
+                  <th className="py-3.5 px-4">Referral Status</th>
+                  <th className="py-3.5 px-4 text-right">Referrer Reward</th>
+                  <th className="py-3.5 px-4">Rewarded Date / Remarks</th>
+                  <th className="py-3.5 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredList.map((item: any, idx: number) => {
+                  const isRewarded = item.status === 'rewarded';
+                  const isFirstOrder = item.status === 'first_order' || item.referee_first_order_completed;
+                  const isCancelled = item.status === 'cancelled';
+
+                  return (
+                    <tr key={item.refer_id || idx} className="hover:bg-slate-50/70 transition-colors">
+                      {/* Referee Customer */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-extrabold text-sm ${getAvatarColors(item.referee_name)}`}>
+                            {(item.referee_name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <Link
+                              href={`/admin/customers/${item.referee_id}`}
+                              className="font-bold text-gray-900 hover:text-emerald-600 transition-colors block text-xs"
+                            >
+                              {item.referee_name || 'New Customer'}
+                            </Link>
+                            <span className="font-mono text-[11px] text-gray-400">
+                              #{item.referee_id}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Contact */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-0.5">
+                          <p className="font-mono text-xs text-gray-800 flex items-center gap-1.5">
+                            <Phone size={12} className="text-emerald-600" />
+                            <span>{item.referee_phone || 'N/A'}</span>
+                          </p>
+                          {item.referee_email && (
+                            <p className="text-[11px] text-gray-500 flex items-center gap-1.5 truncate max-w-[160px]">
+                              <Mail size={12} className="text-gray-400" />
+                              <span className="truncate">{item.referee_email}</span>
+                            </p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Registered Date */}
+                      <td className="py-3.5 px-4 text-gray-600 font-medium">
+                        {item.created_at ? (
+                          <div>
+                            <p className="text-xs text-gray-800 font-semibold">
+                              {new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </p>
+                            <p className="text-[10px] text-gray-400 font-mono">
+                              {new Date(item.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        ) : (
+                          'N/A'
+                        )}
+                      </td>
+
+                      {/* 1st Order Status */}
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          item.referee_first_order_completed
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            item.referee_first_order_completed ? 'bg-emerald-500' : 'bg-amber-500'
+                          }`} />
+                          {item.referee_first_order_completed ? 'Completed' : 'Pending Order'}
+                        </span>
+                      </td>
+
+                      {/* Referral Status */}
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wide ${
+                          isRewarded
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : isCancelled
+                            ? 'bg-rose-100 text-rose-800'
+                            : isFirstOrder
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {isRewarded && <CheckCircle2 size={12} />}
+                          {item.status || 'PENDING'}
+                        </span>
+                      </td>
+
+                      {/* Referrer Reward */}
+                      <td className="py-3.5 px-4 text-right">
+                        <span className={`font-mono font-extrabold text-sm ${
+                          isRewarded ? 'text-emerald-700' : 'text-gray-500'
+                        }`}>
+                          ₹{Number(item.referrer_reward_amount || 100).toFixed(2)}
+                        </span>
+                      </td>
+
+                      {/* Rewarded Date / Remarks */}
+                      <td className="py-3.5 px-4 text-gray-600">
+                        {item.rewarded_at ? (
+                          <div>
+                            <p className="text-xs text-emerald-700 font-bold">
+                              Rewarded on {new Date(item.rewarded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </p>
+                            {item.remarks && <p className="text-[10px] text-gray-400 mt-0.5">{item.remarks}</p>}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-gray-400 italic">
+                            {item.remarks || 'Awaiting 1st order delivery'}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Action */}
+                      <td className="py-3.5 px-4 text-center">
+                        <Link
+                          href={`/admin/customers/${item.referee_id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 font-bold text-xs rounded-lg transition-colors"
+                        >
+                          <span>View</span>
+                          <ChevronRight size={12} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
