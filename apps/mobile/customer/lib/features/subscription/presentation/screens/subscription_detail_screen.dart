@@ -1152,110 +1152,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     );
   }
 
-  // ─── Bills section ──────────────────────────────────────────
 
-  Widget _buildBillsSection() {
-    if (_loadingBills) {
-      return Container(
-        margin: const EdgeInsets.only(top: 4),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorderLt),
-        ),
-        child: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(8.0),
-            child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
-          ),
-        ),
-      );
-    }
-
-    if (_bills.isEmpty) {
-      return Container(
-        margin: const EdgeInsets.only(top: 4),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorderLt),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.receipt_long_rounded,
-                size: 20,
-                color: kMuted.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Text(
-                'No bills found for this subscription yet.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: kTextSub,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Show first 3 bills inline, with "View All" button
-    final displayBills = _bills.take(3).toList();
-    return Column(
-      children: [
-        ...displayBills.map(
-          (bill) => _BillCard(bill: bill, formatDate: _formatDate),
-        ),
-        if (_bills.length > 3) ...[
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: _showBillsSheet,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: kPrimaryPl,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'View all ${_bills.length} bills',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: kPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: kPrimary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1770,35 +1667,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   _buildSubscriptionDetailsSection(s),
                   const SizedBox(height: 20),
 
-                  // ── 7. Bills section ────────────────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Bills',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: kText,
-                        ),
-                      ),
-                      if (_bills.isNotEmpty)
-                        GestureDetector(
-                          onTap: _showBillsSheet,
-                          child: const Text(
-                            'View All',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: kPrimary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _buildBillsSection(),
-                  const SizedBox(height: 16),
+
                 ],
               ),
             );
