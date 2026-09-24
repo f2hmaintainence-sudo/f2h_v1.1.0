@@ -113,6 +113,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
         morningQty: event.morningQty,
         eveningQty: event.eveningQty,
         weeklySchedule: event.weeklySchedule,
+        customSchedule: event.customSchedule,
         scheduleType: event.scheduleType,
         deliverySlot: event.deliverySlot,
         startDate: event.startDate,

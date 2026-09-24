@@ -38,6 +38,7 @@ abstract class SubscriptionRepository {
     required int morningQty,
     required int eveningQty,
     Map<String, Map<String, int>> weeklySchedule = const {},
+    List<Map<String, dynamic>> customSchedule = const [],
     required String scheduleType,
     required String deliverySlot,
     required String startDate,

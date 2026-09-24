@@ -701,6 +701,37 @@ export class SubscriptionsService {
         ],
       );
     }
+
+    const customDates = (body.custom_dates || []) as any[];
+    for (const cDate of customDates) {
+      const dateStr = typeof cDate === 'string' ? cDate : (cDate?.delivery_date || cDate?.date);
+      const mQty = typeof cDate === 'object' ? Number(cDate?.m_quantity ?? cDate?.morning_qty ?? item.schedules?.[0]?.m_quantity ?? 0) : Number(item.schedules?.[0]?.m_quantity ?? 0);
+      const eQty = typeof cDate === 'object' ? Number(cDate?.e_quantity ?? cDate?.evening_qty ?? item.schedules?.[0]?.e_quantity ?? 0) : Number(item.schedules?.[0]?.e_quantity ?? 0);
+      if (dateStr) {
+        await client.query(
+          `
+          INSERT INTO subscription_custom_schedule (
+            subscription_item_id,
+            subscription_id,
+            delivery_date,
+            m_quantity,
+            e_quantity
+          )
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (subscription_item_id, delivery_date) DO UPDATE SET
+            m_quantity = EXCLUDED.m_quantity,
+            e_quantity = EXCLUDED.e_quantity
+          `,
+          [
+            itemId,
+            subscriptionId,
+            dateStr,
+            mQty,
+            eQty,
+          ],
+        );
+      }
+    }
   }
 
   private makeId(prefix: string) {

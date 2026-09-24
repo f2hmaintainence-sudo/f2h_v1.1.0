@@ -251,6 +251,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     required int morningQty,
     required int eveningQty,
     Map<String, Map<String, int>> weeklySchedule = const {},
+    List<Map<String, dynamic>> customSchedule = const [],
     required String scheduleType,
     required String deliverySlot,
     required String startDate,
@@ -329,7 +330,9 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         if (razorpaySignature != null && razorpaySignature.isNotEmpty)
           'razorpay_signature': razorpaySignature,
 
-        'custom_dates': scheduleType == 'custom' ? customDays : <String>[],
+        'custom_dates': scheduleType == 'custom'
+            ? (customSchedule.isNotEmpty ? customSchedule : customDays)
+            : <dynamic>[],
         'items': [
           {
             'product_variant_id': variantId,
@@ -462,22 +465,6 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       print('Error getting pause history: $e');
       return [];
     }
-  }
-
-  // ── Legacy schedule builder (kept for placeOrder compatibility) ────
-  List<Map<String, dynamic>> _buildSchedules({
-    required String scheduleType,
-    required String deliverySlot,
-    required int quantity,
-    required List<String> customDays,
-  }) {
-    final isMorning = deliverySlot.toLowerCase().contains('morning');
-    return _buildSchedulesWithSplit(
-      scheduleType: scheduleType,
-      morningQty: isMorning ? quantity : 0,
-      eveningQty: isMorning ? 0 : quantity,
-      customDays: customDays,
-    );
   }
 
   // ── Primary schedule builder — supports morning/evening split ──────

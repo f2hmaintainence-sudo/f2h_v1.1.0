@@ -35,6 +35,30 @@ import '../../../../core/payments/payment_service.dart';
 // ── Day abbreviations ─────────────────────────────────────
 const _kDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// ── Custom Date Schedule Entry ─────────────────────────────
+class CustomDateScheduleEntry {
+  DateTime date;
+  int morningQty;
+  int eveningQty;
+
+  CustomDateScheduleEntry({
+    required this.date,
+    this.morningQty = 1,
+    this.eveningQty = 0,
+  });
+
+  String get dateString =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  String get formattedDisplay =>
+      '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year.toString().substring(2)}';
+
+  String get weekdayShort {
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return names[date.weekday - 1];
+  }
+}
+
 class SubscriptionSetupScreen extends StatefulWidget {
   final Product product;
   final ProductVariant? initialVariant;
@@ -42,6 +66,7 @@ class SubscriptionSetupScreen extends StatefulWidget {
   final int? initialMorningQty;
   final int? initialEveningQty;
   final Map<String, Map<String, int>>? initialWeeklySchedule;
+  final List<CustomDateScheduleEntry>? initialCustomDates;
   final bool? initialAutoRenew;
   final String? initialPaymentType;
 
@@ -53,6 +78,7 @@ class SubscriptionSetupScreen extends StatefulWidget {
     this.initialMorningQty,
     this.initialEveningQty,
     this.initialWeeklySchedule,
+    this.initialCustomDates,
     this.initialAutoRenew,
     this.initialPaymentType,
   });
@@ -67,7 +93,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   late ProductVariant _variant;
 
   // ── Frequency ────────────────────────────────────────
-  /// 'daily' | 'weekly'
+  /// 'daily' | 'weekly' | 'custom'
   String _frequency = 'daily';
 
   // ── Daily mode quantities ─────────────────────────────
@@ -77,6 +103,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Weekly mode per-day schedule ─────────────────────
   // Map: dayAbbr → {'morning': qty, 'evening': qty}
   late Map<String, Map<String, int>> _weeklySchedule;
+
+  // ── Custom mode per-date schedule ────────────────────
+  List<CustomDateScheduleEntry> _customDates = [];
 
   // ── Subscription dates ────────────────────────────────
   late DateTime _startDate;
@@ -186,6 +215,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       };
     }
 
+    // Init custom schedule defaults
+    if (widget.initialCustomDates != null && widget.initialCustomDates!.isNotEmpty) {
+      _customDates = List.from(widget.initialCustomDates!);
+    }
+
     // Load default address from session and initialize default quantities based on open slots
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final session = context.read<CustomerSessionCubit>().state;
@@ -247,12 +281,18 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   /// Total morning qty for estimations
   int get _totalMorningQty {
     if (_frequency == 'daily') return _morningQty;
+    if (_frequency == 'custom') {
+      return _customDates.fold(0, (s, d) => s + d.morningQty);
+    }
     return _weeklySchedule.values.fold(0, (s, d) => s + (d['morning'] ?? 0));
   }
 
   /// Total evening qty for estimations
   int get _totalEveningQty {
     if (_frequency == 'daily') return _eveningQty;
+    if (_frequency == 'custom') {
+      return _customDates.fold(0, (s, d) => s + d.eveningQty);
+    }
     return _weeklySchedule.values.fold(0, (s, d) => s + (d['evening'] ?? 0));
   }
 
@@ -290,6 +330,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         ]);
         totalDays += cnt;
         totalQty += cnt * (_morningQty + _eveningQty);
+      }
+    } else if (_frequency == 'custom') {
+      for (final entry in _customDates) {
+        final dayQty = entry.morningQty + entry.eveningQty;
+        if (dayQty > 0) {
+          totalDays += 1;
+          totalQty += dayQty;
+        }
       }
     } else {
       // Weekly: per-day qty
@@ -356,6 +404,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         totalDays += cnt;
         totalQty += cnt * (_morningQty + _eveningQty);
       }
+    } else if (_frequency == 'custom') {
+      for (final entry in _customDates) {
+        final dayQty = entry.morningQty + entry.eveningQty;
+        if (dayQty > 0) {
+          totalDays += 1;
+          totalQty += dayQty;
+        }
+      }
     } else {
       for (final day in _kDays) {
         final wd = dayMap[day] ?? 1;
@@ -385,7 +441,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     );
   }
 
-  // ── Date picker ───────────────────────────────────────
+  // ── Date pickers ──────────────────────────────────────
 
   Future<void> _pickStartDate() async {
     final first = DateTime.now().add(const Duration(days: 1));
@@ -397,7 +453,54 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       lastDate: last,
       title: 'Select Start Date',
     );
+    if (!mounted) return;
     if (picked != null) setState(() => _startDate = picked);
+  }
+
+  Future<void> _pickCustomDeliveryDate() async {
+    final first = DateTime.now().add(const Duration(days: 1));
+    final last = DateTime(first.year, first.month + 3, 0);
+    final initial = _customDates.isNotEmpty
+        ? (_customDates.last.date.add(const Duration(days: 1)).isBefore(last)
+            ? _customDates.last.date.add(const Duration(days: 1))
+            : first)
+        : first;
+    final picked = await showCustomDatePicker(
+      context: context,
+      initialDate: initial.isBefore(first) ? first : initial,
+      firstDate: first,
+      lastDate: last,
+      title: 'Select Delivery Date',
+    );
+    if (!mounted) return;
+    if (picked != null) {
+      final dateOnly = DateTime(picked.year, picked.month, picked.day);
+      final exists = _customDates.any((e) =>
+          e.date.year == dateOnly.year &&
+          e.date.month == dateOnly.month &&
+          e.date.day == dateOnly.day);
+      if (exists) {
+        F2HToast.show(context, 'This date is already added');
+        return;
+      }
+      final slotTimings = slotTimingsOf(context);
+      final now = DateTime.now();
+      final morningWin = getMorningSlotWindow(now, slotTimings);
+      final eveningWin = getEveningSlotWindow(now, slotTimings);
+      final defaultMorning = morningWin.isEnabled ? 1 : 0;
+      final defaultEvening = (!morningWin.isEnabled && eveningWin.isEnabled) ? 1 : 0;
+
+      setState(() {
+        _customDates.add(
+          CustomDateScheduleEntry(
+            date: dateOnly,
+            morningQty: defaultMorning,
+            eveningQty: defaultEvening,
+          ),
+        );
+        _customDates.sort((a, b) => a.date.compareTo(b.date));
+      });
+    }
   }
 
   // ── Address picker ────────────────────────────────────
@@ -444,6 +547,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         reason,
         title: 'Delivery Unavailable',
       );
+      return;
+    }
+
+    if (_frequency == 'custom' && _customDates.isEmpty) {
+      F2HToast.error(context, 'Please add at least one delivery date');
       return;
     }
 
@@ -499,6 +607,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     if (_frequency == 'daily') {
       morningQty = _morningQty;
       eveningQty = _eveningQty;
+    } else if (_frequency == 'custom') {
+      morningQty = _customDates.fold(0, (s, d) => s + d.morningQty);
+      eveningQty = _customDates.fold(0, (s, d) => s + d.eveningQty);
     } else {
       morningQty = _weeklySchedule.values.fold(
         0,
@@ -544,14 +655,36 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         ? 'Morning'
         : 'Evening';
 
-    // For weekly mode: only pass days that actually have qty > 0
-    final activeDays = _frequency == 'weekly'
-        ? _kDays.where((d) {
-            final m = _weeklySchedule[d]?['morning'] ?? 0;
-            final e = _weeklySchedule[d]?['evening'] ?? 0;
-            return m > 0 || e > 0;
-          }).toList()
-        : _kDays;
+    final List<String> activeDays;
+    final List<Map<String, dynamic>> customSchedulePayload;
+
+    if (_frequency == 'weekly') {
+      activeDays = _kDays.where((d) {
+        final m = _weeklySchedule[d]?['morning'] ?? 0;
+        final e = _weeklySchedule[d]?['evening'] ?? 0;
+        return m > 0 || e > 0;
+      }).toList();
+      customSchedulePayload = const [];
+    } else if (_frequency == 'custom') {
+      activeDays = _customDates
+          .where((d) => (d.morningQty + d.eveningQty) > 0)
+          .map((d) => d.dateString)
+          .toList();
+      customSchedulePayload = _customDates
+          .where((d) => (d.morningQty + d.eveningQty) > 0)
+          .map((d) => {
+                'delivery_date': d.dateString,
+                'date': d.dateString,
+                'm_quantity': d.morningQty,
+                'morning_qty': d.morningQty,
+                'e_quantity': d.eveningQty,
+                'evening_qty': d.eveningQty,
+              })
+          .toList();
+    } else {
+      activeDays = _kDays;
+      customSchedulePayload = const [];
+    }
 
     final double effectiveEstimatedTotal = paymentType == 'postpaid'
         ? _fullMonthEstimate.total
@@ -596,6 +729,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
     if (!mounted) return;
 
+    final checkoutStartDate = (_frequency == 'custom' && _customDates.isNotEmpty)
+        ? _customDates.first.dateString
+        : _startDate.toString().split(' ')[0];
+
     context.read<SubscriptionBloc>().add(
       SubscriptionCheckoutRequested(
         customerId: customerId,
@@ -604,12 +741,13 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         variantId: _variant.id,
         scheduleType: _frequency,
         deliverySlot: deliverySlot,
-        startDate: _startDate.toString().split(' ')[0],
+        startDate: checkoutStartDate,
         unitPrice: _subscriptionUnitPrice,
         customDays: activeDays,
         morningQty: morningQty,
         eveningQty: eveningQty,
         weeklySchedule: _frequency == 'weekly' ? Map.from(_weeklySchedule) : {},
+        customSchedule: customSchedulePayload,
         paymentType: paymentType,
         paymentMethod: paymentMethod,
         autoRenew: _autoRenew,
@@ -1335,7 +1473,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Frequency title and Daily/Weekly buttons in a single row ──
+          // ── Frequency title and Daily/Weekly/Custom buttons in a single row ──
           Row(
             children: [
               Container(
@@ -1354,7 +1492,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               Text(
                 'Frequency',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF0F172A),
                 ),
@@ -1368,10 +1506,19 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                   setState(() => _frequency = v);
                 },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _FreqChip(
                 label: 'Weekly',
                 value: 'weekly',
+                selected: _frequency,
+                onTap: (v) {
+                  setState(() => _frequency = v);
+                },
+              ),
+              const SizedBox(width: 6),
+              _FreqChip(
+                label: 'Custom',
+                value: 'custom',
                 selected: _frequency,
                 onTap: (v) {
                   setState(() => _frequency = v);
@@ -1692,6 +1839,283 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                 },
               ),
             ],
+
+            // ── CUSTOM: specific date selection with slot quantities ────
+            if (_frequency == 'custom') ...[
+              if (_customDates.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFDCFCE7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.calendar_month_rounded,
+                          size: 24,
+                          color: Color(0xFF15803D),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No Delivery Dates Added',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Select dates and set morning / evening quantities for each.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: _pickCustomDeliveryDate,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16A34A),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Add Delivery Date',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                // Header
+                Row(
+                  children: [
+                    const SizedBox(width: 80),
+                    if (isMorningOpen)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'MORNING',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: morningColor,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (isMorningOpen && isEveningOpen) const SizedBox(width: 8),
+                    if (isEveningOpen)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'EVENING',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: eveningColor,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 30), // Space for delete icon
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ..._customDates.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 80,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                entry.formattedDisplay,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: kText,
+                                ),
+                              ),
+                              Text(
+                                entry.weekdayShort,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: kTextSub,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isMorningOpen)
+                          Expanded(
+                            child: _MiniQtyControl(
+                              qty: entry.morningQty,
+                              accentColor: morningColor,
+                              onDecrement: () => setState(() {
+                                if (entry.morningQty > 0) entry.morningQty--;
+                              }),
+                              onIncrement: () => setState(() => entry.morningQty++),
+                            ),
+                          ),
+                        if (isMorningOpen && isEveningOpen) const SizedBox(width: 8),
+                        if (isEveningOpen)
+                          Expanded(
+                            child: _MiniQtyControl(
+                              qty: entry.eveningQty,
+                              accentColor: eveningColor,
+                              onDecrement: () => setState(() {
+                                if (entry.eveningQty > 0) entry.eveningQty--;
+                              }),
+                              onIncrement: () => setState(() => entry.eveningQty++),
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() => _customDates.remove(entry));
+                          },
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 14,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 4),
+                // Add more date button
+                InkWell(
+                  onTap: _pickCustomDeliveryDate,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF86EFAC), width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 14,
+                          color: Color(0xFF15803D),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '+ Add Another Date',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF15803D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Divider(color: Color(0xFFE5E7EB)),
+                // Summary bar
+                Builder(
+                  builder: (_) {
+                    final customTotal = _customDates.fold(
+                      0,
+                      (s, d) => s + d.morningQty + d.eveningQty,
+                    );
+                    return customTotal == 0
+                        ? Text(
+                            'Set at least 1 unit for added dates in an active window',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.red.shade400,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        : Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFDCFCE7), width: 1.0),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Custom Schedule',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF15803D),
+                                  ),
+                                ),
+                                Text(
+                                  '$customTotal items (${_customDates.length} days) · ₹${(customTotal * _subscriptionUnitPrice).toStringAsFixed(0)}',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF14532D),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                  },
+                ),
+              ],
+            ],
           ],
         ],
       ),
@@ -1712,7 +2136,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     return map[abbr] ?? abbr;
   }
 
-  // ── Plan Options: start date + auto renewal + payment type ─
+  // ── Plan Options: start date + payment type ───────────────
 
   Widget _buildPlanOptionsCard() {
     return _SectionCard(
@@ -1725,16 +2149,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             label: 'Plan & Payment',
           ),
           const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _buildStartDateRow()),
-                const SizedBox(width: 10),
-                Expanded(child: _buildAutoRenewalRow()),
-              ],
-            ),
-          ),
+          _buildStartDateRow(),
           const SizedBox(height: 14),
           const Divider(color: Color(0xFFE5E7EB), height: 1),
           const SizedBox(height: 14),
@@ -1776,89 +2191,50 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
         },
         borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: kPrimaryPl,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.calendar_today_rounded, size: 14, color: kPrimary),
+                child: const Icon(Icons.calendar_today_rounded, size: 15, color: kPrimary),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  dateStr,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: kText,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'START DATE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: kTextSub,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF94A3B8)),
+              const Icon(Icons.arrow_drop_down_rounded, size: 20, color: Color(0xFF94A3B8)),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // ── Auto Renewal row (inside the plan options card) ───────
-
-  Widget _buildAutoRenewalRow() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBFCFB),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEFF2F0)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: kPrimaryPl,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.autorenew_rounded, size: 14, color: kPrimary),
-            ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'Auto Renew',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: kText,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Transform.scale(
-              scale: 0.75,
-              alignment: Alignment.centerRight,
-              child: Switch(
-                value: _autoRenew,
-                onChanged: (v) {
-                  HapticFeedback.lightImpact();
-                  setState(() => _autoRenew = v);
-                },
-                activeThumbColor: Colors.white,
-                activeTrackColor: kPrimary,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -2324,40 +2700,38 @@ class _FreqChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSel = value == selected;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap(value);
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          decoration: BoxDecoration(
-            color: isSel ? kPrimary : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSel ? kPrimary : const Color(0xFFDDE1E6),
-              width: isSel ? 1.5 : 1.0,
-            ),
-            boxShadow: isSel
-                ? [
-                    BoxShadow(
-                      color: kPrimary.withValues(alpha: 0.2),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap(value);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
+        decoration: BoxDecoration(
+          color: isSel ? kPrimary : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSel ? kPrimary : const Color(0xFFDDE1E6),
+            width: isSel ? 1.5 : 1.0,
           ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: isSel ? Colors.white : kTextSub,
-            ),
+          boxShadow: isSel
+              ? [
+                  BoxShadow(
+                    color: kPrimary.withValues(alpha: 0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: isSel ? Colors.white : kTextSub,
           ),
         ),
       ),

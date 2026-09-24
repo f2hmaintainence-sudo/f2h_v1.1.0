@@ -969,8 +969,22 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
             dq.morningQty == dayQtys.first.morningQty &&
             dq.eveningQty == dayQtys.first.eveningQty);
 
-    final isWeekly = s.frequency.toLowerCase().contains('weekly') ||
-        (dayQtys.isNotEmpty && !isAllSame);
+    final customDates = s.allCustomDates;
+    final isCustom = s.scheduleType.toLowerCase().contains('custom') ||
+        s.frequency.toLowerCase().contains('custom') ||
+        customDates.isNotEmpty;
+
+    final isWeekly = !isCustom && (s.frequency.toLowerCase().contains('weekly') ||
+        (dayQtys.isNotEmpty && !isAllSame));
+
+    final List<CustomDateScheduleEntry> initialCustomDates = customDates.map((c) {
+      final parsedDate = DateTime.tryParse(c.deliveryDate) ?? DateTime.now();
+      return CustomDateScheduleEntry(
+        date: parsedDate,
+        morningQty: c.mQuantity,
+        eveningQty: c.eQuantity,
+      );
+    }).toList();
 
     final mQty = dayQtys.isNotEmpty
         ? dayQtys.first.morningQty
@@ -985,10 +999,11 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         builder: (_) => SubscriptionSetupScreen(
           product: product,
           initialVariant: variant,
-          initialFrequency: isWeekly ? 'weekly' : 'daily',
-          initialMorningQty: isWeekly ? 0 : mQty,
-          initialEveningQty: isWeekly ? 0 : eQty,
+          initialFrequency: isCustom ? 'custom' : (isWeekly ? 'weekly' : 'daily'),
+          initialMorningQty: (isWeekly || isCustom) ? 0 : mQty,
+          initialEveningQty: (isWeekly || isCustom) ? 0 : eQty,
           initialWeeklySchedule: weeklySchedule,
+          initialCustomDates: initialCustomDates,
           initialAutoRenew: s.autoRenew,
           initialPaymentType: s.paymentType,
         ),
