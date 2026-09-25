@@ -29,7 +29,7 @@ export class SubscriptionSnapshotRepository {
     slot: 'morning' | 'evening',
     branchId?: string | null,
   ): Promise<any[]> {
-    const qtyExpr = slot === 'morning' ? 'ws.m_quantity' : 'ws.e_quantity';
+    const qtyExpr = slot === 'morning' ? 'sched.m_quantity' : 'sched.e_quantity';
 
     const params: any[] = [date];
     let branchFilter = '';
@@ -41,6 +41,35 @@ export class SubscriptionSnapshotRepository {
 
     return this.db.query(
       `
+      WITH schedule_union AS (
+        -- Weekly: match by day-of-week
+        SELECT
+          ws.subscription_item_id,
+          ws.m_quantity,
+          ws.e_quantity
+        FROM subscription_weekly_schedule ws
+        JOIN subscription_items si2
+          ON (ws.subscription_item_id = si2.subscription_item_id OR ws.subscription_item_id = si2.id::text)
+        JOIN subscriptions s2
+          ON s2.subscription_id = si2.subscription_id
+        WHERE s2.schedule_type = 'weekly'
+          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
+
+        UNION ALL
+
+        -- Custom dates: match by exact delivery date
+        SELECT
+          cs.subscription_item_id,
+          cs.m_quantity,
+          cs.e_quantity
+        FROM subscription_custom_schedule cs
+        JOIN subscription_items si3
+          ON cs.subscription_item_id = si3.subscription_item_id
+        JOIN subscriptions s3
+          ON s3.subscription_id = si3.subscription_id
+        WHERE s3.schedule_type = 'custom_dates'
+          AND cs.delivery_date = $1::date
+      )
       SELECT
         s.branch_id,
         si.product_variant_id,
@@ -51,8 +80,8 @@ export class SubscriptionSnapshotRepository {
       FROM subscriptions s
       INNER JOIN subscription_items si
         ON si.subscription_id = s.subscription_id
-      INNER JOIN subscription_weekly_schedule ws
-        ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
+      INNER JOIN schedule_union sched
+        ON sched.subscription_item_id = si.subscription_item_id
       LEFT JOIN product_variants pv
         ON pv.variant_id = si.product_variant_id
       LEFT JOIN products p
@@ -65,7 +94,6 @@ export class SubscriptionSnapshotRepository {
           OR s.pause_to_date IS NULL
           OR $1::date NOT BETWEEN s.pause_from_date AND s.pause_to_date
         )
-        AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
         AND ${qtyExpr} > 0
         ${branchFilter}
       GROUP BY
@@ -102,7 +130,7 @@ export class SubscriptionSnapshotRepository {
     generationType: 'cron' | 'manual',
     branchId?: string | null,
   ): Promise<number> {
-    const qtyExpr = slot === 'morning' ? 'ws.m_quantity' : 'ws.e_quantity';
+    const qtyExpr = slot === 'morning' ? 'sched.m_quantity' : 'sched.e_quantity';
 
     const params: any[] = [date, slot, generationType];
     let branchFilter = '';
@@ -113,7 +141,36 @@ export class SubscriptionSnapshotRepository {
 
     const result = await this.db.query<{ inserted_count: string }>(
       `
-      WITH eligible_subs AS (
+      WITH schedule_union AS (
+        -- Weekly: match by day-of-week
+        SELECT
+          ws.subscription_item_id,
+          ws.m_quantity,
+          ws.e_quantity
+        FROM subscription_weekly_schedule ws
+        JOIN subscription_items si2
+          ON (ws.subscription_item_id = si2.subscription_item_id OR ws.subscription_item_id = si2.id::text)
+        JOIN subscriptions s2
+          ON s2.subscription_id = si2.subscription_id
+        WHERE s2.schedule_type = 'weekly'
+          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
+
+        UNION ALL
+
+        -- Custom dates: match by exact delivery date
+        SELECT
+          cs.subscription_item_id,
+          cs.m_quantity,
+          cs.e_quantity
+        FROM subscription_custom_schedule cs
+        JOIN subscription_items si3
+          ON cs.subscription_item_id = si3.subscription_item_id
+        JOIN subscriptions s3
+          ON s3.subscription_id = si3.subscription_id
+        WHERE s3.schedule_type = 'custom_dates'
+          AND cs.delivery_date = $1::date
+      ),
+      eligible_subs AS (
         -- Distinct eligible subscriptions with their subtotals
         SELECT
           s.subscription_id,
@@ -129,8 +186,8 @@ export class SubscriptionSnapshotRepository {
           ON si.subscription_id = s.subscription_id
         LEFT JOIN product_variants pv
           ON pv.variant_id = si.product_variant_id
-        JOIN subscription_weekly_schedule ws
-          ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
+        JOIN schedule_union sched
+          ON sched.subscription_item_id = si.subscription_item_id
         LEFT JOIN customer_addresses ca
           ON ca.address_id = s.address_id
         WHERE (s.status = 'active' OR (s.status = 'paused' AND s.pause_to_date IS NOT NULL AND s.pause_to_date < $1::date))
@@ -141,7 +198,6 @@ export class SubscriptionSnapshotRepository {
             OR s.pause_to_date IS NULL
             OR NOT ($1::date BETWEEN s.pause_from_date AND s.pause_to_date)
           )
-          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
           AND ${qtyExpr} > 0
           ${branchFilter}
         GROUP BY
@@ -216,7 +272,7 @@ export class SubscriptionSnapshotRepository {
     slot: 'morning' | 'evening',
     branchId?: string | null,
   ): Promise<number> {
-    const qtyExpr = slot === 'morning' ? 'ws.m_quantity' : 'ws.e_quantity';
+    const qtyExpr = slot === 'morning' ? 'sched.m_quantity' : 'sched.e_quantity';
 
     const params: any[] = [date, slot];
     let branchFilter = '';
@@ -227,7 +283,36 @@ export class SubscriptionSnapshotRepository {
 
     const result = await this.db.query<{ inserted_count: string }>(
       `
-      WITH items_to_insert AS (
+      WITH schedule_union AS (
+        -- Weekly: match by day-of-week
+        SELECT
+          ws.subscription_item_id,
+          ws.m_quantity,
+          ws.e_quantity
+        FROM subscription_weekly_schedule ws
+        JOIN subscription_items si2
+          ON (ws.subscription_item_id = si2.subscription_item_id OR ws.subscription_item_id = si2.id::text)
+        JOIN subscriptions s2
+          ON s2.subscription_id = si2.subscription_id
+        WHERE s2.schedule_type = 'weekly'
+          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
+
+        UNION ALL
+
+        -- Custom dates: match by exact delivery date
+        SELECT
+          cs.subscription_item_id,
+          cs.m_quantity,
+          cs.e_quantity
+        FROM subscription_custom_schedule cs
+        JOIN subscription_items si3
+          ON cs.subscription_item_id = si3.subscription_item_id
+        JOIN subscriptions s3
+          ON s3.subscription_id = si3.subscription_id
+        WHERE s3.schedule_type = 'custom_dates'
+          AND cs.delivery_date = $1::date
+      ),
+      items_to_insert AS (
         SELECT
           o.order_id,
           -- The business key, not the surrogate si.id. Everything that reads
@@ -246,13 +331,12 @@ export class SubscriptionSnapshotRepository {
           ON si.subscription_id = o.subscription_id
         LEFT JOIN product_variants pv
           ON pv.variant_id = si.product_variant_id
-        JOIN subscription_weekly_schedule ws
-          ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
+        JOIN schedule_union sched
+          ON sched.subscription_item_id = si.subscription_item_id
         WHERE o.scheduled_date = $1::date
           AND o.delivery_slot = $2
           AND o.order_source = 'subscription'
           ${branchFilter}
-          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
           AND ${qtyExpr} > 0
           -- Only for orders that don't already have items
           AND NOT EXISTS (
@@ -429,7 +513,7 @@ export class SubscriptionSnapshotRepository {
     onetime_orders_confirmed: number;
     total_processed: number;
   }>> {
-    const qtyExpr = slot === 'morning' ? 'ws.m_quantity' : 'ws.e_quantity';
+    const qtyExpr = slot === 'morning' ? 'sched.m_quantity' : 'sched.e_quantity';
     const params: any[] = [date, slot];
     let branchFilter = '';
     if (branchId) {
@@ -439,7 +523,36 @@ export class SubscriptionSnapshotRepository {
 
     return this.db.query(
       `
-      WITH scheduled_subs AS (
+      WITH schedule_union AS (
+        -- Weekly: match by day-of-week
+        SELECT
+          ws.subscription_item_id,
+          ws.m_quantity,
+          ws.e_quantity
+        FROM subscription_weekly_schedule ws
+        JOIN subscription_items si2
+          ON (ws.subscription_item_id = si2.subscription_item_id OR ws.subscription_item_id = si2.id::text)
+        JOIN subscriptions s2
+          ON s2.subscription_id = si2.subscription_id
+        WHERE s2.schedule_type = 'weekly'
+          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
+
+        UNION ALL
+
+        -- Custom dates: match by exact delivery date
+        SELECT
+          cs.subscription_item_id,
+          cs.m_quantity,
+          cs.e_quantity
+        FROM subscription_custom_schedule cs
+        JOIN subscription_items si3
+          ON cs.subscription_item_id = si3.subscription_item_id
+        JOIN subscriptions s3
+          ON s3.subscription_id = si3.subscription_id
+        WHERE s3.schedule_type = 'custom_dates'
+          AND cs.delivery_date = $1::date
+      ),
+      scheduled_subs AS (
         SELECT
           s.branch_id,
           COUNT(DISTINCT s.subscription_id)::int AS active_subscriptions,
@@ -447,8 +560,8 @@ export class SubscriptionSnapshotRepository {
         FROM subscriptions s
         INNER JOIN subscription_items si
           ON si.subscription_id = s.subscription_id
-        INNER JOIN subscription_weekly_schedule ws
-          ON (ws.subscription_item_id = si.subscription_item_id OR ws.subscription_item_id = si.id::text)
+        INNER JOIN schedule_union sched
+          ON sched.subscription_item_id = si.subscription_item_id
         WHERE (s.status = 'active' OR (s.status = 'paused' AND s.pause_to_date IS NOT NULL AND s.pause_to_date < $1::date))
           AND s.start_date <= $1::date
           AND (s.end_date IS NULL OR s.end_date >= $1::date)
@@ -457,7 +570,6 @@ export class SubscriptionSnapshotRepository {
             OR s.pause_to_date IS NULL
             OR $1::date NOT BETWEEN s.pause_from_date AND s.pause_to_date
           )
-          AND ws.day_of_week = EXTRACT(DOW FROM $1::date)::int
           AND ${qtyExpr} > 0
         GROUP BY s.branch_id
       ),
