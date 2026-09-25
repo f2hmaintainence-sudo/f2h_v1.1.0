@@ -657,13 +657,11 @@ class ProductCardV extends StatelessWidget {
                     // 1. Image on the left
                     SizedBox(
                       width: MediaQuery.of(context).size.width < 350 ? 98 : 112,
-                      child: Hero(
-                        tag: 'product-v-${p.id}',
-                        child: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: _productImage(p, padding: 0.0),
-                            ),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: _productImage(p, padding: 0.0),
+                          ),
                             if (p.isOutOfStock)
                               Positioned(
                                 top: 6, left: 6,
@@ -729,7 +727,6 @@ class ProductCardV extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
                     // 2. Info on the right
                     Expanded(
                       child: Padding(
@@ -836,16 +833,13 @@ class ProductCardV extends StatelessWidget {
                   // Image area
                   Stack(
                     children: [
-                      Hero(
-                        tag: 'product-v-${p.id}',
-                        child: Container(
-                          height: 112,
-                          width: double.infinity,
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent,
-                          ),
-                          child: _productImage(p, padding: 0.0),
+                      Container(
+                        height: 112,
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                          color: Colors.transparent,
                         ),
+                        child: _productImage(p, padding: 0.0),
                       ),
                       if (p.isOutOfStock)
                         Positioned(

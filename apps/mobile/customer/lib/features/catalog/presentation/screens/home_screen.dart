@@ -1440,13 +1440,10 @@ class _HomeScreenState extends State<HomeScreen>
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
-                  child: Hero(
-                    tag: 'product-sub-${p.id}',
-                    child: buildProductImage(
-                      p.name,
-                      imageAsset: p.imageAsset,
-                      fit: BoxFit.contain,
-                    ),
+                  child: buildProductImage(
+                    p.name,
+                    imageAsset: p.imageAsset,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
@@ -3005,10 +3002,10 @@ class HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  double get maxExtent => topPadding + 110;
+  double get maxExtent => topPadding + 116;
 
   @override
-  double get minExtent => topPadding + 110;
+  double get minExtent => topPadding + 116;
 
   @override
   bool shouldRebuild(covariant HomeHeaderDelegate oldDelegate) {
