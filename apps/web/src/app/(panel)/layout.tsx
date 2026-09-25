@@ -10,18 +10,13 @@
 
 "use client";
 
-import dynamic from "next/dynamic";
 import { AuthProvider, useAuth, getHomeForRole } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { AdminSidebar, adminNav } from "@/components/f2h/AdminSidebar";
 import { AdminHeader } from "@/components/f2h/AdminHeader";
+import { RealtimeNotifications } from "@/components/f2h/RealtimeNotifications";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo } from "react";
-
-const RealtimeNotifications = dynamic(
-  () => import("@/components/f2h/RealtimeNotifications").then((mod) => mod.RealtimeNotifications),
-  { ssr: false }
-);
 
 function PanelGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, activeRole, isAdmin, hasPermission } = useAuth();
