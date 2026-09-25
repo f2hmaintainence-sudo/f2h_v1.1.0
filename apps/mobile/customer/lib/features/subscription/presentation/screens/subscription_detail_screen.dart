@@ -601,129 +601,52 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   Widget _buildDeliveryAddressCard(AddressModel address, String addressString) {
     final contactName = address.contactName.isNotEmpty
         ? address.contactName
-        : (address.customerId.isNotEmpty ? address.customerId : 'Recipient');
-    final contactMobile = address.contactMobile;
-    final addressType = address.addressType.isNotEmpty
-        ? address.addressType.toUpperCase()
-        : 'HOME';
-    final slot = _subscription.slot.isNotEmpty ? _subscription.slot : 'Morning';
+        : (address.customerId.isNotEmpty ? address.customerId : '');
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.only(top: 2, bottom: 6),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: kPrimaryPl,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.location_on_rounded,
-                  size: 17,
-                  color: kPrimary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'DELIVERY ADDRESS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: kTextSub,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: kPrimary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  addressType,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: kPrimary,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ),
-            ],
+          const Icon(
+            Icons.location_on_rounded,
+            size: 15,
+            color: kPrimary,
           ),
-          const SizedBox(height: 12),
-          if (contactName.isNotEmpty || contactMobile.isNotEmpty) ...[
-            Row(
-              children: [
-                Text(
-                  contactName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
-                  ),
-                ),
-                if (contactMobile.isNotEmpty) ...[
-                  const Text(
-                    '  •  ',
-                    style: TextStyle(color: kMuted, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    contactMobile,
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  if (contactName.isNotEmpty) ...[
+                    TextSpan(
+                      text: contactName,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: kText,
+                      ),
+                    ),
+                    const TextSpan(
+                      text: ' • ',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: kMuted,
+                      ),
+                    ),
+                  ],
+                  TextSpan(
+                    text: addressString,
                     style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                       color: kTextSub,
                     ),
                   ),
                 ],
-              ],
-            ),
-            const SizedBox(height: 4),
-          ],
-          Text(
-            addressString,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
-              color: kTextSub,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: kBorderLt),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.schedule_rounded,
-                  size: 13,
-                  color: kPrimary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Preferred Slot: $slot',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: kTextMid,
-                  ),
-                ),
-              ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -1279,9 +1202,30 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   // ── Alert Banners ──────────────────────────────
                   _buildAlertBanners(),
 
-                  // ── 1. Subscription Product Section ───────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  // ── Delivery Address (First) ───────────────────
+                  _buildDeliveryAddressCard(defaultAddress, addressString),
+                  const SizedBox(height: 6),
+
+                  // ── 1. Subscription Product Card ───────────────
+                  Container(
+                    decoration: BoxDecoration(
+                      color: kSurface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isCancelled
+                            ? kRed.withValues(alpha: 0.18)
+                            : kBorderLt,
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(14),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1582,11 +1526,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ── 3. Delivery Address ────────────────────────
-                  _buildDeliveryAddressCard(defaultAddress, addressString),
-                  const SizedBox(height: 12),
-
-                  // ── 4. Subscription Details (collapsible, includes Delivery Details) ──
+                  // ── Subscription Details (collapsible, includes Delivery Details) ──
                   _buildSubscriptionDetailsSection(s),
                   const SizedBox(height: 20),
 
@@ -2381,18 +2321,9 @@ class _QuickActionButton extends StatelessWidget {
         onTap();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorderLt, width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
         ),
         child: Column(
           children: [
