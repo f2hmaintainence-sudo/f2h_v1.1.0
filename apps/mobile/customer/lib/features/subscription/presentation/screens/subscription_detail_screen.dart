@@ -608,20 +608,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         : 'HOME';
     final slot = _subscription.slot.isNotEmpty ? _subscription.slot : 'Morning';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kBorderLt, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -755,20 +743,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final isPostpaid = s.paymentType == 'postpaid';
     final hasEndDate = s.endDate != null && s.endDate!.isNotEmpty;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kBorderLt, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1303,35 +1279,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   // ── Alert Banners ──────────────────────────────
                   _buildAlertBanners(),
 
-                  // ── 1. Subscription Product Card ───────────────
-                  Container(
-                    decoration: BoxDecoration(
-                      color: kSurface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isCancelled
-                            ? kRed.withValues(alpha: 0.18)
-                            : kBorderLt,
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+                  // ── 1. Subscription Product Section ───────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                                 // Product image
                                     Container(
                                       width: 68,
@@ -1569,11 +1522,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                              ),
                   const SizedBox(height: 14),
 
                   // ── 2. Quick action buttons (All Green Theme) ──
@@ -2432,9 +2381,18 @@ class _QuickActionButton extends StatelessWidget {
         onTap();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: const BoxDecoration(
-          color: Colors.transparent,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kBorderLt, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           children: [
