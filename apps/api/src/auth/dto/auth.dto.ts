@@ -213,6 +213,10 @@ export class LoginWithOtpDto {
   @IsOptional()
   @IsString()
   referralCode?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
 }
 
 export class DeviceFingerprintDto {

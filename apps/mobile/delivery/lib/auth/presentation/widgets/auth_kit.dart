@@ -333,6 +333,7 @@ class DeliveryAuthField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final ValueChanged<String>? onChanged;
   final Widget? trailing;
+  final String? prefixText;
   final int? maxLength;
   final TextCapitalization textCapitalization;
 
@@ -348,6 +349,7 @@ class DeliveryAuthField extends StatefulWidget {
     this.onSubmitted,
     this.onChanged,
     this.trailing,
+    this.prefixText,
     this.maxLength,
     this.textCapitalization = TextCapitalization.none,
   });
@@ -396,6 +398,12 @@ class _DeliveryAuthFieldState extends State<DeliveryAuthField> {
                     counterText: '',
                     isDense: true,
                     filled: false,
+                    prefixText: widget.prefixText,
+                    prefixStyle: GoogleFonts.roboto(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w600,
+                      color: kAuthInk,
+                    ),
                     hintText: widget.hint,
                     hintStyle: GoogleFonts.roboto(
                       fontSize: 15.5,
@@ -708,4 +716,29 @@ class DeliveryTextLink extends StatelessWidget {
       ),
     ),
   );
+}
+
+class IndianMobileNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) {
+      return newValue;
+    }
+    final digits = text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      return const TextEditingValue();
+    }
+    if (!RegExp(r'^[6-9]').hasMatch(digits)) {
+      return oldValue;
+    }
+    final clamped = digits.length > 10 ? digits.substring(0, 10) : digits;
+    return TextEditingValue(
+      text: clamped,
+      selection: TextSelection.collapsed(offset: clamped.length),
+    );
+  }
 }

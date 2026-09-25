@@ -8,6 +8,12 @@ import 'package:f2h_delivery/core/api/api_error.dart';
 
 abstract class AuthRemoteDataSource {
   Future<UserModel> login(String identifier, String password);
+  Future<void> sendLoginOtp(String phone);
+  Future<UserModel> loginWithOtp({
+    required String phone,
+    required String otp,
+    String? referralCode,
+  });
   Future<UserModel> register(
     String name,
     String email,
@@ -84,6 +90,63 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
     } on DioException catch (e) {
       throw _extractError(e, 'Invalid email or password');
+    }
+  }
+
+  @override
+  Future<void> sendLoginOtp(String phone) async {
+    await dioClient.fetchCsrfToken();
+    try {
+      await dioClient.dio.post(
+        ApiEndpoints.sendOtp,
+        data: {
+          'phone': phone,
+          'purpose': 'login',
+        },
+      );
+    } on DioException catch (e) {
+      throw _extractError(e, 'Unable to send login OTP');
+    }
+  }
+
+  @override
+  Future<UserModel> loginWithOtp({
+    required String phone,
+    required String otp,
+    String? referralCode,
+  }) async {
+    await dioClient.fetchCsrfToken();
+    final fcmToken = await _getFcmToken();
+    try {
+      final response = await dioClient.dio.post(
+        ApiEndpoints.loginWithOtp,
+        data: {
+          'phone': phone,
+          'otp': otp,
+          'role': 'DELIVERY_PARTNER',
+          if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
+          if (referralCode != null && referralCode.isNotEmpty)
+            'referral_code': referralCode,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final rawUser = response.data['user'] ?? response.data ?? {};
+        final userData = Map<String, dynamic>.from(rawUser as Map);
+        userData['accessToken'] = response.data['accessToken'] ?? response.data['token'];
+        userData['refreshToken'] = response.data['refreshToken'];
+        userData['is_new_user'] = response.data['is_new_user'] ?? false;
+        dioClient.setAuthToken(response.data['accessToken']?.toString() ?? response.data['token']?.toString());
+        return UserModel.fromJson(userData);
+      } else {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          error: response.data['message'] ?? 'OTP Login failed',
+        );
+      }
+    } on DioException catch (e) {
+      throw _extractError(e, 'Failed to log in with OTP');
     }
   }
 

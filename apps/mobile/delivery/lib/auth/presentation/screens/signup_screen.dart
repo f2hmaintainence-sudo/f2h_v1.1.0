@@ -913,34 +913,6 @@ class _LightFieldState extends State<_LightField> {
   }
 }
 
-class IndianMobileNumberInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final text = newValue.text;
-    if (text.isEmpty) {
-      return newValue;
-    }
-    // Only allow digits
-    final digits = text.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) {
-      return const TextEditingValue();
-    }
-    // First digit MUST start with 6, 7, 8, or 9
-    if (!RegExp(r'^[6-9]').hasMatch(digits)) {
-      return oldValue; // Rejects 0-5 as first character
-    }
-    // Maximum 10 digits
-    final clamped = digits.length > 10 ? digits.substring(0, 10) : digits;
-    return TextEditingValue(
-      text: clamped,
-      selection: TextSelection.collapsed(offset: clamped.length),
-    );
-  }
-}
-
 // ─── Green CTA Button — pill, matches the login screen ────────────────────────
 class _GreenButton extends StatelessWidget {
   final String label;

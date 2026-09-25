@@ -8,7 +8,6 @@ import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
 import 'package:f2h_delivery/core/utils/app_update_service.dart';
-import 'package:f2h_delivery/core/utils/version_checker.dart';
 import 'package:f2h_delivery/core/widgets/force_update_gate.dart';
 
 class SplashScreen extends StatefulWidget {

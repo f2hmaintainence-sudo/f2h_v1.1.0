@@ -1175,19 +1175,38 @@ export class AuthService {
 
       await this.Data.insert('users', userInsertData);
 
-      try {
-        const customerInsertData: any = {
-          customer_id: userId,
-          branch_id: 'BRANCH_KUPPAM_01',
-          customer_type: 'retail',
-          wallet_balance: 0,
-          first_order_completed: false,
-          created_at: now,
-          updated_at: now,
-        };
-        await this.Data.insert('customers', customerInsertData);
-      } catch (custErr) {
-        this.developer.error('[AuthService] Auto customer record creation failed during OTP login:', { custErr });
+      if (initialRole === 'DELIVERY_PARTNER') {
+        try {
+          await this.Data.insert('delivery_partners', {
+            delivery_partner_id: userId,
+            branch_id: null,
+            is_active: true,
+            is_verified: false,
+            is_available: true,
+            is_online: false,
+            vehicle_type: 'BIKE',
+            vehicle_number: 'N/A',
+            created_at: now,
+            updated_at: now,
+          });
+        } catch (dpErr) {
+          this.developer.error('[AuthService] Auto delivery_partner record creation failed during OTP login:', { dpErr });
+        }
+      } else {
+        try {
+          const customerInsertData: any = {
+            customer_id: userId,
+            branch_id: 'BRANCH_KUPPAM_01',
+            customer_type: 'retail',
+            wallet_balance: 0,
+            first_order_completed: false,
+            created_at: now,
+            updated_at: now,
+          };
+          await this.Data.insert('customers', customerInsertData);
+        } catch (custErr) {
+          this.developer.error('[AuthService] Auto customer record creation failed during OTP login:', { custErr });
+        }
       }
 
       if (referrerId) {
@@ -1240,7 +1259,20 @@ export class AuthService {
           isRoleAllowed = true;
           break;
         case 'DELIVERY_PARTNER':
-          isRoleAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(userRole);
+          if (userRole === 'CUSTOMER') {
+            try {
+              await this.DataBase.query(
+                `UPDATE users SET role_id = 'DELIVERY_PARTNER', updated_at = NOW() WHERE user_id = $1`,
+                [user.user_id],
+              );
+              user.role_id = 'DELIVERY_PARTNER';
+            } catch (upgErr) {
+              this.developer.error('[AuthService] Failed to upgrade user to DELIVERY_PARTNER:', { upgErr });
+            }
+            isRoleAllowed = true;
+          } else {
+            isRoleAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(userRole);
+          }
           break;
         case 'ADMIN':
           isRoleAllowed = !['CUSTOMER', 'DELIVERY_PARTNER'].includes(userRole);
@@ -1251,6 +1283,32 @@ export class AuthService {
 
       if (!isRoleAllowed) {
         throw new UnauthorizedException(`Unauthorized role for ${clientRole} application`);
+      }
+
+      // Ensure delivery_partners satellite record exists when logging into DELIVERY_PARTNER
+      if (clientRole === 'DELIVERY_PARTNER') {
+        try {
+          const dpExists = await this.DataBase.query(
+            `SELECT delivery_partner_id FROM delivery_partners WHERE delivery_partner_id = $1 LIMIT 1`,
+            [user.user_id],
+          );
+          if (!dpExists || dpExists.length === 0) {
+            await this.Data.insert('delivery_partners', {
+              delivery_partner_id: user.user_id,
+              branch_id: null,
+              is_active: true,
+              is_verified: false,
+              is_available: true,
+              is_online: false,
+              vehicle_type: 'BIKE',
+              vehicle_number: 'N/A',
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+          }
+        } catch (ensureErr) {
+          this.developer.warn('[AuthService] Ensure delivery_partners record failed:', { ensureErr });
+        }
       }
 
       const isSatelliteActive = await this.checkSatelliteIsActive(user.user_id, clientRole);

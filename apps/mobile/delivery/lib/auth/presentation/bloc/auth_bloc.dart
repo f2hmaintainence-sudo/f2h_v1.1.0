@@ -11,6 +11,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   AuthBloc({required this.authRepository}) : super(AuthInitial()) {
     on<LoginRequested>(_onLoginRequested);
+    on<PhoneOtpLoginRequested>(_onPhoneOtpLoginRequested);
     on<SignupRequested>(_onSignupRequested);
     on<GoogleSignInRequested>(_onGoogleSignInRequested);
     on<LogoutRequested>(_onLogoutRequested);
@@ -21,6 +22,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final user = await authRepository.login(event.identifier, event.password);
+      emit(Authenticated(user: user));
+    } catch (e) {
+      emit(AuthFailure(error: e.toString()));
+    }
+  }
+
+  Future<void> _onPhoneOtpLoginRequested(PhoneOtpLoginRequested event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+    try {
+      final user = await authRepository.loginWithOtp(
+        phone: event.phone,
+        otp: event.otp,
+        referralCode: event.referralCode,
+      );
       emit(Authenticated(user: user));
     } catch (e) {
       emit(AuthFailure(error: e.toString()));

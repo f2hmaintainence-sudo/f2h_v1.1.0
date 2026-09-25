@@ -215,13 +215,15 @@ export class AuthController {
     const ip =
       req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'unknown';
-    const rawClientRole = req.headers['x-role'];
+    const rawClientRole = req.headers['x-role'] || body.role;
     let clientRole =
       typeof rawClientRole === 'string'
         ? rawClientRole.trim().toUpperCase()
         : 'CUSTOMER';
     if (clientRole === 'A') {
       clientRole = 'ADMIN';
+    } else if (clientRole === 'D' || clientRole === 'DELIVERY' || clientRole === 'DELIVERY_BOY') {
+      clientRole = 'DELIVERY_PARTNER';
     }
 
     const result = await this.authService.loginWithOtp(
