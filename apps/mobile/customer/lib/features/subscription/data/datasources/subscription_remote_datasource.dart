@@ -18,6 +18,7 @@ abstract class SubscriptionRemoteDataSource {
   Future<List<dynamic>> getPauseHistory(String subscriptionId);
   Future<Map<String, dynamic>> getSubscriptionDetail(String subscriptionId);
   Future<List<dynamic>> getSubscriptionBills(String subscriptionId);
+  Future<Map<String, dynamic>> updateSubscription(String subscriptionId, Map<String, dynamic> data);
 }
 
 class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
@@ -116,6 +117,24 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
       data: {'auto_renew': autoRenew},
     );
     return response.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateSubscription(String subscriptionId, Map<String, dynamic> data) async {
+    await dioClient.fetchCsrfToken();
+    try {
+      final response = await dioClient.dio.put(
+        '${ApiEndpoints.subscriptions}/$subscriptionId',
+        data: data,
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'status': true, 'message': 'Subscription updated successfully'};
+    } catch (e) {
+      print('[SubscriptionDS] updateSubscription ERROR: $e');
+      rethrow;
+    }
   }
 
   @override

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DataService } from 'src/shared/database/Data.service';
@@ -1291,6 +1291,221 @@ export class SubscriptionsService {
       if (error instanceof BadRequestException) throw error;
       this.developer.error('updateAutoRenew error', { error, subscriptionId });
       throw new BadRequestException('Failed to update auto renew setting');
+    }
+  }
+
+  // Update existing subscription without creating a new record
+  async updateSubscription(id: string, body: CreateSubscriptionDto) {
+    try {
+      const existingRows = await this.db.query(
+        `SELECT subscription_id, subscription_number, customer_id, branch_id, address_id, schedule_type, delivery_slot, start_date, end_date, auto_renew, status
+         FROM subscriptions
+         WHERE subscription_id = $1 OR id::text = $1
+         LIMIT 1`,
+        [id],
+      );
+
+      if (!existingRows?.length) {
+        throw new NotFoundException(`Subscription ${id} not found`);
+      }
+
+      const existingSub = existingRows[0];
+      const subscriptionId = existingSub.subscription_id;
+      const subscriptionNumber = existingSub.subscription_number;
+
+      const rawScheduleType = (body.schedule_type || existingSub.schedule_type || 'weekly').toLowerCase();
+      const dbScheduleType = (rawScheduleType === 'custom' || rawScheduleType === 'custom_days' || rawScheduleType === 'custom_dates')
+        ? 'custom_dates'
+        : 'weekly';
+
+      const itemsList = body.items || [];
+      const primaryItem = itemsList[0];
+      const variantId = primaryItem?.product_variant_id;
+      const unitPrice = primaryItem?.unit_price != null ? Number(primaryItem.unit_price) : null;
+
+      return await this.db.transaction(async (client) => {
+        // 1. Update subscriptions table (keeps existing subscription_id & subscription_number)
+        await client.query(
+          `UPDATE subscriptions
+           SET schedule_type = $1,
+               delivery_slot = COALESCE($2, delivery_slot),
+               auto_renew = COALESCE($3, auto_renew),
+               address_id = COALESCE($4, address_id),
+               monthly_estimate = COALESCE($5, monthly_estimate),
+               start_date = COALESCE($6, start_date),
+               updated_at = NOW()
+           WHERE subscription_id = $7`,
+          [
+            dbScheduleType,
+            body.delivery_slot || null,
+            body.auto_renew !== undefined ? body.auto_renew : null,
+            body.address_id || null,
+            body.monthly_estimate ?? body.estimated_total ?? null,
+            body.start_date || null,
+            subscriptionId,
+          ],
+        );
+
+        // 2. Fetch or update subscription_items
+        const itemRows = await client.query(
+          `SELECT subscription_item_id, id FROM subscription_items WHERE subscription_id = $1 ORDER BY id ASC LIMIT 1`,
+          [subscriptionId],
+        );
+        let itemId = itemRows?.rows?.[0]?.subscription_item_id;
+
+        if (itemId) {
+          if (variantId || unitPrice != null) {
+            await client.query(
+              `UPDATE subscription_items
+               SET product_variant_id = COALESCE($1, product_variant_id),
+                   unit_price = COALESCE($2, unit_price),
+                   final_price = COALESCE($2, final_price),
+                   updated_at = NOW()
+               WHERE subscription_item_id = $3`,
+              [variantId || null, unitPrice, itemId],
+            );
+          }
+        } else {
+          itemId = this.makeId('SBI');
+          await client.query(
+            `INSERT INTO subscription_items (subscription_item_id, subscription_id, product_variant_id, unit_price, final_price, status)
+             VALUES ($1, $2, $3, $4, $4, 'active')`,
+            [itemId, subscriptionId, variantId || 'DEFAULT', unitPrice || 0],
+          );
+        }
+
+        // 3. Update schedules
+        if (dbScheduleType === 'weekly') {
+          // Clear old weekly schedule
+          await client.query(
+            `DELETE FROM subscription_weekly_schedule WHERE subscription_id = $1 OR subscription_item_id = $2`,
+            [subscriptionId, itemId],
+          );
+          // Delete future custom dates (preserve past history)
+          await client.query(
+            `DELETE FROM subscription_custom_schedule WHERE (subscription_id = $1 OR subscription_item_id = $2) AND delivery_date >= CURRENT_DATE`,
+            [subscriptionId, itemId],
+          );
+
+          // Insert new weekly schedules
+          const schedules = (primaryItem?.schedules || []).map((schedule, idx) => ({
+            day: schedule.day_of_week ?? schedule.day ?? idx,
+            m_quantity: Number(schedule.m_quantity ?? schedule.m_qty ?? schedule.morning_qty ?? 0),
+            e_quantity: Number(schedule.e_quantity ?? schedule.e_qty ?? schedule.evening_qty ?? 0),
+          })).filter(s => s.m_quantity > 0 || s.e_quantity > 0);
+
+          for (const schedule of schedules) {
+            await client.query(
+              `INSERT INTO subscription_weekly_schedule (
+                 subscription_item_id,
+                 subscription_id,
+                 day_of_week,
+                 m_quantity,
+                 e_quantity,
+                 effective_from,
+                 effective_to
+               )
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [
+                itemId,
+                subscriptionId,
+                schedule.day,
+                schedule.m_quantity,
+                schedule.e_quantity,
+                body.start_date || existingSub.start_date,
+                body.end_date || null,
+              ],
+            );
+          }
+        } else {
+          // dbScheduleType === 'custom_dates'
+          // Clear old weekly schedule if switching from weekly
+          await client.query(
+            `DELETE FROM subscription_weekly_schedule WHERE subscription_id = $1 OR subscription_item_id = $2`,
+            [subscriptionId, itemId],
+          );
+          // Delete upcoming custom dates (preserve past)
+          await client.query(
+            `DELETE FROM subscription_custom_schedule WHERE (subscription_id = $1 OR subscription_item_id = $2) AND delivery_date >= CURRENT_DATE`,
+            [subscriptionId, itemId],
+          );
+
+          const customDates = (body.custom_dates || []) as any[];
+          const dateMap = new Map<string, { mQty: number; eQty: number }>();
+          const todayStr = new Date().toISOString().split('T')[0];
+
+          for (const cDate of customDates) {
+            const rawDate = typeof cDate === 'string' ? cDate : (cDate?.delivery_date || cDate?.date);
+            const dateStr = String(rawDate || '').replace('T', ' ').split(' ')[0].trim();
+            if (!dateStr || dateStr < todayStr) continue;
+            const mQty = typeof cDate === 'object'
+              ? Number(cDate?.m_quantity ?? cDate?.morning_qty ?? primaryItem?.schedules?.[0]?.m_quantity ?? 0)
+              : Number(primaryItem?.schedules?.[0]?.m_quantity ?? 0);
+            const eQty = typeof cDate === 'object'
+              ? Number(cDate?.e_quantity ?? cDate?.evening_qty ?? primaryItem?.schedules?.[0]?.e_quantity ?? 0)
+              : Number(primaryItem?.schedules?.[0]?.e_quantity ?? 0);
+            if (mQty > 0 || eQty > 0) {
+              dateMap.set(dateStr, { mQty, eQty });
+            }
+          }
+
+          for (const [dateStr, qty] of dateMap.entries()) {
+            await client.query(
+              `INSERT INTO subscription_custom_schedule (
+                 subscription_item_id,
+                 subscription_id,
+                 delivery_date,
+                 m_quantity,
+                 e_quantity
+               )
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (subscription_item_id, delivery_date) DO UPDATE
+               SET m_quantity = EXCLUDED.m_quantity, e_quantity = EXCLUDED.e_quantity`,
+              [itemId, subscriptionId, dateStr, qty.mQty, qty.eQty],
+            );
+          }
+        }
+
+        // 4. Audit Log
+        await client.query(
+          `INSERT INTO subscription_logs (
+             subscription_id,
+             subscription_item_id,
+             action,
+             old_data,
+             new_data,
+             created_by
+           )
+           VALUES ($1, $2, 'updated', $3, $4, $5)`,
+          [
+            subscriptionId,
+            itemId,
+            JSON.stringify({
+              schedule_type: existingSub.schedule_type,
+              delivery_slot: existingSub.delivery_slot,
+            }),
+            JSON.stringify({
+              schedule_type: dbScheduleType,
+              delivery_slot: body.delivery_slot,
+              custom_dates_count: body.custom_dates?.length,
+              variant_id: variantId,
+            }),
+            existingSub.customer_id,
+          ],
+        );
+
+        return {
+          status: true,
+          success: true,
+          subscription_id: subscriptionId,
+          subscription_number: subscriptionNumber,
+          message: 'Subscription updated successfully',
+        };
+      });
+    } catch (error: any) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) throw error;
+      this.developer.error('updateSubscription error', { error, subscriptionId: id });
+      throw new BadRequestException(error?.message || 'Failed to update subscription');
     }
   }
 

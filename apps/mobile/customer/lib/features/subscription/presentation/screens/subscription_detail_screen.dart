@@ -896,7 +896,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
 
   // ─── Edit Schedule & Quantity Button ────────────────────────
 
-  void _navigateToEditSubscription(Subscription s) {
+  Future<void> _navigateToEditSubscription(Subscription s) async {
     final item = s.items.isNotEmpty ? s.items.first : null;
     final variantId = (item != null && item.productVariantId.isNotEmpty)
         ? item.productVariantId
@@ -1005,10 +1005,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         ? dayQtys.first.eveningQty
         : (s.deliverySlot.toLowerCase().contains('evening') ? s.qty : 0);
 
-    Navigator.push(
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => SubscriptionSetupScreen(
+          existingSubscriptionId: s.id,
+          subscriptionNumber: s.subscriptionNumber.isNotEmpty ? s.subscriptionNumber : s.id,
           product: product,
           initialVariant: variant,
           initialFrequency: isCustom ? 'custom' : (isWeekly ? 'weekly' : 'daily'),
@@ -1021,6 +1023,13 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         ),
       ),
     );
+
+    if (result == true && mounted) {
+      _loadDetailInfo();
+      _loadBills();
+      _loadSubscriptionOrders();
+      _loadPauseHistory();
+    }
   }
 
   Widget _buildEditScheduleButton(Subscription s) {

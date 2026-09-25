@@ -277,30 +277,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       if (isCustom) {
         schedules = [];
       } else if (scheduleType == 'weekly' && weeklySchedule.isNotEmpty) {
-        // Build per-day schedules from the weekly schedule map
-        // Only include days that have at least 1 unit (morning or evening)
-        const dayIndexMap = <String, int>{
-          'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6,
-        };
-        schedules = [];
-        for (final entry in weeklySchedule.entries) {
-          // The key is the 3-letter abbreviation e.g. 'Mon', 'Tue', etc.
-          final key = entry.key.length >= 3 ? entry.key.substring(0, 3) : entry.key;
-          final normalizedKey = key[0].toUpperCase() + key.substring(1).toLowerCase();
-          final dayIndex = dayIndexMap[normalizedKey];
-          final mQty = entry.value['morning'] ?? 0;
-          final eQty = entry.value['evening'] ?? 0;
-          if ((mQty > 0 || eQty > 0) && dayIndex != null) {
-            schedules.add({
-              'day': dayIndex,
-              'day_of_week': dayIndex,
-              'm_quantity': mQty,
-              'm_qty': mQty,
-              'e_quantity': eQty,
-              'e_qty': eQty,
-            });
-          }
-        }
+        schedules = _buildSchedulesFromWeeklyMap(weeklySchedule);
       } else if (scheduleType == 'daily') {
         // Daily: same quantity for all 7 days
         schedules = List.generate(7, (i) => <String, dynamic>{
@@ -354,6 +331,83 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       return res;
     } catch (e) {
       print('Error during subscription checkout: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateSubscription({
+    required String subscriptionId,
+    required String? variantId,
+    required String scheduleType,
+    required String deliverySlot,
+    required String startDate,
+    required double unitPrice,
+    required List<String> customDays,
+    required int morningQty,
+    required int eveningQty,
+    required Map<String, Map<String, int>> weeklySchedule,
+    required List<Map<String, dynamic>> customSchedule,
+    required bool autoRenew,
+    required double estimatedTotal,
+    required double monthlyEstimate,
+    String? addressId,
+    String? branchId,
+    String? customerId,
+  }) async {
+    try {
+      final isCustom = scheduleType == 'custom' || scheduleType == 'custom_dates';
+      final List<Map<String, dynamic>> schedules;
+
+      if (isCustom) {
+        schedules = <Map<String, dynamic>>[];
+      } else if (weeklySchedule.isNotEmpty) {
+        schedules = _buildSchedulesFromWeeklyMap(weeklySchedule);
+      } else if (scheduleType == 'daily') {
+        schedules = List.generate(7, (i) => <String, dynamic>{
+          'day': i,
+          'day_of_week': i,
+          'm_quantity': morningQty,
+          'm_qty': morningQty,
+          'e_quantity': eveningQty,
+          'e_qty': eveningQty,
+        });
+      } else {
+        schedules = _buildSchedulesWithSplit(
+          scheduleType: scheduleType,
+          morningQty: morningQty,
+          eveningQty: eveningQty,
+          customDays: customDays,
+        );
+      }
+
+      final data = {
+        'subscription_id': subscriptionId,
+        if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,
+        if (branchId != null && branchId.isNotEmpty) 'branch_id': branchId,
+        if (addressId != null && addressId.isNotEmpty) 'address_id': addressId,
+        'schedule_type': isCustom ? 'custom_dates' : 'weekly',
+        'delivery_slot': deliverySlot,
+        'auto_renew': autoRenew,
+        'estimated_total': estimatedTotal,
+        'monthly_estimate': monthlyEstimate,
+        'custom_dates': isCustom
+            ? (customSchedule.isNotEmpty ? customSchedule : customDays)
+            : <dynamic>[],
+        'items': [
+          {
+            if (variantId != null && variantId.isNotEmpty) 'product_variant_id': variantId,
+            'unit_price': unitPrice,
+            'schedules': isCustom ? <dynamic>[] : schedules,
+          }
+        ],
+        'start_date': startDate,
+      };
+
+      final res = await remoteDataSource.updateSubscription(subscriptionId, data);
+      return res;
+    } catch (e) {
+      print('Error during subscription update: $e');
       rethrow;
     }
   }
@@ -728,5 +782,30 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     } catch (_) {
       return [];
     }
+  }
+
+  List<Map<String, dynamic>> _buildSchedulesFromWeeklyMap(Map<String, Map<String, int>> weeklySchedule) {
+    const dayIndexMap = <String, int>{
+      'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6,
+    };
+    final schedules = <Map<String, dynamic>>[];
+    for (final entry in weeklySchedule.entries) {
+      final key = entry.key.length >= 3 ? entry.key.substring(0, 3) : entry.key;
+      final normalizedKey = key[0].toUpperCase() + key.substring(1).toLowerCase();
+      final dayIndex = dayIndexMap[normalizedKey];
+      final mQty = entry.value['morning'] ?? 0;
+      final eQty = entry.value['evening'] ?? 0;
+      if ((mQty > 0 || eQty > 0) && dayIndex != null) {
+        schedules.add({
+          'day': dayIndex,
+          'day_of_week': dayIndex,
+          'm_quantity': mQty,
+          'm_qty': mQty,
+          'e_quantity': eQty,
+          'e_qty': eQty,
+        });
+      }
+    }
+    return schedules;
   }
 }

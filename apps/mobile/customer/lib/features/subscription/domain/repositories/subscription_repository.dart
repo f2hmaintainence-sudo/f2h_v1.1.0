@@ -73,4 +73,23 @@ abstract class SubscriptionRepository {
   Future<List<SubscriptionPauseModel>> getPauseHistory(String subscriptionId);
   Future<SubscriptionDetailInfo> getSubscriptionDetail(String subscriptionId);
   Future<List<SubscriptionBillModel>> getSubscriptionBills(String subscriptionId);
+  Future<Map<String, dynamic>> updateSubscription({
+    required String subscriptionId,
+    required String? variantId,
+    required String scheduleType,
+    required String deliverySlot,
+    required String startDate,
+    required double unitPrice,
+    required List<String> customDays,
+    required int morningQty,
+    required int eveningQty,
+    required Map<String, Map<String, int>> weeklySchedule,
+    required List<Map<String, dynamic>> customSchedule,
+    required bool autoRenew,
+    required double estimatedTotal,
+    required double monthlyEstimate,
+    String? addressId,
+    String? branchId,
+    String? customerId,
+  });
 }

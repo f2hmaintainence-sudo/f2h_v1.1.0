@@ -94,6 +94,14 @@ export class CreateSubscriptionDto {
 
   @IsOptional()
   @IsString()
+  subscription_id?: string;
+
+  @IsOptional()
+  @IsString()
+  delivery_slot?: string;
+
+  @IsOptional()
+  @IsString()
   schedule_type?: string;
 
   @IsOptional()

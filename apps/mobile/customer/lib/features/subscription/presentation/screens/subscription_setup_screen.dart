@@ -67,6 +67,8 @@ class SubscriptionSetupScreen extends StatefulWidget {
   final List<CustomDateScheduleEntry>? initialCustomDates;
   final bool? initialAutoRenew;
   final String? initialPaymentType;
+  final String? existingSubscriptionId;
+  final String? subscriptionNumber;
 
   const SubscriptionSetupScreen({
     super.key,
@@ -79,6 +81,8 @@ class SubscriptionSetupScreen extends StatefulWidget {
     this.initialCustomDates,
     this.initialAutoRenew,
     this.initialPaymentType,
+    this.existingSubscriptionId,
+    this.subscriptionNumber,
   });
 
   @override
@@ -87,6 +91,8 @@ class SubscriptionSetupScreen extends StatefulWidget {
 }
 
 class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
+  bool get isEditMode => widget.existingSubscriptionId != null && widget.existingSubscriptionId!.isNotEmpty;
+
   // ── Selected variant ─────────────────────────────────
   late ProductVariant _variant;
 
@@ -538,23 +544,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     }
   }
 
-  double _calculateExistingPostpaidCommitted() {
-    final subState = context.read<SubscriptionBloc>().state;
-    if (subState is! SubscriptionLoaded) return 0.0;
-    double total = 0.0;
-    for (final sub in subState.subscriptions) {
-      final pType = sub.paymentType.toLowerCase();
-      final sStatus = sub.status.toLowerCase();
-      if (pType == 'postpaid' && (sStatus == 'active' || sStatus == 'paused')) {
-        total += sub.pricePerDay * 30;
-      }
-    }
-    return total;
-  }
-
   // ── Confirm subscription ──────────────────────────────
 
   void _confirmSubscription() {
+    if (isEditMode) {
+      _executeUpdateSubscription();
+      return;
+    }
+
     if (_selectedAddress == null) {
       F2HToast.error(context, 'Please select a delivery address');
       return;
@@ -587,6 +584,121 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     _executeCheckout(
       paymentType: _paymentType,
       paymentMethod: 'wallet',
+    );
+  }
+
+  Future<void> _executeUpdateSubscription() async {
+    if (_frequency == 'custom' && _customDates.isEmpty) {
+      F2HToast.error(context, 'Please add at least one delivery date');
+      return;
+    }
+
+    final estimate = _currentMonthEstimate;
+    if (estimate.total <= 0 || estimate.qty <= 0) {
+      F2HToast.error(context, 'Please set delivery quantity to continue');
+      return;
+    }
+
+    final int morningQty;
+    final int eveningQty;
+    if (_frequency == 'daily') {
+      morningQty = _morningQty;
+      eveningQty = _eveningQty;
+    } else if (_frequency == 'custom') {
+      morningQty = _customDates.fold(0, (s, d) => s + d.morningQty);
+      eveningQty = _customDates.fold(0, (s, d) => s + d.eveningQty);
+    } else {
+      morningQty = _weeklySchedule.values.fold(
+        0,
+        (s, d) => s + (d['morning'] ?? 0),
+      );
+      eveningQty = _weeklySchedule.values.fold(
+        0,
+        (s, d) => s + (d['evening'] ?? 0),
+      );
+    }
+
+    if (morningQty == 0 && eveningQty == 0) {
+      F2HToast.error(context, 'Set at least 1 unit to continue');
+      return;
+    }
+
+    final deliverySlot = morningQty > 0 && eveningQty > 0
+        ? 'Both'
+        : morningQty > 0
+        ? 'Morning'
+        : 'Evening';
+
+    final List<String> activeDays;
+    final List<Map<String, dynamic>> customSchedulePayload;
+
+    if (_frequency == 'weekly') {
+      activeDays = _kDays.where((d) {
+        final m = _weeklySchedule[d]?['morning'] ?? 0;
+        final e = _weeklySchedule[d]?['evening'] ?? 0;
+        return m > 0 || e > 0;
+      }).toList();
+      customSchedulePayload = const [];
+    } else if (_frequency == 'custom') {
+      activeDays = _customDates
+          .where((d) => (d.morningQty + d.eveningQty) > 0)
+          .map((d) => d.dateString)
+          .toList();
+      customSchedulePayload = _customDates
+          .where((d) => (d.morningQty + d.eveningQty) > 0)
+          .map((d) => {
+                'delivery_date': d.dateString,
+                'date': d.dateString,
+                'm_quantity': d.morningQty,
+                'morning_qty': d.morningQty,
+                'e_quantity': d.eveningQty,
+                'evening_qty': d.eveningQty,
+              })
+          .toList();
+    } else {
+      activeDays = _kDays;
+      customSchedulePayload = const [];
+    }
+
+    final session = context.read<CustomerSessionCubit>().state;
+    final customerId = session.profile?.customerId ?? '';
+    final addressId = _selectedAddress?.addressId ?? '';
+    final branchId = (_selectedAddress?.branchId != null &&
+            _selectedAddress!.branchId.isNotEmpty)
+        ? _selectedAddress!.branchId
+        : (session.branches.isNotEmpty
+            ? (session.branches.first['branch_id']?.toString() ??
+                session.branches.first['id']?.toString() ??
+                '')
+            : '');
+
+    final checkoutStartDate = (_frequency == 'custom' && _customDates.isNotEmpty)
+        ? _customDates.first.dateString
+        : _startDate.toString().split(' ')[0];
+
+    HapticFeedback.mediumImpact();
+
+    context.read<SubscriptionBloc>().add(
+      UpdateSubscriptionRequested(
+        subscriptionId: widget.existingSubscriptionId!,
+        subscriptionNumber: widget.subscriptionNumber,
+        customerId: customerId,
+        branchId: branchId,
+        addressId: addressId,
+        variantId: _variant.id,
+        scheduleType: _frequency == 'custom' ? 'custom_dates' : _frequency,
+        deliverySlot: deliverySlot,
+        startDate: checkoutStartDate,
+        unitPrice: _subscriptionUnitPrice,
+        customDays: activeDays,
+        morningQty: morningQty,
+        eveningQty: eveningQty,
+        weeklySchedule: _frequency == 'weekly' ? Map.from(_weeklySchedule) : {},
+        customSchedule: customSchedulePayload,
+        autoRenew: _autoRenew,
+        estimatedTotal: _currentMonthEstimate.total,
+        monthlyEstimate: _fullMonthEstimate.total,
+      ),
     );
   }
 
@@ -831,32 +943,34 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       listener: (context, state) {
         if (state is SubscriptionLoading) {
           setState(() => _isLoading = true);
-        } else if (state is SubscriptionActionSuccess &&
-            state.subscriptionId != null) {
-          setState(() => _isLoading = false);
-          // Navigate to success screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SubscriptionSuccessScreen(
-                subscriptionId: state.subscriptionId!,
-                paymentType: state.paymentType ?? _paymentType,
-                autoRenew: state.autoRenew ?? _autoRenew,
-                address: _selectedAddress != null
-                    ? '${_selectedAddress!.addressType.toUpperCase()} · ${_selectedAddress!.name}, ${_selectedAddress!.detail}'
-                    : 'Default Address',
-                startDate: _startDate.toString().split(' ')[0],
-                estimatedMonthlyAmount: estimate.total,
-                productName: _currentDisplayName,
-                variantLabel: _variant.label,
-              ),
-            ),
-          );
         } else if (state is SubscriptionActionSuccess) {
-          // Success but no ID (e.g. pause/resume actions) — just pop
           setState(() => _isLoading = false);
-          F2HToast.success(context, state.message);
-          Navigator.pop(context);
+          if (isEditMode) {
+            final subNum = widget.subscriptionNumber ?? widget.existingSubscriptionId;
+            F2HToast.success(context, 'Subscription #$subNum updated successfully');
+            Navigator.pop(context, true);
+          } else if (state.subscriptionId != null) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SubscriptionSuccessScreen(
+                  subscriptionId: state.subscriptionId!,
+                  paymentType: state.paymentType ?? _paymentType,
+                  autoRenew: state.autoRenew ?? _autoRenew,
+                  address: _selectedAddress != null
+                      ? '${_selectedAddress!.addressType.toUpperCase()} · ${_selectedAddress!.name}, ${_selectedAddress!.detail}'
+                      : 'Default Address',
+                  startDate: _startDate.toString().split(' ')[0],
+                  estimatedMonthlyAmount: estimate.total,
+                  productName: _currentDisplayName,
+                  variantLabel: _variant.label,
+                ),
+              ),
+            );
+          } else {
+            F2HToast.success(context, state.message);
+            Navigator.pop(context);
+          }
         } else if (state is SubscriptionCheckoutError) {
           setState(() => _isLoading = false);
           if (state.errorCode == 'insufficient_wallet' ||
@@ -889,14 +1003,37 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
-          title: const Text(
-            'Subscribe',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: kText,
-            ),
-          ),
+          title: isEditMode
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Edit Subscription',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: kText,
+                      ),
+                    ),
+                    if (widget.subscriptionNumber != null && widget.subscriptionNumber!.isNotEmpty)
+                      Text(
+                        '#${widget.subscriptionNumber}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: kPrimary,
+                        ),
+                      ),
+                  ],
+                )
+              : const Text(
+                  'Subscribe',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: kText,
+                  ),
+                ),
           centerTitle: true,
           leading: IconButton(
             icon: const Icon(
@@ -914,6 +1051,65 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (isEditMode) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF81C784).withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit_note_rounded, color: kPrimary, size: 24),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Editing Existing Subscription',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.subscriptionNumber != null && widget.subscriptionNumber!.isNotEmpty
+                                      ? '#${widget.subscriptionNumber}'
+                                      : '#${widget.existingSubscriptionId}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: kText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: kPrimary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'UPDATE MODE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   // ── Product Card ──────────────────────────────
                   _buildProductCard(p),
                   const SizedBox(height: 16),
@@ -2402,6 +2598,8 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
                         ? 'Delivery Unavailable'
                         : total <= 0
                         ? 'Set Quantity to Continue'
+                        : isEditMode
+                        ? 'Update Subscription'
                         : 'Confirm Subscription',
                     style: const TextStyle(
                       fontSize: 13,

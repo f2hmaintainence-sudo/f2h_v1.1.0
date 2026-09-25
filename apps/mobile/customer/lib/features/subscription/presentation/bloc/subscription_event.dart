@@ -219,3 +219,67 @@ class SubscriptionCheckoutRequested extends SubscriptionEvent {
         razorpayOrderId, razorpayPaymentId, razorpaySignature,
       ];
 }
+
+class UpdateSubscriptionRequested extends SubscriptionEvent {
+  final String subscriptionId;
+  final String? subscriptionNumber;
+  final String customerId;
+  final String branchId;
+  final String? addressId;
+  final String variantId;
+  final String scheduleType;
+  final String deliverySlot;
+  final String startDate;
+  final double unitPrice;
+  final List<String> customDays;
+  final int morningQty;
+  final int eveningQty;
+  final Map<String, Map<String, int>> weeklySchedule;
+  final List<Map<String, dynamic>> customSchedule;
+  final bool autoRenew;
+  final double estimatedTotal;
+  final double? monthlyEstimate;
+
+  const UpdateSubscriptionRequested({
+    required this.subscriptionId,
+    this.subscriptionNumber,
+    required this.customerId,
+    required this.branchId,
+    this.addressId,
+    required this.variantId,
+    required this.scheduleType,
+    required this.deliverySlot,
+    required this.startDate,
+    required this.unitPrice,
+    required this.customDays,
+    this.morningQty = 1,
+    this.eveningQty = 0,
+    this.weeklySchedule = const {},
+    this.customSchedule = const [],
+    this.autoRenew = true,
+    this.estimatedTotal = 0.0,
+    this.monthlyEstimate,
+  });
+
+  @override
+  List<Object?> get props => [
+        subscriptionId,
+        subscriptionNumber,
+        customerId,
+        branchId,
+        addressId,
+        variantId,
+        scheduleType,
+        deliverySlot,
+        startDate,
+        unitPrice,
+        customDays,
+        morningQty,
+        eveningQty,
+        weeklySchedule,
+        customSchedule,
+        autoRenew,
+        estimatedTotal,
+        monthlyEstimate,
+      ];
+}

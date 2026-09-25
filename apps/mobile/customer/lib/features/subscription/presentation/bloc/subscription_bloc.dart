@@ -20,6 +20,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     on<CancelSubscriptionRequested>(_onCancelSubscription);
     on<LoadPauseHistoryRequested>(_onLoadPauseHistory);
     on<UpdateAutoRenewRequested>(_onUpdateAutoRenew);
+    on<UpdateSubscriptionRequested>(_onUpdateSubscription);
   }
 
   Future<void> _onLoadSubscriptions(LoadSubscriptions event, Emitter<SubscriptionState> emit) async {
@@ -272,6 +273,56 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
       ));
     } catch (e) {
       // Silently fail — auto renew toggle is best-effort
+    }
+  }
+
+  Future<void> _onUpdateSubscription(UpdateSubscriptionRequested event, Emitter<SubscriptionState> emit) async {
+    emit(SubscriptionLoading());
+    try {
+      final result = await subscriptionRepository.updateSubscription(
+        subscriptionId: event.subscriptionId,
+        variantId: event.variantId,
+        scheduleType: event.scheduleType,
+        deliverySlot: event.deliverySlot,
+        startDate: event.startDate,
+        unitPrice: event.unitPrice,
+        customDays: event.customDays,
+        morningQty: event.morningQty,
+        eveningQty: event.eveningQty,
+        weeklySchedule: event.weeklySchedule,
+        customSchedule: event.customSchedule,
+        autoRenew: event.autoRenew,
+        estimatedTotal: event.estimatedTotal,
+        monthlyEstimate: event.monthlyEstimate ?? event.estimatedTotal,
+        addressId: event.addressId,
+        branchId: event.branchId,
+        customerId: event.customerId,
+      );
+
+      if (result['success'] == true || result['status'] == true) {
+        final subNum = event.subscriptionNumber ?? event.subscriptionId;
+        emit(SubscriptionActionSuccess(
+          'Subscription #$subNum updated successfully',
+          subscriptionId: event.subscriptionId,
+          autoRenew: event.autoRenew,
+        ));
+
+        final results = await Future.wait([
+          subscriptionRepository.getSubscriptions(),
+          subscriptionRepository.getOrders(),
+        ]);
+        emit(SubscriptionLoaded(
+          subscriptions: results[0] as List<Subscription>,
+          orders: results[1] as List<Order>,
+        ));
+      } else {
+        final errMsg = result['message']?.toString()
+            ?? result['error']?.toString()
+            ?? 'Failed to update subscription';
+        emit(SubscriptionError(errMsg));
+      }
+    } catch (e) {
+      emit(SubscriptionError(extractErrorMessage(e)));
     }
   }
 

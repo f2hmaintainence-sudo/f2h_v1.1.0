@@ -8,7 +8,7 @@
 //
 // ============================================================================
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, Req,
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards, Req,
   Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -151,6 +151,36 @@ export class SubscriptionsController {
     @Body() body: { auto_renew: boolean },
   ) {
     return this.service.updateAutoRenew(id, body.auto_renew);
+  }
+
+  @Public()
+  @RequireIntegrity('customer')
+  @Put(':id')
+  async updateSubscription(
+    @Param('id') id: string,
+    @Body() body: CreateSubscriptionDto,
+  ) {
+    return this.service.updateSubscription(id, body);
+  }
+
+  @Public()
+  @RequireIntegrity('customer')
+  @Patch(':id')
+  async patchSubscription(
+    @Param('id') id: string,
+    @Body() body: CreateSubscriptionDto,
+  ) {
+    return this.service.updateSubscription(id, body);
+  }
+
+  @Public()
+  @RequireIntegrity('customer')
+  @Post(':id/update')
+  async postUpdateSubscription(
+    @Param('id') id: string,
+    @Body() body: CreateSubscriptionDto,
+  ) {
+    return this.service.updateSubscription(id, body);
   }
 
   // @Public()
