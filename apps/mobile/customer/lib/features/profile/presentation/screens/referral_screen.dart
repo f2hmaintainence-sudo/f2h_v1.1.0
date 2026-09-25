@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/core/api/dio_client.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import 'package:f2h_customer/core/widgets/hot_toast.dart';
 import 'package:f2h_customer/core/widgets/invite_code_copied_dialog.dart';
 import 'referral_faq_screen.dart';
 import 'referral_terms_screen.dart';
@@ -53,7 +52,6 @@ class _ReferralScreenState extends State<ReferralScreen>
   bool get _isLocked => _code.isEmpty || (_status.toLowerCase() != 'unlocked' && _status.toLowerCase() != 'active');
   String get _activeCode => _code;
   static const String _playStoreUrl = 'https://play.google.com/store/apps/details?id=com.f2h.customer';
-  String get _referralLink => _playStoreUrl;
 
   @override
   void initState() {
@@ -493,12 +491,7 @@ class _ReferralScreenState extends State<ReferralScreen>
   }
 
   void _copyToClipboard(String text, String toastMsg) {
-    if (_isLocked) {
-      Clipboard.setData(const ClipboardData(text: _playStoreUrl));
-      F2HToast.success(context, 'Play Store app link copied to clipboard! 📋');
-    } else {
-      InviteCodeCopiedDialog.show(context, text);
-    }
+    InviteCodeCopiedDialog.show(context, text);
   }
 
   // ── REWARD SUCCESS MODAL ──────────────────────────────────
@@ -826,7 +819,7 @@ class _ReferralScreenState extends State<ReferralScreen>
                         'Referral code $_activeCode copied!',
                       ),
                       icon: const Icon(Icons.copy_rounded, size: 14),
-                      label: Text(_isLocked ? 'Copy Link' : 'Copy'),
+                      label: const Text('Copy'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF0A3D22),
@@ -844,56 +837,6 @@ class _ReferralScreenState extends State<ReferralScreen>
                       ),
                     ),
                   ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Referral Link Box
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.white.withOpacity(0.18)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.link_rounded, color: _kGold, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _playStoreUrl,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _copyToClipboard(
-                    _playStoreUrl,
-                    'Play Store link copied!',
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Copy Link',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
