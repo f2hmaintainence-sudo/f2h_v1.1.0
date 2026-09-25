@@ -205,6 +205,13 @@ class DeliverySessionBloc
   Future<void> _onToggleOnline(
       ToggleOnlineEvent event, Emitter<DeliverySessionState> emit) async {
     final current = _currentLoaded();
+    if (event.val && !current.isVerified) {
+      if (event.callback != null) {
+        event.callback!(
+            'Your documents are pending verification. You cannot start the engine or go on duty.');
+      }
+      return;
+    }
     try {
       final dioClient = sl<DioClient>();
       await dioClient.dio.post(

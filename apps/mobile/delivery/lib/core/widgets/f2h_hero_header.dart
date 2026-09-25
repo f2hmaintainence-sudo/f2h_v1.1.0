@@ -12,6 +12,7 @@ class F2hHeroHeader extends StatelessWidget {
   final String? avatarUrl;
   final int unreadCount;
   final String? vehicleType;
+  final bool isVerified;
 
   const F2hHeroHeader({
     super.key,
@@ -23,6 +24,7 @@ class F2hHeroHeader extends StatelessWidget {
     this.avatarUrl,
     this.unreadCount = 0,
     this.vehicleType,
+    this.isVerified = true,
   });
 
   String _formatName(String name) {
@@ -267,6 +269,75 @@ class F2hHeroHeader extends StatelessWidget {
   }
 
   Widget _buildOnlineStatusPill(BuildContext context) {
+    if (!isVerified) {
+      return GestureDetector(
+        onTap: () {
+          if (onProfile != null) {
+            onProfile!();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Your documents are under review. Engine start will be enabled once approved.',
+                  style: GoogleFonts.roboto(fontWeight: FontWeight.w500),
+                ),
+                backgroundColor: const Color(0xFFD97706),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+          }
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFFCD34D),
+              width: 1.2,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.hourglass_top_rounded,
+                size: 15,
+                color: Color(0xFFD97706),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF59E0B),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'Documents Pending',
+                style: GoogleFonts.roboto(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFB45309),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final vehicleIcon = _getVehicleIcon(vehicleType);
 
     return GestureDetector(

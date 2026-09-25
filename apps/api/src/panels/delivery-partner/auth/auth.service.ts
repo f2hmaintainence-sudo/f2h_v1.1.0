@@ -15,7 +15,7 @@ export class AuthService {
     }
 
     let boyRes = await this.db.query(
-      `SELECT is_active, is_online, is_available, delivery_partner_id
+      `SELECT is_active, is_online, is_available, is_verified, delivery_partner_id
        FROM delivery_partners
        WHERE delivery_partner_id = $1
        LIMIT 1`,
@@ -34,7 +34,7 @@ export class AuthService {
         const branchId = activeBranch?.branch_id || null;
         await this.db.query(
           `INSERT INTO delivery_partners (delivery_partner_id, branch_id, is_active, is_verified, is_available, is_online, vehicle_type, vehicle_number, created_at, updated_at)
-           VALUES ($1, $2, true, true, true, false, 'BIKE', 'N/A', NOW(), NOW())
+           VALUES ($1, $2, true, false, true, false, 'BIKE', 'N/A', NOW(), NOW())
            ON CONFLICT (delivery_partner_id) DO NOTHING`,
           [userId, branchId],
         );
@@ -45,7 +45,7 @@ export class AuthService {
           [userId, branchId],
         );
         boyRes = await this.db.query(
-          `SELECT is_active, is_online, is_available, delivery_partner_id
+          `SELECT is_active, is_online, is_available, is_verified, delivery_partner_id
            FROM delivery_partners
            WHERE delivery_partner_id = $1
            LIMIT 1`,
@@ -60,6 +60,13 @@ export class AuthService {
 
     const currentStatus = Boolean(boyRes[0].is_online ?? boyRes[0].is_active);
     const newStatus = typeof requestedActiveState === 'boolean' ? requestedActiveState : !currentStatus;
+
+    if (newStatus === true) {
+      const isVerified = Boolean(boyRes[0].is_verified);
+      if (!isVerified) {
+        throw new BadRequestException('Your documents are pending verification. You cannot start the engine or go on duty until verified.');
+      }
+    }
 
     if (newStatus === false) {
       const { targetDate, targetSlot } = await this.getKolkataDateAndSlot();

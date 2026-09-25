@@ -211,7 +211,7 @@ export class DeliveryOrderService {
         const branchId = activeBranch?.branch_id || null;
         await this.db.query(
           `INSERT INTO delivery_partners (delivery_partner_id, branch_id, is_active, is_verified, is_available, is_online, vehicle_type, vehicle_number, created_at, updated_at)
-           VALUES ($1, $2, true, true, true, false, 'BIKE', 'N/A', NOW(), NOW())
+           VALUES ($1, $2, true, false, true, false, 'BIKE', 'N/A', NOW(), NOW())
            ON CONFLICT (delivery_partner_id) DO NOTHING`,
           [userId, branchId],
         );

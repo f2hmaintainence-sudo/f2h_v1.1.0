@@ -329,6 +329,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _handleOnlineToggle(bool val) async {
+    final sessionState = context.read<DeliverySessionBloc>().state;
+    final isVerified = sessionState is DeliverySessionLoaded ? sessionState.isVerified : true;
+    if (val && !isVerified) {
+      if (!mounted) return;
+      AppSnackBar.error(
+        context,
+        'Your documents are pending verification. Engine start is disabled until administrator approval.',
+      );
+      return;
+    }
+
     if (val) {
       final isLocationReady = await _locationService.ensureLocationPermission(context);
       if (!isLocationReady) {
@@ -549,7 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
-          floatingActionButton: _buildExpandableFab(session, currentRun),
+          floatingActionButton: (!isVerified || !isAccountActive) ? null : _buildExpandableFab(session, currentRun),
           body: Column(
             children: [
               // ── OFFLINE BANNER ───────────────────────────────
@@ -558,6 +569,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               F2hHeroHeader(
                 driverName: session.driverName,
                 isOnline: session.isOnline,
+                isVerified: isVerified,
                 vehicleType: session.vehicleType,
                 avatarUrl: session.profilePhotoUrl,
                 unreadCount: _unreadNotificationsCount,
@@ -585,7 +597,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                     children: [
-                      if (!session.isOnline) ...[
+                      if (!isVerified || !isAccountActive) ...[
+                        const SizedBox(height: 12),
+                        VerificationPendingView(
+                          isUnverified: !isVerified,
+                          onRedirectToProfile: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                            );
+                          },
+                        ),
+                      ] else if (!session.isOnline) ...[
                         Container(
                           margin: const EdgeInsets.symmetric(vertical: 16),
                           padding: const EdgeInsets.all(24),
@@ -1045,18 +1068,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               );
                             }),
                         ],
-                      ],
-                      if (!isVerified || !isAccountActive) ...[
-                        const SizedBox(height: 16),
-                        VerificationPendingView(
-                          isUnverified: !isVerified,
-                          onRedirectToProfile: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                            );
-                          },
-                        ),
                       ],
                     ],
                   ),
