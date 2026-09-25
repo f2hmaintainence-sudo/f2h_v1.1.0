@@ -701,6 +701,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           ],
           Text(
             addressString,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w500,
@@ -1032,53 +1034,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     }
   }
 
-  Widget _buildEditScheduleButton(Subscription s) {
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      width: double.infinity,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _navigateToEditSubscription(s),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: kPrimaryPl,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.edit_calendar_rounded,
-                  size: 16,
-                  color: kPrimary,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Edit Schedule & Quantity',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: kPrimary,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 12,
-                  color: kPrimary,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   // ─── Alert banners ──────────────────────────────────────────
 
@@ -1411,14 +1366,58 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            _prettifyName(s.productName),
-                                            style: const TextStyle(
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.w900,
-                                              color: kText,
-                                              letterSpacing: -0.3,
-                                            ),
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  _prettifyName(s.productName),
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: kText,
+                                                    letterSpacing: -0.3,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              GestureDetector(
+                                                onTap: () => _navigateToEditSubscription(s),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: kPrimaryPl,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: kPrimary.withValues(alpha: 0.25),
+                                                      width: 1,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        _prettifyName(s.frequency.isNotEmpty ? s.frequency : 'Daily'),
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: kPrimary,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      const Icon(
+                                                        Icons.edit_outlined,
+                                                        size: 13,
+                                                        color: kPrimary,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           const SizedBox(height: 3),
                                           Text(
@@ -1454,7 +1453,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                               } else {
                                                 volume = count > 1 ? '$count Units' : '1 Unit';
                                               }
-                                              return s.frequency.isNotEmpty ? '$volume • ${s.frequency}' : volume;
+                                              return volume;
                                             }(),
                                             style: const TextStyle(
                                               fontSize: 12.5,
@@ -1570,8 +1569,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                     ),
                                   ],
                                 ),
-                                // Edit Schedule & Quantity button
-                                _buildEditScheduleButton(s),
                               ],
                             ),
                           ),
@@ -1732,64 +1729,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     }
 
     if (isCompleted) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-        decoration: BoxDecoration(
-          color: kSurface,
-          border: const Border(top: BorderSide(color: kBorderLt, width: 1.2)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Container(
-            height: 48,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF16A34A), Color(0xFF22C55E)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: kPrimary.withValues(alpha: 0.28),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: ElevatedButton.icon(
-              onPressed: _handleRenew,
-              icon: const Icon(
-                Icons.replay_rounded,
-                size: 18,
-                color: Colors.white,
-              ),
-              label: const Text(
-                'RENEW SUBSCRIPTION',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     if (isExpired) {
@@ -1883,77 +1823,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Auto Renew toggle row ───────────────────────────
-            if (!isTerminal) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: kBorderLt),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: s.autoRenew
-                            ? const Color(0xFFDCFCE7)
-                            : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.autorenew_rounded,
-                        size: 16,
-                        color: s.autoRenew ? const Color(0xFF15803D) : kMuted,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Auto Renew',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: kText,
-                            ),
-                          ),
-                          Text(
-                            s.autoRenew
-                                ? 'Renews automatically each cycle'
-                                : 'Stops at current end date',
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              color: kTextSub,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Switch.adaptive(
-                      value: s.autoRenew,
-                      onChanged: (val) {
-                        context.read<SubscriptionBloc>().add(
-                          UpdateAutoRenewRequested(
-                            subscriptionId: s.id,
-                            autoRenew: val,
-                          ),
-                        );
-                      },
-                      activeTrackColor: const Color(0xFF15803D),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+
             // ── Pause disabled / Resume / Cancel row ───────────
             Row(
               children: [
@@ -2562,18 +2432,9 @@ class _QuickActionButton extends StatelessWidget {
         onTap();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorderLt, width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
         ),
         child: Column(
           children: [

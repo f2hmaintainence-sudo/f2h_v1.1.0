@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
-import '../../../../core/widgets/hot_toast.dart';
 import '../../data/models/subscription_model.dart';
 import '../../../catalog/data/models/product_model.dart';
-import '../../../catalog/domain/entities/cart/cart_item_entity.dart';
-import '../../../catalog/presentation/bloc/cart/cart_bloc.dart';
-import '../../../catalog/presentation/bloc/cart/cart_event.dart';
-import '../../../catalog/presentation/screens/cart_screen.dart';
 import '../screens/subscription_detail_screen.dart';
 
 class SubCard extends StatelessWidget {
@@ -327,12 +321,6 @@ class SubCard extends StatelessWidget {
                               ),
                             ],
                           ),
-
-                          // ── Renew button (completed only) ─────────────
-                          if (isCompleted) ...[
-                            const SizedBox(height: 10),
-                            _RenewButton(subscription: s),
-                          ],
                         ],
                       ),
                     ),
@@ -489,98 +477,6 @@ class _PricePill extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RenewButton extends StatelessWidget {
-  final Subscription subscription;
-
-  const _RenewButton({required this.subscription});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 40,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [kPrimaryMid, kPrimary],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: kPrimary.withValues(alpha: 0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ElevatedButton.icon(
-          onPressed: () {
-            final s = subscription;
-            final firstItem = s.items.isNotEmpty ? s.items.first : null;
-            final variantId = firstItem?.productVariantId ?? s.id;
-            final productName = firstItem?.productName ?? s.productName;
-            final variantName =
-                (firstItem?.variantName.isNotEmpty ?? false)
-                    ? firstItem!.variantName
-                    : 'Standard';
-            final price = (firstItem != null && firstItem.finalPrice > 0)
-                ? firstItem.finalPrice
-                : (firstItem?.unitPrice ?? s.pricePerDay);
-
-            final cartItem = CartItemEntity(
-              productId: variantId,
-              variantId: variantId,
-              productName: productName,
-              variantName: variantName,
-              unitPrice: price,
-              purchaseType: 'subscription',
-              schedules: [
-                SubscriptionSchedule(
-                  day: 0,
-                  mQuantity: s.qty > 0 ? s.qty : 1,
-                  eQuantity: 0,
-                ),
-              ],
-              isSubscribable: true,
-              isOneTime: true,
-              subscriptionPrice: price,
-            );
-            context.read<CartBloc>().add(AddToCartEvent(cartItem));
-            F2HToast.success(
-                context, 'Subscription added to cart for renewal!');
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CartScreen()),
-            );
-          },
-          icon: const Icon(Icons.replay_rounded,
-              size: 15, color: Colors.white),
-          label: const Text(
-            'RENEW SUBSCRIPTION',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.6,
-              color: Colors.white,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            shadowColor: Colors.transparent,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
