@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Power,
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/components/Toast";
 
@@ -153,21 +154,27 @@ export default function SmsIntegrationsPage() {
     }
   };
 
-  // Delete SMS Template
-  const handleDeleteTemplate = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this SMS template?")) return;
+  // Toggle SMS Template Active/Inactive Status
+  const handleToggleTemplateStatus = async (tpl: any) => {
     try {
-      const res = await api.delete(
-        `/admin/developer/api-integrations/sms/templates/${id}`
+      const updatedStatus = tpl.is_active === false ? true : false;
+      const res = await api.put(
+        `/admin/developer/api-integrations/sms/templates/${tpl.id}`,
+        {
+          ...tpl,
+          is_active: updatedStatus,
+        }
       );
       if (!res.error) {
-        showSuccessToast("SMS template deleted");
+        showSuccessToast(
+          `Template "${tpl.name}" marked as ${updatedStatus ? "Active" : "Inactive"}`
+        );
         fetchData();
       } else {
-        showErrorToast(res.error || "Failed to delete template");
+        showErrorToast(res.error || "Failed to update template status");
       }
     } catch (err: any) {
-      showErrorToast(err?.message || "Failed to delete template");
+      showErrorToast(err?.message || "Failed to update template status");
     }
   };
 
@@ -340,18 +347,29 @@ export default function SmsIntegrationsPage() {
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <span className="text-[10px] font-bold text-amber-600 uppercase bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                      <span className="text-[10px] font-bold text-amber-600 uppercase bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100 font-mono">
                         {tpl.template_key}
                       </span>
                       <h3 className="text-sm font-bold text-slate-800 mt-1">
                         {tpl.name}
                       </h3>
                     </div>
-                    {tpl.dlt_template_id && (
-                      <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                        DLT: {tpl.dlt_template_id}
+                    <div className="flex items-center gap-1.5">
+                      {tpl.dlt_template_id && (
+                        <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                          DLT: {tpl.dlt_template_id}
+                        </span>
+                      )}
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                          tpl.is_active !== false
+                            ? "bg-emerald-50 text-[#16a34a] border-emerald-200"
+                            : "bg-slate-100 text-slate-500 border-slate-200"
+                        }`}
+                      >
+                        {tpl.is_active !== false ? "Active" : "Inactive"}
                       </span>
-                    )}
+                    </div>
                   </div>
 
                   <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
@@ -377,21 +395,30 @@ export default function SmsIntegrationsPage() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-slate-100">
+                  <button
+                    onClick={() => handleToggleTemplateStatus(tpl)}
+                    className={`p-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold px-2.5 ${
+                      tpl.is_active !== false
+                        ? "text-slate-500 hover:text-amber-600 hover:bg-amber-50"
+                        : "text-slate-500 hover:text-[#16a34a] hover:bg-emerald-50"
+                    }`}
+                  >
+                    <Power
+                      size={13}
+                      className={tpl.is_active !== false ? "text-[#16a34a]" : "text-slate-400"}
+                    />
+                    {tpl.is_active !== false ? "Deactivate" : "Activate"}
+                  </button>
+
                   <button
                     onClick={() => {
                       setEditingTemplate(tpl);
                       setTemplateModalOpen(true);
                     }}
-                    className="p-1.5 text-slate-500 hover:text-[#16a34a] hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold px-2.5"
+                    className="p-1.5 text-slate-600 hover:text-[#16a34a] hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold px-2.5"
                   >
                     <Edit2 size={13} /> Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteTemplate(tpl.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold px-2.5"
-                  >
-                    <Trash2 size={13} /> Delete
                   </button>
                 </div>
               </div>

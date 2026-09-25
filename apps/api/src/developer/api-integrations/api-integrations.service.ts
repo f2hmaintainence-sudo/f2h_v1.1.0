@@ -270,7 +270,7 @@ export class ApiIntegrationsService {
 
   async saveTemplate(category: string, body: any) {
     try {
-      const { id, template_key, name, dlt_template_id, dlt_sender_id, placeholders, body: templateBody } = body;
+      const { id, template_key, name, dlt_template_id, dlt_sender_id, placeholders, body: templateBody, is_active } = body;
       const templateCategory = `${category}-template`;
 
       const placeholdersArray = Array.isArray(placeholders)
@@ -287,21 +287,24 @@ export class ApiIntegrationsService {
       };
       const configDataJson = JSON.stringify(configData);
 
+      const activeStatus = is_active !== undefined ? Boolean(is_active) : true;
+
       if (id) {
+        // Enforce lock: Do not allow altering config_key on existing templates
         const sql = `
           UPDATE api_integrations_config
-          SET config_key = $1,
-              name = $2,
-              provider = $3,
+          SET name = $1,
+              provider = $2,
+              is_active = $3,
               config_data = $4::jsonb,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = $5 AND (category = $6 OR category = $7)
           RETURNING *;
         `;
         const rows = await this.db.query(sql, [
-          template_key,
           name,
           dlt_sender_id || 'DLT',
+          activeStatus,
           configDataJson,
           id,
           templateCategory,
@@ -333,7 +336,7 @@ export class ApiIntegrationsService {
       } else {
         const sql = `
           INSERT INTO api_integrations_config (category, config_key, name, provider, is_active, config_data)
-          VALUES ($1, $2, $3, $4, true, $5::jsonb)
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb)
           RETURNING *;
         `;
         const rows = await this.db.query(sql, [
@@ -341,6 +344,7 @@ export class ApiIntegrationsService {
           template_key,
           name,
           dlt_sender_id || 'DLT',
+          activeStatus,
           configDataJson,
         ]);
 
@@ -370,24 +374,11 @@ export class ApiIntegrationsService {
   }
 
   async deleteTemplate(category: string, id: string) {
-    try {
-      const sql = `
-        DELETE FROM api_integrations_config
-        WHERE id = $1 AND (category = $2 OR category = $3)
-        RETURNING id;
-      `;
-      const rows = await this.db.query(sql, [
-        id,
-        `${category}-template`,
-        `${category}_template`,
-      ]);
-      if (!rows || rows.length === 0) {
-        throw new NotFoundException('Template not found');
-      }
-      return { status: true, message: 'Template deleted successfully' };
-    } catch (error: any) {
-      this.developer.error(`Error deleting template ${id}`, { error });
-      return { status: false, message: error?.message || 'Failed to delete template' };
-    }
+    // Templates cannot be deleted to avoid breaking backend notification bindings;
+    // they can only be toggled active or inactive.
+    return {
+      status: false,
+      message: 'Templates cannot be deleted to preserve system bindings. You can set the template to Inactive instead.',
+    };
   }
 }

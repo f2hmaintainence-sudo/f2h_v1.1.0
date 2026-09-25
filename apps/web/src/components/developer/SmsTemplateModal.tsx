@@ -11,7 +11,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, FileText, RotateCw } from "lucide-react";
+import { X, FileText, RotateCw, Lock } from "lucide-react";
 
 interface SmsTemplateModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ export function SmsTemplateModal({
   initialData,
 }: SmsTemplateModalProps) {
   const [loading, setLoading] = useState(false);
+  const isEditing = Boolean(initialData?.id || initialData?.template_key);
   const [formData, setFormData] = useState({
     template_key: "",
     name: "",
@@ -34,6 +35,7 @@ export function SmsTemplateModal({
     dlt_sender_id: "",
     placeholders: "",
     body: "",
+    is_active: true,
   });
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function SmsTemplateModal({
           ? initialData.placeholders.join(", ")
           : initialData.placeholders || "",
         body: initialData.body || "",
+        is_active: initialData.is_active !== false,
       });
     } else {
       setFormData({
@@ -56,6 +59,7 @@ export function SmsTemplateModal({
         dlt_sender_id: "",
         placeholders: "",
         body: "",
+        is_active: true,
       });
     }
   }, [initialData, isOpen]);
@@ -109,17 +113,44 @@ export function SmsTemplateModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                Template Identifier Key <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                  {isEditing && <Lock size={12} className="text-amber-500" />}
+                  Template Identifier Key <span className="text-rose-500">*</span>
+                </label>
+                {isEditing && (
+                  <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    Locked
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 required
+                disabled={isEditing}
                 placeholder="e.g. ASSOCIATE_LOGIN_OTP"
                 value={formData.template_key}
-                onChange={(e) => setFormData({ ...formData, template_key: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a]/20 focus:border-[#16a34a] text-slate-800 placeholder:text-slate-400 bg-slate-50/30"
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    template_key: e.target.value.toUpperCase().replace(/\s+/g, "_"),
+                  })
+                }
+                className={`w-full px-3.5 py-2.5 rounded-xl border font-mono text-[11px] ${
+                  isEditing
+                    ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed select-none"
+                    : "bg-slate-50/30 border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a]/20 focus:border-[#16a34a] text-slate-800 placeholder:text-slate-400"
+                }`}
               />
+              {isEditing ? (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Identifier key cannot be modified after creation to protect backend bindings.
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Use uppercase letters and underscores (e.g. CUSTOMER_WELCOME_SMS).
+                </p>
+              )}
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
@@ -190,6 +221,27 @@ export function SmsTemplateModal({
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#16a34a]/20 focus:border-[#16a34a] text-slate-800 placeholder:text-slate-400 bg-slate-50/30 resize-none font-mono text-[11px]"
             />
             <p className="text-[10px] text-slate-400 mt-1">Use {"{#var#}"} for variables e.g. Your OTP is {"{#var#}"}</p>
+          </div>
+
+          {/* Active / Inactive Status Switch */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+            <div>
+              <p className="font-bold text-slate-800 text-xs">Template Active Status</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {formData.is_active
+                  ? "This template is currently ACTIVE and will be used by notification dispatchers."
+                  : "This template is INACTIVE and will be skipped by notification dispatchers."}
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#16a34a]"></div>
+            </label>
           </div>
 
           {/* Footer Actions */}
