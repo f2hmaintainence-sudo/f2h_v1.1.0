@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -268,446 +269,12 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _showPersonalDetails(BuildContext context, ProfileModel? profile) {
-    final firstNameController = TextEditingController(
-      text: profile?.firstName ?? '',
-    );
-    final lastNameController = TextEditingController(
-      text: profile?.lastName ?? '',
-    );
-    final emailController = TextEditingController(text: profile?.email ?? '');
-    final phoneController = TextEditingController(text: profile?.mobile ?? '');
-    final dobController = TextEditingController(text: profile?.dob ?? '');
-    final genderController = TextEditingController(text: profile?.gender ?? '');
-    bool isSaving = false;
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (sheetContext, setSheetState) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: kSurface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-              ),
-              padding: EdgeInsets.fromLTRB(
-                24,
-                12,
-                24,
-                24 + MediaQuery.of(ctx).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 48,
-                        height: 5,
-                        margin: const EdgeInsets.only(bottom: 24),
-                        decoration: BoxDecoration(
-                          color: kMuted.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: kPrimaryPl,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.person_rounded,
-                            color: kPrimary,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Personal Details',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: kText,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    _buildTextField(
-                      controller: firstNameController,
-                      label: 'First Name *',
-                      hint: 'Enter your first name',
-                      icon: Icons.person_outline,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: lastNameController,
-                      label: 'Last Name',
-                      hint: 'Enter your last name',
-                      icon: Icons.person_outline,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: emailController,
-                      label: 'Email Address *',
-                      hint: 'Enter your email address',
-                      icon: Icons.mail_outline,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: phoneController,
-                      label: 'Phone Number *',
-                      hint: '10-digit mobile number',
-                      icon: Icons.phone_android_outlined,
-                      keyboardType: TextInputType.phone,
-                      maxLength: 10,
-                      prefixText: '+91 ',
-                      inputFormatters: [
-                        IndianMobileNumberInputFormatter(),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDatePickerField(
-                      context: ctx,
-                      controller: dobController,
-                      label: 'Date of Birth',
-                      icon: Icons.calendar_today_outlined,
-                    ),
-                    const SizedBox(height: 16),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Gender',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextSub,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _buildGenderPill(
-                          sheetContext,
-                          setSheetState,
-                          'male',
-                          'Male',
-                          genderController,
-                        ),
-                        const SizedBox(width: 12),
-                        _buildGenderPill(
-                          sheetContext,
-                          setSheetState,
-                          'female',
-                          'Female',
-                          genderController,
-                        ),
-                        const SizedBox(width: 12),
-                        _buildGenderPill(
-                          sheetContext,
-                          setSheetState,
-                          'other',
-                          'Other',
-                          genderController,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-                    ElevatedButton(
-                      onPressed: isSaving
-                          ? null
-                          : () async {
-                              final firstName = firstNameController.text.trim();
-                              final mobile = phoneController.text.trim();
-                              final email = emailController.text.trim();
-
-                              if (firstName.isEmpty ||
-                                  email.isEmpty ||
-                                  mobile.isEmpty) {
-                                _showToast(
-                                  context,
-                                  'First name, email and phone number are required',
-                                  isError: true,
-                                );
-                                return;
-                              }
-
-                              if (email.isNotEmpty && !email.contains('@')) {
-                                _showToast(
-                                  context,
-                                  'Please enter a valid email address',
-                                  isError: true,
-                                );
-                                return;
-                              }
-
-                              if (mobile.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(mobile)) {
-                                _showToast(
-                                  context,
-                                  'Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9',
-                                  isError: true,
-                                );
-                                return;
-                              }
-
-                              if (RegExp(r'^([6-9])\1{9}$').hasMatch(mobile)) {
-                                _showToast(
-                                  context,
-                                  'Please enter a valid mobile number (repeated digits not allowed)',
-                                  isError: true,
-                                );
-                                return;
-                              }
-
-                              final payload = {
-                                "first_name": firstName,
-                                "last_name": lastNameController.text.trim(),
-                                "email": email,
-                                "mobile": mobile,
-                                "dob": dobController.text.trim(),
-                                "gender": genderController.text.trim(),
-                              };
-
-                              setSheetState(() => isSaving = true);
-                              try {
-                                await context
-                                    .read<CustomerSessionCubit>()
-                                    .updateProfile(payload);
-
-                                if (ctx.mounted) {
-                                  Navigator.pop(ctx);
-                                  _showToast(
-                                    context,
-                                    'Profile updated successfully',
-                                  );
-                                }
-                              } catch (e) {
-                                if (ctx.mounted) {
-                                  setSheetState(() => isSaving = false);
-                                }
-                                final msg = extractErrorMessage(e);
-                                _showToast(
-                                  context,
-                                  'Failed to update profile: $msg',
-                                  isError: true,
-                                );
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 54),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: isSaving
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Save Changes',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-    List<TextInputFormatter>? inputFormatters,
-    int? maxLength,
-    String? prefixText,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      maxLength: maxLength,
-      style: const TextStyle(
-        fontWeight: FontWeight.w700,
-        color: kText,
-        fontSize: 15,
-      ),
-      decoration: InputDecoration(
-        counterText: '',
-        prefixText: prefixText,
-        prefixStyle: const TextStyle(
-          fontWeight: FontWeight.w700,
-          color: kText,
-          fontSize: 15,
-        ),
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: kPrimaryMid, size: 20),
-        labelStyle: const TextStyle(
-          color: kTextSub,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
-        hintStyle: const TextStyle(
-          color: kMuted,
-          fontWeight: FontWeight.normal,
-        ),
-        floatingLabelStyle: const TextStyle(
-          color: kPrimary,
-          fontWeight: FontWeight.bold,
-        ),
-        filled: true,
-        fillColor: kBg,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: kBorder, width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: kPrimary, width: 1.8),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePickerField({
-    required BuildContext context,
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-  }) {
-    return TextField(
-      controller: controller,
-      readOnly: true,
-      style: const TextStyle(
-        fontWeight: FontWeight.w700,
-        color: kText,
-        fontSize: 15,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: kPrimaryMid, size: 20),
-        labelStyle: const TextStyle(
-          color: kTextSub,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
-        floatingLabelStyle: const TextStyle(
-          color: kPrimary,
-          fontWeight: FontWeight.bold,
-        ),
-        filled: true,
-        fillColor: kBg,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: kBorder, width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: kPrimary, width: 1.8),
-        ),
-      ),
-      onTap: () async {
-        final date = await showDatePicker(
-          context: context,
-          initialDate: DateTime.now(),
-          firstDate: DateTime(1950),
-          lastDate: DateTime.now(),
-          builder: (context, child) {
-            return Theme(
-              data: Theme.of(context).copyWith(
-                colorScheme: const ColorScheme.light(
-                  primary: kPrimary,
-                  onPrimary: Colors.white,
-                  onSurface: kText,
-                ),
-              ),
-              child: child!,
-            );
-          },
-        );
-
-        if (date != null) {
-          controller.text = '${date.day}-${date.month}-${date.year}';
-        }
-      },
-    );
-  }
-
-  Widget _buildGenderPill(
-    BuildContext context,
-    StateSetter setSheetState,
-    String value,
-    String label,
-    TextEditingController controller,
-  ) {
-    final isSelected = controller.text.toLowerCase().trim() == value;
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          setSheetState(() {
-            controller.text = value;
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? kPrimary.withValues(alpha: 0.08)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? kPrimary : kBorder,
-              width: isSelected ? 1.8 : 1,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? kPrimary : kTextSub,
-              ),
-            ),
-          ),
-        ),
+      builder: (ctx) => _CustomerPersonalDetailsSheet(
+        profile: profile,
       ),
     );
   }
@@ -2102,3 +1669,1313 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _divider() =>
       const Divider(height: 1, thickness: 1, color: kBorderLt, indent: 76);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOMER PERSONAL DETAILS SHEET WITH INLINE OTP VERIFICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CustomerPersonalDetailsSheet extends StatefulWidget {
+  final ProfileModel? profile;
+
+  const _CustomerPersonalDetailsSheet({
+    this.profile,
+  });
+
+  @override
+  State<_CustomerPersonalDetailsSheet> createState() =>
+      _CustomerPersonalDetailsSheetState();
+}
+
+class _CustomerPersonalDetailsSheetState
+    extends State<_CustomerPersonalDetailsSheet> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _firstNameController;
+  late final TextEditingController _lastNameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _dobController;
+
+  late final String _initialEmail;
+  late final String _initialPhone;
+
+  String _selectedGender = 'Male';
+  bool _isSaving = false;
+
+  // Email OTP state
+  bool _isSendingEmailOtp = false;
+  bool _isEmailOtpSent = false;
+  bool _isVerifyingEmailOtp = false;
+  bool _isEmailVerified = false;
+  String? _emailVerificationToken;
+  String? _emailOtpError;
+  int _emailCountdown = 0;
+  Timer? _emailTimer;
+  final TextEditingController _emailOtpController = TextEditingController();
+
+  // Phone OTP state
+  bool _isSendingPhoneOtp = false;
+  bool _isPhoneOtpSent = false;
+  bool _isVerifyingPhoneOtp = false;
+  bool _isPhoneVerified = false;
+  String? _phoneVerificationToken;
+  String? _phoneOtpError;
+  int _phoneCountdown = 0;
+  Timer? _phoneTimer;
+  final TextEditingController _phoneOtpController = TextEditingController();
+
+  String? _generalError;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.profile;
+    _firstNameController = TextEditingController(
+      text: p?.firstName.isNotEmpty == true
+          ? p!.firstName
+          : (p?.name.isNotEmpty == true ? p!.name : ''),
+    );
+    _lastNameController = TextEditingController(text: p?.lastName ?? '');
+
+    _initialEmail = (p?.email ?? '').trim().toLowerCase();
+    _emailController = TextEditingController(text: p?.email ?? '');
+
+    String rawPhone = p?.mobile ?? '';
+    _initialPhone = rawPhone
+        .replaceAll(RegExp(r'[\s\-+()]'), '')
+        .replaceFirst(RegExp(r'^(91|0)'), '');
+    if (_initialPhone.length > 10) _initialPhone = _initialPhone.substring(0, 10);
+    _phoneController = TextEditingController(text: _initialPhone);
+
+    _dobController = TextEditingController(
+      text: p?.dob != null && p!.dob.isNotEmpty ? p.dob.split('T')[0] : '',
+    );
+
+    if (p?.gender != null && p!.gender.isNotEmpty) {
+      _selectedGender = ['Male', 'Female', 'Other', 'Prefer not to say'].firstWhere(
+        (g) => g.toLowerCase() == p.gender.toLowerCase().trim(),
+        orElse: () => 'Male',
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailTimer?.cancel();
+    _phoneTimer?.cancel();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _dobController.dispose();
+    _emailOtpController.dispose();
+    _phoneOtpController.dispose();
+    super.dispose();
+  }
+
+  bool get _isEmailChanged {
+    final current = _emailController.text.trim().toLowerCase();
+    return current.isNotEmpty && current != _initialEmail;
+  }
+
+  bool get _isPhoneChanged {
+    final clean = _phoneController.text
+        .replaceAll(RegExp(r'[\s\-+()]'), '')
+        .replaceFirst(RegExp(r'^(91|0)'), '');
+    return clean.isNotEmpty && clean != _initialPhone;
+  }
+
+  void _startEmailCountdown() {
+    _emailTimer?.cancel();
+    setState(() => _emailCountdown = 60);
+    _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_emailCountdown > 0) {
+        setState(() => _emailCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _startPhoneCountdown() {
+    _phoneTimer?.cancel();
+    setState(() => _phoneCountdown = 60);
+    _phoneTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      if (_phoneCountdown > 0) {
+        setState(() => _phoneCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _sendEmailOtp() async {
+    final cleanEmail = _emailController.text.trim().toLowerCase();
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(cleanEmail)) {
+      setState(() => _emailOtpError = 'Enter a valid email address first');
+      return;
+    }
+
+    setState(() {
+      _isSendingEmailOtp = true;
+      _emailOtpError = null;
+      _generalError = null;
+    });
+
+    try {
+      final bootstrapApi = context.read<CustomerSessionCubit>().bootstrapApi;
+      await bootstrapApi.sendUpdateOtp(type: 'email', value: cleanEmail);
+      if (mounted) {
+        setState(() {
+          _isSendingEmailOtp = false;
+          _isEmailOtpSent = true;
+          _emailOtpController.clear();
+        });
+        _startEmailCountdown();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSendingEmailOtp = false;
+          _emailOtpError = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
+  }
+
+  Future<void> _verifyEmailOtp() async {
+    final cleanEmail = _emailController.text.trim().toLowerCase();
+    final otp = _emailOtpController.text.trim();
+
+    if (otp.length != 6) {
+      setState(() => _emailOtpError = 'Enter complete 6-digit OTP');
+      return;
+    }
+
+    setState(() {
+      _isVerifyingEmailOtp = true;
+      _emailOtpError = null;
+      _generalError = null;
+    });
+
+    try {
+      final bootstrapApi = context.read<CustomerSessionCubit>().bootstrapApi;
+      final token = await bootstrapApi.verifyUpdateOtp(
+        type: 'email',
+        value: cleanEmail,
+        otp: otp,
+      );
+      if (mounted) {
+        setState(() {
+          _isVerifyingEmailOtp = false;
+          _isEmailVerified = true;
+          _emailVerificationToken = token;
+          _emailOtpError = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVerifyingEmailOtp = false;
+          _emailOtpError = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
+  }
+
+  Future<void> _sendPhoneOtp() async {
+    final cleanPhone = _phoneController.text
+        .replaceAll(RegExp(r'[\s\-+()]'), '')
+        .replaceFirst(RegExp(r'^(91|0)'), '');
+    if (cleanPhone.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(cleanPhone)) {
+      setState(() => _phoneOtpError = 'Enter a valid 10-digit mobile number first');
+      return;
+    }
+
+    setState(() {
+      _isSendingPhoneOtp = true;
+      _phoneOtpError = null;
+      _generalError = null;
+    });
+
+    try {
+      final bootstrapApi = context.read<CustomerSessionCubit>().bootstrapApi;
+      await bootstrapApi.sendUpdateOtp(type: 'phone', value: cleanPhone);
+      if (mounted) {
+        setState(() {
+          _isSendingPhoneOtp = false;
+          _isPhoneOtpSent = true;
+          _phoneOtpController.clear();
+        });
+        _startPhoneCountdown();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSendingPhoneOtp = false;
+          _phoneOtpError = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
+  }
+
+  Future<void> _verifyPhoneOtp() async {
+    final cleanPhone = _phoneController.text
+        .replaceAll(RegExp(r'[\s\-+()]'), '')
+        .replaceFirst(RegExp(r'^(91|0)'), '');
+    final otp = _phoneOtpController.text.trim();
+
+    if (otp.length != 6) {
+      setState(() => _phoneOtpError = 'Enter complete 6-digit OTP');
+      return;
+    }
+
+    setState(() {
+      _isVerifyingPhoneOtp = true;
+      _phoneOtpError = null;
+      _generalError = null;
+    });
+
+    try {
+      final bootstrapApi = context.read<CustomerSessionCubit>().bootstrapApi;
+      final token = await bootstrapApi.verifyUpdateOtp(
+        type: 'phone',
+        value: cleanPhone,
+        otp: otp,
+      );
+      if (mounted) {
+        setState(() {
+          _isVerifyingPhoneOtp = false;
+          _isPhoneVerified = true;
+          _phoneVerificationToken = token;
+          _phoneOtpError = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVerifyingPhoneOtp = false;
+          _phoneOtpError = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
+  }
+
+  Future<void> _onSaveChanges() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_isEmailChanged && !_isEmailVerified) {
+      setState(() {
+        _generalError =
+            'Please request and verify the OTP for your new Email Address before saving.';
+      });
+      return;
+    }
+
+    if (_isPhoneChanged && !_isPhoneVerified) {
+      setState(() {
+        _generalError =
+            'Please request and verify the OTP for your new Mobile Number before saving.';
+      });
+      return;
+    }
+
+    final cleanPhone = _phoneController.text
+        .replaceAll(RegExp(r'[\s\-+()]'), '')
+        .replaceFirst(RegExp(r'^(91|0)'), '');
+    final cleanEmail = _emailController.text.trim().toLowerCase();
+
+    final updates = <String, dynamic>{
+      'first_name': _firstNameController.text.trim(),
+      'last_name': _lastNameController.text.trim(),
+      'email': cleanEmail,
+      'mobile': cleanPhone,
+      'gender': _selectedGender,
+      'dob': _dobController.text.trim().isEmpty ? null : _dobController.text.trim(),
+    };
+
+    if (_emailVerificationToken != null) {
+      updates['email_verification_token'] = _emailVerificationToken;
+    }
+    if (_phoneVerificationToken != null) {
+      updates['phone_verification_token'] = _phoneVerificationToken;
+    }
+    if (_emailOtpController.text.trim().isNotEmpty) {
+      updates['email_otp'] = _emailOtpController.text.trim();
+    }
+    if (_phoneOtpController.text.trim().isNotEmpty) {
+      updates['phone_otp'] = _phoneOtpController.text.trim();
+    }
+
+    setState(() {
+      _isSaving = true;
+      _generalError = null;
+    });
+
+    try {
+      await context.read<CustomerSessionCubit>().updateProfile(updates);
+      if (mounted) {
+        F2HToast.success(context, 'Personal details updated successfully');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _generalError = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        14,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Pull indicator handle
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: kMuted.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+
+              // Title Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: kPrimaryPl,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.person_outline_rounded,
+                          color: kPrimary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Personal Details',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: kText,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: kTextSub),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Name Row (First Name + Last Name)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildFormField(
+                      label: 'First Name',
+                      controller: _firstNameController,
+                      placeholder: 'First name',
+                      icon: Icons.badge_outlined,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Enter first name';
+                        if (val.trim().length < 2) return 'Min 2 characters';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildFormField(
+                      label: 'Last Name',
+                      controller: _lastNameController,
+                      placeholder: 'Last name',
+                      icon: Icons.person_outline_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // ── EMAIL FIELD WITH INLINE OTP VERIFICATION ─────────────────
+              _buildEmailSection(),
+              const SizedBox(height: 14),
+
+              // ── MOBILE FIELD WITH INLINE OTP VERIFICATION ────────────────
+              _buildPhoneSection(),
+              const SizedBox(height: 14),
+
+              // Date of Birth
+              _buildDobField(),
+              const SizedBox(height: 14),
+
+              // Gender Selector
+              _buildGenderSection(),
+              const SizedBox(height: 16),
+
+              // General error banner if present
+              if (_generalError != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: Color(0xFFDC2626),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _generalError!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFDC2626),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Save Changes Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _onSaveChanges,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Save Changes',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── EMAIL SECTION BUILDER ──────────────────────────────────────────────────
+  Widget _buildEmailSection() {
+    final isDiff = _isEmailChanged;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Email Address',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: kTextSub,
+              ),
+            ),
+            if (isDiff && _isEmailVerified)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Verified',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF15803D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+
+        TextFormField(
+          controller: _emailController,
+          readOnly: _isEmailVerified,
+          keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: kText,
+          ),
+          onChanged: (val) {
+            setState(() {
+              _isEmailOtpSent = false;
+              _isEmailVerified = false;
+              _emailVerificationToken = null;
+              _emailOtpError = null;
+              _generalError = null;
+            });
+          },
+          decoration: InputDecoration(
+            hintText: 'Enter email address',
+            hintStyle: const TextStyle(fontSize: 13, color: kMuted),
+            prefixIcon: const Icon(Icons.mail_outline_rounded, color: kPrimaryMid, size: 19),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            filled: true,
+            fillColor: _isEmailVerified ? const Color(0xFFF0FDF4) : kBg,
+            suffixIcon: isDiff && !_isEmailVerified
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: TextButton(
+                      onPressed: (_isSendingEmailOtp || _emailCountdown > 0)
+                          ? null
+                          : _sendEmailOtp,
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFEFF6FF),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: const BorderSide(color: Color(0xFFBFDBFE)),
+                        ),
+                      ),
+                      child: _isSendingEmailOtp
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF2563EB),
+                              ),
+                            )
+                          : Text(
+                              _emailCountdown > 0
+                                  ? '${_emailCountdown}s'
+                                  : (_isEmailOtpSent ? 'Resend OTP' : 'Request OTP'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1D4ED8),
+                              ),
+                            ),
+                    ),
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: _isEmailVerified ? const Color(0xFF86EFAC) : kBorder,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kPrimary, width: 1.8),
+            ),
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Enter email address';
+            if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(val.trim())) {
+              return 'Enter a valid email address';
+            }
+            return null;
+          },
+        ),
+
+        // Inline OTP input block when OTP is sent
+        if (isDiff && !_isEmailVerified && _isEmailOtpSent) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F9FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBAE6FD)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.mark_email_read_outlined,
+                      size: 15,
+                      color: Color(0xFF0284C7),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Enter 6-digit OTP sent to ${_emailController.text.trim()}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0369A1),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: TextField(
+                          controller: _emailOtpController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 4,
+                            color: kText,
+                          ),
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: InputDecoration(
+                            counterText: '',
+                            hintText: '• • • • • •',
+                            hintStyle: const TextStyle(
+                              fontSize: 14,
+                              letterSpacing: 3,
+                              color: kMuted,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFBAE6FD)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFBAE6FD)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF0284C7),
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 42,
+                      child: ElevatedButton(
+                        onPressed: _isVerifyingEmailOtp ? null : _verifyEmailOtp,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          elevation: 0,
+                        ),
+                        child: _isVerifyingEmailOtp
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Verify OTP',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_emailOtpError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _emailOtpError!,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── PHONE SECTION BUILDER ──────────────────────────────────────────────────
+  Widget _buildPhoneSection() {
+    final isDiff = _isPhoneChanged;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Mobile Number',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: kTextSub,
+              ),
+            ),
+            if (isDiff && _isPhoneVerified)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Verified',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF15803D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+
+        TextFormField(
+          controller: _phoneController,
+          readOnly: _isPhoneVerified,
+          keyboardType: TextInputType.phone,
+          maxLength: 10,
+          inputFormatters: [
+            IndianMobileNumberInputFormatter(),
+          ],
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: kText,
+          ),
+          onChanged: (val) {
+            setState(() {
+              _isPhoneOtpSent = false;
+              _isPhoneVerified = false;
+              _phoneVerificationToken = null;
+              _phoneOtpError = null;
+              _generalError = null;
+            });
+          },
+          decoration: InputDecoration(
+            counterText: '',
+            prefixText: '+91 ',
+            prefixStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: kText,
+            ),
+            hintText: '10-digit mobile number',
+            hintStyle: const TextStyle(fontSize: 13, color: kMuted),
+            prefixIcon: const Icon(
+              Icons.phone_android_rounded,
+              color: kPrimaryMid,
+              size: 19,
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            filled: true,
+            fillColor: _isPhoneVerified ? const Color(0xFFF0FDF4) : kBg,
+            suffixIcon: isDiff && !_isPhoneVerified
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: TextButton(
+                      onPressed: (_isSendingPhoneOtp || _phoneCountdown > 0)
+                          ? null
+                          : _sendPhoneOtp,
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFEFF6FF),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: const BorderSide(color: Color(0xFFBFDBFE)),
+                        ),
+                      ),
+                      child: _isSendingPhoneOtp
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF2563EB),
+                              ),
+                            )
+                          : Text(
+                              _phoneCountdown > 0
+                                  ? '${_phoneCountdown}s'
+                                  : (_isPhoneOtpSent ? 'Resend OTP' : 'Request OTP'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1D4ED8),
+                              ),
+                            ),
+                    ),
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: _isPhoneVerified ? const Color(0xFF86EFAC) : kBorder,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kPrimary, width: 1.8),
+            ),
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Enter mobile number';
+            final clean = val.replaceAll(RegExp(r'[\s\-+()]'), '').replaceFirst(RegExp(r'^(91|0)'), '');
+            if (clean.length != 10) return 'Enter 10-digit mobile number';
+            if (!RegExp(r'^[6-9]\d{9}$').hasMatch(clean)) {
+              return 'Mobile number must start with 6, 7, 8, or 9';
+            }
+            return null;
+          },
+        ),
+
+        // Inline OTP input block when OTP is sent
+        if (isDiff && !_isPhoneVerified && _isPhoneOtpSent) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F9FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBAE6FD)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.sms_outlined,
+                      size: 15,
+                      color: Color(0xFF0284C7),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Enter 6-digit OTP sent to +91 ${_phoneController.text.trim()}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0369A1),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: TextField(
+                          controller: _phoneOtpController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 4,
+                            color: kText,
+                          ),
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: InputDecoration(
+                            counterText: '',
+                            hintText: '• • • • • •',
+                            hintStyle: const TextStyle(
+                              fontSize: 14,
+                              letterSpacing: 3,
+                              color: kMuted,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFBAE6FD)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFBAE6FD)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF0284C7),
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 42,
+                      child: ElevatedButton(
+                        onPressed: _isVerifyingPhoneOtp ? null : _verifyPhoneOtp,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          elevation: 0,
+                        ),
+                        child: _isVerifyingPhoneOtp
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Verify OTP',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_phoneOtpError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _phoneOtpError!,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── FORM FIELD HELPER ──────────────────────────────────────────────────────
+  Widget _buildFormField({
+    required String label,
+    required TextEditingController controller,
+    required String placeholder,
+    required IconData icon,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: kTextSub,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: kText,
+          ),
+          decoration: InputDecoration(
+            hintText: placeholder,
+            hintStyle: const TextStyle(fontSize: 13, color: kMuted),
+            prefixIcon: Icon(icon, color: kPrimaryMid, size: 19),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            filled: true,
+            fillColor: kBg,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kPrimary, width: 1.8),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── DATE OF BIRTH FIELD ────────────────────────────────────────────────────
+  Widget _buildDobField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Date of Birth',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: kTextSub,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: _dobController,
+          readOnly: true,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: kText,
+          ),
+          decoration: InputDecoration(
+            hintText: 'YYYY-MM-DD',
+            hintStyle: const TextStyle(fontSize: 13, color: kMuted),
+            prefixIcon: const Icon(
+              Icons.calendar_today_rounded,
+              color: kPrimaryMid,
+              size: 19,
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            filled: true,
+            fillColor: kBg,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: kPrimary, width: 1.8),
+            ),
+          ),
+          onTap: () async {
+            final now = DateTime.now();
+            final initialDate = _dobController.text.trim().isNotEmpty
+                ? (DateTime.tryParse(_dobController.text.trim()) ??
+                    now.subtract(const Duration(days: 365 * 25)))
+                : now.subtract(const Duration(days: 365 * 25));
+            final date = await showDatePicker(
+              context: context,
+              initialDate: initialDate,
+              firstDate: DateTime(1940),
+              lastDate: now,
+              builder: (ctx, child) {
+                return Theme(
+                  data: Theme.of(ctx).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: kPrimary,
+                      onPrimary: Colors.white,
+                      onSurface: kText,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (date != null) {
+              setState(() {
+                _dobController.text =
+                    '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              });
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  // ── GENDER SECTION ─────────────────────────────────────────────────────────
+  Widget _buildGenderSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: kTextSub,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            _buildGenderOption('Male', Icons.male_rounded),
+            const SizedBox(width: 8),
+            _buildGenderOption('Female', Icons.female_rounded),
+            const SizedBox(width: 8),
+            _buildGenderOption('Other', Icons.transgender_rounded),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderOption(String value, IconData icon) {
+    final isSelected = _selectedGender.toLowerCase() == value.toLowerCase();
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedGender = value),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? kPrimaryPl : kBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? kPrimary : kBorder,
+              width: isSelected ? 1.8 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? kPrimary : kTextSub,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? kPrimary : kTextSub,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

@@ -65,6 +65,44 @@ class CustomerBootstrapApi {
     }
   }
 
+  Future<void> sendUpdateOtp({
+    required String type,
+    required String value,
+  }) async {
+    await dioClient.fetchCsrfToken();
+    final response = await dioClient.dio.post(
+      ApiEndpoints.customerSendUpdateOtp,
+      data: {
+        'type': type,
+        'value': value,
+      },
+    );
+    if (response.data != null && response.data['success'] == false) {
+      throw Exception(response.data['message'] ?? 'Failed to send verification code');
+    }
+  }
+
+  Future<String> verifyUpdateOtp({
+    required String type,
+    required String value,
+    required String otp,
+  }) async {
+    await dioClient.fetchCsrfToken();
+    final response = await dioClient.dio.post(
+      ApiEndpoints.customerVerifyUpdateOtp,
+      data: {
+        'type': type,
+        'value': value,
+        'otp': otp,
+      },
+    );
+    if (response.data != null &&
+        (response.data['success'] == true || response.data['verification_token'] != null)) {
+      return (response.data['verification_token'] ?? '').toString();
+    }
+    throw Exception(response.data?['message'] ?? 'Failed to verify OTP');
+  }
+
   Future<void> updateProfile(Map<String, dynamic> payload) async {
     await dioClient.fetchCsrfToken();
     await dioClient.dio.patch('${ApiEndpoints.customerBootstrap}/profile', data: payload);

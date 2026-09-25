@@ -13,6 +13,8 @@ import { NotificationModule } from 'src/notifications/notification.module';
 import { CacheService } from 'src/cache/cache.service';
 import { DeveloperService } from 'src/shared/logger/Developer.service';
 
+import { SmsService } from 'src/shared/sms/sms.service';
+
 @Module({
   imports: [
     PassportModule.register({ session: false }),
@@ -39,6 +41,7 @@ import { DeveloperService } from 'src/shared/logger/Developer.service';
   providers: [
     AuthService,
     MailService,
+    SmsService,
     DeveloperService,
     CacheService,
   ],
