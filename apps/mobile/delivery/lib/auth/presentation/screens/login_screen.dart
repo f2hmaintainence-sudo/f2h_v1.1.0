@@ -178,15 +178,17 @@ class _LoginScreenState extends State<LoginScreen> {
               const DeliveryAuthDivider(),
               const SizedBox(height: 22),
               DeliveryGoogleButton(onTap: loading || _isSendingOtp ? null : _onGoogle),
-              const SizedBox(height: 34),
-              DeliveryAuthFooter(
-                question: "Don't have an account?",
-                action: 'Sign Up',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SignupScreen()),
+              if (_currentMode == LoginMode.password) ...[
+                const SizedBox(height: 34),
+                DeliveryAuthFooter(
+                  question: "Don't have an account?",
+                  action: 'Sign Up',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SignupScreen()),
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 16),
             ],
           );

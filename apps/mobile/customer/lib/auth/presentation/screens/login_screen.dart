@@ -314,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Phone + OTP bottom actions (Terms & Get OTP button)
+  /// Phone + OTP bottom actions (Terms & Get OTP button + Continue with Google)
   Widget _buildPhoneOtpBottom(bool loading) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -337,6 +337,12 @@ class _LoginScreenState extends State<LoginScreen> {
           label: 'Get OTP',
           loading: _isSendingOtp,
           onTap: _isSendingOtp || loading ? null : _onSendPhoneOtpPressed,
+        ),
+        const SizedBox(height: 16),
+        const AuthDivider(label: 'or continue with'),
+        const SizedBox(height: 14),
+        GoogleAuthButton(
+          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
         ),
       ],
     );
@@ -386,22 +392,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Classic Email/Phone + Password bottom actions (Google + Sign In button)
+  /// Classic Email/Phone + Password bottom actions (Sign In button + Google)
   Widget _buildPasswordBottom(bool loading) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const AuthDivider(label: 'or continue with'),
-        const SizedBox(height: 14),
-        GoogleAuthButton(
-          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
-        ),
-        const SizedBox(height: 14),
         AuthPrimaryButton(
           label: 'Sign In',
           loading: loading,
           onTap: loading || _isSendingOtp ? null : _onPasswordLoginPressed,
+        ),
+        const SizedBox(height: 16),
+        const AuthDivider(label: 'or continue with'),
+        const SizedBox(height: 14),
+        GoogleAuthButton(
+          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
         ),
       ],
     );

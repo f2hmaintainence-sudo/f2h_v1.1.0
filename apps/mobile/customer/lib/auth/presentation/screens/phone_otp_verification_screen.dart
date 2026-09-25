@@ -205,8 +205,15 @@ class _PhoneOtpVerificationScreenState extends State<PhoneOtpVerificationScreen>
                 ),
               ),
               const SizedBox(height: 24),
-              const AuthDivider(label: 'or'),
-              const SizedBox(height: 16),
+              const AuthDivider(label: 'or continue with'),
+              const SizedBox(height: 14),
+              GoogleAuthButton(
+                onTap: loading ? null : () {
+                  FocusScope.of(context).unfocus();
+                  context.read<AuthBloc>().add(const GoogleSignInRequested());
+                },
+              ),
+              const SizedBox(height: 14),
               Center(
                 child: TextButton(
                   onPressed: () {
