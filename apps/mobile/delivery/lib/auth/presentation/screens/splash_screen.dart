@@ -203,7 +203,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           child: Image.asset(
                             'assets/icon/delivery_logo.png',
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            errorBuilder: (context, error, stackTrace) => Container(
                               color: kPrimary,
                               child: const Icon(
                                 Icons.eco_rounded,

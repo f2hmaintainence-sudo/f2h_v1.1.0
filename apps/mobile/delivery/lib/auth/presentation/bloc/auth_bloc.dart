@@ -10,22 +10,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository authRepository;
 
   AuthBloc({required this.authRepository}) : super(AuthInitial()) {
-    on<LoginRequested>(_onLoginRequested);
     on<PhoneOtpLoginRequested>(_onPhoneOtpLoginRequested);
-    on<SignupRequested>(_onSignupRequested);
     on<GoogleSignInRequested>(_onGoogleSignInRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<AuthCheckRequested>(_onAuthCheckRequested);
-  }
-
-  Future<void> _onLoginRequested(LoginRequested event, Emitter<AuthState> emit) async {
-    emit(AuthLoading());
-    try {
-      final user = await authRepository.login(event.identifier, event.password);
-      emit(Authenticated(user: user));
-    } catch (e) {
-      emit(AuthFailure(error: e.toString()));
-    }
   }
 
   Future<void> _onPhoneOtpLoginRequested(PhoneOtpLoginRequested event, Emitter<AuthState> emit) async {
@@ -37,31 +25,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         referralCode: event.referralCode,
       );
       emit(Authenticated(user: user));
-    } catch (e) {
-      emit(AuthFailure(error: e.toString()));
-    }
-  }
-
-  Future<void> _onSignupRequested(SignupRequested event, Emitter<AuthState> emit) async {
-    emit(AuthLoading());
-    try {
-      final user = await authRepository.register(
-        event.name,
-        event.email,
-        event.password,
-        phone: event.phone,
-        branchId: event.branchId,
-        latitude: event.latitude,
-        longitude: event.longitude,
-        verificationToken: event.verificationToken,
-        referralCode: event.referralCode,
-      );
-      if (user.token != null && user.token!.isNotEmpty) {
-        emit(Authenticated(user: user));
-      } else {
-        final loggedInUser = await authRepository.login(event.email, event.password);
-        emit(Authenticated(user: loggedInUser));
-      }
     } catch (e) {
       emit(AuthFailure(error: e.toString()));
     }

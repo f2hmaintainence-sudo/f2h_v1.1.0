@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
-import 'package:f2h_delivery/auth/presentation/screens/signup_screen.dart';
+import 'package:f2h_delivery/auth/presentation/screens/login_screen.dart';
 
 class LocationPermissionScreen extends StatefulWidget {
   const LocationPermissionScreen({super.key});
@@ -143,7 +143,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const SignupScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     } catch (e) {
       if (mounted) {

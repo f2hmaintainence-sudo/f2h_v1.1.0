@@ -8,7 +8,6 @@ import 'package:f2h_delivery/core/api/dio_client.dart';
 import 'package:f2h_delivery/core/auth/token_storage.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 
-
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
   final AuthLocalDataSource localDataSource;
@@ -17,31 +16,6 @@ class AuthRepositoryImpl implements AuthRepository {
     required this.remoteDataSource,
     required this.localDataSource,
   });
-
-  @override
-  Future<User> login(String identifier, String password) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await Future.wait([
-        prefs.remove('cached_profile'),
-        prefs.remove('cached_documents'),
-        prefs.remove('cached_vehicles'),
-        prefs.remove('cached_bank_accounts'),
-      ]);
-    } catch (_) {}
-
-    final user = await remoteDataSource.login(identifier, password);
-    if (user.token != null && user.token!.isNotEmpty) {
-      await TokenStorage.saveTokens(
-        accessToken: user.token!,
-        refreshToken: user.refreshToken ?? '',
-        userId: user.userId,
-        role: 'D',
-      );
-    }
-    await localDataSource.cacheUser(user);
-    return user;
-  }
 
   @override
   Future<void> sendLoginOtp(String phone) {
@@ -67,51 +41,6 @@ class AuthRepositoryImpl implements AuthRepository {
     final user = await remoteDataSource.loginWithOtp(
       phone: phone,
       otp: otp,
-      referralCode: referralCode,
-    );
-    if (user.token != null && user.token!.isNotEmpty) {
-      await TokenStorage.saveTokens(
-        accessToken: user.token!,
-        refreshToken: user.refreshToken ?? '',
-        userId: user.userId,
-        role: 'D',
-      );
-    }
-    await localDataSource.cacheUser(user);
-    return user;
-  }
-
-  @override
-  Future<User> register(
-    String name,
-    String email,
-    String password, {
-    String? phone,
-    String? branchId,
-    double? latitude,
-    double? longitude,
-    String? verificationToken,
-    String? referralCode,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await Future.wait([
-        prefs.remove('cached_profile'),
-        prefs.remove('cached_documents'),
-        prefs.remove('cached_vehicles'),
-        prefs.remove('cached_bank_accounts'),
-      ]);
-    } catch (_) {}
-
-    final user = await remoteDataSource.register(
-      name,
-      email,
-      password,
-      phone: phone,
-      branchId: branchId,
-      latitude: latitude,
-      longitude: longitude,
-      verificationToken: verificationToken,
       referralCode: referralCode,
     );
     if (user.token != null && user.token!.isNotEmpty) {
@@ -161,29 +90,6 @@ class AuthRepositoryImpl implements AuthRepository {
       throw e.toString();
     }
   }
-
-  @override
-  Future<void> requestPasswordResetOtp(String identifier) =>
-      remoteDataSource.requestPasswordResetOtp(identifier);
-
-  @override
-  Future<String> verifyPasswordResetOtp({
-    required String identifier,
-    required String otp,
-  }) =>
-      remoteDataSource.verifyPasswordResetOtp(identifier: identifier, otp: otp);
-
-  @override
-  Future<void> resetPassword({
-    required String identifier,
-    required String token,
-    required String newPassword,
-  }) =>
-      remoteDataSource.resetPassword(
-        identifier: identifier,
-        token: token,
-        newPassword: newPassword,
-      );
 
   @override
   Future<void> logout() async {

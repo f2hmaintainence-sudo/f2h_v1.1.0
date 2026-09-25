@@ -30,36 +30,9 @@ class AuthRepositoryImpl implements AuthRepository {
   });
 
   @override
-  Future<User> login(
-    String identifier,
-    String password, {
-    String? fcmToken,
-  }) async {
-    final userModel = await remoteDataSource.login(
-      identifier,
-      password,
-      fcmToken: fcmToken,
-    );
-    final access = userModel.token;
-    final refresh = userModel.refreshToken;
-    if (access != null && access.isNotEmpty) {
-      await TokenStorage.saveTokens(
-        accessToken: access,
-        refreshToken: refresh ?? '',
-        userId: userModel.userId.toString(),
-        role: 'C',
-      );
-    }
-    await CustomerSessionCache().clear();
-    await localDataSource.cacheUser(userModel);
-    return userModel.toEntity();
-  }
-
-  @override
   Future<User> register(
     String userName,
-    String email,
-    String password, {
+    String email, {
     required String phone,
     required String verificationToken,
     String? referralCode,
@@ -68,7 +41,6 @@ class AuthRepositoryImpl implements AuthRepository {
     final userModel = await remoteDataSource.register(
       userName,
       email,
-      password,
       phone: phone,
       verificationToken: verificationToken,
       referralCode: referralCode,
@@ -134,24 +106,6 @@ class AuthRepositoryImpl implements AuthRepository {
     required String purpose,
   }) {
     return remoteDataSource.verifyOtp(email: email, otp: otp, purpose: purpose);
-  }
-
-  @override
-  Future<void> requestPasswordResetOtp(String email) {
-    return remoteDataSource.requestPasswordResetOtp(email);
-  }
-
-  @override
-  Future<void> resetPassword({
-    required String email,
-    required String token,
-    required String newPassword,
-  }) {
-    return remoteDataSource.resetPassword(
-      email: email,
-      token: token,
-      newPassword: newPassword,
-    );
   }
 
   @override

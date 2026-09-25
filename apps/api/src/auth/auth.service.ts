@@ -940,19 +940,28 @@ export class AuthService {
     }
 
     if (normalizedPhone) {
-      this.logger.log(`[AUTH:sendOtp] Generating OTP for ${normalizedPhone}: ${otp}`);
-      this.developer.info(`[AUTH:sendOtp] Generating OTP for phone ${normalizedPhone}: ${otp}`);
+      const isDevEnv = process.env.NODE_ENV !== 'production';
+      if (isDevEnv) {
+        this.logger.log(`[AUTH:sendOtp] Generating OTP for ${normalizedPhone}: ${otp}`);
+        this.developer.info(`[AUTH:sendOtp] Generating OTP for phone ${normalizedPhone}: ${otp}`);
+      } else {
+        this.logger.log(`[AUTH:sendOtp] Generating OTP for ${normalizedPhone}`);
+      }
       try {
         const sent = await this.smsService.sendOtp(normalizedPhone, otp);
         if (!sent) {
-          this.logger.warn(`[AUTH:sendOtp] Gateway did not deliver SMS to ${normalizedPhone}. Current OTP is: ${otp}`);
-          this.developer.warn(`[AUTH:sendOtp] SMS gateway rejected OTP for ${normalizedPhone}. Current OTP is: ${otp}`);
+          this.logger.warn(`[AUTH:sendOtp] Gateway did not deliver SMS to ${normalizedPhone}`);
+          if (isDevEnv) {
+            this.developer.warn(`[AUTH:sendOtp] SMS gateway rejected OTP for ${normalizedPhone}. Current OTP is: ${otp}`);
+          }
         } else {
-          this.developer.info(`[AUTH:sendOtp] OTP SMS dispatched for ${normalizedPhone}. OTP is: ${otp}`);
+          this.logger.log(`[AUTH:sendOtp] OTP SMS dispatched for ${normalizedPhone}`);
         }
       } catch (err) {
-        this.developer.error(`Failed to send OTP SMS to ${normalizedPhone}. Fallback OTP: ${otp}`, { err, fallbackOtp: otp });
-        this.logger.warn(`[AUTH] OTP SMS failed to send to ${normalizedPhone}. OTP is: ${otp} (or use 123456)`);
+        this.logger.warn(`[AUTH] OTP SMS failed to send to ${normalizedPhone}`);
+        if (isDevEnv) {
+          this.developer.error(`Failed to send OTP SMS to ${normalizedPhone}. Fallback OTP: ${otp}`, { err, fallbackOtp: otp });
+        }
       }
     }
 
@@ -974,7 +983,8 @@ export class AuthService {
     const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(identifier);
     const storedOtp = await this.redisService.fetch(redisKey);
 
-    const isSpecialOtp = otp === '123456' || otp === '999999';
+    const isDevEnv = process.env.NODE_ENV !== 'production';
+    const isSpecialOtp = isDevEnv && (otp === '123456' || otp === '999999');
     if (!isSpecialOtp && (!storedOtp || String(storedOtp) !== otp)) {
       // Recorded so repeated wrong guesses trip the 5-failure lockout. Nothing
       // was counting these before, which left the code brute-forceable within
@@ -1114,7 +1124,8 @@ export class AuthService {
     const redisKey = CACHE_KEYS.AUTH_MOBILE_OTP(normalizedPhone);
     const storedOtp = await this.redisService.fetch(redisKey);
 
-    const isMasterOtp = otp.trim() === '123456' || otp.trim() === '999999';
+    const isDevEnv = process.env.NODE_ENV !== 'production';
+    const isMasterOtp = isDevEnv && (otp.trim() === '123456' || otp.trim() === '999999');
     if (!isMasterOtp && (!storedOtp || String(storedOtp) !== otp.trim())) {
       await this.otpRateLimitService.recordVerificationAttempt(normalizedPhone, false, ip);
       throw new UnauthorizedException('Invalid OTP. Please check the code or request a new one.');
@@ -1259,20 +1270,9 @@ export class AuthService {
           isRoleAllowed = true;
           break;
         case 'DELIVERY_PARTNER':
-          if (userRole === 'CUSTOMER') {
-            try {
-              await this.DataBase.query(
-                `UPDATE users SET role_id = 'DELIVERY_PARTNER', updated_at = NOW() WHERE user_id = $1`,
-                [user.user_id],
-              );
-              user.role_id = 'DELIVERY_PARTNER';
-            } catch (upgErr) {
-              this.developer.error('[AuthService] Failed to upgrade user to DELIVERY_PARTNER:', { upgErr });
-            }
-            isRoleAllowed = true;
-          } else {
-            isRoleAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(userRole);
-          }
+          // A CUSTOMER must register through the proper delivery partner signup
+          // flow instead of being silently upgraded during OTP login.
+          isRoleAllowed = ['DELIVERY_PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(userRole);
           break;
         case 'ADMIN':
           isRoleAllowed = !['CUSTOMER', 'DELIVERY_PARTNER'].includes(userRole);

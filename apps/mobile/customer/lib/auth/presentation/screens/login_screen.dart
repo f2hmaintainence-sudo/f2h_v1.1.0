@@ -4,9 +4,9 @@
 //
 // Project     : F2H Fresh
 // File        : login_screen.dart
-// Description : Dual-mode customer login supporting modern Phone OTP login
-//               alongside classic Email & Password authentication for legacy
-//               users whose phone numbers are null in the database.
+// Description : Customer login screen supporting Phone OTP and Google Sign-In.
+//               Password-based login has been removed — mobile apps authenticate
+//               exclusively via OTP or Google.
 // ============================================================================
 
 import 'package:flutter/gestures.dart';
@@ -18,7 +18,6 @@ import 'package:f2h_customer/auth/domain/repositories/auth_repository.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_customer/auth/presentation/bloc/auth_state.dart';
-import 'package:f2h_customer/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:f2h_customer/auth/presentation/screens/phone_otp_verification_screen.dart';
 import 'package:f2h_customer/auth/presentation/widgets/auth_kit.dart';
 import 'package:f2h_customer/features/address/presentation/screens/add_address_screen.dart';
@@ -30,15 +29,11 @@ import 'package:f2h_customer/features/profile/presentation/screens/privacy_scree
 import 'package:f2h_customer/features/profile/presentation/screens/terms_conditions_screen.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 
-enum LoginMode { phoneOtp, password }
-
 class LoginScreen extends StatefulWidget {
   final bool popOnSuccess;
-  final LoginMode initialMode;
 
   const LoginScreen({
     this.popOnSuccess = false,
-    this.initialMode = LoginMode.phoneOtp,
     super.key,
   });
 
@@ -47,12 +42,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late LoginMode _currentMode;
-
-  // Controllers for Email/Password mode
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-
   // Controller for Phone OTP mode
   final TextEditingController _phoneController = TextEditingController();
   bool _isSendingOtp = false;
@@ -61,7 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _currentMode = widget.initialMode;
     _checkAlreadyAuthenticated();
   }
 
@@ -103,8 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -124,25 +110,6 @@ class _LoginScreenState extends State<LoginScreen> {
               )
             : null,
       ),
-    );
-  }
-
-  void _onPasswordLoginPressed() {
-    final identifier = _usernameController.text.trim();
-    final password = _passwordController.text;
-
-    if (identifier.isEmpty) {
-      _showError('Please enter your email or mobile number');
-      return;
-    }
-    if (password.isEmpty) {
-      _showError('Please enter your password');
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-    context.read<AuthBloc>().add(
-      LoginRequested(identifier: identifier, password: password),
     );
   }
 
@@ -170,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       setState(() => _isSendingOtp = false);
 
-      final result = await Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PhoneOtpVerificationScreen(
@@ -179,25 +146,11 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       );
-
-      if (result == 'switch_to_password' && mounted) {
-        setState(() => _currentMode = LoginMode.password);
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSendingOtp = false);
       final errorMsg = extractErrorMessage(e, fallback: 'Failed to send OTP. Please try again.');
-      
-      // If user has no phone in DB, guide them to switch to Password mode
-      if (errorMsg.contains('email and password')) {
-        _showError(
-          errorMsg,
-          actionLabel: 'Use Password',
-          onAction: () => setState(() => _currentMode = LoginMode.password),
-        );
-      } else {
-        _showError(errorMsg);
-      }
+      _showError(errorMsg);
     }
   }
 
@@ -247,169 +200,62 @@ class _LoginScreenState extends State<LoginScreen> {
 
           return AuthScaffold(
             title: 'Welcome to F2H Fresh!',
-            subtitle: _currentMode == LoginMode.phoneOtp
-                ? 'Sign in instantly with your mobile number'
-                : 'Sign in to access fresh dairy & daily farm picks',
+            subtitle: 'Sign in instantly with your mobile number',
+            footer: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _TermsCheckbox(
+                  value: _agreeToTerms,
+                  onChanged: (v) => setState(() => _agreeToTerms = v),
+                  onOpenTerms: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+                  ),
+                  onOpenPrivacy: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                AuthPrimaryButton(
+                  label: 'Get OTP',
+                  loading: _isSendingOtp,
+                  onTap: _isSendingOtp || loading ? null : _onSendPhoneOtpPressed,
+                ),
+                const SizedBox(height: 16),
+                const AuthDivider(label: 'or continue with'),
+                const SizedBox(height: 14),
+                GoogleAuthButton(
+                  onTap: loading || _isSendingOtp ? null : _onGooglePressed,
+                ),
+              ],
+            ),
             children: [
-              AnimatedCrossFade(
-                duration: const Duration(milliseconds: 250),
-                crossFadeState: _currentMode == LoginMode.phoneOtp
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                firstChild: _buildPhoneOtpTop(loading),
-                secondChild: _buildPasswordTop(loading),
+              AuthField(
+                controller: _phoneController,
+                hint: '10-digit mobile number',
+                icon: Icons.phone_android_rounded,
+                prefixText: '+91  ',
+                keyboardType: TextInputType.phone,
+                inputFormatters: [IndianMobileNumberInputFormatter()],
+                textInputAction: TextInputAction.done,
+                maxLength: 10,
+                onSubmitted: (_) => _onSendPhoneOtpPressed(),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'We will send a 6-digit verification code',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: kAuthSubtitle,
+                ),
               ),
             ],
-            footer: AnimatedCrossFade(
-              duration: const Duration(milliseconds: 250),
-              crossFadeState: _currentMode == LoginMode.phoneOtp
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              firstChild: _buildPhoneOtpBottom(loading),
-              secondChild: _buildPasswordBottom(loading),
-            ),
           );
         },
       ),
-    );
-  }
-
-  /// Phone + OTP top input widgets
-  Widget _buildPhoneOtpTop(bool loading) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AuthField(
-          controller: _phoneController,
-          hint: '10-digit mobile number',
-          icon: Icons.phone_android_rounded,
-          prefixText: '+91  ',
-          keyboardType: TextInputType.phone,
-          inputFormatters: [IndianMobileNumberInputFormatter()],
-          textInputAction: TextInputAction.done,
-          maxLength: 10,
-          onSubmitted: (_) => _onSendPhoneOtpPressed(),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'We will send a 6-digit verification code',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: kAuthSubtitle,
-              ),
-            ),
-            AuthTextLink(
-              label: 'Use Password',
-              alignment: Alignment.centerRight,
-              onTap: () => setState(() => _currentMode = LoginMode.password),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Phone + OTP bottom actions (Terms & Get OTP button + Continue with Google)
-  Widget _buildPhoneOtpBottom(bool loading) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _TermsCheckbox(
-          value: _agreeToTerms,
-          onChanged: (v) => setState(() => _agreeToTerms = v),
-          onOpenTerms: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
-          ),
-          onOpenPrivacy: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PrivacyScreen()),
-          ),
-        ),
-        const SizedBox(height: 16),
-        AuthPrimaryButton(
-          label: 'Get OTP',
-          loading: _isSendingOtp,
-          onTap: _isSendingOtp || loading ? null : _onSendPhoneOtpPressed,
-        ),
-        const SizedBox(height: 16),
-        const AuthDivider(label: 'or continue with'),
-        const SizedBox(height: 14),
-        GoogleAuthButton(
-          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
-        ),
-      ],
-    );
-  }
-
-  /// Classic Email/Phone + Password top input widgets
-  Widget _buildPasswordTop(bool loading) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AuthField(
-          controller: _usernameController,
-          hint: 'Email or Mobile Number',
-          icon: Icons.mail_outline_rounded,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 14),
-        AuthField(
-          controller: _passwordController,
-          hint: 'Password',
-          icon: Icons.lock_outline_rounded,
-          isPassword: true,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _onPasswordLoginPressed(),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            AuthTextLink(
-              label: 'Sign in with OTP instead',
-              alignment: Alignment.centerLeft,
-              onTap: () => setState(() => _currentMode = LoginMode.phoneOtp),
-            ),
-            AuthTextLink(
-              label: 'Forgot Password?',
-              alignment: Alignment.centerRight,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Classic Email/Phone + Password bottom actions (Sign In button + Google)
-  Widget _buildPasswordBottom(bool loading) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AuthPrimaryButton(
-          label: 'Sign In',
-          loading: loading,
-          onTap: loading || _isSendingOtp ? null : _onPasswordLoginPressed,
-        ),
-        const SizedBox(height: 16),
-        const AuthDivider(label: 'or continue with'),
-        const SizedBox(height: 14),
-        GoogleAuthButton(
-          onTap: loading || _isSendingOtp ? null : _onGooglePressed,
-        ),
-      ],
     );
   }
 }
@@ -480,4 +326,3 @@ class _TermsCheckbox extends StatelessWidget {
     ],
   );
 }
-

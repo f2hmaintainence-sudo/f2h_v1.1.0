@@ -4,20 +4,15 @@ import 'package:f2h_customer/core/api/api_endpoints.dart';
 import 'package:f2h_customer/auth/data/models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
-  Future<UserModel> login(
-    String identifier,
-    String password, {
-    String? fcmToken,
-  });
   Future<UserModel> register(
     String userName,
-    String email,
-    String password, {
+    String email, {
     required String phone,
     required String verificationToken,
     String? referralCode,
     String? fcmToken,
   });
+
   /// Exchanges a Google credential for an F2H session.
   ///
   /// Both fields are forwarded because platforms differ in what they can
@@ -27,25 +22,23 @@ abstract class AuthRemoteDataSource {
     String? serverAuthCode,
     String? fcmToken,
   });
+
   Future<void> sendRegistrationOtp(String email, {String? userName});
   Future<void> sendLoginOtp(String phone);
+
   Future<UserModel> loginWithOtp({
     required String phone,
     required String otp,
     String? fcmToken,
     String? referralCode,
   });
+
   Future<String> verifyOtp({
     required String email,
     required String otp,
     required String purpose,
   });
-  Future<void> requestPasswordResetOtp(String email);
-  Future<void> resetPassword({
-    required String email,
-    required String token,
-    required String newPassword,
-  });
+
   Future<void> logout();
 }
 
@@ -63,7 +56,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           return text;
         }
       }
-      return 'Invalid email, phone or password. Please check your login details.';
+      return 'Invalid credentials. Please check your login details.';
     }
 
     if (e.response?.statusCode == 403) {
@@ -111,47 +104,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> login(
-    String identifier,
-    String password, {
-    String? fcmToken,
-  }) async {
-    try {
-      final response = await dioClient.dio.post(
-        ApiEndpoints.login,
-        data: {
-          'identifier': identifier,
-          'password': password,
-          if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
-        },
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Merge top-level response (contains accessToken) with the nested user map
-        final userMap = Map<String, dynamic>.from(
-          response.data['user'] as Map? ?? {},
-        );
-        userMap['accessToken'] = response.data['accessToken'];
-        userMap['refreshToken'] = response.data['refreshToken'];
-        dioClient.setAuthToken(response.data['accessToken']?.toString());
-        return UserModel.fromJson(userMap);
-      } else {
-        throw DioException(
-          requestOptions: response.requestOptions,
-          response: response,
-          error: response.data['message'] ?? 'Login failed',
-        );
-      }
-    } on DioException catch (e) {
-      throw _extractError(e, 'Connection error');
-    }
-  }
-
-  @override
   Future<UserModel> register(
     String userName,
-    String email,
-    String password, {
+    String email, {
     required String phone,
     required String verificationToken,
     String? referralCode,
@@ -159,15 +114,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }) async {
     try {
       final body = <String, dynamic>{
-        'first_name': userName,   // full name → users.first_name column
+        'first_name': userName, // full name → users.first_name column
         'user_name': userName,
         'name': userName,
         'email': email,
         'phone': phone,
-        if (password.isNotEmpty) 'password': password,
         'role': 'CUSTOMER',
         'verification_token': verificationToken,
-         if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
+        if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
       };
 
       if (referralCode != null && referralCode.isNotEmpty) {
@@ -291,34 +245,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return token;
     } on DioException catch (e) {
       throw _extractError(e, 'OTP verification failed');
-    }
-  }
-
-  @override
-  Future<void> requestPasswordResetOtp(String email) async {
-    try {
-      await dioClient.dio.post(
-        ApiEndpoints.forgotPassword,
-        data: {'email': email},
-      );
-    } on DioException catch (e) {
-      throw _extractError(e, 'Unable to send password reset OTP');
-    }
-  }
-
-  @override
-  Future<void> resetPassword({
-    required String email,
-    required String token,
-    required String newPassword,
-  }) async {
-    try {
-      await dioClient.dio.post(
-        ApiEndpoints.resetPassword,
-        data: {'email': email, 'token': token, 'newPassword': newPassword},
-      );
-    } on DioException catch (e) {
-      throw _extractError(e, 'Unable to reset password');
     }
   }
 

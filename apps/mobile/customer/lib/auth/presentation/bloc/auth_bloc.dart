@@ -13,37 +13,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   AuthBloc({required this.authRepository, required this.notificationService})
     : super(AuthInitial()) {
-    on<LoginRequested>(_onLoginRequested);
     on<PhoneOtpLoginRequested>(_onPhoneOtpLoginRequested);
     on<SignupRequested>(_onSignupRequested);
     on<GoogleSignInRequested>(_onGoogleSignInRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<AuthCheckRequested>(_onAuthCheckRequested);
-  }
-
-  Future<void> _onLoginRequested(
-    LoginRequested event,
-    Emitter<AuthState> emit,
-  ) async {
-    emit(AuthLoading());
-    try {
-      final String? fcmToken = await notificationService.getToken();
-      final user = await authRepository.login(
-        event.identifier,
-        event.password,
-        fcmToken: fcmToken,
-      );
-      emit(Authenticated(user: user));
-    } catch (e) {
-      emit(
-        AuthFailure(
-          error: extractErrorMessage(
-            e,
-            fallback: 'Login failed. Please try again.',
-          ),
-        ),
-      );
-    }
   }
 
   Future<void> _onPhoneOtpLoginRequested(
@@ -80,9 +54,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final String? fcmToken = await notificationService.getToken();
       final user = await authRepository.register(
-        event.user_name,
+        event.userName,
         event.email,
-        event.password,
         phone: event.phone,
         verificationToken: event.verificationToken,
         referralCode: event.referralCode,

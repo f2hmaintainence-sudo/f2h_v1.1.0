@@ -4,8 +4,8 @@
 //
 // Project     : F2H Delivery
 // File        : login_screen.dart
-// Description : Dual-mode delivery partner login supporting modern Phone OTP login
-//               alongside classic Email & Password authentication.
+// Description : Delivery partner login supporting Phone OTP login
+//               alongside Google authentication.
 // ============================================================================
 
 import 'package:flutter/material.dart';
@@ -19,43 +19,26 @@ import 'package:f2h_delivery/auth/presentation/bloc/auth_bloc.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_event.dart';
 import 'package:f2h_delivery/auth/presentation/bloc/auth_state.dart';
 import 'package:f2h_delivery/auth/presentation/screens/phone_otp_verification_screen.dart';
-import 'package:f2h_delivery/auth/presentation/screens/signup_screen.dart';
 import 'package:f2h_delivery/auth/presentation/widgets/auth_kit.dart';
-import 'package:f2h_delivery/auth/presentation/widgets/forgot_password_sheet.dart';
 import 'package:f2h_delivery/core/di/injection.dart';
 import 'package:f2h_delivery/core/utils/version_checker.dart';
 import 'package:f2h_delivery/features/delivery_session/presentation/bloc/delivery_session_bloc.dart';
 import 'package:f2h_delivery/theme/app_colors.dart';
 
-enum LoginMode { phoneOtp, password }
-
 class LoginScreen extends StatefulWidget {
-  final LoginMode initialMode;
-
-  const LoginScreen({
-    this.initialMode = LoginMode.phoneOtp,
-    super.key,
-  });
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late LoginMode _currentMode;
-
-  // Controllers for Email/Password mode
-  final _identifierCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-
-  // Controller for Phone OTP mode
   final _phoneCtrl = TextEditingController();
   bool _isSendingOtp = false;
 
   @override
   void initState() {
     super.initState();
-    _currentMode = widget.initialMode;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         VersionChecker.checkUpdates(context);
@@ -65,8 +48,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _identifierCtrl.dispose();
-    _passwordCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
   }
@@ -78,23 +59,6 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: background,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  void _onPasswordLogin() {
-    final identifier = _identifierCtrl.text.trim();
-    final password = _passwordCtrl.text;
-
-    if (identifier.isEmpty || password.isEmpty) {
-      _toast('Please fill in all fields', kPrimary);
-      return;
-    }
-    FocusScope.of(context).unfocus();
-    context.read<AuthBloc>().add(
-      LoginRequested(
-        identifier: identifier,
-        password: password,
       ),
     );
   }
@@ -162,34 +126,14 @@ class _LoginScreenState extends State<LoginScreen> {
           return DeliveryAuthScaffold(
             title: 'Welcome',
             titleAccent: 'Back',
-            subtitle: _currentMode == LoginMode.phoneOtp
-                ? 'Sign in instantly with your mobile number'
-                : 'Sign in to manage your deliveries',
+            subtitle: 'Sign in instantly with your mobile number',
             children: [
-              AnimatedCrossFade(
-                duration: const Duration(milliseconds: 250),
-                crossFadeState: _currentMode == LoginMode.phoneOtp
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                firstChild: _buildPhoneOtpForm(loading),
-                secondChild: _buildPasswordForm(loading),
-              ),
+              _buildPhoneOtpForm(loading),
               const SizedBox(height: 28),
               const DeliveryAuthDivider(),
               const SizedBox(height: 22),
               DeliveryGoogleButton(onTap: loading || _isSendingOtp ? null : _onGoogle),
-              if (_currentMode == LoginMode.password) ...[
-                const SizedBox(height: 34),
-                DeliveryAuthFooter(
-                  question: "Don't have an account?",
-                  action: 'Sign Up',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SignupScreen()),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
             ],
           );
         },
@@ -214,80 +158,19 @@ class _LoginScreenState extends State<LoginScreen> {
           onSubmitted: (_) => _onSendPhoneOtp(),
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'We will send a 6-digit verification code',
-              style: GoogleFonts.roboto(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: kAuthSubtitle,
-              ),
-            ),
-            DeliveryTextLink(
-              label: 'Use Password',
-              alignment: Alignment.centerRight,
-              onTap: () => setState(() => _currentMode = LoginMode.password),
-            ),
-          ],
+        Text(
+          'We will send a 6-digit verification code',
+          style: GoogleFonts.roboto(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: kAuthSubtitle,
+          ),
         ),
         const SizedBox(height: 24),
         DeliveryPrimaryButton(
           label: 'Get OTP',
           loading: _isSendingOtp,
           onTap: _isSendingOtp || loading ? null : _onSendPhoneOtp,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPasswordForm(bool loading) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        DeliveryAuthField(
-          controller: _identifierCtrl,
-          hint: 'Email or Mobile Number',
-          icon: Icons.mail_outline_rounded,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 26),
-        DeliveryAuthField(
-          controller: _passwordCtrl,
-          hint: 'Password',
-          icon: Icons.lock_outline_rounded,
-          isPassword: true,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _onPasswordLogin(),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            DeliveryTextLink(
-              label: 'Forgot Password?',
-              alignment: Alignment.centerLeft,
-              onTap: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => const ForgotPasswordSheet(),
-              ),
-            ),
-            DeliveryTextLink(
-              label: 'Use Phone OTP',
-              alignment: Alignment.centerRight,
-              onTap: () => setState(() => _currentMode = LoginMode.phoneOtp),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        DeliveryPrimaryButton(
-          label: 'Sign In',
-          loading: loading,
-          onTap: loading ? null : _onPasswordLogin,
         ),
       ],
     );
