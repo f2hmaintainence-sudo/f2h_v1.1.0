@@ -1298,7 +1298,7 @@ export class SubscriptionsService {
   async updateSubscription(id: string, body: CreateSubscriptionDto) {
     try {
       const existingRows = await this.db.query(
-        `SELECT subscription_id, subscription_number, customer_id, branch_id, address_id, schedule_type, delivery_slot, start_date, end_date, auto_renew, status
+        `SELECT subscription_id, subscription_number, customer_id, branch_id, address_id, schedule_type, start_date, end_date, auto_renew, status
          FROM subscriptions
          WHERE subscription_id = $1 OR id::text = $1
          LIMIT 1`,
@@ -1328,16 +1328,14 @@ export class SubscriptionsService {
         await client.query(
           `UPDATE subscriptions
            SET schedule_type = $1,
-               delivery_slot = COALESCE($2, delivery_slot),
-               auto_renew = COALESCE($3, auto_renew),
-               address_id = COALESCE($4, address_id),
-               monthly_estimate = COALESCE($5, monthly_estimate),
-               start_date = COALESCE($6, start_date),
+               auto_renew = COALESCE($2, auto_renew),
+               address_id = COALESCE($3, address_id),
+               monthly_estimate = COALESCE($4, monthly_estimate),
+               start_date = COALESCE($5, start_date),
                updated_at = NOW()
-           WHERE subscription_id = $7`,
+           WHERE subscription_id = $6`,
           [
             dbScheduleType,
-            body.delivery_slot || null,
             body.auto_renew !== undefined ? body.auto_renew : null,
             body.address_id || null,
             body.monthly_estimate ?? body.estimated_total ?? null,
@@ -1482,11 +1480,9 @@ export class SubscriptionsService {
             itemId,
             JSON.stringify({
               schedule_type: existingSub.schedule_type,
-              delivery_slot: existingSub.delivery_slot,
             }),
             JSON.stringify({
               schedule_type: dbScheduleType,
-              delivery_slot: body.delivery_slot,
               custom_dates_count: body.custom_dates?.length,
               variant_id: variantId,
             }),
