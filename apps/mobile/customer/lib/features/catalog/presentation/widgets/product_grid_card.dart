@@ -100,25 +100,28 @@ class ProductGridCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Center(
-                  child: product.isOutOfStock
-                      ? ColorFiltered(
-                          colorFilter: const ColorFilter.matrix(<double>[
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0.2126, 0.7152, 0.0722, 0, 0,
-                            0,      0,      0,      0.65, 0,
-                          ]),
-                          child: buildProductImage(
+                  child: Hero(
+                    tag: 'product-v-${product.id}',
+                    child: product.isOutOfStock
+                        ? ColorFiltered(
+                            colorFilter: const ColorFilter.matrix(<double>[
+                              0.2126, 0.7152, 0.0722, 0, 0,
+                              0.2126, 0.7152, 0.0722, 0, 0,
+                              0.2126, 0.7152, 0.0722, 0, 0,
+                              0,      0,      0,      0.65, 0,
+                            ]),
+                            child: buildProductImage(
+                              product.name,
+                              imageAsset: product.imageAsset,
+                              fit: BoxFit.contain,
+                            ),
+                          )
+                        : buildProductImage(
                             product.name,
                             imageAsset: product.imageAsset,
                             fit: BoxFit.contain,
                           ),
-                        )
-                      : buildProductImage(
-                          product.name,
-                          imageAsset: product.imageAsset,
-                          fit: BoxFit.contain,
-                        ),
+                  ),
                 ),
               ),
             ),
