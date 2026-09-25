@@ -512,6 +512,11 @@ export class SubscriptionsService {
       // Always generate a new subscription_id for each subscription record
       const subscriptionId = this.makeId('SUB');
 
+      const rawPaymentType = (body.payment_type || 'prepaid').toLowerCase();
+      const dbBillingCycle = rawPaymentType === 'prepaid'
+        ? 'daily'
+        : (dbScheduleType === 'custom_dates' ? 'custom' : (body.billing_cycle || 'monthly'));
+
       // 3. Insert new subscription row using varchar subscription_id
       await client.query(
         `
@@ -545,7 +550,7 @@ export class SubscriptionsService {
           addressId,
           dbScheduleType,
           body.payment_type,
-          dbScheduleType === 'custom_dates' ? 'custom' : 'monthly',
+          dbBillingCycle,
           body.start_date,
           body.end_date || calcMonthEndDate(body.start_date) || null,
           body.auto_renew,

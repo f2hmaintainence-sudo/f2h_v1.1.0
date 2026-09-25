@@ -105,6 +105,10 @@ export class CreateSubscriptionDto {
   payment_method?: string;
 
   @IsOptional()
+  @IsString()
+  billing_cycle?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   estimated_total?: number;
