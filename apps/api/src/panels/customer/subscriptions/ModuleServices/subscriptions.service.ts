@@ -513,9 +513,7 @@ export class SubscriptionsService {
       const subscriptionId = this.makeId('SUB');
 
       const rawPaymentType = (body.payment_type || 'prepaid').toLowerCase();
-      const dbBillingCycle = rawPaymentType === 'prepaid'
-        ? 'daily'
-        : (dbScheduleType === 'custom_dates' ? 'custom' : (body.billing_cycle || 'monthly'));
+      const dbBillingCycle = rawPaymentType === 'prepaid' ? 'daily' : 'monthly';
 
       // 3. Insert new subscription row using varchar subscription_id
       await client.query(

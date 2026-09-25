@@ -220,7 +220,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'branch_id': branchId,
         'schedule_type': isCustom ? 'custom_dates' : 'weekly',
         'payment_type': paymentType,
-        'billing_cycle': paymentType == 'prepaid' ? 'daily' : (isCustom ? 'custom' : 'monthly'),
+        'billing_cycle': paymentType == 'prepaid' ? 'daily' : 'monthly',
         'auto_renew': autoRenew,
         'custom_dates': isCustom ? customDays : <String>[],
         'items': [
@@ -327,7 +327,7 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
         'schedule_type': isCustom ? 'custom_dates' : 'weekly',
         'payment_type': paymentType,
         'payment_method': paymentMethod,
-        'billing_cycle': paymentType == 'prepaid' ? 'daily' : (isCustom ? 'custom' : 'monthly'),
+        'billing_cycle': paymentType == 'prepaid' ? 'daily' : 'monthly',
         'auto_renew': autoRenew,
         'estimated_total': estimatedTotal,
         'monthly_estimate': monthlyEstimate ?? estimatedTotal,
