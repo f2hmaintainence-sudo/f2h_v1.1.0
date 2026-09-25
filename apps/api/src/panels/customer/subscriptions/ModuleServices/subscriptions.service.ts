@@ -862,7 +862,7 @@ export class SubscriptionsService {
       item.custom_dates = customDates
         .filter(cd => cd.subscription_id === subId || cd.subscription_item_id === itemId)
         .filter(cd => {
-          const dateKey = String(cd.delivery_date || cd.date).split('T')[0];
+          const dateKey = String(cd.delivery_date || cd.date).replace('T', ' ').split(' ')[0].trim();
           if (seenDates.has(dateKey)) return false;
           seenDates.add(dateKey);
           return true;

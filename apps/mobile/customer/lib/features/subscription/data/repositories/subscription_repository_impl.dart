@@ -562,8 +562,8 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     final seen = <String>{};
     final uniqueDates = <SubscriptionCustomDateModel>[];
     for (final cd in rawDates) {
-      final key = cd.deliveryDate.split('T').first;
-      if (seen.add(key)) {
+      final key = cd.deliveryDate.replaceAll('T', ' ').split(' ').first.trim();
+      if (key.isNotEmpty && seen.add(key)) {
         uniqueDates.add(cd);
       }
     }

@@ -977,14 +977,21 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final isWeekly = !isCustom && (s.frequency.toLowerCase().contains('weekly') ||
         (dayQtys.isNotEmpty && !isAllSame));
 
-    final List<CustomDateScheduleEntry> initialCustomDates = customDates.map((c) {
-      final parsedDate = DateTime.tryParse(c.deliveryDate) ?? DateTime.now();
-      return CustomDateScheduleEntry(
-        date: parsedDate,
-        morningQty: c.mQuantity,
-        eveningQty: c.eQuantity,
-      );
-    }).toList();
+    final seenDateKeys = <String>{};
+    final List<CustomDateScheduleEntry> initialCustomDates = [];
+    for (final c in customDates) {
+      final key = c.deliveryDate.replaceAll('T', ' ').split(' ').first.trim();
+      if (key.isNotEmpty && seenDateKeys.add(key)) {
+        final parsedDate = DateTime.tryParse(c.deliveryDate) ?? DateTime.now();
+        initialCustomDates.add(
+          CustomDateScheduleEntry(
+            date: DateTime(parsedDate.year, parsedDate.month, parsedDate.day),
+            morningQty: c.mQuantity,
+            eveningQty: c.eQuantity,
+          ),
+        );
+      }
+    }
 
     final mQty = dayQtys.isNotEmpty
         ? dayQtys.first.morningQty

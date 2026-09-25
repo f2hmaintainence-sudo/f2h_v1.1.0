@@ -40,10 +40,10 @@ class CustomDateScheduleEntry {
   int eveningQty;
 
   CustomDateScheduleEntry({
-    required this.date,
+    required DateTime date,
     this.morningQty = 1,
     this.eveningQty = 0,
-  });
+  }) : date = DateTime(date.year, date.month, date.day);
 
   String get dateString =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -104,6 +104,11 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
   // ── Custom mode per-date schedule ────────────────────
   List<CustomDateScheduleEntry> _customDates = [];
+
+  void _deduplicateCustomDates() {
+    final seen = <String>{};
+    _customDates.retainWhere((entry) => seen.add(entry.dateString));
+  }
 
   // ── Subscription dates ────────────────────────────────
   late DateTime _startDate;
@@ -222,6 +227,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
           _customDates.add(entry);
         }
       }
+      _deduplicateCustomDates();
       _customDates.sort((a, b) => a.date.compareTo(b.date));
     }
 
@@ -480,10 +486,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
     if (!mounted) return;
     if (picked != null) {
       final dateOnly = DateTime(picked.year, picked.month, picked.day);
-      final exists = _customDates.any((e) =>
-          e.date.year == dateOnly.year &&
-          e.date.month == dateOnly.month &&
-          e.date.day == dateOnly.day);
+      final newKey =
+          '${dateOnly.year}-${dateOnly.month.toString().padLeft(2, '0')}-${dateOnly.day.toString().padLeft(2, '0')}';
+      _deduplicateCustomDates();
+      final exists = _customDates.any((e) => e.dateString == newKey);
       if (exists) {
         F2HToast.show(context, 'This date is already added');
         return;
@@ -503,6 +509,7 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
             eveningQty: defaultEvening,
           ),
         );
+        _deduplicateCustomDates();
         _customDates.sort((a, b) => a.date.compareTo(b.date));
       });
     }
@@ -804,6 +811,9 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_frequency == 'custom') {
+      _deduplicateCustomDates();
+    }
     final p = widget.product;
     final estimate = _currentMonthEstimate;
     final fullEst = _fullMonthEstimate;
