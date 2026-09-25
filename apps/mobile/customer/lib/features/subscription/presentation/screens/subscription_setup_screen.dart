@@ -106,8 +106,15 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   List<CustomDateScheduleEntry> _customDates = [];
 
   void _deduplicateCustomDates() {
+    final now = DateTime.now();
+    final earliestDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
     final seen = <String>{};
-    _customDates.retainWhere((entry) => seen.add(entry.dateString));
+    _customDates.retainWhere((entry) {
+      if (entry.date.isBefore(earliestDate)) {
+        return false;
+      }
+      return seen.add(entry.dateString);
+    });
   }
 
   // ── Subscription dates ────────────────────────────────
@@ -220,10 +227,12 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
     // Init custom schedule defaults
     if (widget.initialCustomDates != null && widget.initialCustomDates!.isNotEmpty) {
+      final now = DateTime.now();
+      final earliestDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
       final seen = <String>{};
       _customDates = [];
       for (final entry in widget.initialCustomDates!) {
-        if (seen.add(entry.dateString)) {
+        if (!entry.date.isBefore(earliestDate) && seen.add(entry.dateString)) {
           _customDates.add(entry);
         }
       }

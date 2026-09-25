@@ -977,19 +977,24 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final isWeekly = !isCustom && (s.frequency.toLowerCase().contains('weekly') ||
         (dayQtys.isNotEmpty && !isAllSame));
 
+    final now = DateTime.now();
+    final earliestDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
     final seenDateKeys = <String>{};
     final List<CustomDateScheduleEntry> initialCustomDates = [];
     for (final c in customDates) {
       final key = c.deliveryDate.replaceAll('T', ' ').split(' ').first.trim();
       if (key.isNotEmpty && seenDateKeys.add(key)) {
         final parsedDate = DateTime.tryParse(c.deliveryDate) ?? DateTime.now();
-        initialCustomDates.add(
-          CustomDateScheduleEntry(
-            date: DateTime(parsedDate.year, parsedDate.month, parsedDate.day),
-            morningQty: c.mQuantity,
-            eveningQty: c.eQuantity,
-          ),
-        );
+        final dateOnly = DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
+        if (!dateOnly.isBefore(earliestDate)) {
+          initialCustomDates.add(
+            CustomDateScheduleEntry(
+              date: dateOnly,
+              morningQty: c.mQuantity,
+              eveningQty: c.eQuantity,
+            ),
+          );
+        }
       }
     }
 

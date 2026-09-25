@@ -859,10 +859,12 @@ export class SubscriptionsService {
       item.weekly_schedules = weeklySchedules.filter(s => s.subscription_id === subId || s.subscription_item_id === itemId);
       item.pauses = pauses.filter(p => p.subscription_id === subId || p.subscription_item_id === itemId);
       const seenDates = new Set<string>();
+      const todayStr = new Date().toISOString().split('T')[0];
       item.custom_dates = customDates
         .filter(cd => cd.subscription_id === subId || cd.subscription_item_id === itemId)
         .filter(cd => {
           const dateKey = String(cd.delivery_date || cd.date).replace('T', ' ').split(' ')[0].trim();
+          if (!dateKey || dateKey < todayStr) return false;
           if (seenDates.has(dateKey)) return false;
           seenDates.add(dateKey);
           return true;

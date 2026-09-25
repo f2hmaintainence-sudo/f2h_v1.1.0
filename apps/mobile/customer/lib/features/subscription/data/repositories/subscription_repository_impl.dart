@@ -561,9 +561,16 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
 
     final seen = <String>{};
     final uniqueDates = <SubscriptionCustomDateModel>[];
+    final now = DateTime.now();
+    final earliestDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
     for (final cd in rawDates) {
       final key = cd.deliveryDate.replaceAll('T', ' ').split(' ').first.trim();
       if (key.isNotEmpty && seen.add(key)) {
+        final parsed = DateTime.tryParse(cd.deliveryDate);
+        if (parsed != null) {
+          final dateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+          if (dateOnly.isBefore(earliestDate)) continue;
+        }
         uniqueDates.add(cd);
       }
     }

@@ -655,9 +655,16 @@ class Subscription {
       ...customDates,
       ...items.expand((item) => item.customDates),
     ];
+    final now = DateTime.now();
+    final earliestDate = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
     for (final cd in allSources) {
       final key = cd.deliveryDate.replaceAll('T', ' ').split(' ').first.trim();
       if (key.isNotEmpty && seen.add(key)) {
+        final parsed = DateTime.tryParse(cd.deliveryDate);
+        if (parsed != null) {
+          final dateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+          if (dateOnly.isBefore(earliestDate)) continue;
+        }
         collected.add(cd);
       }
     }
