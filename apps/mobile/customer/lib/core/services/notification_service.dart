@@ -15,6 +15,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/customer_bills_screen.dart';
+import 'package:f2h_customer/app.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -43,6 +44,59 @@ class NotificationService {
     final type = data['type']?.toString().toLowerCase() ?? '';
     final route = data['route']?.toString().toLowerCase() ?? '';
     final url = data['url']?.toString() ?? rawPayload ?? '';
+
+    final actionType = (data['action_type'] ?? data['actionType'] ?? '').toString().toUpperCase();
+    final categoryId = (data['category_id'] ?? data['categoryId'] ?? '').toString();
+    final productId = (data['product_id'] ?? data['productId'] ?? '').toString();
+    final actionValue = (data['action_value'] ?? data['actionValue'] ?? '').toString();
+
+    // 1. Target Product Redirection
+    if (actionType == 'PRODUCT' || productId.isNotEmpty) {
+      final targetPid = productId.isNotEmpty ? productId : actionValue;
+      if (targetPid.isNotEmpty) {
+        final nav = appNavigatorKey.currentState;
+        if (nav != null) {
+          nav.popUntil((r) => r.isFirst);
+          final ctx = appNavigatorKey.currentContext;
+          if (ctx != null) {
+            AppShell.of(ctx)?.setTab(
+              AppShell.tabShop,
+              category: categoryId.isNotEmpty ? categoryId : null,
+              productId: targetPid,
+            );
+          }
+        }
+        return;
+      }
+    }
+
+    // 2. Target Category Redirection
+    if (actionType == 'CATEGORY' || categoryId.isNotEmpty) {
+      final targetCat = categoryId.isNotEmpty ? categoryId : actionValue;
+      if (targetCat.isNotEmpty) {
+        final nav = appNavigatorKey.currentState;
+        if (nav != null) {
+          nav.popUntil((r) => r.isFirst);
+          final ctx = appNavigatorKey.currentContext;
+          if (ctx != null) {
+            AppShell.of(ctx)?.setTab(
+              AppShell.tabShop,
+              category: targetCat,
+            );
+          }
+        }
+        return;
+      }
+    }
+
+    // 3. Deep Link / External URL
+    if (actionType == 'DEEP_LINK' && actionValue.isNotEmpty) {
+      final uri = Uri.tryParse(actionValue);
+      if (uri != null) {
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
 
     if (type == 'customer_bills' ||
         type == 'bills' ||

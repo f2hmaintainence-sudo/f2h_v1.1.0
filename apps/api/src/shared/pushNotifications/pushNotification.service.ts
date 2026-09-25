@@ -182,10 +182,12 @@ export class PushNotificationService implements OnModuleInit {
             try {
                 const notifId = `NTF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
                 const now = new Date();
+                const displayTitle = message.title.replace(/\{\{customer_name\}\}/gi, 'Valued Customer');
+                const displayBody = message.body.replace(/\{\{customer_name\}\}/gi, 'Valued Customer');
                 await this.db.query(
-                    `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, created_by, created_at, updated_at)
-                     VALUES ($1, $2, $3, 'push', 'info', 'high', 'active', 'system', $4, $4)`,
-                    [notifId, message.title, message.body, now]
+                    `INSERT INTO notifications (notification_id, title, message, medium, type, priority, status, data, created_by, created_at, updated_at)
+                     VALUES ($1, $2, $3, 'push', 'info', 'high', 'active', $4::jsonb, 'system', $5, $5)`,
+                    [notifId, displayTitle, displayBody, JSON.stringify(message.data || {}), now]
                 );
 
                 for (const uid of resolvedUserIds) {

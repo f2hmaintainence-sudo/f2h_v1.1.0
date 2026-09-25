@@ -232,6 +232,7 @@ export class NotificationService {
           'notifications.message',
           'notifications.type',
           'notifications.priority',
+          'notifications.data',
           'notification_recipients.html',
           'notification_recipients.image',
           'notification_recipients.status',

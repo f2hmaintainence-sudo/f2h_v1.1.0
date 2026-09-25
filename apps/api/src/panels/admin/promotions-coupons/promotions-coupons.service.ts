@@ -4,6 +4,7 @@ import {
 import { DatabaseService } from 'src/shared/database/Database.service';
 import { DataService } from 'src/shared/database/Data.service';
 import { generateId } from 'src/helpers/RandomHelper';
+import { saveImageUpload } from 'src/helpers/ImageHelper';
 import {
   AddPromotionProductsDto,
   CreateCouponDto,
@@ -467,25 +468,73 @@ export class PromotionsCouponsService implements OnModuleInit {
   }
 
   async createPushCampaign(body: any, adminId: string) {
-    const { title, body: msgBody, image_url, category, target_audience, target_user_ids, schedule_type, scheduled_at, data_payload } = body;
+    const {
+      title,
+      body: msgBody,
+      image_url,
+      category,
+      target_audience,
+      target_user_ids,
+      schedule_type,
+      scheduled_at,
+      action_type,
+      action_value,
+      target_category_id,
+      target_product_id,
+      data_payload,
+    } = body;
     if (!title?.trim()) throw new BadRequestException('Title is required');
     if (!msgBody?.trim()) throw new BadRequestException('Message body is required');
 
+    let processedImageUrl = image_url?.trim() || null;
+    if (processedImageUrl && processedImageUrl.startsWith('data:image')) {
+      try {
+        processedImageUrl = saveImageUpload(processedImageUrl, 'push_campaigns');
+      } catch (err: any) {
+        // Fallback or leave as-is if decoding error
+      }
+    }
+
+    let parsedScheduledAt: string | null = null;
+    if (scheduled_at && typeof scheduled_at === 'string' && scheduled_at.trim()) {
+      const d = new Date(scheduled_at.trim());
+      if (!isNaN(d.getTime())) {
+        parsedScheduledAt = d.toISOString();
+      }
+    }
+
+    const resolvedActionType = action_type || 'NONE';
+    const resolvedActionValue = action_value?.trim() || null;
+    const resolvedTargetCat = target_category_id?.trim() || (resolvedActionType === 'CATEGORY' ? resolvedActionValue : null);
+    const resolvedTargetProd = target_product_id?.trim() || (resolvedActionType === 'PRODUCT' ? resolvedActionValue : null);
+
+    const mergedPayload = {
+      ...(typeof data_payload === 'object' && data_payload ? data_payload : {}),
+      action_type: resolvedActionType,
+      action_value: resolvedActionValue,
+      category_id: resolvedTargetCat,
+      product_id: resolvedTargetProd,
+    };
+
     const rows = await this.db.query(
       `INSERT INTO push_notification_campaigns
-         (title, body, image_url, category, target_audience, target_user_ids, schedule_type, scheduled_at, data_payload, status, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, 'draft', $10, $10)
+         (title, body, image_url, category, target_audience, target_user_ids, schedule_type, scheduled_at, action_type, action_value, target_category_id, target_product_id, data_payload, status, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, 'draft', $14, $14)
        RETURNING *`,
       [
         title.trim(),
         msgBody.trim(),
-        image_url?.trim() || null,
+        processedImageUrl,
         category?.trim() || 'promotional',
         target_audience || 'all_customers',
         target_user_ids && target_user_ids.length > 0 ? target_user_ids : null,
         schedule_type || 'immediate',
-        scheduled_at || null,
-        JSON.stringify(data_payload || {}),
+        parsedScheduledAt,
+        resolvedActionType,
+        resolvedActionValue,
+        resolvedTargetCat,
+        resolvedTargetProd,
+        JSON.stringify(mergedPayload),
         adminId,
       ],
     );
@@ -498,33 +547,98 @@ export class PromotionsCouponsService implements OnModuleInit {
       throw new BadRequestException('Cannot edit a campaign that is already sent or cancelled');
     }
 
-    const { title, body: msgBody, image_url, category, target_audience, target_user_ids, schedule_type, scheduled_at, data_payload } = body;
+    const {
+      title,
+      body: msgBody,
+      image_url,
+      category,
+      target_audience,
+      target_user_ids,
+      schedule_type,
+      scheduled_at,
+      action_type,
+      action_value,
+      target_category_id,
+      target_product_id,
+      data_payload,
+    } = body;
+
+    let processedImageUrl: string | null | undefined = undefined;
+    if (image_url !== undefined) {
+      processedImageUrl = image_url?.trim() || null;
+      if (processedImageUrl && processedImageUrl.startsWith('data:image')) {
+        try {
+          processedImageUrl = saveImageUpload(processedImageUrl, 'push_campaigns');
+        } catch (err: any) {
+          // ignore
+        }
+      }
+    }
+
+    let parsedScheduledAt: string | null | undefined = undefined;
+    if (scheduled_at !== undefined) {
+      if (scheduled_at && typeof scheduled_at === 'string' && scheduled_at.trim()) {
+        const d = new Date(scheduled_at.trim());
+        parsedScheduledAt = !isNaN(d.getTime()) ? d.toISOString() : null;
+      } else {
+        parsedScheduledAt = null;
+      }
+    }
+
+    const resolvedActionType = action_type !== undefined ? (action_type || 'NONE') : (existing.data.action_type || 'NONE');
+    const resolvedActionValue = action_value !== undefined ? (action_value?.trim() || null) : existing.data.action_value;
+    const resolvedTargetCat = target_category_id !== undefined ? (target_category_id?.trim() || null) : existing.data.target_category_id;
+    const resolvedTargetProd = target_product_id !== undefined ? (target_product_id?.trim() || null) : existing.data.target_product_id;
+
+    const mergedPayload = {
+      ...(typeof existing.data.data_payload === 'object' && existing.data.data_payload ? existing.data.data_payload : {}),
+      ...(typeof data_payload === 'object' && data_payload ? data_payload : {}),
+      action_type: resolvedActionType,
+      action_value: resolvedActionValue,
+      category_id: resolvedTargetCat,
+      product_id: resolvedTargetProd,
+    };
+
     const rows = await this.db.query(
       `UPDATE push_notification_campaigns SET
          title = COALESCE($1, title),
          body = COALESCE($2, body),
-         image_url = $3,
-         category = COALESCE($4, category),
-         target_audience = COALESCE($5, target_audience),
-         target_user_ids = $6,
-         schedule_type = COALESCE($7, schedule_type),
-         scheduled_at = $8,
-         data_payload = COALESCE($9::jsonb, data_payload),
+         image_url = CASE WHEN $3::boolean THEN $4 ELSE image_url END,
+         category = COALESCE($5, category),
+         target_audience = COALESCE($6, target_audience),
+         target_user_ids = CASE WHEN $7::boolean THEN $8 ELSE target_user_ids END,
+         schedule_type = COALESCE($9, schedule_type),
+         scheduled_at = CASE WHEN $10::boolean THEN $11::timestamptz ELSE scheduled_at END,
+         action_type = COALESCE($12, action_type),
+         action_value = CASE WHEN $13::boolean THEN $14 ELSE action_value END,
+         target_category_id = CASE WHEN $15::boolean THEN $16 ELSE target_category_id END,
+         target_product_id = CASE WHEN $17::boolean THEN $18 ELSE target_product_id END,
+         data_payload = COALESCE($19::jsonb, data_payload),
          status = 'draft',
-         updated_by = $10,
+         updated_by = $20,
          updated_at = NOW()
-       WHERE campaign_id = $11 AND deleted_at IS NULL
+       WHERE campaign_id = $21 AND deleted_at IS NULL
        RETURNING *`,
       [
         title?.trim() || null,
         msgBody?.trim() || null,
-        image_url?.trim() || null,
+        image_url !== undefined,
+        processedImageUrl || null,
         category?.trim() || null,
         target_audience || null,
-        target_user_ids && target_user_ids.length > 0 ? target_user_ids : null,
+        target_user_ids !== undefined,
+        Array.isArray(target_user_ids) && target_user_ids.length > 0 ? target_user_ids : null,
         schedule_type || null,
-        scheduled_at || null,
-        data_payload ? JSON.stringify(data_payload) : null,
+        scheduled_at !== undefined,
+        parsedScheduledAt || null,
+        action_type || null,
+        action_value !== undefined,
+        resolvedActionValue,
+        target_category_id !== undefined,
+        resolvedTargetCat,
+        target_product_id !== undefined,
+        resolvedTargetProd,
+        JSON.stringify(mergedPayload),
         adminId,
         campaignId,
       ],
@@ -607,6 +721,10 @@ export class PromotionsCouponsService implements OnModuleInit {
             campaign_id: campaign.campaign_id,
             image_url: campaign.image_url || '',
             category: campaign.category || 'promotional',
+            action_type: campaign.action_type || 'NONE',
+            action_value: campaign.action_value || '',
+            category_id: campaign.target_category_id || '',
+            product_id: campaign.target_product_id || '',
             ...(campaign.data_payload || {}),
           },
         });

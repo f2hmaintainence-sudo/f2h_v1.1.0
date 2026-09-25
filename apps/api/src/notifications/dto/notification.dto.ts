@@ -46,6 +46,7 @@ export interface NotificationResponse {
   html?: string;
   image?: string;
   status: string;
+  data?: Record<string, any>;
   notified_at?: string;
   read_at?: string;
   created_at?: string;

@@ -87,6 +87,7 @@ async function bootstrap() {
   // else is capped at 1 MB.
   const LARGE_BODY_ROUTES = [
     '/api/v1/admin/catalog',
+    '/api/v1/admin/promotions-coupons',
     '/api/v1/admin/profile',
     '/api/v1/zone/delivery',
     '/api/v1/delivery-partner/profile',

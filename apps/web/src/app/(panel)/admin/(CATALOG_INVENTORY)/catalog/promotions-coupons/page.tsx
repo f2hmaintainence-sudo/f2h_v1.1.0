@@ -111,6 +111,10 @@ interface PushCampaign {
   target_user_ids?: string[];
   schedule_type: "immediate" | "scheduled";
   scheduled_at?: string | null;
+  action_type?: "NONE" | "CATEGORY" | "PRODUCT" | "DEEP_LINK";
+  action_value?: string | null;
+  target_category_id?: string | null;
+  target_product_id?: string | null;
   data_payload?: Record<string, any>;
   status: "draft" | "pending_approval" | "approved" | "rejected" | "sent" | "failed" | "cancelled";
   approved_by?: string;
@@ -396,6 +400,574 @@ function BannerVisualPreview({
   );
 }
 
+export interface PushCampaignFormData {
+  title: string;
+  body: string;
+  image_url: string;
+  category: string;
+  target_audience: "all_customers" | "all_delivery_partners" | "all_users" | "specific_users";
+  schedule_type: "immediate" | "scheduled";
+  scheduled_at: string;
+  action_type: "NONE" | "CATEGORY" | "PRODUCT" | "DEEP_LINK";
+  action_value: string;
+  target_category_id: string;
+  target_product_id: string;
+}
+
+const PUSH_EMOJIS = ["🎉", "🔥", "⚡", "💰", "🎁", "🚀", "📢", "🛒", "🏷️", "✨", "⏰", "🍉"];
+const PUSH_DYNAMIC_TAGS = [
+  { label: "Customer Name", tag: "{{customer_name}}" },
+  { label: "Coupon Code", tag: "{{coupon_code}}" },
+  { label: "Discount %", tag: "{{discount}}" },
+];
+
+const PUSH_CATEGORY_OPTIONS = [
+  { id: "promotional", label: "Promotional", icon: "🎯", color: "border-blue-200 bg-blue-50/50 text-blue-700" },
+  { id: "offer", label: "Special Offer", icon: "💰", color: "border-emerald-200 bg-emerald-50/50 text-emerald-700" },
+  { id: "festival", label: "Festival", icon: "🎉", color: "border-amber-200 bg-amber-50/50 text-amber-700" },
+  { id: "new_product", label: "New Arrival", icon: "📦", color: "border-purple-200 bg-purple-50/50 text-purple-700" },
+  { id: "flash_sale", label: "Flash Sale", icon: "⚡", color: "border-rose-200 bg-rose-50/50 text-rose-700" },
+  { id: "general", label: "General", icon: "📢", color: "border-slate-200 bg-slate-50 text-slate-700" },
+  { id: "order_update", label: "Order Notice", icon: "🚨", color: "border-indigo-200 bg-indigo-50/50 text-indigo-700" },
+  { id: "exclusive_deal", label: "Exclusive", icon: "✨", color: "border-violet-200 bg-violet-50/50 text-violet-700" },
+];
+
+function PushCampaignFormFields({
+  form,
+  setForm,
+  idPrefix = "create",
+  categories = [],
+  products = [],
+}: {
+  form: PushCampaignFormData;
+  setForm: React.Dispatch<React.SetStateAction<PushCampaignFormData>>;
+  idPrefix?: string;
+  categories?: CategoryOption[];
+  products?: Array<{ product_id: string; product_name: string; category_id?: string; category?: string }>;
+}) {
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const isGif = form.image_url?.toLowerCase().includes(".gif") || form.image_url?.startsWith("data:image/gif");
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showErrorToast("File too large. Maximum size is 10MB");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setForm((prev) => ({ ...prev, image_url: base64 }));
+      showSuccessToast(file.type.includes("gif") ? "✨ Animated GIF attached!" : "Image attached!");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, image_url: "" }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const insertTextAtBody = (text: string) => {
+    setForm((prev) => ({ ...prev, body: prev.body ? `${prev.body} ${text}` : text }));
+  };
+
+  const inputId = `push-media-upload-${idPrefix}`;
+
+  // Find target names for live preview
+  const selectedCatObj = categories.find((c) => c.category_id === (form.target_category_id || form.action_value));
+  const selectedProdObj = products.find((p) => p.product_id === (form.target_product_id || form.action_value));
+
+  const ctaButtonLabel =
+    form.action_type === "CATEGORY"
+      ? (selectedCatObj ? `Browse ${selectedCatObj.name}` : "Browse Category")
+      : form.action_type === "PRODUCT"
+        ? (selectedProdObj ? `View ${selectedProdObj.product_name}` : "View Product")
+        : form.action_type === "DEEP_LINK"
+          ? "Open Link"
+          : "Shop Now";
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Left Column: Form Fields & Text Editor */}
+      <div className="lg:col-span-7 space-y-4">
+        {/* Category Picker */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+            <span>Promotion Category <span className="text-red-500">*</span></span>
+            <span className="text-[10px] text-slate-400 font-normal">Choose best fit</span>
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {PUSH_CATEGORY_OPTIONS.map((cat) => {
+              const isSelected = form.category === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, category: cat.id }))}
+                  className={`p-2 rounded-xl border text-left transition flex items-center gap-1.5 text-xs font-semibold ${
+                    isSelected
+                      ? "bg-violet-600 text-white border-violet-600 shadow-xs"
+                      : `${cat.color} hover:border-violet-300`
+                  }`}
+                >
+                  <span>{cat.icon}</span>
+                  <span className="truncate">{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Title with Character Count */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-700">Notification Title <span className="text-red-500">*</span></label>
+            <span className="text-[10px] text-slate-400 font-mono">{form.title.length}/100</span>
+          </div>
+          <input
+            type="text"
+            value={form.title}
+            onChange={(e) => {
+              const val = e.target.value;
+              setForm((prev) => ({ ...prev, title: val }));
+            }}
+            placeholder="e.g. 🎉 Flat 30% OFF on Fresh Mangoes!"
+            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            maxLength={100}
+          />
+        </div>
+
+        {/* Message Body & Text Editor Bar */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-700">Message Body / Content <span className="text-red-500">*</span></label>
+            <span className="text-[10px] text-slate-400 font-mono">{form.body.length}/500</span>
+          </div>
+
+          {/* Quick Toolbar: Emojis & Dynamic Tags */}
+          <div className="p-2 bg-slate-100 rounded-xl border border-slate-200/80 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+              <span className="flex items-center gap-1">✨ Quick Emojis</span>
+              <span className="text-[10px] text-slate-400">Click to insert</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {PUSH_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => insertTextAtBody(emoji)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-sm hover:scale-110 hover:bg-violet-50 transition active:scale-95 shadow-2xs"
+                  title={`Insert ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-slate-200/60">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Variables:</span>
+              {PUSH_DYNAMIC_TAGS.map((v) => (
+                <button
+                  key={v.tag}
+                  type="button"
+                  onClick={() => insertTextAtBody(v.tag)}
+                  className="px-2 py-0.5 rounded-md bg-white border border-violet-200 text-[10px] font-mono text-violet-700 hover:bg-violet-50 transition font-bold"
+                  title={`Insert ${v.tag}`}
+                >
+                  + {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <textarea
+            rows={4}
+            value={form.body}
+            onChange={(e) => {
+              const val = e.target.value;
+              setForm((prev) => ({ ...prev, body: val }));
+            }}
+            placeholder="Type your notification message... e.g. Hi {{customer_name}}, treat yourself today! Use code {{coupon_code}} for exclusive discount."
+            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+            maxLength={500}
+          />
+        </div>
+
+        {/* ── Category & Product Redirection Target Section ── */}
+        <div className="space-y-3 p-3.5 rounded-2xl border border-violet-100 bg-violet-50/20">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <Target size={14} className="text-violet-600" />
+              <span>Tap Redirection (Category or Product Link)</span>
+            </label>
+            <span className="text-[10px] text-slate-400">Where customer goes on tap</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { id: "NONE", label: "Default / Home", icon: "🏠" },
+              { id: "CATEGORY", label: "Category", icon: "📁" },
+              { id: "PRODUCT", label: "Product", icon: "📦" },
+              { id: "DEEP_LINK", label: "Web Link", icon: "🌐" },
+            ].map((act) => {
+              const isSelected = (form.action_type || "NONE") === act.id;
+              return (
+                <button
+                  key={act.id}
+                  type="button"
+                  onClick={() => {
+                    setForm((prev) => ({
+                      ...prev,
+                      action_type: act.id as any,
+                      target_category_id: act.id === "CATEGORY" ? prev.target_category_id : "",
+                      target_product_id: act.id === "PRODUCT" ? prev.target_product_id : "",
+                      action_value: act.id === "DEEP_LINK" ? prev.action_value : "",
+                    }));
+                  }}
+                  className={`py-2 px-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                    isSelected
+                      ? "bg-violet-600 text-white border-violet-600 shadow-xs"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-violet-300"
+                  }`}
+                >
+                  <span>{act.icon}</span>
+                  <span>{act.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* If Category is selected */}
+          {form.action_type === "CATEGORY" && (
+            <div className="space-y-1.5 animate-in fade-in duration-150">
+              <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <span>Select Target Category <span className="text-red-500">*</span></span>
+                <span className="text-[10px] text-slate-400">{categories.length} available</span>
+              </label>
+              <select
+                value={form.target_category_id || ""}
+                onChange={(e) => {
+                  const catId = e.target.value;
+                  setForm((prev) => ({
+                    ...prev,
+                    target_category_id: catId,
+                    action_value: catId,
+                  }));
+                }}
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500"
+              >
+                <option value="">— Select Category to Open —</option>
+                {categories.map((c) => (
+                  <option key={c.category_id} value={c.category_id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* If Product is selected */}
+          {form.action_type === "PRODUCT" && (
+            <div className="space-y-2 animate-in fade-in duration-150">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-500">Filter by Category (Optional)</label>
+                  <select
+                    value={form.target_category_id || ""}
+                    onChange={(e) => {
+                      const catId = e.target.value;
+                      setForm((prev) => ({
+                        ...prev,
+                        target_category_id: catId,
+                      }));
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map((c) => (
+                      <option key={c.category_id} value={c.category_id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-500">Select Target Product <span className="text-red-500">*</span></label>
+                  <select
+                    value={form.target_product_id || ""}
+                    onChange={(e) => {
+                      const pid = e.target.value;
+                      setForm((prev) => ({
+                        ...prev,
+                        target_product_id: pid,
+                        action_value: pid,
+                      }));
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="">— Select Product to Open —</option>
+                    {products
+                      .filter((p) => {
+                        if (!form.target_category_id) return true;
+                        if (p.category_id && p.category_id === form.target_category_id) return true;
+                        const catObj = categories.find((c) => c.category_id === form.target_category_id);
+                        if (catObj && (p.category === catObj.name || p.category === catObj.category_id)) return true;
+                        return false;
+                      })
+                      .map((p) => (
+                        <option key={p.product_id} value={p.product_id}>
+                          {p.product_name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* If Deep Link / External URL is selected */}
+          {form.action_type === "DEEP_LINK" && (
+            <div className="space-y-1.5 animate-in fade-in duration-150">
+              <label className="text-xs font-bold text-slate-700">Web / App URL</label>
+              <input
+                type="url"
+                value={form.action_value || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm((prev) => ({ ...prev, action_value: val }));
+                }}
+                placeholder="https://f2hfresh.com/... or app route"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Image / Animated GIF Media Section */}
+        <div className="space-y-2 p-3.5 rounded-2xl border border-violet-100 bg-violet-50/30">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <ImageIcon size={14} className="text-violet-600" />
+              <span>Banner Image or Animated GIF</span>
+            </label>
+            {isGif && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-pink-500 to-violet-600 text-white animate-pulse shadow-xs">
+                ✨ ANIMATED GIF ACTIVE
+              </span>
+            )}
+          </div>
+
+          {/* File Upload Box with GIF support */}
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor={inputId}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-white border-2 border-dashed border-violet-300 rounded-xl text-xs font-bold text-violet-700 hover:bg-violet-50/80 hover:border-violet-500 cursor-pointer transition"
+            >
+              <Upload size={14} />
+              <span>Upload File (GIF, PNG, JPG, WebP)</span>
+            </label>
+            <input
+              ref={fileInputRef}
+              id={inputId}
+              type="file"
+              accept="image/gif,image/png,image/jpeg,image/webp,.gif,.png,.jpg,.jpeg,.webp"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            {form.image_url && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold flex items-center gap-1 transition"
+                title="Remove attached image or GIF"
+              >
+                <Trash2 size={13} />
+                <span>Remove</span>
+              </button>
+            )}
+          </div>
+
+          {/* Direct URL Input */}
+          <div className="space-y-1">
+            <div className="text-[11px] text-slate-500">Or paste an online image / GIF URL:</div>
+            <input
+              type="url"
+              value={form.image_url?.startsWith("data:") ? "" : (form.image_url || "")}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({ ...prev, image_url: val }));
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              placeholder={
+                form.image_url?.startsWith("data:")
+                  ? "Local file attached (paste URL here to replace)"
+                  : "https://media.giphy.com/media/.../giphy.gif or https://cdn..."
+              }
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+          </div>
+        </div>
+
+        {/* Target Audience & Schedule Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Target Audience</label>
+            <select
+              value={form.target_audience}
+              onChange={(e) => {
+                const val = e.target.value as PushCampaignFormData["target_audience"];
+                setForm((prev) => ({ ...prev, target_audience: val }));
+              }}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500"
+            >
+              <option value="all_customers">👥 All Customers (App Users)</option>
+              <option value="all_delivery_partners">🚴 All Delivery Partners</option>
+              <option value="all_users">🌐 All Accounts (Broadcast)</option>
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Send Timing</label>
+            <div className="flex items-center gap-1.5">
+              {(["immediate", "scheduled"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, schedule_type: t }))}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1 ${
+                    form.schedule_type === t
+                      ? "bg-violet-600 text-white border-violet-600 shadow-xs"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-violet-300"
+                  }`}
+                >
+                  {t === "immediate" ? <><Send size={11} /> Immediate</> : <><Calendar size={11} /> Schedule</>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {form.schedule_type === "scheduled" && (
+          <div className="space-y-1 animate-in fade-in duration-150">
+            <label className="text-[11px] font-bold text-slate-600">Select Date & Time</label>
+            <input
+              type="datetime-local"
+              value={form.scheduled_at}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({ ...prev, scheduled_at: val }));
+              }}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Right Column: Live Interactive Mobile Preview */}
+      <div className="lg:col-span-5 flex flex-col items-center justify-start">
+        <div className="w-full max-w-sm bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-4 shadow-2xl border-4 border-slate-700/80 space-y-4">
+          {/* Phone Status Bar Mockup */}
+          <div className="flex items-center justify-between text-slate-400 text-[10px] px-1 font-mono">
+            <span>09:41</span>
+            <div className="flex items-center gap-1.5">
+              <span>5G</span>
+              <div className="w-4 h-2 rounded-xs border border-slate-400 flex items-center p-0.5">
+                <div className="w-full h-full bg-slate-300 rounded-2xs"></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><Eye size={12} className="text-violet-400" /> Phone Notification</span>
+            <span className="text-[10px] text-violet-400 font-semibold">Live Preview</span>
+          </div>
+
+          {/* Mobile Notification Card */}
+          <div className="bg-slate-800/90 backdrop-blur-md rounded-2xl p-3.5 border border-slate-700/80 shadow-lg space-y-2.5">
+            {/* App Header */}
+            <div className="flex items-center justify-between text-slate-300 text-[11px]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white font-black text-[10px]">
+                  F
+                </div>
+                <span className="font-bold text-white text-xs">F2H Fresh</span>
+                <span className="text-slate-400">• now</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                {form.category}
+              </span>
+            </div>
+
+            {/* Title & Body */}
+            <div className="space-y-1">
+              <div className="text-white font-bold text-xs leading-snug">
+                {form.title || "🎉 Weekend Fresh Sale!"}
+              </div>
+              <div className="text-slate-300 text-[11px] leading-relaxed line-clamp-3">
+                {form.body || "Get up to 30% off on premium farm fresh vegetables and fruits. Tap now to order before stock runs out!"}
+              </div>
+            </div>
+
+            {/* Large Banner Image or Animated GIF Container */}
+            {form.image_url ? (
+              <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-900 aspect-video flex items-center justify-center group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getImageSrc(form.image_url)}
+                  alt="Campaign Banner / GIF"
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as any).style.display = 'none'; }}
+                />
+                {isGif && (
+                  <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-[9px] font-mono font-black text-white border border-white/20 tracking-wider">
+                    GIF ANIMATED
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/50 p-4 text-center text-slate-500 text-[11px] flex flex-col items-center justify-center gap-1">
+                <ImageIcon size={18} className="text-slate-600" />
+                <span>No banner image or GIF attached</span>
+              </div>
+            )}
+
+            {/* Notification Action Buttons Preview */}
+            <div className="pt-2 border-t border-slate-700/60 flex items-center gap-2">
+              <button
+                type="button"
+                className="flex-1 py-1.5 px-2 rounded-lg bg-violet-600 text-white text-[11px] font-bold text-center truncate"
+                title={ctaButtonLabel}
+              >
+                {ctaButtonLabel}
+              </button>
+              <button type="button" className="px-3 py-1.5 rounded-lg bg-slate-700/80 text-slate-300 text-[11px] font-semibold text-center">
+                Dismiss
+              </button>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-slate-400 text-center flex flex-col items-center justify-center gap-0.5">
+            <div>
+              <span>Audience: </span>
+              <span className="font-bold text-violet-300 capitalize">{form.target_audience.replace(/_/g, " ")}</span>
+            </div>
+            {form.action_type && form.action_type !== "NONE" && (
+              <div className="text-[10px] text-violet-300/80 font-mono">
+                Tap: {ctaButtonLabel}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PromotionsCouponsOffersPage() {
   const [activeTab, setActiveTab] = useState<"promotions" | "coupons" | "offers" | "push">("promotions");
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -431,16 +1003,20 @@ export default function PromotionsCouponsOffersPage() {
   const [isCreatePushOpen, setIsCreatePushOpen] = useState(false);
   const [isEditPushOpen, setIsEditPushOpen] = useState(false);
   const [editingPush, setEditingPush] = useState<PushCampaign | null>(null);
-  const [pushForm, setPushForm] = useState({
+  const [pushForm, setPushForm] = useState<PushCampaignFormData>({
     title: "",
     body: "",
     image_url: "",
     category: "promotional",
-    target_audience: "all_customers" as "all_customers" | "all_delivery_partners" | "all_users" | "specific_users",
-    schedule_type: "immediate" as "immediate" | "scheduled",
+    target_audience: "all_customers",
+    schedule_type: "immediate",
     scheduled_at: "",
+    action_type: "NONE",
+    action_value: "",
+    target_category_id: "",
+    target_product_id: "",
   });
-  const [editPushForm, setEditPushForm] = useState({ ...pushForm });
+  const [editPushForm, setEditPushForm] = useState<PushCampaignFormData>({ ...pushForm });
   const [pushStatusFilter, setPushStatusFilter] = useState("all");
   const [pushSearch, setPushSearch] = useState("");
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -1978,7 +2554,11 @@ export default function PromotionsCouponsOffersPage() {
                 category: pushForm.category,
                 target_audience: pushForm.target_audience,
                 schedule_type: pushForm.schedule_type,
-                scheduled_at: pushForm.scheduled_at || null,
+                scheduled_at: pushForm.scheduled_at ? new Date(pushForm.scheduled_at).toISOString() : null,
+                action_type: pushForm.action_type || "NONE",
+                action_value: pushForm.action_value.trim() || null,
+                target_category_id: pushForm.target_category_id.trim() || null,
+                target_product_id: pushForm.target_product_id.trim() || null,
               });
 
               if (res?.error) {
@@ -2000,6 +2580,10 @@ export default function PromotionsCouponsOffersPage() {
                   target_audience: pushForm.target_audience,
                   schedule_type: pushForm.schedule_type,
                   scheduled_at: pushForm.scheduled_at || null,
+                  action_type: pushForm.action_type || "NONE",
+                  action_value: pushForm.action_value.trim() || null,
+                  target_category_id: pushForm.target_category_id.trim() || null,
+                  target_product_id: pushForm.target_product_id.trim() || null,
                   status: "draft",
                   sent_count: 0,
                   failed_count: 0,
@@ -2010,7 +2594,19 @@ export default function PromotionsCouponsOffersPage() {
 
               showSuccessToast("🎉 Push campaign created as draft!");
               setIsCreatePushOpen(false);
-              setPushForm({ title: "", body: "", image_url: "", category: "promotional", target_audience: "all_customers", schedule_type: "immediate", scheduled_at: "" });
+              setPushForm({
+                title: "",
+                body: "",
+                image_url: "",
+                category: "promotional",
+                target_audience: "all_customers",
+                schedule_type: "immediate",
+                scheduled_at: "",
+                action_type: "NONE",
+                action_value: "",
+                target_category_id: "",
+                target_product_id: "",
+              });
               await fetchData();
             } catch (e: any) { showErrorToast(e.response?.data?.message || e.message || "Failed to create campaign"); }
           };
@@ -2026,7 +2622,11 @@ export default function PromotionsCouponsOffersPage() {
                 category: editPushForm.category,
                 target_audience: editPushForm.target_audience,
                 schedule_type: editPushForm.schedule_type,
-                scheduled_at: editPushForm.scheduled_at || null,
+                scheduled_at: editPushForm.scheduled_at ? new Date(editPushForm.scheduled_at).toISOString() : null,
+                action_type: editPushForm.action_type || "NONE",
+                action_value: editPushForm.action_value.trim() || null,
+                target_category_id: editPushForm.target_category_id.trim() || null,
+                target_product_id: editPushForm.target_product_id.trim() || null,
               });
 
               if (res?.error) {
@@ -2047,6 +2647,10 @@ export default function PromotionsCouponsOffersPage() {
                   target_audience: editPushForm.target_audience,
                   schedule_type: editPushForm.schedule_type,
                   scheduled_at: editPushForm.scheduled_at || null,
+                  action_type: editPushForm.action_type || "NONE",
+                  action_value: editPushForm.action_value.trim() || null,
+                  target_category_id: editPushForm.target_category_id.trim() || null,
+                  target_product_id: editPushForm.target_product_id.trim() || null,
                   status: "draft",
                 } : c));
               }
@@ -2065,7 +2669,7 @@ export default function PromotionsCouponsOffersPage() {
                 return;
               }
               setPushCampaigns((prev) => prev.map((c) => c.campaign_id === id ? { ...c, status: "pending_approval" } : c));
-              showSuccessToast("Campaign submitted for approval!");
+              showSuccessToast("Campaign submitted for approval");
               await fetchData();
             } catch (e: any) { showErrorToast(e.response?.data?.message || e.message || "Failed to submit"); }
           };
@@ -2121,345 +2725,12 @@ export default function PromotionsCouponsOffersPage() {
               target_audience: c.target_audience || "all_customers",
               schedule_type: c.schedule_type || "immediate",
               scheduled_at: c.scheduled_at ? c.scheduled_at.substring(0, 16) : "",
+              action_type: c.action_type || (c.data_payload?.action_type as any) || "NONE",
+              action_value: c.action_value || c.data_payload?.action_value || "",
+              target_category_id: c.target_category_id || c.data_payload?.category_id || "",
+              target_product_id: c.target_product_id || c.data_payload?.product_id || "",
             });
             setIsEditPushOpen(true);
-          };
-
-          const EMOJIS = ["🎉", "🔥", "⚡", "💰", "🎁", "🚀", "📢", "🛒", "🏷️", "✨", "⏰", "🍉"];
-          const DYNAMIC_TAGS = [
-            { label: "Customer Name", tag: "{{customer_name}}" },
-            { label: "Coupon Code", tag: "{{coupon_code}}" },
-            { label: "Discount %", tag: "{{discount}}" },
-          ];
-
-          const PushCampaignFormFields = ({ form, setForm }: { form: typeof pushForm; setForm: (v: typeof pushForm) => void }) => {
-            const isGif = form.image_url?.toLowerCase().includes(".gif") || form.image_url?.startsWith("data:image/gif");
-
-            const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              if (file.size > 10 * 1024 * 1024) {
-                showErrorToast("File too large. Maximum size is 10MB");
-                return;
-              }
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const base64 = reader.result as string;
-                setForm({ ...form, image_url: base64 });
-                showSuccessToast(file.type.includes("gif") ? "✨ Animated GIF attached!" : "Image attached!");
-              };
-              reader.readAsDataURL(file);
-            };
-
-            const insertTextAtBody = (text: string) => {
-              setForm({ ...form, body: form.body ? `${form.body} ${text}` : text });
-            };
-
-            const insertTextAtTitle = (text: string) => {
-              setForm({ ...form, title: form.title ? `${form.title} ${text}` : text });
-            };
-
-            return (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Left Column: Form Fields & Text Editor */}
-                <div className="lg:col-span-7 space-y-4">
-                  {/* Category Picker */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                      <span>Promotion Category <span className="text-red-500">*</span></span>
-                      <span className="text-[10px] text-slate-400 font-normal">Choose best fit</span>
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {[
-                        { id: "promotional", label: "Promotional", icon: "🎯", color: "border-blue-200 bg-blue-50/50 text-blue-700" },
-                        { id: "offer", label: "Special Offer", icon: "💰", color: "border-emerald-200 bg-emerald-50/50 text-emerald-700" },
-                        { id: "festival", label: "Festival", icon: "🎉", color: "border-amber-200 bg-amber-50/50 text-amber-700" },
-                        { id: "new_product", label: "New Arrival", icon: "📦", color: "border-purple-200 bg-purple-50/50 text-purple-700" },
-                        { id: "flash_sale", label: "Flash Sale", icon: "⚡", color: "border-rose-200 bg-rose-50/50 text-rose-700" },
-                        { id: "general", label: "General", icon: "📢", color: "border-slate-200 bg-slate-50 text-slate-700" },
-                        { id: "order_update", label: "Order Notice", icon: "🚨", color: "border-indigo-200 bg-indigo-50/50 text-indigo-700" },
-                        { id: "exclusive_deal", label: "Exclusive", icon: "✨", color: "border-violet-200 bg-violet-50/50 text-violet-700" },
-                      ].map((cat) => {
-                        const isSelected = form.category === cat.id;
-                        return (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => setForm({ ...form, category: cat.id })}
-                            className={`p-2 rounded-xl border text-left transition flex items-center gap-1.5 text-xs font-semibold ${
-                              isSelected
-                                ? "bg-violet-600 text-white border-violet-600 shadow-sm"
-                                : `${cat.color} hover:border-violet-300`
-                            }`}
-                          >
-                            <span>{cat.icon}</span>
-                            <span className="truncate">{cat.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Title with Emoji Shortcuts */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-700">Notification Title <span className="text-red-500">*</span></label>
-                      <span className="text-[10px] text-slate-400 font-mono">{form.title.length}/100</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={form.title}
-                      onChange={(e) => setForm({ ...form, title: e.target.value })}
-                      placeholder="e.g. 🎉 Flat 30% OFF on Fresh Mangoes!"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      maxLength={100}
-                    />
-                  </div>
-
-                  {/* Message Body & Text Editor Bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-700">Message Body / Content <span className="text-red-500">*</span></label>
-                      <span className="text-[10px] text-slate-400 font-mono">{form.body.length}/500</span>
-                    </div>
-
-                    {/* Quick Toolbar: Emojis & Dynamic Tags */}
-                    <div className="p-2 bg-slate-100 rounded-xl border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                        <span className="flex items-center gap-1">✨ Quick Emojis</span>
-                        <span className="text-[10px] text-slate-400">Click to insert</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {EMOJIS.map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => insertTextAtBody(emoji)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-sm hover:scale-110 hover:bg-violet-50 transition active:scale-95 shadow-2xs"
-                            title={`Insert ${emoji}`}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-slate-200/60">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Variables:</span>
-                        {DYNAMIC_TAGS.map((v) => (
-                          <button
-                            key={v.tag}
-                            type="button"
-                            onClick={() => insertTextAtBody(v.tag)}
-                            className="px-2 py-0.5 rounded-md bg-white border border-violet-200 text-[10px] font-mono text-violet-700 hover:bg-violet-50 transition font-bold"
-                            title={`Insert ${v.tag}`}
-                          >
-                            + {v.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <textarea
-                      rows={4}
-                      value={form.body}
-                      onChange={(e) => setForm({ ...form, body: e.target.value })}
-                      placeholder="Type your notification message... e.g. Hi {{customer_name}}, treat yourself today! Use code {{coupon_code}} for exclusive discount."
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
-                      maxLength={500}
-                    />
-                  </div>
-
-                  {/* Image / Animated GIF Media Section */}
-                  <div className="space-y-2 p-3.5 rounded-2xl border border-violet-100 bg-violet-50/30">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <ImageIcon size={14} className="text-violet-600" />
-                        <span>Banner Image or Animated GIF</span>
-                      </label>
-                      {isGif && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-pink-500 to-violet-600 text-white animate-pulse shadow-xs">
-                          ✨ ANIMATED GIF ACTIVE
-                        </span>
-                      )}
-                    </div>
-
-                    {/* File Upload Box with GIF support */}
-                    <div className="flex items-center gap-2">
-                      <label
-                        htmlFor="push-media-upload-input"
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-white border-2 border-dashed border-violet-300 rounded-xl text-xs font-bold text-violet-700 hover:bg-violet-50/80 hover:border-violet-500 cursor-pointer transition"
-                      >
-                        <Upload size={14} />
-                        <span>Upload File (GIF, PNG, JPG, WebP)</span>
-                      </label>
-                      <input
-                        id="push-media-upload-input"
-                        type="file"
-                        accept="image/gif,image/png,image/jpeg,image/webp,.gif,.png,.jpg,.jpeg,.webp"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                      {form.image_url && (
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, image_url: "" })}
-                          className="px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold flex items-center gap-1 transition"
-                          title="Remove attached image or GIF"
-                        >
-                          <Trash2 size={13} />
-                          <span>Remove</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Direct URL Input */}
-                    <div className="space-y-1">
-                      <div className="text-[11px] text-slate-500">Or paste an online image / GIF URL:</div>
-                      <input
-                        type="url"
-                        value={form.image_url}
-                        onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                        placeholder="https://media.giphy.com/media/.../giphy.gif or https://cdn..."
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Target Audience & Schedule Row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Target Audience</label>
-                      <select
-                        value={form.target_audience}
-                        onChange={(e) => setForm({ ...form, target_audience: e.target.value as any })}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      >
-                        <option value="all_customers">👥 All Customers (App Users)</option>
-                        <option value="all_delivery_partners">🚴 All Delivery Partners</option>
-                        <option value="all_users">🌐 All Accounts (Broadcast)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Send Timing</label>
-                      <div className="flex items-center gap-1.5">
-                        {(["immediate", "scheduled"] as const).map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setForm({ ...form, schedule_type: t })}
-                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1 ${
-                              form.schedule_type === t
-                                ? "bg-violet-600 text-white border-violet-600 shadow-sm"
-                                : "bg-white text-slate-600 border-slate-200 hover:border-violet-300"
-                            }`}
-                          >
-                            {t === "immediate" ? <><Send size={11} /> Immediate</> : <><Calendar size={11} /> Schedule</>}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {form.schedule_type === "scheduled" && (
-                    <div className="space-y-1 animate-in fade-in duration-150">
-                      <label className="text-[11px] font-bold text-slate-600">Select Date & Time</label>
-                      <input
-                        type="datetime-local"
-                        value={form.scheduled_at}
-                        onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Column: Live Interactive Mobile Preview */}
-                <div className="lg:col-span-5 flex flex-col items-center justify-start">
-                  <div className="w-full max-w-sm bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-4 shadow-2xl border-4 border-slate-700/80 space-y-4">
-                    {/* Phone Status Bar Mockup */}
-                    <div className="flex items-center justify-between text-slate-400 text-[10px] px-1 font-mono">
-                      <span>09:41</span>
-                      <div className="flex items-center gap-1.5">
-                        <span>5G</span>
-                        <div className="w-4 h-2 rounded-xs border border-slate-400 flex items-center p-0.5">
-                          <div className="w-full h-full bg-slate-300 rounded-2xs"></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                      <span className="flex items-center gap-1.5"><Eye size={12} className="text-violet-400" /> Phone Notification</span>
-                      <span className="text-[10px] text-violet-400 font-semibold">Live Preview</span>
-                    </div>
-
-                    {/* Mobile Notification Card */}
-                    <div className="bg-slate-800/90 backdrop-blur-md rounded-2xl p-3.5 border border-slate-700/80 shadow-lg space-y-2.5">
-                      {/* App Header */}
-                      <div className="flex items-center justify-between text-slate-300 text-[11px]">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white font-black text-[10px]">
-                            F
-                          </div>
-                          <span className="font-bold text-white text-xs">F2H Fresh</span>
-                          <span className="text-slate-400">• now</span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                          {form.category}
-                        </span>
-                      </div>
-
-                      {/* Title & Body */}
-                      <div className="space-y-1">
-                        <div className="text-white font-bold text-xs leading-snug">
-                          {form.title || "🎉 Weekend Fresh Sale!"}
-                        </div>
-                        <div className="text-slate-300 text-[11px] leading-relaxed line-clamp-3">
-                          {form.body || "Get up to 30% off on premium farm fresh vegetables and fruits. Tap now to order before stock runs out!"}
-                        </div>
-                      </div>
-
-                      {/* Large Banner Image or Animated GIF Container */}
-                      {form.image_url ? (
-                        <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-900 aspect-video flex items-center justify-center group">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={form.image_url}
-                            alt="Campaign Banner / GIF"
-                            className="w-full h-full object-cover"
-                            onError={(e) => { (e.target as any).style.display = 'none'; }}
-                          />
-                          {isGif && (
-                            <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-[9px] font-mono font-black text-white border border-white/20 tracking-wider">
-                              GIF ANIMATED
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/50 p-4 text-center text-slate-500 text-[11px] flex flex-col items-center justify-center gap-1">
-                          <ImageIcon size={18} className="text-slate-600" />
-                          <span>No banner image or GIF attached</span>
-                        </div>
-                      )}
-
-                      {/* Notification Action Buttons Preview */}
-                      <div className="pt-2 border-t border-slate-700/60 flex items-center gap-2">
-                        <button type="button" className="flex-1 py-1.5 rounded-lg bg-violet-600 text-white text-[11px] font-bold text-center">
-                          Shop Now
-                        </button>
-                        <button type="button" className="px-3 py-1.5 rounded-lg bg-slate-700/80 text-slate-300 text-[11px] font-semibold text-center">
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
-                      <span>Audience:</span>
-                      <strong className="text-white capitalize">{form.target_audience.replace(/_/g, " ")}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
           };
 
           return (
@@ -2550,6 +2821,8 @@ export default function PromotionsCouponsOffersPage() {
                     const canApprove = c.status === "pending_approval";
                     const canSend = c.status === "approved";
                     const canDelete = !["sent"].includes(c.status);
+                    const actionCat = categories.find((cat) => cat.category_id === (c.target_category_id || c.action_value));
+                    const actionProd = uniqueProducts.find((p) => p.product_id === (c.target_product_id || c.action_value));
 
                     return (
                       <div key={c.campaign_id} className="bg-white rounded-2xl border border-slate-100 shadow-xs hover:shadow-md transition overflow-hidden group">
@@ -2599,6 +2872,16 @@ export default function PromotionsCouponsOffersPage() {
                               <Tag size={11} className="text-violet-400" />
                               <span className="capitalize">{c.category || "promotional"}</span>
                             </div>
+                            {c.action_type && c.action_type !== "NONE" && (
+                              <div className="col-span-2 flex items-center gap-1.5 text-[11px] text-violet-700 bg-violet-50/80 px-2.5 py-1.5 rounded-xl border border-violet-100 font-medium">
+                                <ExternalLink size={12} className="text-violet-600 shrink-0" />
+                                <span className="truncate">
+                                  {c.action_type === "CATEGORY" && (actionCat ? `Target: Category "${actionCat.name}"` : `Target: Category ${c.target_category_id || c.action_value}`)}
+                                  {c.action_type === "PRODUCT" && (actionProd ? `Target: Product "${actionProd.product_name}"` : `Target: Product ${c.target_product_id || c.action_value}`)}
+                                  {c.action_type === "DEEP_LINK" && `Target Link: ${c.action_value}`}
+                                </span>
+                              </div>
+                            )}
                             {c.status === "sent" && (
                               <>
                                 <div className="flex items-center gap-1.5 text-blue-600 font-semibold">
@@ -2706,7 +2989,13 @@ export default function PromotionsCouponsOffersPage() {
                     </div>
                     <div className="p-5 sm:p-6 overflow-y-auto flex-1">
                       <form id="create-push-form" onSubmit={handleCreatePush}>
-                        <PushCampaignFormFields form={pushForm} setForm={setPushForm} />
+                        <PushCampaignFormFields
+                          form={pushForm}
+                          setForm={setPushForm}
+                          idPrefix="create"
+                          categories={categories}
+                          products={uniqueProducts}
+                        />
                       </form>
                     </div>
                     <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
@@ -2739,7 +3028,13 @@ export default function PromotionsCouponsOffersPage() {
                     </div>
                     <div className="p-5 sm:p-6 overflow-y-auto flex-1">
                       <form id="edit-push-form" onSubmit={handleUpdatePush}>
-                        <PushCampaignFormFields form={editPushForm} setForm={setEditPushForm} />
+                        <PushCampaignFormFields
+                          form={editPushForm}
+                          setForm={setEditPushForm}
+                          idPrefix="edit"
+                          categories={categories}
+                          products={uniqueProducts}
+                        />
                       </form>
                     </div>
                     <div className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">

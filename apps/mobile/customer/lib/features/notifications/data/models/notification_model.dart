@@ -7,6 +7,7 @@ class NotificationItem {
   final String priority; // low, medium, high, critical
   final String? html;
   final String? image;
+  final Map<String, dynamic>? data;
   final String status; // unread, read, dismissed
   final DateTime? notifiedAt;
   final DateTime? readAt;
@@ -21,6 +22,7 @@ class NotificationItem {
     required this.priority,
     this.html,
     this.image,
+    this.data,
     required this.status,
     this.notifiedAt,
     this.readAt,
@@ -30,6 +32,11 @@ class NotificationItem {
   bool get isUnread => status == 'unread';
 
   factory NotificationItem.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic>? parsedData;
+    if (json['data'] is Map) {
+      parsedData = Map<String, dynamic>.from(json['data'] as Map);
+    }
+
     return NotificationItem(
       id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
       notificationId: json['notification_id']?.toString() ?? '',
@@ -39,6 +46,7 @@ class NotificationItem {
       priority: json['priority']?.toString() ?? 'medium',
       html: json['html']?.toString(),
       image: json['image']?.toString(),
+      data: parsedData,
       status: json['status']?.toString() ?? 'unread',
       notifiedAt: json['notified_at'] != null ? DateTime.tryParse(json['notified_at'].toString()) : null,
       readAt: json['read_at'] != null ? DateTime.tryParse(json['read_at'].toString()) : null,
@@ -56,6 +64,7 @@ class NotificationItem {
       priority: priority,
       html: html,
       image: image,
+      data: data,
       status: status ?? this.status,
       notifiedAt: notifiedAt,
       readAt: readAt ?? this.readAt,

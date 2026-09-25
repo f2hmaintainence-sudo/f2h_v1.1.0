@@ -12,6 +12,8 @@ import 'package:f2h_customer/features/profile/presentation/screens/customer_bill
 import 'package:f2h_customer/features/profile/presentation/screens/referral_screen.dart';
 import 'package:f2h_customer/features/profile/presentation/screens/pakage_screen.dart';
 import 'package:f2h_customer/features/wallet/presentation/screens/wallet_screen.dart';
+import 'package:f2h_customer/app.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -755,6 +757,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _handleNotificationRouting(BuildContext context, NotificationItem item) {
+    // 0. Action Targets (Category, Product, Deep Link) from Push & In-App Campaign Payload
+    final data = item.data;
+    if (data != null) {
+      final actionType = (data['action_type'] ?? data['actionType'] ?? '').toString().toUpperCase();
+      final categoryId = (data['category_id'] ?? data['categoryId'] ?? '').toString();
+      final productId = (data['product_id'] ?? data['productId'] ?? '').toString();
+      final actionValue = (data['action_value'] ?? data['actionValue'] ?? '').toString();
+
+      if (actionType == 'PRODUCT' || productId.isNotEmpty) {
+        final targetPid = productId.isNotEmpty ? productId : actionValue;
+        if (targetPid.isNotEmpty) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          AppShell.of(context)?.setTab(
+            AppShell.tabShop,
+            category: categoryId.isNotEmpty ? categoryId : null,
+            productId: targetPid,
+          );
+          return;
+        }
+      }
+
+      if (actionType == 'CATEGORY' || categoryId.isNotEmpty) {
+        final targetCat = categoryId.isNotEmpty ? categoryId : actionValue;
+        if (targetCat.isNotEmpty) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          AppShell.of(context)?.setTab(
+            AppShell.tabShop,
+            category: targetCat,
+          );
+          return;
+        }
+      }
+
+      if (actionType == 'DEEP_LINK' && actionValue.isNotEmpty) {
+        final uri = Uri.tryParse(actionValue);
+        if (uri != null) {
+          launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      }
+    }
+
     final title = item.title.toLowerCase();
     final message = item.message.toLowerCase();
     final combined = '$title $message';
