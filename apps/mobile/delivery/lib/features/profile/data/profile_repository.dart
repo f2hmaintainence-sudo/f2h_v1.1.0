@@ -18,6 +18,14 @@ class ProfileRepository {
     return remoteDataSource.updatePersonalInfo(data);
   }
 
+  Future<Map<String, dynamic>> sendUpdateOtp({required String type, required String value}) async {
+    return remoteDataSource.sendUpdateOtp(type: type, value: value);
+  }
+
+  Future<String> verifyUpdateOtp({required String type, required String value, required String otp}) async {
+    return remoteDataSource.verifyUpdateOtp(type: type, value: value, otp: otp);
+  }
+
   Future<String> uploadProfilePhoto(dynamic fileOrBytes, {String? filename}) async {
     return remoteDataSource.uploadProfilePhoto(fileOrBytes, filename: filename);
   }

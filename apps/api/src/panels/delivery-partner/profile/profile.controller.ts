@@ -22,6 +22,8 @@ import { Request } from 'express';
 import { ProfileService } from './profile.service';
 import {
   UpdatePersonalDto,
+  SendUpdateOtpDto,
+  VerifyUpdateOtpDto,
   CreateDocumentDto,
   UpdateDocumentDto,
   CreateVehicleDto,
@@ -49,6 +51,18 @@ export class ProfileController {
   async getReferrals(@Req() req: Request) {
     const deliveryPartnerId = (req.user as any).user_id;
     return this.profileService.getDeliveryPartnerReferrals(deliveryPartnerId);
+  }
+
+  @Post('send-update-otp')
+  async sendUpdateOtp(@Req() req: Request, @Body() dto: SendUpdateOtpDto) {
+    const deliveryPartnerId = (req.user as any).user_id;
+    return this.profileService.sendUpdateOtp(deliveryPartnerId, dto);
+  }
+
+  @Post('verify-update-otp')
+  async verifyUpdateOtp(@Req() req: Request, @Body() dto: VerifyUpdateOtpDto) {
+    const deliveryPartnerId = (req.user as any).user_id;
+    return this.profileService.verifyUpdateOtp(deliveryPartnerId, dto);
   }
 
   @Patch('personal')

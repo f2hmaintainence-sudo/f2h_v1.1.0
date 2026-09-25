@@ -12,6 +12,8 @@ import 'package:f2h_delivery/core/api/api_error.dart';
 abstract class ProfileRemoteDataSource {
   Future<ProfileModel> fetchPersonalInfo();
   Future<void> updatePersonalInfo(Map<String, dynamic> data);
+  Future<Map<String, dynamic>> sendUpdateOtp({required String type, required String value});
+  Future<String> verifyUpdateOtp({required String type, required String value, required String otp});
   Future<String> uploadProfilePhoto(dynamic fileOrBytes, {String? filename});
 
   Future<List<DocumentModel>> fetchDocuments();
@@ -95,6 +97,33 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       await dioClient.dio.patch(ApiEndpoints.profilePersonal, data: data);
     } on DioException catch (e) {
       throw apiErrorMessage(e, 'Failed to update personal info');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendUpdateOtp({required String type, required String value}) async {
+    try {
+      final response = await dioClient.dio.post(
+        ApiEndpoints.profileSendUpdateOtp,
+        data: {'type': type, 'value': value},
+      );
+      return response.data is Map<String, dynamic> ? response.data : {'success': true};
+    } on DioException catch (e) {
+      throw apiErrorMessage(e, 'Failed to send OTP');
+    }
+  }
+
+  @override
+  Future<String> verifyUpdateOtp({required String type, required String value, required String otp}) async {
+    try {
+      final response = await dioClient.dio.post(
+        ApiEndpoints.profileVerifyUpdateOtp,
+        data: {'type': type, 'value': value, 'otp': otp},
+      );
+      final token = response.data?['verification_token'] ?? '';
+      return token.toString();
+    } on DioException catch (e) {
+      throw apiErrorMessage(e, 'Failed to verify OTP');
     }
   }
 

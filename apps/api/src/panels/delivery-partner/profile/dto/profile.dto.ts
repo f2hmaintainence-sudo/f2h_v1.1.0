@@ -1,28 +1,72 @@
-import { IsEmail, IsOptional, IsString, IsBoolean } from 'class-validator';
+import { IsEmail, IsOptional, IsString, IsBoolean, IsIn } from 'class-validator';
 import { Transform } from 'class-transformer';
+
+export class SendUpdateOtpDto {
+  @IsString()
+  @IsIn(['email', 'phone'])
+  type: 'email' | 'phone';
+
+  @IsString()
+  value: string;
+}
+
+export class VerifyUpdateOtpDto {
+  @IsString()
+  @IsIn(['email', 'phone'])
+  type: 'email' | 'phone';
+
+  @IsString()
+  value: string;
+
+  @IsString()
+  otp: string;
+}
 
 export class UpdatePersonalDto {
   @IsString()
   @IsOptional()
   full_name?: string;
+
   @IsEmail()
   @IsOptional()
   email?: string;
+
+  @IsString()
+  @IsOptional()
+  email_verification_token?: string;
+
+  @IsString()
+  @IsOptional()
+  email_otp?: string;
+
   @IsString()
   @IsOptional()
   phone?: string;
+
+  @IsString()
+  @IsOptional()
+  phone_verification_token?: string;
+
+  @IsString()
+  @IsOptional()
+  phone_otp?: string;
+
   @IsString()
   @IsOptional()
   date_of_birth?: string;
+
   @IsString()
   @IsOptional()
   gender?: string;
+
   @IsString()
   @IsOptional()
   residential_address?: string;
+
   @IsString()
   @IsOptional()
   emergency_contact?: string;
+
   @IsString()
   @IsOptional()
   emergency_contact_number?: string;

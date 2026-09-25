@@ -88,6 +88,8 @@ class ApiEndpoints {
   static const String updateKyc        = '/delivery-partner/auth/update-kyc';
 
   static const String profilePersonal   = '/delivery-partner/profile/personal';
+  static const String profileSendUpdateOtp   = '/delivery-partner/profile/send-update-otp';
+  static const String profileVerifyUpdateOtp = '/delivery-partner/profile/verify-update-otp';
   static const String profilePhoto      = '/delivery-partner/profile/personal/photo';
   static const String profileDocs       = '/delivery-partner/profile/documents';
   static String profileDocItem(String id) => '/delivery-partner/profile/documents/$id';
