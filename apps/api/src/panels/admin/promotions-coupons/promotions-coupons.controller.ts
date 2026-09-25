@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { PromotionsCouponsService } from './promotions-coupons.service';
+import { PushNotificationService } from 'src/shared/pushNotifications/pushNotification.service';
 import {
   AddPromotionProductsDto,
   CreateCouponDto,
@@ -18,7 +19,10 @@ import {
 @Roles(ROLE.ADMIN, ROLE.SUPER_ADMIN)
 @Controller({ path: 'admin/promotions-coupons', version: '1' })
 export class PromotionsCouponsController {
-  constructor(private readonly svc: PromotionsCouponsService) {}
+  constructor(
+    private readonly svc: PromotionsCouponsService,
+    private readonly pushSvc: PushNotificationService,
+  ) {}
 
   private getAdminId(req: any): string {
     return req?.user?.sub || req?.user?.user_id || 'ADMIN';
@@ -117,4 +121,52 @@ export class PromotionsCouponsController {
   ) {
     return this.svc.getCouponRedemptions(id, Number(page || 1), Number(limit || 50));
   }
+
+  // ── PUSH NOTIFICATION CAMPAIGNS ────────────────────────────────────────────
+
+  @Get('push-campaigns')
+  listPushCampaigns(@Query('status') status?: string) {
+    return this.svc.listPushCampaigns(status);
+  }
+
+  @Get('push-campaigns/:id')
+  getPushCampaign(@Param('id') id: string) {
+    return this.svc.getPushCampaign(id);
+  }
+
+  @Post('push-campaigns')
+  createPushCampaign(@Body() body: any, @Req() req: any) {
+    return this.svc.createPushCampaign(body, this.getAdminId(req));
+  }
+
+  @Put('push-campaigns/:id')
+  updatePushCampaign(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.svc.updatePushCampaign(id, body, this.getAdminId(req));
+  }
+
+  @Patch('push-campaigns/:id/submit')
+  submitPushCampaign(@Param('id') id: string, @Req() req: any) {
+    return this.svc.submitPushCampaignForApproval(id, this.getAdminId(req));
+  }
+
+  @Patch('push-campaigns/:id/approve')
+  approvePushCampaign(@Param('id') id: string, @Req() req: any) {
+    return this.svc.approvePushCampaign(id, this.getAdminId(req));
+  }
+
+  @Patch('push-campaigns/:id/reject')
+  rejectPushCampaign(@Param('id') id: string, @Body() body: { reason?: string }, @Req() req: any) {
+    return this.svc.rejectPushCampaign(id, body?.reason || '', this.getAdminId(req));
+  }
+
+  @Post('push-campaigns/:id/send')
+  sendPushCampaign(@Param('id') id: string, @Req() req: any) {
+    return this.svc.sendPushCampaign(id, this.getAdminId(req), this.pushSvc);
+  }
+
+  @Delete('push-campaigns/:id')
+  deletePushCampaign(@Param('id') id: string, @Req() req: any) {
+    return this.svc.deletePushCampaign(id, this.getAdminId(req));
+  }
 }
+

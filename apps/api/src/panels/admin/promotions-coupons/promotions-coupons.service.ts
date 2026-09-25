@@ -444,4 +444,194 @@ export class PromotionsCouponsService implements OnModuleInit {
       limit,
     };
   }
+
+  // ── PUSH NOTIFICATION CAMPAIGNS ────────────────────────────────────────────
+
+  async listPushCampaigns(status?: string) {
+    const statusClause = status && status !== 'all' ? `AND status = '${status.replace(/'/g, "''")}'` : '';
+    const rows = await this.db.query(
+      `SELECT * FROM push_notification_campaigns
+       WHERE deleted_at IS NULL ${statusClause}
+       ORDER BY created_at DESC`,
+    );
+    return { status: true, data: rows || [] };
+  }
+
+  async getPushCampaign(campaignId: string) {
+    const rows = await this.db.query(
+      `SELECT * FROM push_notification_campaigns WHERE campaign_id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [campaignId],
+    );
+    if (!rows || rows.length === 0) throw new NotFoundException('Campaign not found');
+    return { status: true, data: rows[0] };
+  }
+
+  async createPushCampaign(body: any, adminId: string) {
+    const { title, body: msgBody, image_url, category, target_audience, target_user_ids, schedule_type, scheduled_at, data_payload } = body;
+    if (!title?.trim()) throw new BadRequestException('Title is required');
+    if (!msgBody?.trim()) throw new BadRequestException('Message body is required');
+
+    const rows = await this.db.query(
+      `INSERT INTO push_notification_campaigns
+         (title, body, image_url, category, target_audience, target_user_ids, schedule_type, scheduled_at, data_payload, status, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, 'draft', $10, $10)
+       RETURNING *`,
+      [
+        title.trim(),
+        msgBody.trim(),
+        image_url?.trim() || null,
+        category?.trim() || 'promotional',
+        target_audience || 'all_customers',
+        target_user_ids && target_user_ids.length > 0 ? target_user_ids : null,
+        schedule_type || 'immediate',
+        scheduled_at || null,
+        JSON.stringify(data_payload || {}),
+        adminId,
+      ],
+    );
+    return { status: true, message: 'Campaign created as draft', data: rows[0] };
+  }
+
+  async updatePushCampaign(campaignId: string, body: any, adminId: string) {
+    const existing = await this.getPushCampaign(campaignId);
+    if (['sent', 'cancelled'].includes(existing.data.status)) {
+      throw new BadRequestException('Cannot edit a campaign that is already sent or cancelled');
+    }
+
+    const { title, body: msgBody, image_url, category, target_audience, target_user_ids, schedule_type, scheduled_at, data_payload } = body;
+    const rows = await this.db.query(
+      `UPDATE push_notification_campaigns SET
+         title = COALESCE($1, title),
+         body = COALESCE($2, body),
+         image_url = $3,
+         category = COALESCE($4, category),
+         target_audience = COALESCE($5, target_audience),
+         target_user_ids = $6,
+         schedule_type = COALESCE($7, schedule_type),
+         scheduled_at = $8,
+         data_payload = COALESCE($9::jsonb, data_payload),
+         status = 'draft',
+         updated_by = $10,
+         updated_at = NOW()
+       WHERE campaign_id = $11 AND deleted_at IS NULL
+       RETURNING *`,
+      [
+        title?.trim() || null,
+        msgBody?.trim() || null,
+        image_url?.trim() || null,
+        category?.trim() || null,
+        target_audience || null,
+        target_user_ids && target_user_ids.length > 0 ? target_user_ids : null,
+        schedule_type || null,
+        scheduled_at || null,
+        data_payload ? JSON.stringify(data_payload) : null,
+        adminId,
+        campaignId,
+      ],
+    );
+    if (!rows || rows.length === 0) throw new NotFoundException('Campaign not found');
+    return { status: true, message: 'Campaign updated', data: rows[0] };
+  }
+
+  async submitPushCampaignForApproval(campaignId: string, adminId: string) {
+    const existing = await this.getPushCampaign(campaignId);
+    if (!['draft', 'rejected'].includes(existing.data.status)) {
+      throw new BadRequestException('Only draft or rejected campaigns can be submitted for approval');
+    }
+    const rows = await this.db.query(
+      `UPDATE push_notification_campaigns SET status = 'pending_approval', updated_by = $1, updated_at = NOW()
+       WHERE campaign_id = $2 AND deleted_at IS NULL RETURNING *`,
+      [adminId, campaignId],
+    );
+    return { status: true, message: 'Campaign submitted for approval', data: rows?.[0] };
+  }
+
+  async approvePushCampaign(campaignId: string, adminId: string) {
+    const existing = await this.getPushCampaign(campaignId);
+    if (existing.data.status !== 'pending_approval') {
+      throw new BadRequestException('Only pending_approval campaigns can be approved');
+    }
+    const rows = await this.db.query(
+      `UPDATE push_notification_campaigns SET status = 'approved', approved_by = $1, approved_at = NOW(), updated_by = $1, updated_at = NOW()
+       WHERE campaign_id = $2 AND deleted_at IS NULL RETURNING *`,
+      [adminId, campaignId],
+    );
+    return { status: true, message: 'Campaign approved', data: rows?.[0] };
+  }
+
+  async rejectPushCampaign(campaignId: string, reason: string, adminId: string) {
+    const existing = await this.getPushCampaign(campaignId);
+    if (existing.data.status !== 'pending_approval') {
+      throw new BadRequestException('Only pending_approval campaigns can be rejected');
+    }
+    const rows = await this.db.query(
+      `UPDATE push_notification_campaigns SET status = 'rejected', rejection_reason = $1, approved_by = $2, approved_at = NOW(), updated_by = $2, updated_at = NOW()
+       WHERE campaign_id = $3 AND deleted_at IS NULL RETURNING *`,
+      [reason || 'No reason provided', adminId, campaignId],
+    );
+    return { status: true, message: 'Campaign rejected', data: rows?.[0] };
+  }
+
+  async sendPushCampaign(campaignId: string, adminId: string, pushService: any) {
+    const existing = await this.getPushCampaign(campaignId);
+    const campaign = existing.data;
+    if (campaign.status !== 'approved') {
+      throw new BadRequestException('Campaign must be approved before sending');
+    }
+
+    // Resolve target user IDs
+    let userIds: string[] = [];
+    if (campaign.target_audience === 'specific_users' && campaign.target_user_ids?.length > 0) {
+      userIds = campaign.target_user_ids;
+    } else if (campaign.target_audience === 'all_customers') {
+      const rows = await this.db.query(`SELECT customer_id AS user_id FROM customers WHERE deleted_at IS NULL`);
+      userIds = (rows || []).map((r: any) => r.user_id).filter(Boolean);
+    } else if (campaign.target_audience === 'all_delivery_partners') {
+      const rows = await this.db.query(`SELECT delivery_partner_id AS user_id FROM delivery_partners WHERE deleted_at IS NULL`);
+      userIds = (rows || []).map((r: any) => r.user_id).filter(Boolean);
+    } else {
+      // all_users
+      const rows = await this.db.query(`SELECT user_id FROM users WHERE deleted_at IS NULL`);
+      userIds = (rows || []).map((r: any) => r.user_id).filter(Boolean);
+    }
+
+    let sentCount = 0;
+    let failedCount = 0;
+
+    if (pushService && userIds.length > 0) {
+      try {
+        const result = await pushService.sendNotificationToUsers(userIds, {
+          title: campaign.title,
+          body: campaign.body,
+          data: {
+            campaign_id: campaign.campaign_id,
+            image_url: campaign.image_url || '',
+            category: campaign.category || 'promotional',
+            ...(campaign.data_payload || {}),
+          },
+        });
+        sentCount = userIds.length;
+        if (!result.success) failedCount = userIds.length;
+      } catch (e) {
+        failedCount = userIds.length;
+      }
+    }
+
+    await this.db.query(
+      `UPDATE push_notification_campaigns SET status = 'sent', sent_at = NOW(), sent_count = $1, failed_count = $2, updated_by = $3, updated_at = NOW()
+       WHERE campaign_id = $4`,
+      [sentCount, failedCount, adminId, campaignId],
+    );
+
+    return { status: true, message: `Campaign sent to ${sentCount} users`, sentCount, failedCount };
+  }
+
+  async deletePushCampaign(campaignId: string, adminId: string) {
+    await this.db.query(
+      `UPDATE push_notification_campaigns SET deleted_at = NOW(), updated_by = $1, updated_at = NOW()
+       WHERE campaign_id = $2 AND deleted_at IS NULL`,
+      [adminId, campaignId],
+    );
+    return { status: true, message: 'Campaign deleted' };
+  }
 }
