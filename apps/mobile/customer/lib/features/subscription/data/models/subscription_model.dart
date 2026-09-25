@@ -649,10 +649,17 @@ class Subscription {
   }
 
   List<SubscriptionCustomDateModel> get allCustomDates {
-    final collected = <SubscriptionCustomDateModel>[
-      ...customDates,
-      ...items.expand((item) => item.customDates),
-    ];
+    final seen = <String>{};
+    final collected = <SubscriptionCustomDateModel>[];
+    final source = customDates.isNotEmpty
+        ? customDates
+        : items.expand((item) => item.customDates);
+    for (final cd in source) {
+      final key = cd.deliveryDate.split('T').first;
+      if (seen.add(key)) {
+        collected.add(cd);
+      }
+    }
     return collected;
   }
 

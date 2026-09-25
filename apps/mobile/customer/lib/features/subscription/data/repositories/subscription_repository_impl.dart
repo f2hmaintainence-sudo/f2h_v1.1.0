@@ -548,18 +548,27 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     Map<String, dynamic> subRow,
     List<Map<String, dynamic>> rows,
   ) {
-    final customDates = <SubscriptionCustomDateModel>[];
-    customDates.addAll(_asCustomDates(subRow['custom_dates'] ?? subRow['customDates']));
+    final rawDates = <SubscriptionCustomDateModel>[];
+    rawDates.addAll(_asCustomDates(subRow['custom_dates'] ?? subRow['customDates']));
 
-    if (customDates.isEmpty) {
+    if (rawDates.isEmpty) {
       for (final row in rows) {
-        customDates.addAll(
+        rawDates.addAll(
           _asCustomDates(row['custom_dates'] ?? row['customDates']),
         );
       }
     }
 
-    return customDates;
+    final seen = <String>{};
+    final uniqueDates = <SubscriptionCustomDateModel>[];
+    for (final cd in rawDates) {
+      final key = cd.deliveryDate.split('T').first;
+      if (seen.add(key)) {
+        uniqueDates.add(cd);
+      }
+    }
+
+    return uniqueDates;
   }
 
   List<SubscriptionPauseModel> _buildPauses(

@@ -858,9 +858,15 @@ export class SubscriptionsService {
       const itemId = item.subscription_item_id || item.id;
       item.weekly_schedules = weeklySchedules.filter(s => s.subscription_id === subId || s.subscription_item_id === itemId);
       item.pauses = pauses.filter(p => p.subscription_id === subId || p.subscription_item_id === itemId);
-      item.custom_dates = customDates.filter(
-        cd => cd.subscription_id === subId || cd.subscription_item_id === itemId,
-      );
+      const seenDates = new Set<string>();
+      item.custom_dates = customDates
+        .filter(cd => cd.subscription_id === subId || cd.subscription_item_id === itemId)
+        .filter(cd => {
+          const dateKey = String(cd.delivery_date || cd.date).split('T')[0];
+          if (seenDates.has(dateKey)) return false;
+          seenDates.add(dateKey);
+          return true;
+        });
     }
 
     return {

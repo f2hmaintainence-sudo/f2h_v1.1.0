@@ -27,10 +27,8 @@ import '../bloc/subscription_event.dart';
 import '../bloc/subscription_state.dart';
 import '../../../catalog/presentation/helpers/cart_helpers.dart';
 import '../widgets/monthly_estimation_card.dart';
-import '../widgets/subscription_payment_sheet.dart';
 import 'subscription_success_screen.dart';
 import '../../../wallet/presentation/screens/wallet_screen.dart';
-import '../../../../core/payments/payment_service.dart';
 
 // ── Day abbreviations ─────────────────────────────────────
 const _kDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -217,7 +215,14 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
 
     // Init custom schedule defaults
     if (widget.initialCustomDates != null && widget.initialCustomDates!.isNotEmpty) {
-      _customDates = List.from(widget.initialCustomDates!);
+      final seen = <String>{};
+      _customDates = [];
+      for (final entry in widget.initialCustomDates!) {
+        if (seen.add(entry.dateString)) {
+          _customDates.add(entry);
+        }
+      }
+      _customDates.sort((a, b) => a.date.compareTo(b.date));
     }
 
     // Load default address from session and initialize default quantities based on open slots
