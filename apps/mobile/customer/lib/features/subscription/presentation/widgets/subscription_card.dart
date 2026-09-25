@@ -72,11 +72,6 @@ class SubCard extends StatelessWidget {
 
     // ── Payment type visuals ────────────────────────────────────────
     final isPostpaid = s.paymentType.toLowerCase() == 'postpaid';
-    final Color paymentTypeColor =
-        isPostpaid ? const Color(0xFF7E22CE) : const Color(0xFF047857);
-    final Color paymentTypeBg =
-        isPostpaid ? const Color(0xFFF3E8FF) : const Color(0xFFECFDF5);
-    final String paymentTypeLabel = isPostpaid ? 'POSTPAID' : 'PREPAID';
 
     // ── Card background ─────────────────────────────────────────────
     final cardBg = isTerminal ? const Color(0xFFF8FAFC) : Colors.white;
@@ -118,13 +113,13 @@ class SubCard extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Top row: image + details
-                  Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top row: image + details
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Product image
@@ -164,14 +159,7 @@ class SubCard extends StatelessWidget {
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
-                                        const SizedBox(width: 5),
-                                        // Payment type badge (dot style)
-                                        _DotBadge(
-                                          label: paymentTypeLabel,
-                                          color: paymentTypeColor,
-                                          bg: paymentTypeBg,
-                                        ),
-                                        const SizedBox(width: 4),
+                                        const SizedBox(width: 6),
                                         // Status badge
                                         _DotBadge(
                                           label: statusLabel,
@@ -268,66 +256,83 @@ class SubCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                        ),
 
-                          // ── Divider ──────────────────────────────────
-                          const SizedBox(height: 10),
-                          Container(
-                            height: 1,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.transparent,
-                                  const Color(0xFFE2E8F0),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // ── Footer ────────────────────────────────────
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                isTerminal
-                                    ? 'Tap to view details'
-                                    : 'Tap to manage subscription',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: kTextSub.withValues(alpha: 0.65),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Text(
-                                    isTerminal
-                                        ? 'View Details'
-                                        : 'Manage',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: kPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 10,
-                                    color: kPrimary,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                  // ── Divider ──────────────────────────────────
+                  Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      color: isPostpaid
+                          ? const Color(0xFF86EFAC).withValues(alpha: 0.4)
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
-                ),
+
+                  // ── Manage line / Footer ─────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: isPostpaid ? null : Colors.transparent,
+                      gradient: isPostpaid
+                          ? const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.white,
+                                Color(0xFFDCFCE7),
+                                Color(0xFF16A34A),
+                              ],
+                              stops: [0.0, 0.42, 1.0],
+                            )
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isTerminal
+                              ? 'Tap to view details'
+                              : 'Tap to manage subscription',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: isPostpaid
+                                ? const Color(0xFF334155)
+                                : kTextSub.withValues(alpha: 0.65),
+                            fontWeight:
+                                isPostpaid ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isTerminal ? 'View Details' : 'Manage',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isPostpaid ? Colors.white : kPrimary,
+                                letterSpacing: isPostpaid ? 0.2 : 0.0,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 10,
+                              color: isPostpaid ? Colors.white : kPrimary,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            );
+            ),
+          ),
+        ),
+      );
   }
 }
 

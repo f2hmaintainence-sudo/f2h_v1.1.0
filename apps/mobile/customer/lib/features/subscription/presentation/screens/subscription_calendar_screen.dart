@@ -94,15 +94,8 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
       return DateTime(now.year, now.month);
     }
     final now = DateTime.now();
-    if (s.autoRenew) {
-      // Current + next month
-      return DateTime(now.year, now.month + 1);
-    } else {
-      // Only until endDate month
-      final end = _parseDateStr(s.endDate);
-      if (end != null) return DateTime(end.year, end.month);
-      return DateTime(now.year, now.month);
-    }
+    // Subscriptions run continuously until cancelled - allow current & next month
+    return DateTime(now.year, now.month + 1);
   }
 
   bool get _canGoBack {
@@ -158,10 +151,12 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
       return false;
     }
 
-    // 2. End date check
-    final endDate = _parseDateStr(widget.subscription.endDate);
-    if (endDate != null && d.isAfter(endDate)) {
-      return false;
+    // 2. End date check (only if cancelled)
+    if (widget.subscription.status == 'cancelled') {
+      final endDate = _parseDateStr(widget.subscription.endDate);
+      if (endDate != null && d.isAfter(endDate)) {
+        return false;
+      }
     }
 
     // 3. Paused days have no delivery
@@ -207,8 +202,10 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
 
     final startDate = _parseDateStr(widget.subscription.startDate);
     if (startDate != null && d.isBefore(startDate)) return 'no_delivery';
-    final endDate = _parseDateStr(widget.subscription.endDate);
-    if (endDate != null && d.isAfter(endDate)) return 'no_delivery';
+    if (widget.subscription.status == 'cancelled') {
+      final endDate = _parseDateStr(widget.subscription.endDate);
+      if (endDate != null && d.isAfter(endDate)) return 'no_delivery';
+    }
 
     if (widget.subscription.status == 'cancelled' ||
         widget.subscription.status == 'expaired' ||
@@ -539,51 +536,7 @@ class _SubscriptionCalendarScreenState extends State<SubscriptionCalendarScreen>
                                     ),
                                   ],
                                 ),
-                                // Auto-renew / end-date hint
-                                if (s.autoRenew && s.isActive)
-                                  Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFDCFCE7),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: const [
-                                        Icon(Icons.autorenew_rounded, size: 11, color: Color(0xFF15803D)),
-                                        SizedBox(width: 5),
-                                        Flexible(
-                                          child: Text(
-                                            'Showing current & next month (Auto Renew ON)',
-                                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                else if (!s.autoRenew && s.isActive && s.endDate != null)
-                                  Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF7ED),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.info_outline_rounded, size: 11, color: Color(0xFFD97706)),
-                                        const SizedBox(width: 5),
-                                        Flexible(
-                                          child: Text(
-                                            'Ends ${s.endDate} · Enable Auto Renew to extend',
-                                            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                const SizedBox(height: 4),
                                 // Weekday header
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceAround,

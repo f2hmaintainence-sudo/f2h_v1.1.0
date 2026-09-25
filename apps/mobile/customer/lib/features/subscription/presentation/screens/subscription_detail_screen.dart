@@ -60,9 +60,6 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   List<SubscriptionBillModel> _bills = [];
   bool _loadingBills = true;
 
-  /// Collapsed/expanded state of the Subscription Details panel.
-  bool _subscriptionDetailsExpanded = false;
-
   String _getMonthName(int month) {
     const names = [
       '',
@@ -671,125 +668,92 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() =>
-                  _subscriptionDetailsExpanded = !_subscriptionDetailsExpanded);
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long_rounded,
-                    size: 17,
-                    color: Color(0xFF2563EB),
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.receipt_long_rounded,
+                  size: 15,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Subscription Details',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                  color: kText,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kPrimaryPl,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '#${s.id}',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: kPrimary,
                   ),
                 ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Subscription Details',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
-                  ),
-                ),
-                const Spacer(),
-                if (!_subscriptionDetailsExpanded)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: kPrimaryPl,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '#${s.id}',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: kPrimary,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                AnimatedRotation(
-                  turns: _subscriptionDetailsExpanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 20,
-                    color: kTextSub,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, thickness: 1, color: kBorderLt),
+          const SizedBox(height: 6),
+          _buildDetailRow('Subscription ID', '#${s.id}'),
+          _buildDetailRow(
+            'Product Price',
+            '₹${unitPrice.toStringAsFixed(2)} / unit',
+          ),
+          _buildDetailRow(
+            'Frequency',
+            s.frequency.isNotEmpty ? s.frequency : 'Daily',
+          ),
+          _buildDetailRow('Start Date', _formatDate(s.startDate)),
+          if (isCancelled && hasEndDate)
+            _buildDetailRow('End Date', _formatDate(s.endDate)),
+          _buildDetailRow(
+            'Payment Method',
+            isPostpaid
+                ? 'Postpaid (Monthly Invoice)'
+                : 'Prepaid (Wallet)',
+            valueColor:
+                isPostpaid ? const Color(0xFFD97706) : kPrimary,
+          ),
+          if (isCancelled)
+            _buildDetailRow('Status', 'Cancelled', valueColor: kRed),
+          if (!isPostpaid &&
+              _detailInfo != null &&
+              !_loadingDetail) ...[
+            _buildDetailRow(
+              'Wallet Balance',
+              '₹${_detailInfo!.walletBalance.toStringAsFixed(2)}',
+              valueColor: _detailInfo!.alertLowBalance
+                  ? kRed
+                  : kPrimary,
             ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.fastOutSlowIn,
-            alignment: Alignment.topCenter,
-            child: _subscriptionDetailsExpanded
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      const Divider(height: 1, thickness: 1, color: kBorderLt),
-                      const SizedBox(height: 6),
-                      _buildDetailRow('Subscription ID', '#${s.id}'),
-                      _buildDetailRow(
-                        'Product Price',
-                        '₹${unitPrice.toStringAsFixed(2)} / unit',
-                      ),
-                      _buildDetailRow(
-                        'Frequency',
-                        s.frequency.isNotEmpty ? s.frequency : 'Daily',
-                      ),
-                      _buildDetailRow('Start Date', _formatDate(s.startDate)),
-                      _buildDetailRow(
-                        'End Date',
-                        hasEndDate ? _formatDate(s.endDate) : 'Ongoing / Auto-renew',
-                      ),
-                      _buildDetailRow(
-                        'Payment Method',
-                        isPostpaid
-                            ? 'Postpaid (Monthly Invoice)'
-                            : 'Prepaid (Wallet)',
-                        valueColor:
-                            isPostpaid ? const Color(0xFFD97706) : kPrimary,
-                      ),
-                      if (isCancelled)
-                        _buildDetailRow('Status', 'Cancelled', valueColor: kRed),
-                      if (!isPostpaid &&
-                          _detailInfo != null &&
-                          !_loadingDetail) ...[
-                        _buildDetailRow(
-                          'Wallet Balance',
-                          '₹${_detailInfo!.walletBalance.toStringAsFixed(2)}',
-                          valueColor: _detailInfo!.alertLowBalance
-                              ? kRed
-                              : kPrimary,
-                        ),
-                      ],
-                      if (_detailInfo != null &&
-                          !_loadingDetail &&
-                          _detailInfo!.nextRenewalEstimate > 0)
-                        _buildDetailRow(
-                          'Est. Monthly Renewal',
-                          '₹${_detailInfo!.nextRenewalEstimate.toStringAsFixed(0)}',
-                          valueColor: kText,
-                        ),
-                    ],
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
+          ],
+          if (_detailInfo != null &&
+              !_loadingDetail &&
+              _detailInfo!.nextRenewalEstimate > 0)
+            _buildDetailRow(
+              'Est. Monthly Renewal',
+              '₹${_detailInfo!.nextRenewalEstimate.toStringAsFixed(0)}',
+              valueColor: kText,
+            ),
         ],
       ),
     );
@@ -1210,7 +1174,7 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                   Container(
                     decoration: BoxDecoration(
                       color: kSurface,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isCancelled
                             ? kRed.withValues(alpha: 0.18)
@@ -1225,40 +1189,40 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(12),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                                // Product image
-                                    Container(
-                                      width: 68,
-                                      height: 68,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFAFBF9),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: kBorderLt,
-                                          width: 1.2,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.03),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(14),
-                                        child: buildProductImage(
-                                          s.productName,
-                                          imageAsset: s.imageUrl,
-                                          fit: BoxFit.cover,
-                                          fallbackColor: isActive ? kPrimary : kTextSub,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
+                        // Product image
+                        Container(
+                          width: 84,
+                          height: 84,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFAFBF9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: kBorderLt,
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: buildProductImage(
+                              s.productName,
+                              imageAsset: s.imageUrl,
+                              fit: BoxFit.cover,
+                              fallbackColor: isActive ? kPrimary : kTextSub,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1365,23 +1329,29 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
                                             runSpacing: 4,
                                             children: [
                                               if (unitPrice > 0)
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 7.5,
-                                                    vertical: 3,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: kPrimaryPl,
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Text(
-                                                    '₹${unitPrice.toStringAsFixed(2)} / unit',
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w900,
-                                                      color: kPrimary,
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                                  textBaseline: TextBaseline.alphabetic,
+                                                  children: [
+                                                    Text(
+                                                      '₹${unitPrice.toStringAsFixed(unitPrice % 1 == 0 ? 0 : 2)}',
+                                                      style: TextStyle(
+                                                        fontSize: 13.5,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: isActive ? kPrimary : kText,
+                                                      ),
                                                     ),
-                                                  ),
+                                                    const SizedBox(width: 2),
+                                                    const Text(
+                                                      '/ unit',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: kTextSub,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               if (originalPrice > unitPrice) ...[
                                                 Text(
