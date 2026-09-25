@@ -40,7 +40,7 @@ class _SubsScreenState extends State<SubsScreen>
   late List<Subscription> _subscriptions;
   DateTime? vacationStart;
   DateTime? vacationEnd;
-  String _selectedFilter = 'all'; // 'all', 'active', 'expired', 'cancelled'
+  String _selectedFilter = 'active'; // 'active', 'expired', 'cancelled', 'all'
 
   List<Subscription> get _filteredSubscriptions {
     switch (_selectedFilter) {
@@ -1356,10 +1356,10 @@ class _SubsScreenState extends State<SubsScreen>
               setState(() => _selectedFilter = val);
             },
             itemBuilder: (context) => [
-              _buildFilterMenuItem('all', 'All', total, Icons.all_inclusive_rounded),
               _buildFilterMenuItem('active', 'Active', active, Icons.check_circle_outline_rounded),
               _buildFilterMenuItem('expired', 'Expired', expired, Icons.schedule_rounded),
               _buildFilterMenuItem('cancelled', 'Cancelled', cancelled, Icons.cancel_outlined),
+              _buildFilterMenuItem('all', 'All', total, Icons.all_inclusive_rounded),
             ],
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
