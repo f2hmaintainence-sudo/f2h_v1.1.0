@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
@@ -39,6 +40,21 @@ class _SubsScreenState extends State<SubsScreen>
   late List<Subscription> _subscriptions;
   DateTime? vacationStart;
   DateTime? vacationEnd;
+  String _selectedFilter = 'all'; // 'all', 'active', 'expired', 'cancelled'
+
+  List<Subscription> get _filteredSubscriptions {
+    switch (_selectedFilter) {
+      case 'active':
+        return _subscriptions.where((s) => s.status == 'active').toList();
+      case 'expired':
+        return _subscriptions.where((s) => s.isExpired || s.status == 'expired' || s.status == 'expaired').toList();
+      case 'cancelled':
+        return _subscriptions.where((s) => s.status == 'cancelled').toList();
+      case 'all':
+      default:
+        return _subscriptions;
+    }
+  }
 
   @override
   void initState() {
@@ -1185,76 +1201,95 @@ class _SubsScreenState extends State<SubsScreen>
                   child: _subscriptionWalletCard(context),
                 ),
                 SliverToBoxAdapter(
-                  child: _summaryRow(activeCount, expiredCount, cancelledCount),
+                  child: _filterBar(_subscriptions.length, activeCount, expiredCount, cancelledCount),
                 ),
                 // SliverToBoxAdapter(child: _calendar()),
-                _subscriptions.isEmpty
+                _filteredSubscriptions.isEmpty
                     ? SliverToBoxAdapter(
                         child: Container(
                           margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
                             color: kSurface,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: kBorderLt, width: 1.5),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: kBorderLt, width: 1.2),
                             boxShadow: [
                               BoxShadow(
-                                color: kPrimary.withValues(alpha: 0.04),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.calendar_today_outlined, size: 48, color: kMuted),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'No Active Subscriptions',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: kText),
+                              const Icon(Icons.inbox_outlined, size: 44, color: kMuted),
+                              const SizedBox(height: 14),
+                              Text(
+                                _selectedFilter == 'all'
+                                    ? 'No Active Subscriptions'
+                                    : 'No ${_selectedFilter[0].toUpperCase()}${_selectedFilter.substring(1)} Subscriptions',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: kText),
                               ),
                               const SizedBox(height: 6),
-                              const Text(
-                                'Subscribe to daily milk, ghee, curd or fresh juices and get free morning delivery before 7 AM.',
-                                style: TextStyle(fontSize: 12, color: kTextSub, height: 1.4),
+                              Text(
+                                _selectedFilter == 'all'
+                                    ? 'Subscribe to daily milk, ghee, curd or fresh juices and get free morning delivery before 7 AM.'
+                                    : 'You do not have any subscriptions with status "$_selectedFilter".',
+                                style: const TextStyle(fontSize: 12, color: kTextSub, height: 1.4),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 20),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                      Navigator.push(context, 
-                                        MaterialPageRoute(
-                                          builder: (_) => const BrowseScreen(),
-                                        ), );
-                                      // or HomeScreen()
-                                    },
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text('Add First Subscription', style: TextStyle(fontWeight: FontWeight.w800)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kPrimary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              const SizedBox(height: 18),
+                              if (_selectedFilter != 'all')
+                                OutlinedButton(
+                                  onPressed: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _selectedFilter = 'all');
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: kPrimary,
+                                    side: const BorderSide(color: kPrimary),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  child: const Text('Show All Subscriptions', style: TextStyle(fontWeight: FontWeight.w800)),
+                                )
+                              else
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const BrowseScreen(),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text('Add First Subscription', style: TextStyle(fontWeight: FontWeight.w800)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kPrimary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
                       )
                     : SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (_, i) {
-                              final sub = _subscriptions[i];
+                              final sub = _filteredSubscriptions[i];
                               return SubCard(
                                 sub,
                                 onSkip: () => _showSkipDayDialog(sub),
                                 onDelete: () => _deleteSubscription(sub),
                               );
                             },
-                            childCount: _subscriptions.length,
+                            childCount: _filteredSubscriptions.length,
                           ),
                         ),
                       ),
@@ -1268,88 +1303,146 @@ class _SubsScreenState extends State<SubsScreen>
     );
   }
 
-  Widget _summaryRow(int active, int expired, int cancelled) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-        child: Row(
-          children: [
-            _buildStatPill(
-              value: '$active',
-              label: 'Active',
-              color: kPrimary,
-              bg: kPrimaryPl,
-              icon: Icons.check_circle_rounded,
-            ),
-            const SizedBox(width: 8),
-            _buildStatPill(
-              value: '$expired',
-              label: 'Expired',
-              color: kAccent,
-              bg: kAccentLt,
-              icon: Icons.schedule_rounded,
-            ),
-            const SizedBox(width: 8),
-            _buildStatPill(
-              value: '$cancelled',
-              label: 'Cancelled',
-              color: kRed,
-              bg: kRedLt,
-              icon: Icons.cancel_rounded,
-            ),
-          ],
-        ),
-      );
+  Widget _filterBar(int total, int active, int expired, int cancelled) {
+    final currentLabel = _getFilterLabel(total, active, expired, cancelled);
 
-  Widget _buildStatPill({
-    required String value,
-    required String label,
-    required Color color,
-    required Color bg,
-    required IconData icon,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: bg.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withValues(alpha: 0.18),
-            width: 1.2,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Subscriptions',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: kText,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_filteredSubscriptions.length}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: kTextSub,
+                  ),
+                ),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+          PopupMenuButton<String>(
+            initialValue: _selectedFilter,
+            elevation: 4,
+            color: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(height: 5),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                color: color,
-                letterSpacing: -0.5,
+            offset: const Offset(0, 36),
+            onSelected: (val) {
+              HapticFeedback.selectionClick();
+              setState(() => _selectedFilter = val);
+            },
+            itemBuilder: (context) => [
+              _buildFilterMenuItem('all', 'All', total, Icons.all_inclusive_rounded),
+              _buildFilterMenuItem('active', 'Active', active, Icons.check_circle_outline_rounded),
+              _buildFilterMenuItem('expired', 'Expired', expired, Icons.schedule_rounded),
+              _buildFilterMenuItem('cancelled', 'Cancelled', cancelled, Icons.cancel_outlined),
+            ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    currentLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: Color(0xFF64748B),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getFilterLabel(int total, int active, int expired, int cancelled) {
+    switch (_selectedFilter) {
+      case 'active':
+        return 'Active ($active)';
+      case 'expired':
+        return 'Expired ($expired)';
+      case 'cancelled':
+        return 'Cancelled ($cancelled)';
+      case 'all':
+      default:
+        return 'All ($total)';
+    }
+  }
+
+  PopupMenuItem<String> _buildFilterMenuItem(
+    String value,
+    String title,
+    int count,
+    IconData icon,
+  ) {
+    final isSelected = _selectedFilter == value;
+    return PopupMenuItem<String>(
+      value: value,
+      height: 38,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: isSelected ? kPrimary : const Color(0xFF64748B),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$title ($count)',
               style: TextStyle(
-                fontSize: 10,
-                color: color.withValues(alpha: 0.75),
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.1,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? kPrimary : kText,
               ),
             ),
-          ],
-        ),
+          ),
+          if (isSelected)
+            const Icon(
+              Icons.check_rounded,
+              size: 16,
+              color: kPrimary,
+            ),
+        ],
       ),
     );
   }

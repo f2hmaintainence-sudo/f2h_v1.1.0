@@ -112,7 +112,7 @@ class SubCard extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
             color: cardBg,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: cardBorderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
@@ -123,7 +123,7 @@ class SubCard extends StatelessWidget {
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(14),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
               child: Column(
@@ -367,7 +367,7 @@ class _ProductImage extends StatelessWidget {
       height: 68,
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFFE2E8F0),
           width: 1.0,
@@ -381,7 +381,7 @@ class _ProductImage extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(19),
+        borderRadius: BorderRadius.circular(11),
         child: buildProductImage(
           subscription.productName,
           imageAsset: subscription.imageUrl,
@@ -465,38 +465,30 @@ class _PricePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: isActive ? kPrimary : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text(
-            '₹${_dailyCost.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              color: isActive ? Colors.white : kTextSub,
-              letterSpacing: -0.3,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          '₹${_dailyCost.toStringAsFixed(0)}',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: isActive ? kText : kTextSub,
+            letterSpacing: -0.3,
           ),
-          Text(
-            ' / day',
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w600,
-              color: isActive
-                  ? Colors.white.withValues(alpha: 0.7)
-                  : kMuted,
-            ),
+        ),
+        const SizedBox(width: 2),
+        Text(
+          '/ day',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: kTextSub,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:f2h_customer/theme/app_colors.dart';
 import 'package:f2h_customer/features/catalog/presentation/helpers/cart_helpers.dart';
 
@@ -11,6 +12,8 @@ class CustomDatePickerDialog extends StatefulWidget {
   final bool showSlots;
   final String? initialSlot;
   final Map<String, dynamic>? slotTimings;
+  final List<DateTime>? existingDates;
+  final bool allowMultiple;
 
   const CustomDatePickerDialog({
     super.key,
@@ -22,6 +25,8 @@ class CustomDatePickerDialog extends StatefulWidget {
     this.showSlots = false,
     this.initialSlot,
     this.slotTimings,
+    this.existingDates,
+    this.allowMultiple = false,
   });
 
   @override
@@ -32,6 +37,9 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
   late DateTime _selectedDate;
   late DateTime _currentMonth;
   late String _selectedSlot;
+  final Set<String> _existingDateKeys = {};
+  final Set<DateTime> _selectedDates = {};
+  String? _statusMessage;
 
   final List<String> _weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -43,10 +51,62 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
   @override
   void initState() {
     super.initState();
+
+    // Populate existing scheduled date keys
+    if (widget.existingDates != null) {
+      for (final d in widget.existingDates!) {
+        _existingDateKeys.add('${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}');
+      }
+    }
+
     // Normalize date to remove time component
-    _selectedDate = DateTime(widget.initialDate.year, widget.initialDate.month, widget.initialDate.day);
+    var candidate = DateTime(widget.initialDate.year, widget.initialDate.month, widget.initialDate.day);
+    final firstNormalized = DateTime(widget.firstDate.year, widget.firstDate.month, widget.firstDate.day);
+    final lastNormalized = DateTime(widget.lastDate.year, widget.lastDate.month, widget.lastDate.day);
+
+    if (candidate.isBefore(firstNormalized)) {
+      candidate = firstNormalized;
+    } else if (candidate.isAfter(lastNormalized)) {
+      candidate = firstNormalized;
+    }
+
+    // If initialDate is already in existingDates, find the first available future date that is not added
+    final initKey = '${candidate.year}-${candidate.month.toString().padLeft(2, '0')}-${candidate.day.toString().padLeft(2, '0')}';
+    if (_existingDateKeys.contains(initKey)) {
+      var testDate = DateTime(candidate.year, candidate.month, candidate.day);
+      bool found = false;
+      while (!testDate.isAfter(lastNormalized)) {
+        final key = '${testDate.year}-${testDate.month.toString().padLeft(2, '0')}-${testDate.day.toString().padLeft(2, '0')}';
+        if (!_existingDateKeys.contains(key)) {
+          candidate = testDate;
+          found = true;
+          break;
+        }
+        testDate = testDate.add(const Duration(days: 1));
+      }
+      if (!found) {
+        testDate = DateTime(firstNormalized.year, firstNormalized.month, firstNormalized.day);
+        while (testDate.isBefore(candidate)) {
+          final key = '${testDate.year}-${testDate.month.toString().padLeft(2, '0')}-${testDate.day.toString().padLeft(2, '0')}';
+          if (!_existingDateKeys.contains(key)) {
+            candidate = testDate;
+            found = true;
+            break;
+          }
+          testDate = testDate.add(const Duration(days: 1));
+        }
+      }
+    }
+
+    _selectedDate = candidate;
     _currentMonth = DateTime(_selectedDate.year, _selectedDate.month);
     _selectedSlot = widget.initialSlot ?? 'Morning';
+
+    final selKey = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+    if (!_existingDateKeys.contains(selKey)) {
+      _selectedDates.add(_selectedDate);
+    }
+
     if (widget.showSlots) {
       final now = DateTime.now();
       var available = getAvailableSlots(_selectedDate, now, widget.slotTimings);
@@ -210,14 +270,64 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                widget.title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: kText,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: kText,
+                      ),
+                    ),
+                  ),
+                  if (widget.allowMultiple && _selectedDates.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: kPrimary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_selectedDates.length} selected',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: kPrimary,
+                        ),
+                      ),
+                    ),
+                ],
               ),
+              if (_statusMessage != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFD97706)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _statusMessage!,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -293,9 +403,11 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
               final DateTime date = item['date'];
               final bool isCurrentMonth = item['isCurrentMonth'];
               final bool isEnabled = item['isEnabled'];
-              final bool isSelected = _selectedDate.year == date.year &&
-                  _selectedDate.month == date.month &&
-                  _selectedDate.day == date.day;
+              final String dateKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+              final bool isAlreadyAdded = _existingDateKeys.contains(dateKey);
+              final bool isSelected = widget.allowMultiple
+                  ? _selectedDates.any((d) => d.year == date.year && d.month == date.month && d.day == date.day)
+                  : (_selectedDate.year == date.year && _selectedDate.month == date.month && _selectedDate.day == date.day);
               
               final bool isInRange = widget.highlightMonthEnd &&
                   date.year == _selectedDate.year &&
@@ -318,11 +430,96 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
                 );
               }
 
-              // Active, enabled day
+              // ── Already in Schedule (e.g. 26 and 27) ──
+              if (isAlreadyAdded) {
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _statusMessage = '${date.day} ${_months[date.month - 1]} is already in your schedule';
+                    });
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${date.day} ${_months[date.month - 1]} is already in your schedule'),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.6),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              date.day.toString().padLeft(2, '0'),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF15803D),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              width: 4,
+                              height: 4,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF16A34A),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 11,
+                            color: Color(0xFF15803D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // Active, enabled day (not already added)
               return GestureDetector(
                 onTap: () {
+                  HapticFeedback.selectionClick();
                   setState(() {
-                    _selectedDate = date;
+                    _statusMessage = null;
+                    if (widget.allowMultiple) {
+                      final match = _selectedDates.firstWhere(
+                        (d) => d.year == date.year && d.month == date.month && d.day == date.day,
+                        orElse: () => DateTime(0),
+                      );
+                      if (match.year != 0) {
+                        if (_selectedDates.length > 1) {
+                          _selectedDates.remove(match);
+                        }
+                      } else {
+                        _selectedDates.add(date);
+                        _selectedDate = date;
+                      }
+                    } else {
+                      _selectedDate = date;
+                    }
+
                     if (widget.showSlots) {
                       final available = getAvailableSlots(date, DateTime.now(), widget.slotTimings);
                       if (!available.contains(_selectedSlot)) {
@@ -370,6 +567,53 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
               );
             },
           ),
+          if (_existingDateKeys.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
+                  ),
+                  child: const Icon(Icons.check_rounded, size: 9, color: Color(0xFF15803D)),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'In Schedule',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF15803D),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: kPrimary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  widget.allowMultiple && _selectedDates.length > 1
+                      ? 'Selected (${_selectedDates.length})'
+                      : 'Selected Date',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: kText,
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (widget.showSlots) ...[
             const SizedBox(height: 16),
             const Text(
@@ -415,35 +659,49 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
               },
             ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           // Done Button
           Center(
             child: SizedBox(
-              width: 130,
+              width: widget.allowMultiple ? 180 : 130,
               height: 44,
               child: ElevatedButton(
-                onPressed: () {
-                  if (widget.showSlots) {
-                    Navigator.pop(
-                      context,
-                      DateSlotResult(date: _selectedDate, slot: _selectedSlot),
-                    );
-                  } else {
-                    Navigator.pop(context, _selectedDate);
-                  }
-                },
+                onPressed: (widget.allowMultiple && _selectedDates.isEmpty)
+                    ? null
+                    : () {
+                        if (widget.allowMultiple) {
+                          final sorted = _selectedDates.toList()..sort();
+                          Navigator.pop(
+                            context,
+                            sorted.isNotEmpty ? sorted : [_selectedDate],
+                          );
+                        } else if (widget.showSlots) {
+                          Navigator.pop(
+                            context,
+                            DateSlotResult(date: _selectedDate, slot: _selectedSlot),
+                          );
+                        } else {
+                          Navigator.pop(context, _selectedDate);
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimary,
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade600,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(
+                child: Text(
+                  widget.allowMultiple
+                      ? (_selectedDates.length > 1
+                          ? 'Add ${_selectedDates.length} Dates'
+                          : (_selectedDates.length == 1 ? 'Add 1 Date' : 'Select Date'))
+                      : 'Done',
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.1,
@@ -458,15 +716,17 @@ class _CustomDatePickerDialogState extends State<CustomDatePickerDialog> {
   }
 }
 
-Future<DateTime?> showCustomDatePicker({
+Future<dynamic> showCustomDatePicker({
   required BuildContext context,
   required DateTime initialDate,
   required DateTime firstDate,
   required DateTime lastDate,
   String title = 'Start Date',
   bool highlightMonthEnd = false,
+  List<DateTime>? existingDates,
+  bool allowMultiple = false,
 }) {
-  return showDialog<DateTime>(
+  return showDialog<dynamic>(
     context: context,
     barrierDismissible: true,
     builder: (context) {
@@ -484,6 +744,8 @@ Future<DateTime?> showCustomDatePicker({
           lastDate: lastDate,
           title: title,
           highlightMonthEnd: highlightMonthEnd,
+          existingDates: existingDates,
+          allowMultiple: allowMultiple,
         ),
       );
     },

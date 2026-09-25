@@ -470,8 +470,10 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   // ── Date pickers ──────────────────────────────────────
 
   Future<void> _pickStartDate() async {
-    final first = DateTime.now().add(const Duration(days: 1));
-    final last = DateTime(first.year, first.month + 2, 0);
+    final now = DateTime.now();
+    final first = now.add(const Duration(days: 1));
+    // Allow current month and next month only (last day of next month)
+    final last = DateTime(now.year, now.month + 2, 0);
     final picked = await showCustomDatePicker(
       context: context,
       initialDate: _startDate,
@@ -484,31 +486,53 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
   }
 
   Future<void> _pickCustomDeliveryDate() async {
-    final first = DateTime.now().add(const Duration(days: 1));
-    final last = DateTime(first.year, first.month + 3, 0);
-    final initial = _customDates.isNotEmpty
-        ? (_customDates.last.date.add(const Duration(days: 1)).isBefore(last)
-            ? _customDates.last.date.add(const Duration(days: 1))
-            : first)
+    final now = DateTime.now();
+    final first = now.add(const Duration(days: 1));
+    // Allow current month and next month only (last day of next month)
+    final last = DateTime(now.year, now.month + 2, 0);
+
+    // Collect all already selected dates
+    final existingDates = _customDates.map((e) => DateTime(e.date.year, e.date.month, e.date.day)).toList();
+    final existingKeys = _customDates.map((e) => e.dateString).toSet();
+
+    // Default initial date: next day after last scheduled date, or next available future date not in existingKeys
+    DateTime candidate = _customDates.isNotEmpty
+        ? _customDates.last.date.add(const Duration(days: 1))
         : first;
+    if (candidate.isAfter(last) || candidate.isBefore(first)) candidate = first;
+
+    while (existingKeys.contains('${candidate.year}-${candidate.month.toString().padLeft(2, '0')}-${candidate.day.toString().padLeft(2, '0')}')) {
+      candidate = candidate.add(const Duration(days: 1));
+      if (candidate.isAfter(last)) {
+        candidate = first;
+        break;
+      }
+    }
+
     final picked = await showCustomDatePicker(
       context: context,
-      initialDate: initial.isBefore(first) ? first : initial,
+      initialDate: candidate,
       firstDate: first,
       lastDate: last,
       title: 'Select Delivery Date',
+      existingDates: existingDates,
+      allowMultiple: true,
     );
     if (!mounted) return;
     if (picked != null) {
-      final dateOnly = DateTime(picked.year, picked.month, picked.day);
-      final newKey =
-          '${dateOnly.year}-${dateOnly.month.toString().padLeft(2, '0')}-${dateOnly.day.toString().padLeft(2, '0')}';
-      _deduplicateCustomDates();
-      final exists = _customDates.any((e) => e.dateString == newKey);
-      if (exists) {
-        F2HToast.show(context, 'This date is already added');
-        return;
+      final List<DateTime> datesToAdd = [];
+      if (picked is List<DateTime>) {
+        datesToAdd.addAll(picked);
+      } else if (picked is DateTime) {
+        datesToAdd.add(picked);
+      } else if (picked is List) {
+        for (final item in picked) {
+          if (item is DateTime) datesToAdd.add(item);
+        }
       }
+
+      if (datesToAdd.isEmpty) return;
+
       final slotTimings = slotTimingsOf(context);
       final now = DateTime.now();
       final morningWin = getMorningSlotWindow(now, slotTimings);
@@ -516,17 +540,30 @@ class _SubscriptionSetupScreenState extends State<SubscriptionSetupScreen> {
       final defaultMorning = morningWin.isEnabled ? 1 : 0;
       final defaultEvening = (!morningWin.isEnabled && eveningWin.isEnabled) ? 1 : 0;
 
+      int addedCount = 0;
       setState(() {
-        _customDates.add(
-          CustomDateScheduleEntry(
-            date: dateOnly,
-            morningQty: defaultMorning,
-            eveningQty: defaultEvening,
-          ),
-        );
+        for (final d in datesToAdd) {
+          final dateOnly = DateTime(d.year, d.month, d.day);
+          final key =
+              '${dateOnly.year}-${dateOnly.month.toString().padLeft(2, '0')}-${dateOnly.day.toString().padLeft(2, '0')}';
+          if (!_customDates.any((e) => e.dateString == key)) {
+            _customDates.add(
+              CustomDateScheduleEntry(
+                date: dateOnly,
+                morningQty: defaultMorning,
+                eveningQty: defaultEvening,
+              ),
+            );
+            addedCount++;
+          }
+        }
         _deduplicateCustomDates();
         _customDates.sort((a, b) => a.date.compareTo(b.date));
       });
+
+      if (addedCount > 0) {
+        HapticFeedback.lightImpact();
+      }
     }
   }
 
