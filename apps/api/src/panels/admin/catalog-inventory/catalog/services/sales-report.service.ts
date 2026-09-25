@@ -278,6 +278,8 @@ export class CatalogSalesReportService {
                pv.unit_type,
                COALESCE(oi.quantity, 1)::numeric AS quantity,
                COALESCE(oi.unit_price, 0)::numeric AS unit_price,
+               COALESCE(pv.purchase_price, pe.avg_unit_cost, vc.avg_unit_cost, 0)::numeric AS purchase_price,
+               COALESCE(${ESTIMATED_COST}, 0)::numeric AS estimated_cogs,
                COALESCE(${GROSS_REVENUE}, 0)::numeric AS gross_amount,
                COALESCE(${DISCOUNT_LOSS}, 0)::numeric AS discount_amount,
                COALESCE(${NET_REVENUE}, 0)::numeric AS total_amount,
@@ -290,6 +292,18 @@ export class CatalogSalesReportService {
              LEFT JOIN categories c ON (c.category_id = p.category_id OR c.id::text = p.category_id)
              LEFT JOIN branches b ON b.branch_id = o.branch_id
              LEFT JOIN users u ON u.user_id = o.customer_id
+             LEFT JOIN (
+               SELECT variant_id, AVG(unit_cost)::numeric AS avg_unit_cost
+               FROM purchase_entries
+               WHERE deleted_at IS NULL AND unit_cost > 0
+               GROUP BY variant_id
+             ) pe ON pe.variant_id = pv.variant_id
+             LEFT JOIN (
+               SELECT product_id, AVG(rate_per_unit)::numeric AS avg_unit_cost
+               FROM vendor_collections
+               WHERE deleted_at IS NULL AND rate_per_unit > 0
+               GROUP BY product_id
+             ) vc ON vc.product_id = p.product_id
              WHERE ${whereClause}
              ORDER BY COALESCE(o.scheduled_date, o.created_at::date) DESC, o.order_id DESC, oi.id ASC
              LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -402,7 +416,16 @@ export class CatalogSalesReportService {
           })),
           by_product: productsWithProfit,
           by_branch: branchesWithShare,
-          line_items: lineItemRows || [],
+          line_items: (lineItemRows || []).map((item: any) => ({
+            ...item,
+            quantity: Number(item.quantity || 0),
+            unit_price: Number(item.unit_price || 0),
+            purchase_price: Number(item.purchase_price || 0),
+            estimated_cogs: Number(item.estimated_cogs || 0),
+            gross_amount: Number(item.gross_amount || 0),
+            discount_amount: Number(item.discount_amount || 0),
+            total_amount: Number(item.total_amount || 0),
+          })),
           pagination: {
             page,
             limit,
@@ -448,7 +471,8 @@ export class CatalogSalesReportService {
           COALESCE(SUM(${GROSS_REVENUE}), 0)::numeric AS gross_sales,
           COALESCE(SUM(${DISCOUNT_LOSS}), 0)::numeric AS discount_loss,
           COALESCE(SUM(${NET_REVENUE}), 0)::numeric AS net_revenue,
-          COALESCE(SUM(${ESTIMATED_COST}), 0)::numeric AS estimated_cogs
+          COALESCE(SUM(${ESTIMATED_COST}), 0)::numeric AS estimated_cogs,
+          COALESCE(MAX(pv.purchase_price), MAX(pe.avg_unit_cost), MAX(vc.avg_unit_cost), 0)::numeric AS unit_purchase_price
         FROM order_items oi
         JOIN orders o ON o.order_id = oi.order_id
         LEFT JOIN product_variants pv ON pv.variant_id = oi.variant_id
@@ -482,6 +506,8 @@ export class CatalogSalesReportService {
         'SKU',
         'Total Orders',
         'Quantity Sold',
+        'Purchase Price (INR)',
+        'Purchase Cost / COGS (INR)',
         'Gross Sales (INR)',
         'Total Loss (INR)',
         'Net Sales (INR)',
@@ -498,6 +524,7 @@ export class CatalogSalesReportService {
 
       let sumOrders = 0;
       let sumQty = 0;
+      let sumCogs = 0;
       let sumGross = 0;
       let sumLoss = 0;
       let sumNet = 0;
@@ -513,6 +540,7 @@ export class CatalogSalesReportService {
         const discountLoss = Number(r.discount_loss || 0);
         const net = Number(r.net_revenue || 0);
         const cogs = Number(r.estimated_cogs || 0);
+        const purchasePrice = Number(r.unit_purchase_price || (qty > 0 && cogs > 0 ? cogs / qty : 0));
 
         const grossProfit = Math.round((net - cogs) * 100) / 100;
         const totalProfit = Math.max(0, grossProfit);
@@ -521,6 +549,7 @@ export class CatalogSalesReportService {
 
         sumOrders += orders;
         sumQty += qty;
+        sumCogs += cogs;
         sumGross += gross;
         sumLoss += totalLoss;
         sumNet += net;
@@ -535,6 +564,8 @@ export class CatalogSalesReportService {
             escapeCsv(r.sku || '-'),
             orders,
             qty,
+            purchasePrice.toFixed(2),
+            cogs.toFixed(2),
             gross.toFixed(2),
             totalLoss.toFixed(2),
             net.toFixed(2),
@@ -555,6 +586,8 @@ export class CatalogSalesReportService {
           escapeCsv('-'),
           sumOrders,
           sumQty,
+          escapeCsv('-'),
+          sumCogs.toFixed(2),
           sumGross.toFixed(2),
           sumLoss.toFixed(2),
           sumNet.toFixed(2),

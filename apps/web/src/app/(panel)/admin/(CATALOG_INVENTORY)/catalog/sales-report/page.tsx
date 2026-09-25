@@ -116,6 +116,8 @@ interface LineItemRow {
   unit_value: string;
   unit_type: string;
   quantity: number;
+  purchase_price?: number;
+  estimated_cogs?: number;
   unit_price: number;
   gross_amount: number;
   discount_amount: number;
@@ -687,9 +689,12 @@ export default function CatalogSalesReportPage() {
           <div className="text-2xl font-black text-teal-700 tracking-tight">
             {formatMoney(totals?.gross_profit || 0)}
           </div>
-          <div className="flex items-center gap-1.5 mt-2 text-[11px]">
+          <div className="flex items-center justify-between gap-1.5 mt-2 text-[11px]">
             <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 font-extrabold text-[10px] border border-teal-200/60">
               {totals?.gross_margin_pct || 0}% Margin
+            </span>
+            <span className="text-[11px] text-slate-400 font-medium">
+              Cost: <span className="font-bold text-slate-600">{formatMoney(totals?.total_cogs || 0)}</span>
             </span>
           </div>
         </div>
@@ -932,6 +937,7 @@ export default function CatalogSalesReportPage() {
                   <th className="py-4 px-4">Pack / Variant</th>
                   <th className="py-4 px-4 text-right">Total Orders</th>
                   <th className="py-4 px-4 text-right">Units Sold</th>
+                  <th className="py-4 px-4 text-right text-indigo-700">Purchase Price</th>
                   <th className="py-4 px-4 text-right">Gross Sales</th>
                   <th className="py-4 px-4 text-right text-rose-500">Total Loss</th>
                   <th className="py-4 px-4 text-right text-teal-600">Gross Profit</th>
@@ -943,7 +949,7 @@ export default function CatalogSalesReportPage() {
               <tbody className="divide-y divide-slate-100">
                 {productsList.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-16 text-center text-slate-400 font-semibold">
+                    <td colSpan={12} className="py-16 text-center text-slate-400 font-semibold">
                       No product sales matching the filters.
                     </td>
                   </tr>
@@ -967,8 +973,27 @@ export default function CatalogSalesReportPage() {
                       <td className="py-3.5 px-4 text-right font-medium text-slate-700">
                         {formatQty(p.quantity_sold)}
                       </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="font-bold text-slate-900">
+                          {formatMoney(
+                            p.purchase_price ||
+                              (p.quantity_sold > 0 && p.estimated_cogs > 0
+                                ? p.estimated_cogs / p.quantity_sold
+                                : 0)
+                          )}
+                          <span className="text-[10px] text-slate-400 font-normal"> /unit</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-medium">
+                          Total: {formatMoney(p.estimated_cogs || 0)}
+                        </div>
+                      </td>
                       <td className="py-3.5 px-4 text-right text-slate-600 font-medium">
-                        {formatMoney(p.gross_sales)}
+                        <div className="font-bold text-slate-900">{formatMoney(p.gross_sales)}</div>
+                        {p.avg_price > 0 && (
+                          <div className="text-[10px] text-slate-400 font-medium">
+                            Avg: {formatMoney(p.avg_price)}/unit
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-right font-bold text-rose-600">
                         {formatMoney(p.total_loss)}
@@ -1075,6 +1100,7 @@ export default function CatalogSalesReportPage() {
                   <th className="py-4 px-4">Branch</th>
                   <th className="py-4 px-4">Product &amp; Variant</th>
                   <th className="py-4 px-4 text-right">Qty</th>
+                  <th className="py-4 px-4 text-right text-indigo-700">Purchase Price</th>
                   <th className="py-4 px-4 text-right">Unit Price</th>
                   <th className="py-4 px-4 text-right">Total</th>
                   <th className="py-4 px-4">Source</th>
@@ -1084,7 +1110,7 @@ export default function CatalogSalesReportPage() {
               <tbody className="divide-y divide-slate-100">
                 {lineItems.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center text-slate-400 font-semibold">
+                    <td colSpan={10} className="py-16 text-center text-slate-400 font-semibold">
                       No sales records match the applied criteria.
                     </td>
                   </tr>
@@ -1115,6 +1141,21 @@ export default function CatalogSalesReportPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right font-bold text-slate-900">
                         {formatQty(item.quantity)}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="font-bold text-slate-900">
+                          {formatMoney(
+                            item.purchase_price ||
+                              (item.quantity > 0 && (item.estimated_cogs || 0) > 0
+                                ? (item.estimated_cogs || 0) / item.quantity
+                                : 0)
+                          )}
+                        </div>
+                        {(item.estimated_cogs || 0) > 0 && (
+                          <div className="text-[10px] text-slate-400 font-medium">
+                            Cost: {formatMoney(item.estimated_cogs || 0)}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-right text-slate-600 font-medium">
                         {formatMoney(item.unit_price)}
